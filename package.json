@@ -1,0 +1,23 @@
+{
+  "name": "gestion-kpi",
+  "version": "1.0.0",
+  "description": "Sistema de Gestión de KPI - Aplicación web para gestión de objetivos y KPIs",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "build:frontend": "cd frontend && npm run build",
+    "build:backend": "cd backend && npm run build"
+  },
+  "keywords": [
+    "kpi",
+    "objetivos",
+    "gestion",
+    "react",
+    "nodejs"
+  ],
+  "author": "",
+  "license": "ISC"
+}
+
