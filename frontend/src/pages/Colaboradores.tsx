@@ -7,10 +7,8 @@ export default function Colaboradores() {
   const { data: collaborators, isLoading } = useQuery<Collaborator[]>(
     'collaborators',
     async () => {
-      // TODO: Implementar endpoint en backend
-      // const response = await api.get('/collaborators')
-      // return response.data
-      return []
+      const response = await api.get('/collaborators')
+      return response.data
     },
     {
       retry: false,

@@ -59,6 +59,27 @@ export default function Layout({ children }: LayoutProps) {
             <span className="nav-icon">🌳</span>
             Árbol de Objetivos
           </Link>
+          <Link
+            to="/mi-parrilla"
+            className={`nav-item ${isActive('/mi-parrilla') ? 'active' : ''}`}
+          >
+            <span className="nav-icon">📊</span>
+            Mi Parrilla
+          </Link>
+          <Link
+            to="/mi-parrilla"
+            className={`nav-item ${isActive('/mi-parrilla') ? 'active' : ''}`}
+          >
+            <span className="nav-icon">📊</span>
+            Mi Parrilla
+          </Link>
+          <Link
+            to="/historial"
+            className={`nav-item ${isActive('/historial') ? 'active' : ''}`}
+          >
+            <span className="nav-icon">📜</span>
+            Histórico
+          </Link>
         </nav>
       </aside>
       <main className="main-content">

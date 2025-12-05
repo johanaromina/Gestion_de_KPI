@@ -38,6 +38,22 @@
   background: #1e3a8a;
 }
 
+.btn-small {
+  background: #1e40af;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-small:hover {
+  background: #1e3a8a;
+}
+
 .table-container {
   background: white;
   border-radius: 12px;
@@ -45,38 +61,55 @@
   overflow: hidden;
 }
 
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
+.periods-list {
+  padding: 0;
 }
 
-.data-table thead {
-  background: #f9fafb;
-}
-
-.data-table th {
-  padding: 16px;
-  text-align: left;
-  font-weight: 600;
-  color: #374151;
-  font-size: 14px;
-  border-bottom: 2px solid #e5e7eb;
-}
-
-.data-table td {
-  padding: 16px;
+.period-card {
   border-bottom: 1px solid #e5e7eb;
-  color: #1f2937;
-  font-size: 14px;
+  padding: 20px;
+  transition: background-color 0.2s;
 }
 
-.data-table tbody tr:hover {
+.period-card:last-child {
+  border-bottom: none;
+}
+
+.period-card:hover {
   background: #f9fafb;
 }
 
-.name-cell {
-  font-weight: 500;
-  color: #1e40af;
+.period-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.period-card-main {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.period-info {
+  flex: 1;
+}
+
+.period-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 8px;
+}
+
+.period-dates {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.period-status {
+  margin-left: 16px;
 }
 
 .status-badge {
@@ -102,9 +135,10 @@
   color: #374151;
 }
 
-.action-buttons {
+.period-actions {
   display: flex;
   gap: 8px;
+  margin-left: 16px;
 }
 
 .btn-icon {
@@ -117,8 +151,79 @@
   transition: background-color 0.2s;
 }
 
-.btn-icon:hover {
+.btn-icon:hover:not(:disabled) {
   background: #f3f4f6;
+}
+
+.btn-icon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.close-btn {
+  color: #ef4444;
+}
+
+.reopen-btn {
+  color: #10b981;
+}
+
+.subperiods-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.subperiods-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.subperiods-header h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.subperiods-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.subperiods-table thead {
+  background: #f9fafb;
+}
+
+.subperiods-table th {
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  font-size: 14px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.subperiods-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.subperiods-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.empty-subperiods {
+  padding: 24px;
+  text-align: center;
+  color: #6b7280;
+}
+
+.empty-subperiods p {
+  margin-bottom: 12px;
 }
 
 .loading,
@@ -142,4 +247,3 @@
   color: #6b7280;
   margin-bottom: 24px;
 }
-

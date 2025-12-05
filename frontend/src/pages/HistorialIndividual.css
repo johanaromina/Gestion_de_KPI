@@ -1,0 +1,283 @@
+.historial-individual-page {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.historial-header {
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.historial-header h1 {
+  font-size: 32px;
+  font-weight: 700;
+  color: #1e40af;
+  margin-bottom: 16px;
+}
+
+.collaborator-info {
+  margin-top: 8px;
+}
+
+.collaborator-name {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.collaborator-details {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.filters-section {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 32px;
+  padding: 24px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  flex: 1;
+  min-width: 250px;
+}
+
+.filter-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.filter-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+  color: #1f2937;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.filter-select:hover {
+  border-color: #1e40af;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: #1e40af;
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+}
+
+.global-result-card {
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+  border-radius: 16px;
+  padding: 32px;
+  margin-bottom: 32px;
+  color: white;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.result-content h2 {
+  font-size: 18px;
+  font-weight: 500;
+  margin-bottom: 16px;
+  opacity: 0.9;
+}
+
+.result-value {
+  margin-bottom: 12px;
+}
+
+.result-number {
+  font-size: 48px;
+  font-weight: 700;
+  display: block;
+  margin-bottom: 16px;
+}
+
+.result-bar {
+  width: 100%;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.result-fill {
+  height: 100%;
+  background: white;
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+
+.result-description {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.kpis-section {
+  margin-bottom: 32px;
+  position: relative;
+}
+
+.kpis-section h2 {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 16px;
+}
+
+.read-only-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  background: #fef3c7;
+  color: #92400e;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+.kpis-table-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow-x: auto;
+}
+
+.kpis-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1200px;
+}
+
+.kpis-table thead {
+  background: #f9fafb;
+}
+
+.kpis-table th {
+  padding: 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  font-size: 14px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.kpis-table td {
+  padding: 16px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.kpis-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.kpi-name {
+  font-weight: 600;
+  color: #1e40af;
+}
+
+.kpi-description,
+.kpi-criteria {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kpi-target,
+.kpi-actual,
+.kpi-weight {
+  text-align: right;
+  font-weight: 500;
+}
+
+.kpi-variation,
+.kpi-weighted {
+  text-align: right;
+  font-weight: 600;
+  color: #1e40af;
+}
+
+.kpi-status {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.kpi-status-draft {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.kpi-status-proposed {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.kpi-status-approved {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.kpi-status-closed {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.chart-section {
+  margin-bottom: 32px;
+}
+
+.chart-section h2 {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 16px;
+}
+
+.chart-container {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.loading,
+.empty-state {
+  padding: 64px 32px;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.empty-state h3 {
+  font-size: 20px;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.empty-state p {
+  color: #6b7280;
+}
+

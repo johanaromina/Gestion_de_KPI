@@ -7,10 +7,8 @@ export default function KPIs() {
   const { data: kpis, isLoading } = useQuery<KPI[]>(
     'kpis',
     async () => {
-      // TODO: Implementar endpoint en backend
-      // const response = await api.get('/kpis')
-      // return response.data
-      return []
+      const response = await api.get('/kpis')
+      return response.data
     },
     {
       retry: false,

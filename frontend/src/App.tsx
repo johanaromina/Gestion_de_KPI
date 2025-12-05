@@ -7,6 +7,8 @@ import Periodos from './pages/Periodos'
 import KPIs from './pages/KPIs'
 import Asignaciones from './pages/Asignaciones'
 import ArbolObjetivos from './pages/ArbolObjetivos'
+import MiParrilla from './pages/MiParrilla'
+import HistorialIndividual from './pages/HistorialIndividual'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,6 +31,9 @@ function App() {
             <Route path="/kpis" element={<KPIs />} />
             <Route path="/asignaciones" element={<Asignaciones />} />
             <Route path="/arbol-objetivos" element={<ArbolObjetivos />} />
+            <Route path="/mi-parrilla" element={<MiParrilla />} />
+            <Route path="/mi-parrilla/:collaboratorId/:periodId" element={<MiParrilla />} />
+            <Route path="/historial/:collaboratorId?" element={<HistorialIndividual />} />
           </Routes>
         </Layout>
       </Router>

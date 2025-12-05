@@ -2,7 +2,15 @@ import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
 import helmet from 'helmet'
-import { testConnection } from './config/database'
+import { testConnection } from './config/database.js'
+
+// Routes
+import authRoutes from './routes/auth.routes.js'
+import collaboratorsRoutes from './routes/collaborators.routes.js'
+import periodsRoutes from './routes/periods.routes.js'
+import subPeriodsRoutes from './routes/sub-periods.routes.js'
+import kpisRoutes from './routes/kpis.routes.js'
+import collaboratorKpisRoutes from './routes/collaborator-kpis.routes.js'
 
 dotenv.config()
 
@@ -25,10 +33,26 @@ app.get('/api/health', async (req, res) => {
   })
 })
 
+// API Routes
+app.use('/api/auth', authRoutes)
+app.use('/api/collaborators', collaboratorsRoutes)
+app.use('/api/periods', periodsRoutes)
+app.use('/api/sub-periods', subPeriodsRoutes)
+app.use('/api/kpis', kpisRoutes)
+app.use('/api/collaborator-kpis', collaboratorKpisRoutes)
+
 // Start server
 app.listen(PORT, async () => {
   console.log(`🚀 Server running on port ${PORT}`)
   console.log(`📡 Health check: http://localhost:${PORT}/api/health`)
+  console.log(`\n📋 API Endpoints:`)
+  console.log(`   POST   /api/auth/login`)
+  console.log(`   GET    /api/auth/me`)
+  console.log(`   GET    /api/collaborators`)
+  console.log(`   GET    /api/periods`)
+  console.log(`   GET    /api/kpis`)
+  console.log(`   GET    /api/collaborator-kpis`)
+  console.log(`   GET    /api/collaborator-kpis/collaborator/:id`)
   
   // Test database connection
   console.log('\n🔌 Testing database connection...')
