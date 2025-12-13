@@ -13,12 +13,32 @@ CREATE TABLE IF NOT EXISTS collaborators (
   area VARCHAR(255) NOT NULL,
   managerId INT NULL,
   role ENUM('admin', 'director', 'manager', 'leader', 'collaborator') NOT NULL DEFAULT 'collaborator',
+  status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+  inactiveReason VARCHAR(255) NULL,
+  inactiveAt TIMESTAMP NULL,
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (managerId) REFERENCES collaborators(id) ON DELETE SET NULL,
   INDEX idx_manager (managerId),
   INDEX idx_role (role),
+  INDEX idx_status (status),
   INDEX idx_area (area)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Eventos de colaborador (cambios de rol, desvinculaci¢n, reactivaci¢n)
+CREATE TABLE IF NOT EXISTS collaborator_events (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  collaboratorId INT NOT NULL,
+  eventType ENUM('role_change', 'termination', 'reactivation') NOT NULL,
+  oldValue VARCHAR(255) NULL,
+  newValue VARCHAR(255) NULL,
+  reason VARCHAR(255) NULL,
+  createdBy INT NULL,
+  createdByName VARCHAR(255) NULL,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (collaboratorId) REFERENCES collaborators(id) ON DELETE CASCADE,
+  INDEX idx_collaborator_event (collaboratorId, eventType),
+  INDEX idx_event_type (eventType)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Tabla de Períodos
@@ -101,5 +121,18 @@ CREATE TABLE IF NOT EXISTS objective_trees (
   FOREIGN KEY (parentId) REFERENCES objective_trees(id) ON DELETE CASCADE,
   INDEX idx_level (level),
   INDEX idx_parent (parentId)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tabla de relación entre Árbol de Objetivos y KPIs
+CREATE TABLE IF NOT EXISTS objective_trees_kpis (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  objectiveTreeId INT NOT NULL,
+  kpiId INT NOT NULL,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (objectiveTreeId) REFERENCES objective_trees(id) ON DELETE CASCADE,
+  FOREIGN KEY (kpiId) REFERENCES kpis(id) ON DELETE CASCADE,
+  UNIQUE KEY unique_objective_kpi (objectiveTreeId, kpiId),
+  INDEX idx_objective (objectiveTreeId),
+  INDEX idx_kpi (kpiId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

@@ -7,6 +7,9 @@ export interface Collaborator {
   area: string
   managerId?: number
   role: 'admin' | 'director' | 'manager' | 'leader' | 'collaborator'
+  status?: 'active' | 'inactive'
+  inactiveReason?: string | null
+  inactiveAt?: string | null
 }
 
 export interface Period {
@@ -34,6 +37,7 @@ export interface KPI {
   description: string
   type: KPIType
   criteria: string
+  formula?: string
   macroKPIId?: number
 }
 
@@ -59,4 +63,3 @@ export interface ObjectiveTree {
   parentId?: number
   kpis: KPI[]
 }
-

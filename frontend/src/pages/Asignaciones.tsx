@@ -1,10 +1,19 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import api from '../services/api'
 import { CollaboratorKPI } from '../types'
 import CollaboratorKPIForm from '../components/CollaboratorKPIForm'
 import CloseParrillaModal from '../components/CloseParrillaModal'
+import GenerateBaseGridModal from '../components/GenerateBaseGridModal'
+import ReviewModal from '../components/ReviewModal'
+import ConsistencyAlerts from '../components/ConsistencyAlerts'
+import { useAuth } from '../hooks/useAuth'
 import './Asignaciones.css'
+
+const toNumber = (value: any): number | null => {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
+}
 
 export default function Asignaciones() {
   const [showForm, setShowForm] = useState(false)
@@ -15,12 +24,28 @@ export default function Asignaciones() {
   const [selectedCollaboratorId, setSelectedCollaboratorId] = useState<
     number | null
   >(null)
+  const [selectedKPIId, setSelectedKPIId] = useState<number | null>(null)
+  const [selectedArea, setSelectedArea] = useState<string>('')
+  const [searchTerm, setSearchTerm] = useState('')
   const [showCloseModal, setShowCloseModal] = useState(false)
   const [closingCollaboratorId, setClosingCollaboratorId] = useState<
     number | null
   >(null)
+  const [showGenerateModal, setShowGenerateModal] = useState(false)
+  const [reviewingAssignment, setReviewingAssignment] = useState<{
+    assignment: CollaboratorKPI
+    action: 'approve' | 'reject'
+  } | null>(null)
 
   const queryClient = useQueryClient()
+  const { user } = useAuth()
+
+  // Preseleccionar el área del usuario si existe
+  useEffect(() => {
+    if (user?.area && !selectedArea) {
+      setSelectedArea(user.area)
+    }
+  }, [user?.area, selectedArea])
 
   // Obtener períodos
   const { data: periods } = useQuery('periods', async () => {
@@ -127,11 +152,52 @@ export default function Asignaciones() {
       approved: { label: 'Aprobado', class: 'status-approved' },
       closed: { label: 'Cerrado', class: 'status-closed' },
     }
-    const config = statusConfig[status]
+    const config = status ? statusConfig[status] : undefined
+    if (!config) {
+      return <span className="status-badge status-unknown">{status || 'Sin estado'}</span>
+    }
     return (
       <span className={`status-badge ${config.class}`}>{config.label}</span>
     )
   }
+
+  // Obtener KPIs
+  const { data: kpis } = useQuery('kpis', async () => {
+    const response = await api.get('/kpis')
+    return response.data
+  })
+
+  // Obtener áreas únicas
+  const areas = Array.from(new Set(collaborators?.map((c: any) => c.area).filter(Boolean) || [])).sort()
+
+  const collaboratorsInArea = selectedArea
+    ? collaborators?.filter((c: any) => c.area === selectedArea)
+    : collaborators
+
+  // Filtrar asignaciones localmente
+  const filteredAssignments = assignments?.filter((assignment) => {
+    // Filtro por KPI
+    const matchesKPI = !selectedKPIId || assignment.kpiId === selectedKPIId
+
+    // Filtro por área
+    const matchesArea =
+      !selectedArea ||
+      collaborators?.find((c: any) => c.id === assignment.collaboratorId)
+        ?.area === selectedArea
+
+    // Búsqueda por texto (nombre de colaborador o KPI)
+    const matchesSearch =
+      !searchTerm ||
+      (collaborators?.find((c: any) => c.id === assignment.collaboratorId)
+        ?.name || '')
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
+      (kpis?.find((k: any) => k.id === assignment.kpiId)?.name || '')
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase())
+
+    return matchesKPI && matchesArea && matchesSearch
+  })
 
   // Calcular suma de ponderaciones por colaborador y período
   const getTotalWeightByCollaborator = (
@@ -144,7 +210,7 @@ export default function Asignaciones() {
         (a) =>
           a.collaboratorId === collaboratorId && a.periodId === periodId
       )
-      .reduce((sum, a) => sum + a.weight, 0)
+      .reduce((sum, a) => sum + (toNumber(a.weight) || 0), 0)
   }
 
   return (
@@ -157,6 +223,13 @@ export default function Asignaciones() {
           </p>
         </div>
         <div className="header-actions">
+          <button
+            className="btn-secondary"
+            onClick={() => setShowGenerateModal(true)}
+            title="Generar parrillas base para un área completa"
+          >
+            🎯 Generar Parrillas Base
+          </button>
           <button className="btn-secondary" onClick={handleCloseParrilla}>
             🔒 Cerrar Parrilla
           </button>
@@ -167,8 +240,19 @@ export default function Asignaciones() {
       </div>
 
       <div className="filters-section">
+        <div className="search-group">
+          <label htmlFor="search">🔍 Buscar:</label>
+          <input
+            type="text"
+            id="search"
+            placeholder="Buscar por colaborador o KPI..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="search-input"
+          />
+        </div>
         <div className="filter-group">
-          <label htmlFor="period-filter">Filtrar por Período:</label>
+          <label htmlFor="period-filter">Período:</label>
           <select
             id="period-filter"
             value={selectedPeriodId || ''}
@@ -179,7 +263,7 @@ export default function Asignaciones() {
             }
             className="filter-select"
           >
-            <option value="">Todos los períodos</option>
+            <option value="">Todos</option>
             {periods?.map((period: any) => (
               <option key={period.id} value={period.id}>
                 {period.name}
@@ -189,7 +273,7 @@ export default function Asignaciones() {
         </div>
 
         <div className="filter-group">
-          <label htmlFor="collaborator-filter">Filtrar por Colaborador:</label>
+          <label htmlFor="collaborator-filter">Colaborador:</label>
           <select
             id="collaborator-filter"
             value={selectedCollaboratorId || ''}
@@ -200,21 +284,88 @@ export default function Asignaciones() {
             }
             className="filter-select"
           >
-            <option value="">Todos los colaboradores</option>
-            {collaborators?.map((collaborator: any) => (
+            <option value="">Todos</option>
+            {collaboratorsInArea?.map((collaborator: any) => (
               <option key={collaborator.id} value={collaborator.id}>
                 {collaborator.name}
               </option>
             ))}
           </select>
         </div>
+
+        <div className="filter-group">
+          <label htmlFor="kpi-filter">KPI:</label>
+          <select
+            id="kpi-filter"
+            value={selectedKPIId || ''}
+            onChange={(e) =>
+              setSelectedKPIId(
+                e.target.value ? parseInt(e.target.value) : null
+              )
+            }
+            className="filter-select"
+          >
+            <option value="">Todos</option>
+            {kpis?.map((kpi: any) => (
+              <option key={kpi.id} value={kpi.id}>
+                {kpi.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="filter-group">
+          <label htmlFor="area-filter">Área:</label>
+          <select
+            id="area-filter"
+            value={selectedArea}
+            onChange={(e) => setSelectedArea(e.target.value)}
+            className="filter-select"
+          >
+            <option value="">Todas</option>
+            {areas.map((area) => (
+              <option key={area} value={area}>
+                {area}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {(selectedPeriodId ||
+          selectedCollaboratorId ||
+          selectedKPIId ||
+          selectedArea ||
+          searchTerm) && (
+          <button
+            className="btn-clear-filters"
+            onClick={() => {
+              setSelectedPeriodId(null)
+              setSelectedCollaboratorId(null)
+              setSelectedKPIId(null)
+              setSelectedArea('')
+              setSearchTerm('')
+            }}
+          >
+            Limpiar Filtros
+          </button>
+        )}
       </div>
+
+      {selectedPeriodId && selectedCollaboratorId && (
+        <ConsistencyAlerts
+          collaboratorId={selectedCollaboratorId}
+          periodId={selectedPeriodId}
+        />
+      )}
 
       <div className="table-container">
         {isLoading ? (
           <div className="loading">Cargando asignaciones...</div>
-        ) : assignments && assignments.length > 0 ? (
+        ) : filteredAssignments && filteredAssignments.length > 0 ? (
           <>
+            <div className="results-info">
+              Mostrando {filteredAssignments.length} de {assignments?.length || 0} asignaciones
+            </div>
             <table className="data-table">
               <thead>
                 <tr>
@@ -227,11 +378,12 @@ export default function Asignaciones() {
                   <th>Peso</th>
                   <th>Variación</th>
                   <th>Estado</th>
+                  <th>Comentarios</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {assignments.map((assignment) => {
+                {filteredAssignments.map((assignment) => {
                   const totalWeight = getTotalWeightByCollaborator(
                     assignment.collaboratorId,
                     assignment.periodId
@@ -252,12 +404,12 @@ export default function Asignaciones() {
                         {(assignment as any).periodName ||
                           `Período #${assignment.periodId}`}
                       </td>
-                      <td className="number-cell">{assignment.target}</td>
+                      <td className="number-cell">{toNumber(assignment.target) ?? assignment.target}</td>
                       <td className="number-cell">
-                        {assignment.actual ?? '-'}
+                        {toNumber(assignment.actual) ?? assignment.actual ?? '-'}
                       </td>
                       <td className="number-cell">
-                        {assignment.weight}%
+                        {toNumber(assignment.weight) ?? assignment.weight}%
                         {totalWeight !== 100 && (
                           <span
                             className={`weight-warning ${
@@ -270,15 +422,56 @@ export default function Asignaciones() {
                         )}
                       </td>
                       <td className="number-cell">
-                        {assignment.variation !== null &&
-                        assignment.variation !== undefined
-                          ? `${assignment.variation.toFixed(1)}%`
-                          : '-'}
+                        {(() => {
+                          const variationValue = toNumber(assignment.variation)
+                          return variationValue !== null
+                            ? `${variationValue.toFixed(1)}%`
+                            : '-'
+                        })()}
                       </td>
                       <td>{getStatusBadge(assignment.status)}</td>
+                      <td className="comments-cell">
+                        {assignment.comments ? (
+                          <span className="comments-text" title={assignment.comments}>
+                            {assignment.comments.length > 50
+                              ? `${assignment.comments.substring(0, 50)}...`
+                              : assignment.comments}
+                          </span>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
                       <td>
                         <div className="action-buttons">
-                          {canEditAssignment(assignment) ? (
+                          {assignment.status === 'proposed' && (
+                            <>
+                              <button
+                                className="btn-approve-small"
+                                onClick={() =>
+                                  setReviewingAssignment({
+                                    assignment,
+                                    action: 'approve',
+                                  })
+                                }
+                                title="Aprobar asignación"
+                              >
+                                ✓ Aprobar
+                              </button>
+                              <button
+                                className="btn-reject-small"
+                                onClick={() =>
+                                  setReviewingAssignment({
+                                    assignment,
+                                    action: 'reject',
+                                  })
+                                }
+                                title="Rechazar asignación"
+                              >
+                                ✕ Rechazar
+                              </button>
+                            </>
+                          )}
+                          {canEditAssignment(assignment) && assignment.status !== 'proposed' && (
                             <>
                               <button
                                 className="btn-icon"
@@ -295,7 +488,8 @@ export default function Asignaciones() {
                                 🗑️
                               </button>
                             </>
-                          ) : (
+                          )}
+                          {!canEditAssignment(assignment) && assignment.status !== 'proposed' && (
                             <span className="locked-badge" title="Parrilla cerrada - No se puede editar">
                               🔒 Cerrada
                             </span>
@@ -404,6 +598,26 @@ export default function Asignaciones() {
           onClose={() => {
             setShowCloseModal(false)
             setClosingCollaboratorId(null)
+          }}
+        />
+      )}
+
+      {showGenerateModal && (
+        <GenerateBaseGridModal
+          onClose={() => setShowGenerateModal(false)}
+          onSuccess={() => {
+            setShowGenerateModal(false)
+          }}
+        />
+      )}
+
+      {reviewingAssignment && (
+        <ReviewModal
+          assignment={reviewingAssignment.assignment as any}
+          action={reviewingAssignment.action}
+          onClose={() => setReviewingAssignment(null)}
+          onSuccess={() => {
+            setReviewingAssignment(null)
           }}
         />
       )}

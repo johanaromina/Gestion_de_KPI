@@ -1,22 +1,49 @@
 .dashboard {
   max-width: 1400px;
   margin: 0 auto;
+  padding: 24px;
 }
 
 .dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 2px solid #e5e7eb;
 }
 
 .dashboard-header h1 {
   font-size: 32px;
   font-weight: 700;
-  color: #1e40af;
+  color: #111827;
   margin-bottom: 8px;
 }
 
 .subtitle {
   color: #6b7280;
   font-size: 16px;
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.user-name {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 16px;
+}
+
+.user-role {
+  font-size: 14px;
+  color: #6b7280;
+  padding: 4px 12px;
+  background: #f3f4f6;
+  border-radius: 12px;
 }
 
 .dashboard-grid {
@@ -56,7 +83,7 @@
 .stat-value {
   font-size: 32px;
   font-weight: 700;
-  color: #1e40af;
+  color: #f97316;
   margin-bottom: 4px;
 }
 
@@ -76,45 +103,25 @@
   margin-bottom: 16px;
 }
 
-.status-card {
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.chart-card {
   background: white;
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.status-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.status-item:last-child {
-  border-bottom: none;
-}
-
-.status-label {
-  font-weight: 500;
-  color: #374151;
-}
-
-.status-badge {
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.status-badge.success {
-  background-color: #d1fae5;
-  color: #065f46;
-}
-
-.status-badge.error {
-  background-color: #fee2e2;
-  color: #991b1b;
+.chart-card h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 20px;
 }
 
 .quick-actions {
@@ -124,7 +131,7 @@
 }
 
 .action-btn {
-  background: #1e40af;
+  background: #f97316;
   color: white;
   border: none;
   padding: 12px 24px;
@@ -132,14 +139,138 @@
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, transform 0.1s;
 }
 
 .action-btn:hover {
-  background: #1e3a8a;
+  background: #ea580c;
+  transform: translateY(-1px);
 }
 
 .action-btn:active {
   transform: scale(0.98);
 }
 
+/* KPIs del colaborador */
+.kpi-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.kpi-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.kpi-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.kpi-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.compliance-badge {
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.compliance-badge.excellent {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.compliance-badge.good {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.compliance-badge.warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.compliance-badge.poor {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.kpi-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kpi-detail {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.detail-label {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.detail-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.loading {
+  text-align: center;
+  padding: 64px;
+  color: #6b7280;
+  font-size: 16px;
+}
+
+.empty-state {
+  background: white;
+  border-radius: 12px;
+  padding: 48px;
+  text-align: center;
+  color: #6b7280;
+}
+
+.empty-state p {
+  font-size: 16px;
+  margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .dashboard-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .user-info {
+    align-items: flex-start;
+  }
+
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}

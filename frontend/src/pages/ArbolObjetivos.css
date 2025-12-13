@@ -13,7 +13,7 @@
 .page-header h1 {
   font-size: 32px;
   font-weight: 700;
-  color: #1e40af;
+  color: #111827;
   margin-bottom: 8px;
 }
 
@@ -23,8 +23,8 @@
 }
 
 .btn-primary {
-  background: #1e40af;
-  color: white;
+  background: #f97316;
+  color: #111827;
   border: none;
   padding: 12px 24px;
   border-radius: 8px;
@@ -35,7 +35,7 @@
 }
 
 .btn-primary:hover {
-  background: #1e3a8a;
+  background: #ea580c;
 }
 
 .table-container {
@@ -76,7 +76,24 @@
 
 .name-cell {
   font-weight: 500;
-  color: #1e40af;
+  color: #111827;
+}
+
+.okr-row {
+  background: #fff7ed;
+}
+
+.okr-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #f97316;
+  color: #fff;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  margin-right: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
 }
 
 .level-badge {
@@ -94,7 +111,7 @@
 
 .level-direction {
   background: #dbeafe;
-  color: #1e40af;
+  color: #111827;
 }
 
 .level-management {
@@ -151,5 +168,35 @@
 .empty-state p {
   color: #6b7280;
   margin-bottom: 24px;
+}
+
+.expand-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: #6b7280;
+  padding: 0 4px;
+  margin-right: 8px;
+  width: 20px;
+  text-align: center;
+}
+
+.expand-button:hover {
+  color: #f97316;
+}
+
+.expand-spacer {
+  display: inline-block;
+  width: 20px;
+  margin-right: 8px;
+}
+
+.child-row {
+  background: #f9fafb;
+}
+
+.child-row:hover {
+  background: #f3f4f6;
 }
 

@@ -1,0 +1,56 @@
+/* Reutiliza estilos de PeriodForm.css */
+@import './PeriodForm.css';
+
+.objective-tree-modal {
+  max-width: 800px;
+}
+
+.objective-tree-form {
+  padding: 24px;
+}
+
+.kpi-selection {
+  max-height: 250px;
+  overflow-y: auto;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f9fafb;
+}
+
+.kpi-checkbox {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.kpi-checkbox:hover {
+  background: #e5e7eb;
+}
+
+.kpi-checkbox input[type="checkbox"] {
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+.kpi-checkbox span {
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.macro-indicator {
+  color: #6b7280;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.no-kpis {
+  color: #6b7280;
+  font-size: 14px;
+  text-align: center;
+  padding: 16px;
+}
+

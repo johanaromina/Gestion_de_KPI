@@ -13,7 +13,7 @@
 .page-header h1 {
   font-size: 32px;
   font-weight: 700;
-  color: #1e40af;
+  color: #111827;
   margin-bottom: 8px;
 }
 
@@ -23,7 +23,7 @@
 }
 
 .btn-primary {
-  background: #1e40af;
+  background: #f97316;
   color: white;
   border: none;
   padding: 12px 24px;
@@ -35,11 +35,11 @@
 }
 
 .btn-primary:hover {
-  background: #1e3a8a;
+  background: #ea580c;
 }
 
 .btn-small {
-  background: #1e40af;
+  background: #f97316;
   color: white;
   border: none;
   padding: 6px 12px;
@@ -51,7 +51,7 @@
 }
 
 .btn-small:hover {
-  background: #1e3a8a;
+  background: #ea580c;
 }
 
 .table-container {
@@ -62,21 +62,24 @@
 }
 
 .periods-list {
-  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 12px;
+  padding: 12px 12px 20px;
 }
 
 .period-card {
-  border-bottom: 1px solid #e5e7eb;
-  padding: 20px;
-  transition: background-color 0.2s;
-}
-
-.period-card:last-child {
-  border-bottom: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: white;
+  transition: box-shadow 0.2s, border-color 0.2s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .period-card:hover {
-  background: #f9fafb;
+  border-color: #d1d5db;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.06);
 }
 
 .period-card-header {
@@ -87,9 +90,10 @@
 
 .period-card-main {
   flex: 1;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
+  gap: 8px;
 }
 
 .period-info {
@@ -98,18 +102,34 @@
 
 .period-name {
   font-size: 18px;
-  font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 8px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 4px;
 }
 
 .period-dates {
-  font-size: 14px;
+  font-size: 13px;
   color: #6b7280;
 }
 
 .period-status {
   margin-left: 16px;
+}
+
+.period-meta {
+  margin-top: 6px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.meta-pill {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #374151;
 }
 
 .status-badge {
@@ -121,24 +141,25 @@
 }
 
 .status-open {
-  background: #d1fae5;
-  color: #065f46;
+  background: #fff4e6;
+  color: #7c2d12;
 }
 
 .status-review {
-  background: #fef3c7;
-  color: #92400e;
+  background: #f2f4f7;
+  color: #1f2937;
 }
 
 .status-closed {
-  background: #e5e7eb;
-  color: #374151;
+  background: #f2f4f7;
+  color: #4b5563;
 }
 
 .period-actions {
   display: flex;
   gap: 8px;
   margin-left: 16px;
+  flex-wrap: wrap;
 }
 
 .btn-icon {
@@ -153,6 +174,44 @@
 
 .btn-icon:hover:not(:disabled) {
   background: #f3f4f6;
+}
+
+.btn-text {
+  background: none;
+  border: none;
+  color: #f97316;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 14px;
+  border-radius: 6px;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.btn-text:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.btn-text:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-text.danger {
+  color: #b91c1c;
+}
+
+.btn-text.danger:hover {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.btn-text.success {
+  color: #047857;
+}
+
+.btn-text.success:hover {
+  background: #ecfdf3;
+  color: #065f46;
 }
 
 .btn-icon:disabled {
@@ -171,7 +230,7 @@
 .subperiods-section {
   margin-top: 20px;
   padding-top: 20px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px dashed #e5e7eb;
 }
 
 .subperiods-header {
@@ -210,10 +269,22 @@
   border-bottom: 1px solid #e5e7eb;
   color: #1f2937;
   font-size: 14px;
+  vertical-align: middle;
 }
 
 .subperiods-table tbody tr:hover {
   background: #f9fafb;
+}
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.loading-row {
+  padding: 16px;
+  color: #6b7280;
+  font-size: 14px;
 }
 
 .empty-subperiods {
@@ -246,4 +317,84 @@
 .empty-state p {
   color: #6b7280;
   margin-bottom: 24px;
+}
+
+/* Filtros y búsqueda */
+.filters-section {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.search-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 250px;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 180px;
+}
+
+.search-group label,
+.filter-group label {
+  font-weight: 500;
+  color: #374151;
+  font-size: 14px;
+}
+
+.search-input,
+.filter-group select,
+.filter-group input[type='date'] {
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+  transition: border-color 0.2s;
+}
+
+.search-input:focus,
+.filter-group select:focus,
+.filter-group input[type='date']:focus {
+  outline: none;
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+.btn-clear-filters {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  height: fit-content;
+  margin-top: 24px;
+}
+
+.btn-clear-filters:hover {
+  background: #dc2626;
+}
+
+.results-info {
+  padding: 12px 16px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  color: #6b7280;
+  font-size: 14px;
 }

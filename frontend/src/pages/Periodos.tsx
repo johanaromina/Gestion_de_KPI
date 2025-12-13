@@ -1,8 +1,8 @@
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from 'react-query'
+import { useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from 'react-query'
+import { format } from 'date-fns'
 import api from '../services/api'
 import { Period } from '../types'
-import { format } from 'date-fns'
 import PeriodForm from '../components/PeriodForm'
 import SubPeriodForm from '../components/SubPeriodForm'
 import './Periodos.css'
@@ -16,12 +16,96 @@ interface SubPeriod {
   weight?: number
 }
 
+function SubPeriodsSection({
+  period,
+  expanded,
+  onCreate,
+  onEdit,
+  onDelete,
+}: {
+  period: Period
+  expanded: boolean
+  onCreate: () => void
+  onEdit: (sub: SubPeriod) => void
+  onDelete: (sub: SubPeriod) => void
+}) {
+  const { data, isLoading } = useQuery<SubPeriod[]>(
+    ['sub-periods', period.id],
+    async () => {
+      const response = await api.get(`/periods/${period.id}/sub-periods`)
+      return response.data
+    },
+    {
+      enabled: expanded,
+    }
+  )
+
+  if (!expanded) return null
+
+  return (
+    <div className="subperiods-section">
+      <div className="subperiods-header">
+        <h4>Subperiodos</h4>
+        <button className="btn-small" onClick={onCreate}>
+          + Agregar subperiodo
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div className="loading-row">Cargando subperiodos...</div>
+      ) : data && data.length > 0 ? (
+        <table className="subperiods-table">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Fecha Inicio</th>
+              <th>Fecha Fin</th>
+              <th>Peso</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((subPeriod) => (
+              <tr key={subPeriod.id}>
+                <td>{subPeriod.name}</td>
+                <td>{format(new Date(subPeriod.startDate), 'dd MMM yyyy')}</td>
+                <td>{format(new Date(subPeriod.endDate), 'dd MMM yyyy')}</td>
+                <td>{subPeriod.weight ? `${subPeriod.weight}%` : '-'}</td>
+                <td className="row-actions">
+                  <button className="btn-text" onClick={() => onEdit(subPeriod)}>
+                    Editar
+                  </button>
+                  <button className="btn-text danger" onClick={() => onDelete(subPeriod)}>
+                    Eliminar
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <div className="empty-subperiods">
+          <p>No hay subperiodos definidos</p>
+          <button className="btn-small" onClick={onCreate}>
+            Crear primer subperiodo
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Periodos() {
   const [showPeriodForm, setShowPeriodForm] = useState(false)
   const [showSubPeriodForm, setShowSubPeriodForm] = useState(false)
   const [selectedPeriod, setSelectedPeriod] = useState<Period | null>(null)
   const [editingPeriod, setEditingPeriod] = useState<Period | undefined>(undefined)
+  const [editingSubPeriod, setEditingSubPeriod] = useState<SubPeriod | undefined>(undefined)
   const [expandedPeriods, setExpandedPeriods] = useState<Set<number>>(new Set())
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
+  const [filterStartDate, setFilterStartDate] = useState('')
+  const [filterEndDate, setFilterEndDate] = useState('')
 
   const queryClient = useQueryClient()
 
@@ -30,28 +114,32 @@ export default function Periodos() {
     async () => {
       const response = await api.get('/periods')
       return response.data
-    }
-  )
-
-  const { data: subPeriods } = useQuery<SubPeriod[]>(
-    ['sub-periods', selectedPeriod?.id],
-    async () => {
-      if (!selectedPeriod?.id) return []
-      const response = await api.get(`/periods/${selectedPeriod.id}/sub-periods`)
-      return response.data
     },
     {
-      enabled: !!selectedPeriod?.id,
+      staleTime: 60 * 1000,
     }
   )
 
-  const deleteMutation = useMutation(
+  const deletePeriodMutation = useMutation(
     async (id: number) => {
       await api.delete(`/periods/${id}`)
     },
     {
       onSuccess: () => {
         queryClient.invalidateQueries('periods')
+      },
+    }
+  )
+
+  const deleteSubPeriodMutation = useMutation(
+    async (subPeriod: SubPeriod) => {
+      await api.delete(`/sub-periods/${subPeriod.id}`)
+      return subPeriod
+    },
+    {
+      onSuccess: (_data, subPeriod) => {
+        queryClient.invalidateQueries('periods')
+        queryClient.invalidateQueries(['sub-periods', subPeriod.periodId])
       },
     }
   )
@@ -78,10 +166,7 @@ export default function Periodos() {
         queryClient.invalidateQueries('collaborator-kpis')
       },
       onError: (error: any) => {
-        alert(
-          error.response?.data?.error ||
-            'No tienes permisos para reabrir períodos cerrados'
-        )
+        alert(error.response?.data?.error || 'No tienes permisos para reabrir periodos cerrados')
       },
     }
   )
@@ -90,13 +175,8 @@ export default function Periodos() {
     const newExpanded = new Set(expandedPeriods)
     if (newExpanded.has(periodId)) {
       newExpanded.delete(periodId)
-      setSelectedPeriod(null)
     } else {
       newExpanded.add(periodId)
-      const period = periods?.find((p) => p.id === periodId)
-      if (period) {
-        setSelectedPeriod(period)
-      }
     }
     setExpandedPeriods(newExpanded)
   }
@@ -113,193 +193,253 @@ export default function Periodos() {
 
   const handleCreateSubPeriod = (period: Period) => {
     setSelectedPeriod(period)
+    setEditingSubPeriod(undefined)
     setShowSubPeriodForm(true)
   }
 
-  const handleDeletePeriod = async (id: number) => {
-    if (window.confirm('¿Estás seguro de eliminar este período? Esta acción no se puede deshacer.')) {
-      deleteMutation.mutate(id)
+  const handleEditSubPeriod = (period: Period, subPeriod: SubPeriod) => {
+    setSelectedPeriod(period)
+    setEditingSubPeriod(subPeriod)
+    setShowSubPeriodForm(true)
+  }
+
+  const handleDeleteSubPeriod = (subPeriod: SubPeriod) => {
+    if (
+      window.confirm(
+        `Estas seguro de eliminar el subperiodo "${subPeriod.name}"? Esta accion no se puede deshacer.`
+      )
+    ) {
+      deleteSubPeriodMutation.mutate(subPeriod)
     }
   }
 
-  const handleClosePeriod = async (period: Period) => {
+  const handleDeletePeriod = (id: number, name: string) => {
+    if (window.confirm(`Estas seguro de eliminar el periodo "${name}"? Esta accion no se puede deshacer.`)) {
+      deletePeriodMutation.mutate(id)
+    }
+  }
+
+  const handleClosePeriod = (period: Period) => {
     if (
       window.confirm(
-        `¿Estás seguro de cerrar el período "${period.name}"? Una vez cerrado, no se podrán editar las asignaciones sin permisos especiales.`
+        `Estas seguro de cerrar el periodo "${period.name}"? Una vez cerrado no se podran editar asignaciones sin permisos especiales.`
       )
     ) {
       closePeriodMutation.mutate(period.id)
     }
   }
 
-  const handleReopenPeriod = async (period: Period) => {
+  const handleReopenPeriod = (period: Period) => {
     if (
       window.confirm(
-        `¿Estás seguro de reabrir el período "${period.name}"? Esta acción requiere permisos especiales.`
+        `Estas seguro de reabrir el periodo "${period.name}"? Esta accion requiere permisos especiales.`
       )
     ) {
       reopenPeriodMutation.mutate(period.id)
     }
   }
 
+  const filteredPeriods = useMemo(() => {
+    return periods?.filter((period) => {
+      const matchesSearch =
+        !searchTerm || period.name.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesStatus = !filterStatus || period.status === filterStatus
+
+      const start = new Date(period.startDate).getTime()
+      const end = new Date(period.endDate).getTime()
+      const filterStart = filterStartDate ? new Date(filterStartDate).getTime() : null
+      const filterEnd = filterEndDate ? new Date(filterEndDate).getTime() : null
+
+      const matchesStart = filterStart ? start >= filterStart : true
+      const matchesEnd = filterEnd ? end <= filterEnd : true
+
+      return matchesSearch && matchesStatus && matchesStart && matchesEnd
+    })
+  }, [periods, searchTerm, filterStatus, filterStartDate, filterEndDate])
+
   const getStatusBadge = (status: Period['status']) => {
-    const statusConfig = {
+    const statusConfig: Record<Period['status'], { label: string; class: string }> = {
       open: { label: 'Abierto', class: 'status-open' },
-      in_review: { label: 'En Revisión', class: 'status-review' },
+      in_review: { label: 'En revision', class: 'status-review' },
       closed: { label: 'Cerrado', class: 'status-closed' },
     }
     const config = statusConfig[status]
-    return (
-      <span className={`status-badge ${config.class}`}>
-        {config.label}
-      </span>
-    )
+    return <span className={`status-badge ${config.class}`}>{config.label}</span>
   }
 
   return (
     <div className="periodos-page">
       <div className="page-header">
         <div>
-          <h1>Períodos</h1>
-          <p className="subtitle">Gestiona los períodos de evaluación</p>
+          <h1>Periodos</h1>
+          <p className="subtitle">Gestiona los periodos de evaluacion</p>
         </div>
         <button className="btn-primary" onClick={handleCreatePeriod}>
-          ➕ Crear Período
+          + Crear periodo
         </button>
+      </div>
+
+      <div className="filters-section">
+        <div className="search-group">
+          <label htmlFor="search">Buscar:</label>
+          <input
+            type="text"
+            id="search"
+            placeholder="Buscar por nombre de periodo..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="search-input"
+          />
+        </div>
+        <div className="filter-group">
+          <label htmlFor="filter-status">Estado:</label>
+          <select
+            id="filter-status"
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+          >
+            <option value="">Todos los estados</option>
+            <option value="open">Abierto</option>
+            <option value="in_review">En revision</option>
+            <option value="closed">Cerrado</option>
+          </select>
+        </div>
+        <div className="filter-group">
+          <label htmlFor="filter-start">Desde:</label>
+          <input
+            id="filter-start"
+            type="date"
+            value={filterStartDate}
+            onChange={(e) => setFilterStartDate(e.target.value)}
+          />
+        </div>
+        <div className="filter-group">
+          <label htmlFor="filter-end">Hasta:</label>
+          <input
+            id="filter-end"
+            type="date"
+            value={filterEndDate}
+            onChange={(e) => setFilterEndDate(e.target.value)}
+          />
+        </div>
+        {(searchTerm || filterStatus) && (
+          <button
+            className="btn-clear-filters"
+            onClick={() => {
+              setSearchTerm('')
+              setFilterStatus('')
+              setFilterStartDate('')
+              setFilterEndDate('')
+            }}
+          >
+            Limpiar filtros
+          </button>
+        )}
       </div>
 
       <div className="table-container">
         {isLoading ? (
-          <div className="loading">Cargando períodos...</div>
+          <div className="loading">Cargando periodos...</div>
+        ) : filteredPeriods && filteredPeriods.length > 0 ? (
+          <>
+            <div className="results-info">
+              Mostrando {filteredPeriods.length} de {periods?.length || 0} periodos
+            </div>
+            <div className="periods-list">
+              {filteredPeriods.map((period) => {
+                const isExpanded = expandedPeriods.has(period.id)
+                return (
+                  <div key={period.id} className="period-card">
+                    <div className="period-card-header">
+                      <div className="period-card-main">
+                        <div className="period-info">
+                          <h3 className="period-name">{period.name}</h3>
+                          <div className="period-dates">
+                            {format(new Date(period.startDate), 'dd MMM yyyy')} —{' '}
+                            {format(new Date(period.endDate), 'dd MMM yyyy')}
+                          </div>
+                          <div className="period-meta">
+                            <span className="meta-pill">Estado: {getStatusBadge(period.status)}</span>
+                          </div>
+                        </div>
+                        <div className="period-actions">
+                          <button
+                            className="btn-icon"
+                            onClick={() => togglePeriodExpansion(period.id)}
+                            title={isExpanded ? 'Ocultar subperiodos' : 'Ver subperiodos'}
+                          >
+                            {isExpanded ? '[-]' : '[+]'}
+                          </button>
+                          {period.status === 'closed' ? (
+                            <button
+                              className="btn-text success"
+                              onClick={() => handleReopenPeriod(period)}
+                              title="Reabrir periodo"
+                            >
+                              Reabrir
+                            </button>
+                          ) : (
+                            <button
+                              className="btn-text"
+                              onClick={() => handleClosePeriod(period)}
+                              title="Cerrar periodo"
+                            >
+                              Cerrar
+                            </button>
+                          )}
+                          <button
+                            className="btn-text"
+                            onClick={() => handleEditPeriod(period)}
+                            title="Editar periodo"
+                            disabled={period.status === 'closed'}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            className="btn-text danger"
+                            onClick={() => handleDeletePeriod(period.id, period.name)}
+                            title="Eliminar periodo"
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <SubPeriodsSection
+                      period={period}
+                      expanded={isExpanded}
+                      onCreate={() => handleCreateSubPeriod(period)}
+                      onEdit={(sub) => handleEditSubPeriod(period, sub)}
+                      onDelete={(sub) => handleDeleteSubPeriod(sub)}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          </>
         ) : periods && periods.length > 0 ? (
-          <div className="periods-list">
-            {periods.map((period) => (
-              <div key={period.id} className="period-card">
-                <div className="period-card-header">
-                  <div className="period-card-main">
-                    <div className="period-info">
-                      <h3 className="period-name">{period.name}</h3>
-                      <div className="period-dates">
-                        <span>
-                          {format(new Date(period.startDate), 'dd MMM yyyy')} -{' '}
-                          {format(new Date(period.endDate), 'dd MMM yyyy')}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="period-status">{getStatusBadge(period.status)}</div>
-                  </div>
-                  <div className="period-actions">
-                    <button
-                      className="btn-icon"
-                      onClick={() => togglePeriodExpansion(period.id)}
-                      title="Ver subperíodos"
-                    >
-                      {expandedPeriods.has(period.id) ? '▼' : '▶'}
-                    </button>
-                    {period.status === 'closed' ? (
-                      <button
-                        className="btn-icon reopen-btn"
-                        onClick={() => handleReopenPeriod(period)}
-                        title="Reabrir Período (requiere permisos)"
-                      >
-                        🔓
-                      </button>
-                    ) : (
-                      <button
-                        className="btn-icon close-btn"
-                        onClick={() => handleClosePeriod(period)}
-                        title="Cerrar Período"
-                      >
-                        🔒
-                      </button>
-                    )}
-                    <button
-                      className="btn-icon"
-                      onClick={() => handleEditPeriod(period)}
-                      title="Editar"
-                      disabled={period.status === 'closed'}
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      className="btn-icon"
-                      onClick={() => handleDeletePeriod(period.id)}
-                      title="Eliminar"
-                    >
-                      🗑️
-                    </button>
-                  </div>
-                </div>
-
-                {expandedPeriods.has(period.id) && (
-                  <div className="subperiods-section">
-                    <div className="subperiods-header">
-                      <h4>Subperíodos</h4>
-                      <button
-                        className="btn-small"
-                        onClick={() => handleCreateSubPeriod(period)}
-                      >
-                        ➕ Agregar Subperíodo
-                      </button>
-                    </div>
-
-                    {subPeriods && subPeriods.length > 0 ? (
-                      <table className="subperiods-table">
-                        <thead>
-                          <tr>
-                            <th>Nombre</th>
-                            <th>Fecha Inicio</th>
-                            <th>Fecha Fin</th>
-                            <th>Peso</th>
-                            <th>Acciones</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {subPeriods.map((subPeriod) => (
-                            <tr key={subPeriod.id}>
-                              <td>{subPeriod.name}</td>
-                              <td>
-                                {format(new Date(subPeriod.startDate), 'dd MMM yyyy')}
-                              </td>
-                              <td>
-                                {format(new Date(subPeriod.endDate), 'dd MMM yyyy')}
-                              </td>
-                              <td>{subPeriod.weight ? `${subPeriod.weight}%` : '-'}</td>
-                              <td>
-                                <button className="btn-icon" title="Editar">
-                                  ✏️
-                                </button>
-                                <button className="btn-icon" title="Eliminar">
-                                  🗑️
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    ) : (
-                      <div className="empty-subperiods">
-                        <p>No hay subperíodos definidos</p>
-                        <button
-                          className="btn-small"
-                          onClick={() => handleCreateSubPeriod(period)}
-                        >
-                          Crear primer subperíodo
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
+          <div className="empty-state">
+            <div className="empty-icon">:/</div>
+            <h3>No se encontraron periodos</h3>
+            <p>Intenta ajustar los filtros de busqueda</p>
+            <button
+              className="btn-primary"
+              onClick={() => {
+                setSearchTerm('')
+                setFilterStatus('')
+              }}
+            >
+              Limpiar filtros
+            </button>
           </div>
         ) : (
           <div className="empty-state">
-            <div className="empty-icon">📅</div>
-            <h3>No hay períodos registrados</h3>
-            <p>Crea un nuevo período para comenzar a evaluar KPIs</p>
+            <div className="empty-icon">:)</div>
+            <h3>No hay periodos registrados</h3>
+            <p>Crea un nuevo periodo para comenzar a evaluar KPIs</p>
             <button className="btn-primary" onClick={handleCreatePeriod}>
-              Crear Período
+              Crear periodo
             </button>
           </div>
         )}
@@ -318,9 +458,11 @@ export default function Periodos() {
       {showSubPeriodForm && selectedPeriod && (
         <SubPeriodForm
           periodId={selectedPeriod.id}
+          subPeriod={editingSubPeriod}
           onClose={() => {
             setShowSubPeriodForm(false)
             setSelectedPeriod(null)
+            setEditingSubPeriod(undefined)
           }}
         />
       )}

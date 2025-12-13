@@ -1,0 +1,50 @@
+/* Reutiliza estilos de PeriodForm.css */
+@import './PeriodForm.css';
+
+.kpi-form {
+  padding: 24px;
+}
+
+.kpi-form textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  transition: border-color 0.2s;
+}
+
+.kpi-form textarea:focus {
+  outline: none;
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+}
+
+.kpi-form textarea.error {
+  border-color: #ef4444;
+}
+
+.form-hint {
+  display: block;
+  color: #6b7280;
+  font-size: 12px;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.form-hint code {
+  background-color: #f4f4f4;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+}
+
+.formula-help-icon {
+  margin-left: 0.5rem;
+  cursor: help;
+  font-size: 0.9em;
+}
+

@@ -11,7 +11,7 @@ const dbConfig = {
   database: process.env.DB_NAME || 'gestion_kpi',
 }
 
-// Create connection pool
+// Create connection pool 
 export const pool = mysql.createPool({
   ...dbConfig,
   waitForConnections: true,

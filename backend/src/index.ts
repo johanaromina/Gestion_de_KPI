@@ -11,6 +11,14 @@ import periodsRoutes from './routes/periods.routes.js'
 import subPeriodsRoutes from './routes/sub-periods.routes.js'
 import kpisRoutes from './routes/kpis.routes.js'
 import collaboratorKpisRoutes from './routes/collaborator-kpis.routes.js'
+import objectiveTreesRoutes from './routes/objective-trees.routes.js'
+import validationRoutes from './routes/validation.routes.js'
+import aggregatedViewsRoutes from './routes/aggregated-views.routes.js'
+import reductionViewsRoutes from './routes/reduction-views.routes.js'
+import exportRoutes from './routes/export.routes.js'
+import auditRoutes from './routes/audit.routes.js'
+import dashboardRoutes from './routes/dashboard.routes.js'
+import configRoutes from './routes/config.routes.js'
 
 dotenv.config()
 
@@ -40,6 +48,14 @@ app.use('/api/periods', periodsRoutes)
 app.use('/api/sub-periods', subPeriodsRoutes)
 app.use('/api/kpis', kpisRoutes)
 app.use('/api/collaborator-kpis', collaboratorKpisRoutes)
+app.use('/api/objective-trees', objectiveTreesRoutes)
+app.use('/api/validation', validationRoutes)
+app.use('/api/aggregated-views', aggregatedViewsRoutes)
+app.use('/api', reductionViewsRoutes)
+app.use('/api/export', exportRoutes)
+app.use('/api', auditRoutes)
+app.use('/api/dashboard', dashboardRoutes)
+app.use('/api/config', configRoutes)
 
 // Start server
 app.listen(PORT, async () => {
@@ -67,4 +83,3 @@ app.listen(PORT, async () => {
     console.log('   3. Run the database setup script: npm run setup:db')
   }
 })
-

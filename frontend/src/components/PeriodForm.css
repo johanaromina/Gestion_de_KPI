@@ -85,8 +85,8 @@
 .form-group input:focus,
 .form-group select:focus {
   outline: none;
-  border-color: #1e40af;
-  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
 }
 
 .form-group input.error {
@@ -127,12 +127,12 @@
 }
 
 .btn-primary {
-  background: #1e40af;
-  color: white;
+  background: #f97316;
+  color: #111827;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #1e3a8a;
+  background: #ea580c;
 }
 
 .btn-primary:disabled {

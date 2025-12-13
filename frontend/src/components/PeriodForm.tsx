@@ -80,12 +80,12 @@ export default function PeriodForm({ period, onClose, onSuccess }: PeriodFormPro
         newErrors.endDate = 'La fecha de fin debe ser posterior a la fecha de inicio'
       }
 
-      // Validar que sea aproximadamente un año (entre 10 y 14 meses)
-      const monthsDiff = (end.getFullYear() - start.getFullYear()) * 12 + 
-                        (end.getMonth() - start.getMonth())
-      
-      if (monthsDiff < 10 || monthsDiff > 14) {
-        newErrors.endDate = 'El período debe durar aproximadamente un año (10-14 meses)'
+      // Validar duración mínima y máxima (permitir trimestres de ~3-4 meses y hasta 14 meses)
+      const monthsDiffInclusive = (end.getFullYear() - start.getFullYear()) * 12 +
+        (end.getMonth() - start.getMonth()) + 1
+
+      if (monthsDiffInclusive < 3 || monthsDiffInclusive > 14) {
+        newErrors.endDate = 'El período debe durar entre 3 y 14 meses'
       }
     }
 

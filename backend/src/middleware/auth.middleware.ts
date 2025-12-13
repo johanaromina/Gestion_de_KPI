@@ -1,14 +1,18 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
+// Usar la misma clave por defecto que el controlador de auth
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-change-in-production'
 
 export interface AuthRequest extends Request {
   user?: {
     id: number
     name: string
     role: string
+    area?: string
     collaboratorId?: number
+    hasSuperpowers?: boolean
+    permissions?: string[]
   }
 }
 
@@ -32,7 +36,10 @@ export const authenticate = (
       id: decoded.id,
       name: decoded.name,
       role: decoded.role,
+      area: decoded.area,
       collaboratorId: decoded.collaboratorId,
+      hasSuperpowers: decoded.hasSuperpowers || false,
+      permissions: decoded.permissions || [],
     }
 
     next()
@@ -59,6 +66,23 @@ export const authorize = (...roles: string[]) => {
       return res.status(403).json({ error: 'No autorizado' })
     }
 
+    next()
+  }
+}
+
+export const requirePermission = (...permissions: string[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const user = (req as AuthRequest).user
+    if (!user) {
+      return res.status(401).json({ error: 'No autenticado' })
+    }
+    const hasPerm =
+      user.hasSuperpowers ||
+      (user.permissions || []).some((p) => permissions.includes(p)) ||
+      false
+    if (!hasPerm) {
+      return res.status(403).json({ error: 'No autorizado' })
+    }
     next()
   }
 }

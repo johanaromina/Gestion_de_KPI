@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { pool } from '../config/database'
 import { KPI } from '../types'
+import { validateFormula } from '../utils/kpi-formulas'
 
 export const getKPIs = async (req: Request, res: Response) => {
   try {
@@ -35,16 +36,31 @@ export const getKPIById = async (req: Request, res: Response) => {
 
 export const createKPI = async (req: Request, res: Response) => {
   try {
-    const { name, description, type, criteria, macroKPIId } = req.body
+    const { name, description, type, criteria, formula, macroKPIId } = req.body
 
     if (!name || !type) {
       return res.status(400).json({ error: 'Faltan campos requeridos' })
     }
 
+    // Validar fórmula si se proporciona
+    if (formula) {
+      const validation = validateFormula(formula)
+      if (!validation.valid) {
+        return res.status(400).json({ error: validation.error })
+      }
+    }
+
     const [result] = await pool.query(
-      `INSERT INTO kpis (name, description, type, criteria, macroKPIId) 
-       VALUES (?, ?, ?, ?, ?)`,
-      [name, description || null, type, criteria || null, macroKPIId || null]
+      `INSERT INTO kpis (name, description, type, criteria, formula, macroKPIId) 
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        name,
+        description || null,
+        type,
+        criteria || null,
+        formula || null,
+        macroKPIId || null,
+      ]
     )
 
     const insertResult = result as any
@@ -54,6 +70,7 @@ export const createKPI = async (req: Request, res: Response) => {
       description: description || null,
       type,
       criteria: criteria || null,
+      formula: formula || null,
       macroKPIId: macroKPIId || null,
     })
   } catch (error: any) {
@@ -65,13 +82,31 @@ export const createKPI = async (req: Request, res: Response) => {
 export const updateKPI = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const { name, description, type, criteria, macroKPIId } = req.body
+    const { name, description, type, criteria, formula, macroKPIId } = req.body
+
+    // Validar fórmula si se proporciona
+    if (formula !== undefined) {
+      if (formula && formula.trim()) {
+        const validation = validateFormula(formula)
+        if (!validation.valid) {
+          return res.status(400).json({ error: validation.error })
+        }
+      }
+    }
 
     await pool.query(
       `UPDATE kpis 
-       SET name = ?, description = ?, type = ?, criteria = ?, macroKPIId = ? 
+       SET name = ?, description = ?, type = ?, criteria = ?, formula = ?, macroKPIId = ? 
        WHERE id = ?`,
-      [name, description, type, criteria, macroKPIId || null, id]
+      [
+        name,
+        description,
+        type,
+        criteria,
+        formula || null,
+        macroKPIId || null,
+        id,
+      ]
     )
 
     res.json({ message: 'KPI actualizado correctamente' })

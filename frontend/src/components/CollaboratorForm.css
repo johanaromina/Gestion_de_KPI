@@ -1,0 +1,7 @@
+/* Reutiliza estilos de PeriodForm.css */
+@import './PeriodForm.css';
+
+.collaborator-form {
+  padding: 24px;
+}
+

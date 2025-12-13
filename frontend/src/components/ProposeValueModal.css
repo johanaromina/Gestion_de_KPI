@@ -1,0 +1,46 @@
+/* Reutiliza estilos de PeriodForm.css */
+@import './PeriodForm.css';
+
+.propose-modal {
+  max-width: 600px;
+}
+
+.propose-form {
+  padding: 24px;
+}
+
+.propose-info {
+  background: #f3f4f6;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.propose-info p {
+  margin: 8px 0;
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.propose-info strong {
+  color: #374151;
+  font-weight: 600;
+}
+
+.propose-form textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  transition: border-color 0.2s;
+}
+
+.propose-form textarea:focus {
+  outline: none;
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+}
+

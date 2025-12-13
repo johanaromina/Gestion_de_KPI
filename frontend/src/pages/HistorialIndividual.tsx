@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from 'react-query'
 import { useParams } from 'react-router-dom'
 import api from '../services/api'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
+import { useAuth } from '../hooks/useAuth'
 import './HistorialIndividual.css'
 
 interface Period {
@@ -43,32 +44,62 @@ interface CollaboratorKPI {
   subPeriodName?: string
 }
 
+interface Collaborator {
+  id: number
+  name: string
+  position: string
+  area: string
+  status?: 'active' | 'inactive'
+  inactiveAt?: string | null
+  inactiveReason?: string | null
+}
+
+interface CollaboratorEvent {
+  id: number
+  collaboratorId: number
+  eventType: 'role_change' | 'termination' | 'reactivation'
+  oldValue?: string | null
+  newValue?: string | null
+  reason?: string | null
+  createdByName?: string | null
+  createdAt: string
+}
+
 export default function HistorialIndividual() {
   const { collaboratorId } = useParams<{ collaboratorId: string }>()
-  const id = collaboratorId || '1'
+  const { user } = useAuth()
+  const resolvedId = useMemo(() => {
+    if (collaboratorId) return collaboratorId
+    if (user?.collaboratorId) return String(user.collaboratorId)
+    return ''
+  }, [collaboratorId, user?.collaboratorId])
 
   const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null)
   const [selectedSubPeriodId, setSelectedSubPeriodId] = useState<number | null>(null)
 
-  // Obtener colaborador
-  const { data: collaborator } = useQuery(
-    ['collaborator', id],
+  const { data: collaborator } = useQuery<Collaborator>(
+    ['collaborator', resolvedId],
     async () => {
-      const response = await api.get(`/collaborators/${id}`)
+      const response = await api.get(`/collaborators/${resolvedId}`)
       return response.data
-    }
+    },
+    { enabled: !!resolvedId }
   )
 
-  // Obtener todos los períodos
-  const { data: periods } = useQuery<Period[]>(
-    'periods',
+  const { data: events } = useQuery<CollaboratorEvent[]>(
+    ['collaborator-events', resolvedId],
     async () => {
-      const response = await api.get('/periods')
+      const response = await api.get(`/collaborators/${resolvedId}/events`)
       return response.data
-    }
+    },
+    { enabled: !!resolvedId }
   )
 
-  // Obtener subperíodos del período seleccionado
+  const { data: periods } = useQuery<Period[]>('periods', async () => {
+    const response = await api.get('/periods')
+    return response.data
+  })
+
   const { data: subPeriods } = useQuery<SubPeriod[]>(
     ['sub-periods', selectedPeriodId],
     async () => {
@@ -81,59 +112,88 @@ export default function HistorialIndividual() {
     }
   )
 
-  // Obtener KPIs del colaborador para el período/subperíodo seleccionado
   const { data: kpis, isLoading: loadingKPIs } = useQuery<CollaboratorKPI[]>(
-    ['collaborator-kpis-historical', id, selectedPeriodId, selectedSubPeriodId],
+    ['collaborator-kpis-historical', resolvedId],
     async () => {
-      const response = await api.get(`/collaborator-kpis/collaborator/${id}`, {
-        params: {
-          periodId: selectedPeriodId,
-        },
-      })
+      const response = await api.get(`/collaborator-kpis/collaborator/${resolvedId}`)
       return response.data
     },
     {
-      enabled: !!selectedPeriodId,
+      enabled: !!resolvedId,
     }
   )
 
-  // Filtrar KPIs por subperíodo si está seleccionado
-  const filteredKPIs = selectedSubPeriodId
-    ? kpis?.filter((kpi) => kpi.subPeriodId === selectedSubPeriodId)
-    : kpis
+  const availablePeriods = useMemo(() => {
+    if (!kpis) return []
+    const seen = new Map<number, { id: number; name: string; status?: string }>()
+    kpis.forEach((kpi) => {
+      if (!seen.has(kpi.periodId)) {
+        seen.set(kpi.periodId, {
+          id: kpi.periodId,
+          name: kpi.periodName || `Periodo ${kpi.periodId}`,
+          status: (kpi as any).periodStatus,
+        })
+      }
+    })
+    return Array.from(seen.values())
+  }, [kpis])
 
-  // Calcular resultado global
-  const totalWeightedResult = filteredKPIs?.reduce((sum, kpi) => {
-    return sum + (kpi.weightedResult || 0)
-  }, 0) || 0
+  const optionsPeriods =
+    availablePeriods.length > 0
+      ? availablePeriods
+      : (periods || []).map((p) => ({ id: p.id, name: p.name, status: p.status }))
 
-  const totalWeight = filteredKPIs?.reduce((sum, kpi) => {
-    return sum + kpi.weight
-  }, 0) || 0
+  useEffect(() => {
+    if (!selectedPeriodId && optionsPeriods.length > 0) {
+      setSelectedPeriodId(optionsPeriods[0].id)
+      setSelectedSubPeriodId(null)
+    }
+  }, [optionsPeriods, selectedPeriodId])
+
+  useEffect(() => {
+    if (!selectedPeriodId && availablePeriods.length > 0) {
+      setSelectedPeriodId(availablePeriods[0].id)
+      setSelectedSubPeriodId(null)
+    }
+  }, [availablePeriods, selectedPeriodId])
+
+  const filteredKPIs = useMemo(() => {
+    const byPeriod = selectedPeriodId ? kpis?.filter((kpi) => kpi.periodId === selectedPeriodId) : kpis
+    return selectedSubPeriodId ? byPeriod?.filter((kpi) => kpi.subPeriodId === selectedSubPeriodId) : byPeriod
+  }, [kpis, selectedPeriodId, selectedSubPeriodId])
+
+  const totalWeightedResult =
+    filteredKPIs?.reduce((sum, kpi) => {
+      return sum + (kpi.weightedResult || 0)
+    }, 0) || 0
+
+  const totalWeight =
+    filteredKPIs?.reduce((sum, kpi) => {
+      return sum + kpi.weight
+    }, 0) || 0
 
   const globalResult = totalWeight > 0 ? (totalWeightedResult / totalWeight) * 100 : 0
 
-  // Datos para gráfico
-  const chartData = filteredKPIs?.map((kpi) => ({
-    name: kpi.kpiName || `KPI ${kpi.kpiId}`,
-    target: kpi.target,
-    actual: kpi.actual || 0,
-    variation: kpi.variation || 0,
-  })) || []
+  const chartData =
+    filteredKPIs?.map((kpi) => ({
+      name: kpi.kpiName || `KPI ${kpi.kpiId}`,
+      target: kpi.target,
+      actual: kpi.actual || 0,
+      variation: kpi.variation || 0,
+    })) || []
 
-  // Datos para gráfico de evolución (si hay múltiples períodos)
-  const evolutionData = periods?.map((period) => {
-    // Esto requeriría una consulta adicional, por ahora placeholder
-    return {
-      period: period.name,
-      result: 0, // Se calcularía con los KPIs de ese período
-    }
-  }) || []
+  const evolutionData =
+    periods?.map((period) => {
+      return {
+        period: period.name,
+        result: 0,
+      }
+    }) || []
 
   const handlePeriodChange = (periodId: string) => {
     const periodIdNum = periodId ? parseInt(periodId) : null
     setSelectedPeriodId(periodIdNum)
-    setSelectedSubPeriodId(null) // Reset subperíodo al cambiar período
+    setSelectedSubPeriodId(null)
   }
 
   const handleSubPeriodChange = (subPeriodId: string) => {
@@ -145,31 +205,71 @@ export default function HistorialIndividual() {
     <div className="historial-individual-page">
       <div className="historial-header">
         <div>
-          <h1>Histórico Individual</h1>
+          <h1>Historico Individual</h1>
           {collaborator && (
             <div className="collaborator-info">
               <p className="collaborator-name">{collaborator.name}</p>
               <p className="collaborator-details">
-                {collaborator.position} • {collaborator.area}
+                {collaborator.position} · {collaborator.area}
               </p>
+              <div className="status-line">
+                <span className={`status-pill ${collaborator.status === 'inactive' ? 'inactive' : 'active'}`}>
+                  {collaborator.status === 'inactive' ? 'Inactivo' : 'Activo'}
+                </span>
+                {collaborator.status === 'inactive' && collaborator.inactiveAt && (
+                  <span className="muted">Desde: {new Date(collaborator.inactiveAt).toLocaleDateString('es-ES')}</span>
+                )}
+                {collaborator.inactiveReason && <span className="muted">Motivo: {collaborator.inactiveReason}</span>}
+              </div>
             </div>
           )}
         </div>
       </div>
 
+      {events && events.length > 0 && (
+        <div className="event-timeline">
+          <h3>Eventos del colaborador</h3>
+          <ul>
+            {events.map((event) => (
+              <li key={event.id}>
+                <span className="event-date">
+                  {new Date(event.createdAt).toLocaleDateString('es-ES', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: '2-digit',
+                  })}
+                </span>
+                <span className="event-desc">
+                  {event.eventType === 'termination' && 'Desvinculacion'}
+                  {event.eventType === 'reactivation' && 'Reactivacion'}
+                  {event.eventType === 'role_change' && 'Cambio de rol'}
+                </span>
+                {event.oldValue && event.newValue && (
+                  <span className="muted">
+                    {event.oldValue} → {event.newValue}
+                  </span>
+                )}
+                {event.reason && <span className="muted">Motivo: {event.reason}</span>}
+                {event.createdByName && <span className="muted">Por: {event.createdByName}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="filters-section">
         <div className="filter-group">
-          <label htmlFor="period-select">Período:</label>
+          <label htmlFor="period-select">Periodo:</label>
           <select
             id="period-select"
             value={selectedPeriodId || ''}
             onChange={(e) => handlePeriodChange(e.target.value)}
             className="filter-select"
           >
-            <option value="">Seleccione un período</option>
-            {periods?.map((period) => (
+            <option value="">Seleccione un periodo</option>
+            {optionsPeriods.map((period) => (
               <option key={period.id} value={period.id}>
-                {period.name} ({new Date(period.startDate).getFullYear()})
+                {period.name}
               </option>
             ))}
           </select>
@@ -177,14 +277,14 @@ export default function HistorialIndividual() {
 
         {selectedPeriodId && subPeriods && subPeriods.length > 0 && (
           <div className="filter-group">
-            <label htmlFor="subperiod-select">Subperíodo (opcional):</label>
+            <label htmlFor="subperiod-select">Subperiodo (opcional):</label>
             <select
               id="subperiod-select"
               value={selectedSubPeriodId || ''}
               onChange={(e) => handleSubPeriodChange(e.target.value)}
               className="filter-select"
             >
-              <option value="">Todos los subperíodos</option>
+              <option value="">Todos los subperiodos</option>
               {subPeriods.map((subPeriod) => (
                 <option key={subPeriod.id} value={subPeriod.id}>
                   {subPeriod.name} ({subPeriod.weight ? `${subPeriod.weight}%` : ''})
@@ -197,21 +297,19 @@ export default function HistorialIndividual() {
 
       {!selectedPeriodId && (
         <div className="empty-state">
-          <div className="empty-icon">📅</div>
-          <h3>Selecciona un período</h3>
-          <p>Elige un período para ver el histórico de resultados</p>
+          <div className="empty-icon">:/</div>
+          <h3>Selecciona un periodo</h3>
+          <p>Elige un periodo para ver el historico de resultados</p>
         </div>
       )}
 
-      {selectedPeriodId && loadingKPIs && (
-        <div className="loading">Cargando resultados...</div>
-      )}
+      {selectedPeriodId && loadingKPIs && <div className="loading">Cargando resultados...</div>}
 
       {selectedPeriodId && !loadingKPIs && filteredKPIs && filteredKPIs.length > 0 && (
         <>
           <div className="global-result-card">
             <div className="result-content">
-              <h2>Resultado Global del Período</h2>
+              <h2>Resultado Global del Periodo</h2>
               <div className="result-value">
                 <span className="result-number">{globalResult.toFixed(1)}%</span>
                 <div className="result-bar">
@@ -222,43 +320,39 @@ export default function HistorialIndividual() {
                 </div>
               </div>
               <p className="result-description">
-                Promedio ponderado de todos los KPIs del período seleccionado
-                {selectedSubPeriodId && ' (filtrado por subperíodo)'}
+                Promedio ponderado de todos los KPIs del periodo seleccionado
+                {selectedSubPeriodId && ' (filtrado por subperiodo)'}
               </p>
             </div>
           </div>
 
           <div className="kpis-section">
-            <h2>KPIs del Período</h2>
+            <h2>KPIs del Periodo</h2>
             <div className="read-only-badge">Modo Solo Lectura</div>
             <div className="kpis-table-container">
               <table className="kpis-table">
                 <thead>
                   <tr>
                     <th>KPI</th>
-                    <th>Descripción</th>
+                    <th>Descripcion</th>
                     <th>Target</th>
                     <th>Alcance</th>
-                    <th>Variación</th>
-                    <th>Ponderación</th>
+                    <th>Variacion</th>
+                    <th>Ponderacion</th>
                     <th>Alcance Ponderado</th>
                     <th>Criterio</th>
                     <th>Estado</th>
-                    {selectedSubPeriodId && <th>Subperíodo</th>}
+                    {selectedSubPeriodId && <th>Subperiodo</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {filteredKPIs.map((kpi) => (
                     <tr key={kpi.id}>
                       <td className="kpi-name">{kpi.kpiName || `KPI ${kpi.kpiId}`}</td>
-                      <td className="kpi-description">
-                        {kpi.kpiDescription || '-'}
-                      </td>
+                      <td className="kpi-description">{kpi.kpiDescription || '-'}</td>
                       <td className="kpi-target">{kpi.target}</td>
                       <td className="kpi-actual">
-                        {kpi.actual !== null && kpi.actual !== undefined
-                          ? kpi.actual
-                          : '-'}
+                        {kpi.actual !== null && kpi.actual !== undefined ? kpi.actual : '-'}
                       </td>
                       <td className="kpi-variation">
                         {kpi.variation !== null && kpi.variation !== undefined
@@ -267,27 +361,20 @@ export default function HistorialIndividual() {
                       </td>
                       <td className="kpi-weight">{kpi.weight}%</td>
                       <td className="kpi-weighted">
-                        {kpi.weightedResult !== null &&
-                        kpi.weightedResult !== undefined
+                        {kpi.weightedResult !== null && kpi.weightedResult !== undefined
                           ? `${kpi.weightedResult.toFixed(1)}%`
                           : '-'}
                       </td>
-                      <td className="kpi-criteria">
-                        {kpi.kpiCriteria || '-'}
-                      </td>
+                      <td className="kpi-criteria">{kpi.kpiCriteria || '-'}</td>
                       <td>
-                        <span
-                          className={`kpi-status kpi-status-${kpi.status}`}
-                        >
+                        <span className={`kpi-status kpi-status-${kpi.status}`}>
                           {kpi.status === 'draft' && 'Borrador'}
                           {kpi.status === 'proposed' && 'Propuesto'}
                           {kpi.status === 'approved' && 'Aprobado'}
                           {kpi.status === 'closed' && 'Cerrado'}
                         </span>
                       </td>
-                      {selectedSubPeriodId && (
-                        <td>{kpi.subPeriodName || '-'}</td>
-                      )}
+                      {selectedSubPeriodId && <td>{kpi.subPeriodName || '-'}</td>}
                     </tr>
                   ))}
                 </tbody>
@@ -297,21 +384,16 @@ export default function HistorialIndividual() {
 
           {chartData.length > 0 && (
             <div className="chart-section">
-              <h2>Gráfico de Resultados</h2>
+              <h2>Grafico de Resultados</h2>
               <div className="chart-container">
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis
-                      dataKey="name"
-                      angle={-45}
-                      textAnchor="end"
-                      height={100}
-                    />
+                    <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
                     <YAxis />
                     <Tooltip />
-                    <Bar dataKey="target" fill="#3b82f6" name="Target" />
-                    <Bar dataKey="actual" fill="#10b981" name="Actual" />
+                    <Bar dataKey="target" fill="#e5e7eb" name="Target" />
+                    <Bar dataKey="actual" fill="#f97316" name="Actual" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -322,12 +404,11 @@ export default function HistorialIndividual() {
 
       {selectedPeriodId && !loadingKPIs && (!filteredKPIs || filteredKPIs.length === 0) && (
         <div className="empty-state">
-          <div className="empty-icon">📊</div>
-          <h3>No hay resultados para este período</h3>
-          <p>No se encontraron KPIs asignados para el período seleccionado</p>
+          <div className="empty-icon">:/</div>
+          <h3>No hay resultados para este periodo</h3>
+          <p>No se encontraron KPIs asignados para el periodo seleccionado</p>
         </div>
       )}
     </div>
   )
 }
-

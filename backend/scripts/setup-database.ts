@@ -60,15 +60,8 @@ async function setupDatabase() {
     await connection.query(createScript)
     console.log('✅ Base de datos y tablas creadas exitosamente')
 
-    // Leer y ejecutar script de datos de ejemplo
-    const seedScriptPath = join(__dirname, 'seed_data.sql')
-    const seedScript = readFileSync(seedScriptPath, 'utf-8')
-
-    console.log('📝 Insertando datos de ejemplo...')
-    await connection.query(seedScript)
-    console.log('✅ Datos de ejemplo insertados exitosamente')
-
     console.log('\n🎉 ¡Base de datos configurada correctamente!')
+    console.log('💡 Nota: Los datos deben ser insertados manualmente a través de la aplicación.')
   } catch (error: any) {
     console.error('❌ Error al configurar la base de datos:', error.message)
     if (error.code === 'ER_ACCESS_DENIED_ERROR') {

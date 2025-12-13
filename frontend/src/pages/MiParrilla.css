@@ -10,12 +10,14 @@
   margin-bottom: 32px;
   padding-bottom: 24px;
   border-bottom: 2px solid #e5e7eb;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
 .parrilla-header h1 {
   font-size: 32px;
   font-weight: 700;
-  color: #1e40af;
+  color: #111827;
   margin-bottom: 16px;
 }
 
@@ -59,6 +61,52 @@
   justify-content: flex-end;
 }
 
+.export-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.btn-export {
+  background: white;
+  border: 1px solid #d1d5db;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-export:hover {
+  background: #f9fafb;
+  border-color: #f97316;
+  color: #f97316;
+}
+
+.btn-export-pdf {
+  color: #dc2626;
+}
+
+.btn-export-pdf:hover {
+  background: #fee2e2;
+  border-color: #dc2626;
+  color: #dc2626;
+}
+
+.btn-export-excel {
+  color: #059669;
+}
+
+.btn-export-excel:hover {
+  background: #d1fae5;
+  border-color: #059669;
+  color: #059669;
+}
+
 .status-badge {
   display: inline-block;
   padding: 6px 12px;
@@ -83,7 +131,7 @@
 }
 
 .global-result-card {
-  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+  background: linear-gradient(135deg, #f97316 0%, #111827 100%);
   border-radius: 16px;
   padding: 32px;
   margin-bottom: 32px;
@@ -180,7 +228,7 @@
 
 .kpi-name {
   font-weight: 600;
-  color: #1e40af;
+  color: #111827;
 }
 
 .kpi-description,
@@ -202,7 +250,7 @@
 .kpi-weighted {
   text-align: right;
   font-weight: 600;
-  color: #1e40af;
+  color: #f97316;
 }
 
 .kpi-status {
@@ -230,8 +278,8 @@
 }
 
 .kpi-status-closed {
-  background: #dbeafe;
-  color: #1e40af;
+  background: #e5e7eb;
+  color: #111827;
 }
 
 .chart-section {
@@ -271,4 +319,131 @@
 
 .empty-state p {
   color: #6b7280;
+}
+
+.actual-value-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.btn-edit-actual {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+  border-radius: 4px;
+  opacity: 0.6;
+  transition: all 0.2s;
+}
+
+.btn-edit-actual:hover {
+  opacity: 1;
+  background: #f3f4f6;
+}
+
+.edit-actual-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.actual-input {
+  width: 100px;
+  padding: 6px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  text-align: right;
+}
+
+.actual-input:focus {
+  outline: none;
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+.edit-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.btn-save-small,
+.btn-cancel-small {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.btn-save-small {
+  color: #10b981;
+}
+
+.btn-save-small:hover {
+  background: #d1fae5;
+}
+
+.btn-save-small:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-cancel-small {
+  color: #ef4444;
+}
+
+.btn-cancel-small:hover {
+  background: #fee2e2;
+}
+
+.kpi-comments {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comments-text {
+  color: #6b7280;
+  font-size: 13px;
+  cursor: help;
+}
+
+.kpi-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-propose {
+  background: #f97316;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-propose:hover {
+  background: #ea580c;
+}
+
+.pending-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  background: #fef3c7;
+  color: #92400e;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
 }

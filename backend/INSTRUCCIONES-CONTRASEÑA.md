@@ -42,12 +42,12 @@ Si prefieres ejecutar los scripts SQL manualmente con MySQL CLI:
 ```bash
 # Con contraseña
 mysql -u root -p < scripts/create_database.sql
-mysql -u root -p < scripts/seed_data.sql
 
 # O desde PowerShell
 Get-Content scripts/create_database.sql | mysql -u root -p
-Get-Content scripts/seed_data.sql | mysql -u root -p
 ```
+
+**Nota:** Los datos deben ser insertados manualmente a través de la aplicación.
 
 ## Verificar la Contraseña
 

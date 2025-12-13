@@ -3,6 +3,11 @@ import { useMutation, useQueryClient, useQuery } from 'react-query'
 import api from '../services/api'
 import './CollaboratorKPIForm.css'
 
+const toNumber = (value: any): number => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
 interface CollaboratorKPI {
   id?: number
   collaboratorId: number
@@ -10,6 +15,7 @@ interface CollaboratorKPI {
   periodId: number
   subPeriodId?: number
   target: number
+  actual?: number
   weight: number
   status: 'draft' | 'proposed' | 'approved' | 'closed'
   comments?: string
@@ -35,8 +41,9 @@ export default function CollaboratorKPIForm({
     kpiId: assignment?.kpiId || 0,
     periodId: assignment?.periodId || periodId,
     subPeriodId: assignment?.subPeriodId,
-    target: assignment?.target || 0,
-    weight: assignment?.weight || 0,
+    target: assignment?.target ?? 0,
+    actual: assignment?.actual,
+    weight: assignment?.weight ?? 0,
     status: assignment?.status || 'draft',
     comments: assignment?.comments || '',
   })
@@ -45,60 +52,47 @@ export default function CollaboratorKPIForm({
 
   const queryClient = useQueryClient()
 
-  // Obtener colaboradores
   const { data: collaborators } = useQuery('collaborators', async () => {
     const response = await api.get('/collaborators')
     return response.data
   })
 
-  // Obtener KPIs
   const { data: kpis } = useQuery('kpis', async () => {
     const response = await api.get('/kpis')
     return response.data
   })
 
-  // Obtener subperíodos del período
   const { data: subPeriods } = useQuery(
     ['sub-periods', periodId],
     async () => {
       const response = await api.get(`/periods/${periodId}/sub-periods`)
       return response.data
     },
-    {
-      enabled: !!periodId,
-    }
+    { enabled: !!periodId }
   )
 
-  // Obtener información del período para verificar si está cerrado
   const { data: periodInfo } = useQuery(
     ['period', periodId],
     async () => {
       const response = await api.get(`/periods/${periodId}`)
       return response.data
     },
-    {
-      enabled: !!periodId,
-    }
+    { enabled: !!periodId }
   )
 
   const isPeriodClosed = periodInfo?.status === 'closed'
 
-  // Obtener asignaciones existentes del colaborador para calcular suma de ponderaciones
   const { data: existingAssignments } = useQuery(
     ['collaborator-kpis', formData.collaboratorId, periodId],
     async () => {
       if (!formData.collaboratorId || !periodId) return []
       const response = await api.get(
         `/collaborator-kpis/collaborator/${formData.collaboratorId}`,
-        {
-          params: { periodId },
-        }
+        { params: { periodId } }
       )
       return response.data
     },
-    {
-      enabled: !!formData.collaboratorId && !!periodId,
-    }
+    { enabled: !!formData.collaboratorId && !!periodId }
   )
 
   const createMutation = useMutation(
@@ -118,7 +112,19 @@ export default function CollaboratorKPIForm({
 
   const updateMutation = useMutation(
     async (data: CollaboratorKPI) => {
-      const response = await api.put(`/collaborator-kpis/${assignment?.id}`, data)
+      if (!assignment?.id) throw new Error('Falta ID de asignación')
+      const payload = {
+        collaboratorId: assignment.collaboratorId,
+        kpiId: assignment.kpiId,
+        periodId: assignment.periodId,
+        subPeriodId: data.subPeriodId,
+        target: assignment.target ?? 0,
+        weight: assignment.weight ?? 0,
+        status: data.status,
+        comments: data.comments,
+        actual: data.actual,
+      }
+      const response = await api.put(`/collaborator-kpis/${assignment.id}`, payload)
       return response.data
     },
     {
@@ -130,28 +136,25 @@ export default function CollaboratorKPIForm({
     }
   )
 
-  // Calcular suma de ponderaciones
   const calculateTotalWeight = (): number => {
-    if (!existingAssignments) return formData.weight
+    if (!existingAssignments) return toNumber(formData.weight)
 
-    const otherAssignments = existingAssignments.filter(
-      (a: any) => a.id !== assignment?.id
-    )
-    const otherWeights = otherAssignments.reduce(
-      (sum: number, a: any) => sum + (a.weight || 0),
-      0
-    )
-    return otherWeights + formData.weight
+    const otherAssignments = existingAssignments.filter((a: any) => a.id !== assignment?.id)
+    const otherWeights = otherAssignments.reduce((sum: number, a: any) => sum + toNumber(a.weight), 0)
+    return otherWeights + toNumber(formData.weight)
   }
 
   const isAssignmentClosed = assignment?.status === 'closed'
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {}
+    const weightValue = toNumber(formData.weight)
+    const targetValue = toNumber(formData.target)
+    const actualValue =
+      formData.actual !== undefined && formData.actual !== null ? Number(formData.actual) : null
 
-    // Validar si el período está cerrado
     if (isPeriodClosed && !assignment?.id) {
-      newErrors.periodId = 'No se pueden crear asignaciones en períodos cerrados'
+      newErrors.periodId = 'No se pueden crear asignaciones en periodos cerrados'
     }
 
     if (!formData.collaboratorId || formData.collaboratorId === 0) {
@@ -162,22 +165,33 @@ export default function CollaboratorKPIForm({
       newErrors.kpiId = 'Debe seleccionar un KPI'
     }
 
-    if (!formData.target || formData.target <= 0) {
-      newErrors.target = 'El target debe ser mayor a 0'
+    if (!assignment?.id) {
+      if (!targetValue || targetValue <= 0) {
+        newErrors.target = 'El target debe ser mayor a 0'
+      }
+
+      if (!weightValue || weightValue <= 0) {
+        newErrors.weight = 'La ponderación debe ser mayor a 0'
+      }
+
+      if (weightValue > 100) {
+        newErrors.weight = 'La ponderación no puede ser mayor a 100%'
+      }
+
+      const totalWeight = toNumber(calculateTotalWeight())
+      if (totalWeight > 100) {
+        newErrors.weight = `La suma de ponderaciones sería ${totalWeight.toFixed(
+          1
+        )}%. Debe ser máximo 100%`
+      }
     }
 
-    if (!formData.weight || formData.weight <= 0) {
-      newErrors.weight = 'La ponderación debe ser mayor a 0'
-    }
-
-    if (formData.weight > 100) {
-      newErrors.weight = 'La ponderación no puede ser mayor a 100%'
-    }
-
-    // Validar suma de ponderaciones
-    const totalWeight = calculateTotalWeight()
-    if (totalWeight > 100) {
-      newErrors.weight = `La suma de ponderaciones sería ${totalWeight.toFixed(1)}%. Debe ser máximo 100%`
+    if (assignment?.id) {
+      if (actualValue === null || Number.isNaN(actualValue)) {
+        newErrors.actual = 'Ingresa el valor actual'
+      } else if (actualValue < 0) {
+        newErrors.actual = 'El valor actual no puede ser negativo'
+      }
     }
 
     setErrors(newErrors)
@@ -187,9 +201,7 @@ export default function CollaboratorKPIForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!validate()) {
-      return
-    }
+    if (!validate()) return
 
     if (assignment?.id) {
       updateMutation.mutate(formData)
@@ -198,34 +210,25 @@ export default function CollaboratorKPIForm({
     }
   }
 
-  const totalWeight = calculateTotalWeight()
-  const remainingWeight = 100 - (totalWeight - formData.weight)
+  const totalWeight = toNumber(calculateTotalWeight())
+  const remainingWeight = 100 - (totalWeight - toNumber(formData.weight))
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>
-            {assignment?.id
-              ? 'Editar Asignación de KPI'
-              : 'Asignar KPI a Colaborador'}
-          </h2>
-          <button className="close-button" onClick={onClose}>×</button>
+          <h2>{assignment?.id ? 'Editar Asignación de KPI' : 'Asignar KPI a Colaborador'}</h2>
+          <button className="close-button" onClick={onClose}>
+            ×
+          </button>
         </div>
 
         {isPeriodClosed && (
           <div className="period-closed-warning">
-            <strong>⚠️ Período Cerrado:</strong> Este período está cerrado. 
+            <strong>⚠ Periodo Cerrado:</strong>{' '}
             {assignment?.id
-              ? ' Solo se puede actualizar el valor actual (alcance) con permisos especiales.'
-              : ' No se pueden crear nuevas asignaciones en períodos cerrados.'}
-          </div>
-        )}
-
-        {isPeriodClosed && (
-          <div className="closed-warning">
-            <strong>⚠️ Período Cerrado</strong>
-            <p>Este período está cerrado. No se pueden crear nuevas asignaciones.</p>
+              ? 'Solo se puede actualizar el valor actual (alcance).'
+              : 'No se pueden crear nuevas asignaciones en periodos cerrados.'}
           </div>
         )}
 
@@ -259,9 +262,7 @@ export default function CollaboratorKPIForm({
                   </option>
                 ))}
               </select>
-              {errors.collaboratorId && (
-                <span className="error-message">{errors.collaboratorId}</span>
-              )}
+              {errors.collaboratorId && <span className="error-message">{errors.collaboratorId}</span>}
             </div>
 
             <div className="form-group">
@@ -285,102 +286,122 @@ export default function CollaboratorKPIForm({
                   </option>
                 ))}
               </select>
-              {errors.kpiId && (
-                <span className="error-message">{errors.kpiId}</span>
-              )}
+              {errors.kpiId && <span className="error-message">{errors.kpiId}</span>}
             </div>
           </div>
 
           {subPeriods && subPeriods.length > 0 && (
             <div className="form-group">
-              <label htmlFor="subPeriodId">Subperíodo (opcional)</label>
+              <label htmlFor="subPeriodId">Subperiodo (opcional)</label>
               <select
                 id="subPeriodId"
                 value={formData.subPeriodId || ''}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    subPeriodId: e.target.value
-                      ? parseInt(e.target.value)
-                      : undefined,
+                    subPeriodId: e.target.value ? parseInt(e.target.value) : undefined,
                   })
                 }
               >
-                <option value="">Sin subperíodo específico</option>
+                <option value="">Sin subperiodo específico</option>
                 {subPeriods.map((sp: any) => (
                   <option key={sp.id} value={sp.id}>
-                    {sp.name} ({sp.weight ? `${sp.weight}%` : ''})
+                    {sp.name} {sp.weight ? `(${sp.weight}%)` : ''}
                   </option>
                 ))}
               </select>
             </div>
           )}
 
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="target">Target *</label>
-              <input
-                type="number"
-                id="target"
-                min="0"
-                step="0.01"
-                value={formData.target || ''}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    target: parseFloat(e.target.value) || 0,
-                  })
-                }
-                disabled={!!(isPeriodClosed && assignment?.id)}
-                className={errors.target ? 'error' : ''}
-                placeholder="Ej: 100"
-              />
-              {errors.target && (
-                <span className="error-message">{errors.target}</span>
-              )}
-            </div>
+          {!assignment?.id && (
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="target">Target *</label>
+                <input
+                  type="number"
+                  id="target"
+                  min="0"
+                  step="0.01"
+                  value={formData.target || ''}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      target: parseFloat(e.target.value) || 0,
+                    })
+                  }
+                  className={errors.target ? 'error' : ''}
+                  placeholder="Ej: 100"
+                />
+                {errors.target && <span className="error-message">{errors.target}</span>}
+              </div>
 
-            <div className="form-group">
-              <label htmlFor="weight">Ponderación (%) *</label>
-              <input
-                type="number"
-                id="weight"
-                min="0"
-                max="100"
-                step="0.01"
-                value={formData.weight || ''}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    weight: parseFloat(e.target.value) || 0,
-                  })
-                }
-                disabled={!!(isPeriodClosed && assignment?.id)}
-                className={errors.weight ? 'error' : ''}
-                placeholder="Ej: 25.00"
-              />
-              {errors.weight && (
-                <span className="error-message">{errors.weight}</span>
-              )}
-              <div className="weight-info">
-                <span className="weight-total">
-                  Total ponderación: {totalWeight.toFixed(1)}%
-                </span>
-                {remainingWeight >= 0 && (
-                  <span className="weight-remaining">
-                    Restante: {remainingWeight.toFixed(1)}%
-                  </span>
-                )}
-                {totalWeight === 100 && (
-                  <span className="weight-perfect">✓ Suma perfecta (100%)</span>
-                )}
-                {totalWeight > 100 && (
-                  <span className="weight-error">
-                    ⚠ Excede 100% por {(totalWeight - 100).toFixed(1)}%
-                  </span>
-                )}
+              <div className="form-group">
+                <label htmlFor="weight">Ponderación (%) *</label>
+                <input
+                  type="number"
+                  id="weight"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={formData.weight || ''}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      weight: parseFloat(e.target.value) || 0,
+                    })
+                  }
+                  className={errors.weight ? 'error' : ''}
+                  placeholder="Ej: 25.00"
+                />
+                {errors.weight && <span className="error-message">{errors.weight}</span>}
+                <div className="weight-info">
+                  <span className="weight-total">Total ponderación: {totalWeight.toFixed(1)}%</span>
+                  {remainingWeight >= 0 && (
+                    <span className="weight-remaining">Restante: {remainingWeight.toFixed(1)}%</span>
+                  )}
+                  {totalWeight === 100 && <span className="weight-perfect">✓ Suma perfecta (100%)</span>}
+                  {totalWeight > 100 && (
+                    <span className="weight-error">⚠ Excede 100% por {(totalWeight - 100).toFixed(1)}%</span>
+                  )}
+                </div>
               </div>
             </div>
+          )}
+
+          {assignment?.id && (
+            <div className="form-row">
+              <div className="form-group">
+                <label>Target (solo lectura)</label>
+                <input type="number" value={formData.target || ''} disabled />
+              </div>
+              <div className="form-group">
+                <label>Ponderación (%) (solo lectura)</label>
+                <input type="number" value={formData.weight || ''} disabled />
+              </div>
+            </div>
+          )}
+
+          <div className="form-group">
+            <label htmlFor="actual">Valor Actual (Alcance) *</label>
+            <input
+              type="number"
+              id="actual"
+              min="0"
+              step="0.01"
+              value={formData.actual ?? ''}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  actual: e.target.value === '' ? undefined : parseFloat(e.target.value),
+                })
+              }
+              placeholder="Ingresa el valor logrado este mes"
+              className={errors.actual ? 'error' : ''}
+            />
+            {errors.actual && <span className="error-message">{errors.actual}</span>}
+            <small className="form-hint">
+              Actualiza aquí el valor alcanzado mes a mes. Target y ponderación no se editan al actualizar.
+            </small>
           </div>
 
           {!isPeriodClosed && (
@@ -396,46 +417,11 @@ export default function CollaboratorKPIForm({
                   })
                 }
               >
-                <option value="draft">Borrador</option>
                 <option value="proposed">Propuesto</option>
                 <option value="approved">Aprobado</option>
+                <option value="draft">Borrador</option>
                 <option value="closed">Cerrado</option>
               </select>
-            </div>
-          )}
-
-          {isPeriodClosed && assignment?.id && (
-            <div className="form-group">
-              <label htmlFor="actual">Valor Actual (Alcance) *</label>
-              <input
-                type="number"
-                id="actual"
-                min="0"
-                step="0.01"
-                value={(assignment as any).actual || ''}
-                onChange={(e) => {
-                  // Actualizar directamente usando el endpoint especial
-                  const actualValue = parseFloat(e.target.value) || 0
-                  api
-                    .patch(`/collaborator-kpis/${assignment.id}/actual`, {
-                      actual: actualValue,
-                    })
-                    .then(() => {
-                      queryClient.invalidateQueries('collaborator-kpis')
-                      onSuccess?.()
-                    })
-                    .catch((error) => {
-                      alert(
-                        error.response?.data?.error ||
-                          'Error al actualizar valor actual'
-                      )
-                    })
-                }}
-                placeholder="Ingrese el valor actual alcanzado"
-              />
-              <small className="form-hint">
-                Solo se puede actualizar el valor actual en períodos cerrados
-              </small>
             </div>
           )}
 
@@ -444,9 +430,7 @@ export default function CollaboratorKPIForm({
             <textarea
               id="comments"
               value={formData.comments || ''}
-              onChange={(e) =>
-                setFormData({ ...formData, comments: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, comments: e.target.value })}
               rows={3}
               placeholder="Comentarios adicionales sobre esta asignación..."
             />
@@ -459,17 +443,10 @@ export default function CollaboratorKPIForm({
             <button
               type="submit"
               className="btn-primary"
-              disabled={
-                createMutation.isLoading ||
-                updateMutation.isLoading ||
-                isPeriodClosed ||
-                isAssignmentClosed
-              }
+              disabled={createMutation.isLoading || updateMutation.isLoading || isAssignmentClosed}
             >
               {createMutation.isLoading || updateMutation.isLoading
                 ? 'Guardando...'
-                : isPeriodClosed || isAssignmentClosed
-                ? 'Bloqueado (Cerrado)'
                 : assignment?.id
                 ? 'Actualizar'
                 : 'Asignar'}
@@ -480,4 +457,3 @@ export default function CollaboratorKPIForm({
     </div>
   )
 }
-

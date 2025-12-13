@@ -142,8 +142,8 @@
 
 .form-group input:focus {
   outline: none;
-  border-color: #1e40af;
-  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
 }
 
 .form-group input.error {
@@ -187,12 +187,12 @@
 }
 
 .btn-danger {
-  background: #ef4444;
-  color: white;
+  background: #ea580c;
+  color: #111827;
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: #dc2626;
+  background: #c2410c;
 }
 
 .btn-danger:disabled {

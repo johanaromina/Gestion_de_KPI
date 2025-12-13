@@ -1,13 +1,13 @@
 .layout {
   display: flex;
   min-height: 100vh;
-  background-color: #f5f5f5;
+  background-color: #f4f4f5;
 }
 
 .sidebar {
   width: 260px;
-  background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 100%);
-  color: white;
+  background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
+  color: #f9fafb;
   display: flex;
   flex-direction: column;
   box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
@@ -25,7 +25,7 @@
   font-size: 24px;
   font-weight: 700;
   margin: 0;
-  color: white;
+  color: #f9fafb;
 }
 
 .sidebar-nav {
@@ -33,32 +33,73 @@
   flex: 1;
 }
 
+.sidebar-footer {
+  padding: 16px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.user-info {
+  font-size: 14px;
+  color: rgba(249, 250, 251, 0.9);
+}
+
+.user-name {
+  font-weight: 600;
+  color: #f9fafb;
+}
+
+.user-role {
+  font-size: 12px;
+  opacity: 0.9;
+  color: #e5e7eb;
+}
+
+.logout-button {
+  border: 1px solid rgba(249, 250, 251, 0.4);
+  background: transparent;
+  color: #f9fafb;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.logout-button:hover {
+  background: rgba(249, 250, 251, 0.1);
+  border-color: rgba(249, 250, 251, 0.7);
+}
+
 .nav-item {
   display: flex;
   align-items: center;
   padding: 14px 20px;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(249, 250, 251, 0.8);
   text-decoration: none;
   transition: all 0.2s ease;
   border-left: 3px solid transparent;
 }
 
 .nav-item:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: white;
-  border-left-color: #60a5fa;
+  background-color: rgba(249, 250, 251, 0.08);
+  color: #f9fafb;
+  border-left-color: #f97316;
 }
 
 .nav-item.active {
-  background-color: rgba(255, 255, 255, 0.15);
-  color: white;
-  border-left-color: #60a5fa;
+  background-color: rgba(249, 250, 251, 0.12);
+  color: #f9fafb;
+  border-left-color: #f97316;
   font-weight: 600;
 }
 
 .nav-icon {
   margin-right: 12px;
-  font-size: 20px;
+  font-size: 12px;
+  color: rgba(249, 250, 251, 0.6);
 }
 
 .main-content {

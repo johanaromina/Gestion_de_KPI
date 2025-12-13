@@ -3,7 +3,12 @@ import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import { pool } from '../config/database'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-change-in-production'
+
+if (!process.env.JWT_SECRET) {
+  console.warn('⚠️  ADVERTENCIA: JWT_SECRET no está configurado. Usando clave por defecto (solo para desarrollo).')
+  console.warn('⚠️  En producción, configura JWT_SECRET en el archivo .env')
+}
 
 interface User {
   id: number
@@ -11,24 +16,15 @@ interface User {
   name: string
   role: string
   collaboratorId?: number
+  hasSuperpowers?: boolean
+  permissions?: string[]
 }
 
 // Para MVP, usaremos la tabla de collaborators como usuarios
 // En producción, deberías tener una tabla de usuarios separada
 export const login = async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body
-
-    // TODO: En producción, buscar en tabla de usuarios
-    // Por ahora, usamos un sistema simple basado en colaboradores
-    // Esto es solo para MVP - necesitarás crear tabla de usuarios después
-
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email y contraseña son requeridos' })
-    }
-
-    // Para MVP: buscar colaborador por email (necesitarías agregar campo email a collaborators)
-    // Por ahora, hacemos login simple con ID de colaborador
+    // MVP: login solo por ID de colaborador (email/contraseña no requeridos)
     const { collaboratorId } = req.body
 
     if (!collaboratorId) {
@@ -46,14 +42,24 @@ export const login = async (req: Request, res: Response) => {
 
     const collaborator = rows[0]
 
-    // Para MVP, generamos token directamente
-    // En producción, validarías la contraseña aquí
+    const [permRows] = await pool.query<any[]>(
+      `SELECT p.code 
+       FROM permissions p 
+       JOIN collaborator_permissions cp ON cp.permissionId = p.id
+       WHERE cp.collaboratorId = ?`,
+      [collaborator.id]
+    )
+    const permissions: string[] = Array.isArray(permRows) ? permRows.map((p) => p.code) : []
+
     const token = jwt.sign(
       {
         id: collaborator.id,
         name: collaborator.name,
         role: collaborator.role,
+        area: collaborator.area,
         collaboratorId: collaborator.id,
+        hasSuperpowers: collaborator.hasSuperpowers === 1 || collaborator.hasSuperpowers === true,
+        permissions,
       },
       JWT_SECRET,
       { expiresIn: '7d' }
@@ -65,7 +71,10 @@ export const login = async (req: Request, res: Response) => {
         id: collaborator.id,
         name: collaborator.name,
         role: collaborator.role,
+        area: collaborator.area,
         collaboratorId: collaborator.id,
+        hasSuperpowers: collaborator.hasSuperpowers === 1 || collaborator.hasSuperpowers === true,
+        permissions,
       },
     })
   } catch (error: any) {
@@ -102,11 +111,23 @@ export const getCurrentUser = async (req: Request, res: Response) => {
 
     const collaborator = rows[0]
 
+    const [permRows] = await pool.query<any[]>(
+      `SELECT p.code 
+       FROM permissions p 
+       JOIN collaborator_permissions cp ON cp.permissionId = p.id
+       WHERE cp.collaboratorId = ?`,
+      [collaborator.id]
+    )
+    const permissions: string[] = Array.isArray(permRows) ? permRows.map((p) => p.code) : []
+
     res.json({
       id: user.id,
       name: collaborator.name,
       role: collaborator.role,
+      area: collaborator.area,
       collaboratorId: collaborator.id,
+      hasSuperpowers: collaborator.hasSuperpowers === 1 || collaborator.hasSuperpowers === true,
+      permissions,
     })
   } catch (error: any) {
     console.error('Error getting current user:', error)
