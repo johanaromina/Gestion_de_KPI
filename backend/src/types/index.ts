@@ -47,6 +47,7 @@ export interface KPI {
   criteria: string
   formula?: string
   macroKPIId?: number
+  areas?: string[]
   createdAt?: Date
   updatedAt?: Date
 }
@@ -68,9 +69,30 @@ export interface CollaboratorKPI {
   updatedAt?: Date
 }
 
+export interface CollaboratorKPIPlan {
+  id: number
+  collaboratorId: number
+  kpiId: number
+  periodId: number
+  subPeriodId: number
+  target: number
+  weight: number
+  source?: string | null
+  createdAt?: Date
+  updatedAt?: Date
+}
+
 export interface ObjectiveTree {
   id: number
   level: 'company' | 'direction' | 'management' | 'leadership' | 'individual'
   name: string
   parentId?: number
+}
+
+export interface Area {
+  id: number
+  name: string
+  parentId?: number | null
+  createdAt?: Date
+  updatedAt?: Date
 }

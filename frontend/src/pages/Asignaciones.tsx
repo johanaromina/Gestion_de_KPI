@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from 'react-query'
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from 'react-query'
 import api from '../services/api'
 import { CollaboratorKPI } from '../types'
 import CollaboratorKPIForm from '../components/CollaboratorKPIForm'
@@ -7,7 +7,6 @@ import CloseParrillaModal from '../components/CloseParrillaModal'
 import GenerateBaseGridModal from '../components/GenerateBaseGridModal'
 import ReviewModal from '../components/ReviewModal'
 import ConsistencyAlerts from '../components/ConsistencyAlerts'
-import { useAuth } from '../hooks/useAuth'
 import './Asignaciones.css'
 
 const toNumber = (value: any): number | null => {
@@ -17,20 +16,16 @@ const toNumber = (value: any): number | null => {
 
 export default function Asignaciones() {
   const [showForm, setShowForm] = useState(false)
-  const [editingAssignment, setEditingAssignment] = useState<
-    CollaboratorKPI | undefined
-  >(undefined)
+  const [editingAssignment, setEditingAssignment] = useState<CollaboratorKPI | undefined>(undefined)
   const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null)
-  const [selectedCollaboratorId, setSelectedCollaboratorId] = useState<
-    number | null
-  >(null)
+  const [selectedCollaboratorId, setSelectedCollaboratorId] = useState<number | null>(null)
   const [selectedKPIId, setSelectedKPIId] = useState<number | null>(null)
   const [selectedArea, setSelectedArea] = useState<string>('')
+  const [selectedSubPeriodId, setSelectedSubPeriodId] = useState<number | null>(null)
+  const [showMonthly, setShowMonthly] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [showCloseModal, setShowCloseModal] = useState(false)
-  const [closingCollaboratorId, setClosingCollaboratorId] = useState<
-    number | null
-  >(null)
+  const [closingCollaboratorId, setClosingCollaboratorId] = useState<number | null>(null)
   const [showGenerateModal, setShowGenerateModal] = useState(false)
   const [reviewingAssignment, setReviewingAssignment] = useState<{
     assignment: CollaboratorKPI
@@ -38,28 +33,37 @@ export default function Asignaciones() {
   } | null>(null)
 
   const queryClient = useQueryClient()
-  const { user } = useAuth()
 
-  // Preseleccionar el área del usuario si existe
-  useEffect(() => {
-    if (user?.area && !selectedArea) {
-      setSelectedArea(user.area)
-    }
-  }, [user?.area, selectedArea])
-
-  // Obtener períodos
+  // Periodos
   const { data: periods } = useQuery('periods', async () => {
     const response = await api.get('/periods')
     return response.data
   })
 
-  // Obtener colaboradores
+  // Subperiodos del periodo seleccionado
+  const { data: subPeriods } = useQuery<any[]>(
+    ['sub-periods', selectedPeriodId],
+    async () => {
+      if (!selectedPeriodId) return []
+      const res = await api.get(`/periods/${selectedPeriodId}/sub-periods`)
+      return res.data
+    },
+    { enabled: !!selectedPeriodId }
+  )
+
+  // Colaboradores
   const { data: collaborators } = useQuery('collaborators', async () => {
     const response = await api.get('/collaborators')
     return response.data
   })
 
-  // Obtener asignaciones
+  // KPIs
+  const { data: kpis } = useQuery('kpis', async () => {
+    const response = await api.get('/kpis')
+    return response.data
+  })
+
+  // Asignaciones
   const { data: assignments, isLoading } = useQuery<CollaboratorKPI[]>(
     ['collaborator-kpis', selectedPeriodId, selectedCollaboratorId],
     async () => {
@@ -72,9 +76,7 @@ export default function Asignaciones() {
       const response = await api.get(url)
       return response.data
     },
-    {
-      enabled: true,
-    }
+    { enabled: true }
   )
 
   const deleteMutation = useMutation(
@@ -93,57 +95,43 @@ export default function Asignaciones() {
       alert('Por favor selecciona un período primero')
       return
     }
-
-    // Verificar si el período está cerrado
     const selectedPeriod = periods?.find((p: any) => p.id === selectedPeriodId)
     if (selectedPeriod?.status === 'closed') {
       alert('No se pueden crear asignaciones en períodos cerrados')
       return
     }
-
     setEditingAssignment(undefined)
     setShowForm(true)
   }
 
   const handleEdit = (assignment: CollaboratorKPI) => {
-    // Verificar si el período está cerrado
     const period = periods?.find((p: any) => p.id === assignment.periodId)
     if (period?.status === 'closed') {
-      alert(
-        'Este período está cerrado. Solo se puede editar el valor actual (alcance) con permisos especiales.'
-      )
-      // Aún permitir abrir el formulario, pero los campos estarán deshabilitados
+      alert('Periodo cerrado. Solo se puede editar alcance con permisos especiales.')
     }
     setEditingAssignment(assignment)
     setShowForm(true)
   }
 
-  const handleDelete = async (id: number) => {
-    if (
-      window.confirm(
-        '¿Estás seguro de eliminar esta asignación? Esta acción no se puede deshacer.'
-      )
-    ) {
+  const handleDelete = (id: number) => {
+    if (window.confirm('¿Estás seguro de eliminar esta asignación?')) {
       deleteMutation.mutate(id)
     }
   }
 
   const handleCloseParrilla = () => {
     if (!selectedPeriodId) {
-      alert('Por favor selecciona un período primero')
+      alert('Selecciona un período primero')
       return
     }
     setClosingCollaboratorId(selectedCollaboratorId)
     setShowCloseModal(true)
   }
 
-  const isAssignmentClosed = (assignment: CollaboratorKPI): boolean => {
-    return assignment.status === 'closed' || (assignment as any).periodStatus === 'closed'
-  }
+  const isAssignmentClosed = (assignment: CollaboratorKPI) =>
+    assignment.status === 'closed' || (assignment as any).periodStatus === 'closed'
 
-  const canEditAssignment = (assignment: CollaboratorKPI): boolean => {
-    return !isAssignmentClosed(assignment)
-  }
+  const canEditAssignment = (assignment: CollaboratorKPI) => !isAssignmentClosed(assignment)
 
   const getStatusBadge = (status: CollaboratorKPI['status']) => {
     const statusConfig = {
@@ -151,65 +139,47 @@ export default function Asignaciones() {
       proposed: { label: 'Propuesto', class: 'status-proposed' },
       approved: { label: 'Aprobado', class: 'status-approved' },
       closed: { label: 'Cerrado', class: 'status-closed' },
-    }
+    } as const
     const config = status ? statusConfig[status] : undefined
-    if (!config) {
-      return <span className="status-badge status-unknown">{status || 'Sin estado'}</span>
-    }
-    return (
-      <span className={`status-badge ${config.class}`}>{config.label}</span>
-    )
+    if (!config) return <span className="status-badge status-unknown">{status || 'Sin estado'}</span>
+    return <span className={`status-badge ${config.class}`}>{config.label}</span>
   }
 
-  // Obtener KPIs
-  const { data: kpis } = useQuery('kpis', async () => {
-    const response = await api.get('/kpis')
-    return response.data
-  })
-
-  // Obtener áreas únicas
-  const areas = Array.from(new Set(collaborators?.map((c: any) => c.area).filter(Boolean) || [])).sort()
-
+  // Áreas únicas
+  const areas: string[] = Array.from(
+    new Set<string>((collaborators?.map((c: any) => c.area).filter(Boolean) as string[]) || [])
+  ).sort()
   const collaboratorsInArea = selectedArea
     ? collaborators?.filter((c: any) => c.area === selectedArea)
     : collaborators
 
-  // Filtrar asignaciones localmente
+  // Filtro local
   const filteredAssignments = assignments?.filter((assignment) => {
-    // Filtro por KPI
     const matchesKPI = !selectedKPIId || assignment.kpiId === selectedKPIId
-
-    // Filtro por área
+    const matchesSubPeriod =
+      selectedSubPeriodId === null
+        ? true
+        : (assignment as any).subPeriodId === selectedSubPeriodId
+    const matchesShowMonthly = showMonthly || (assignment as any).subPeriodId === null
     const matchesArea =
       !selectedArea ||
-      collaborators?.find((c: any) => c.id === assignment.collaboratorId)
-        ?.area === selectedArea
-
-    // Búsqueda por texto (nombre de colaborador o KPI)
+      collaborators?.find((c: any) => c.id === assignment.collaboratorId)?.area === selectedArea
     const matchesSearch =
       !searchTerm ||
-      (collaborators?.find((c: any) => c.id === assignment.collaboratorId)
-        ?.name || '')
+      (collaborators?.find((c: any) => c.id === assignment.collaboratorId)?.name || '')
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
       (kpis?.find((k: any) => k.id === assignment.kpiId)?.name || '')
         .toLowerCase()
         .includes(searchTerm.toLowerCase())
 
-    return matchesKPI && matchesArea && matchesSearch
+    return matchesKPI && matchesArea && matchesSearch && matchesSubPeriod && matchesShowMonthly
   })
 
-  // Calcular suma de ponderaciones por colaborador y período
-  const getTotalWeightByCollaborator = (
-    collaboratorId: number,
-    periodId: number
-  ): number => {
+  const getTotalWeightByCollaborator = (collaboratorId: number, periodId: number): number => {
     if (!assignments) return 0
     return assignments
-      .filter(
-        (a) =>
-          a.collaboratorId === collaboratorId && a.periodId === periodId
-      )
+      .filter((a) => a.collaboratorId === collaboratorId && a.periodId === periodId)
       .reduce((sum, a) => sum + (toNumber(a.weight) || 0), 0)
   }
 
@@ -218,30 +188,24 @@ export default function Asignaciones() {
       <div className="page-header">
         <div>
           <h1>Asignaciones de KPIs</h1>
-          <p className="subtitle">
-            Gestiona las asignaciones de KPIs a colaboradores
-          </p>
+          <p className="subtitle">Gestiona las asignaciones de KPIs a colaboradores</p>
         </div>
         <div className="header-actions">
-          <button
-            className="btn-secondary"
-            onClick={() => setShowGenerateModal(true)}
-            title="Generar parrillas base para un área completa"
-          >
-            🎯 Generar Parrillas Base
+          <button className="btn-secondary" onClick={() => setShowGenerateModal(true)}>
+            Generar Parrillas Base
           </button>
           <button className="btn-secondary" onClick={handleCloseParrilla}>
-            🔒 Cerrar Parrilla
+            Cerrar Parrilla
           </button>
           <button className="btn-primary" onClick={handleCreate}>
-            ➕ Nueva Asignación
+            Nueva Asignación
           </button>
         </div>
       </div>
 
       <div className="filters-section">
         <div className="search-group">
-          <label htmlFor="search">🔍 Buscar:</label>
+          <label htmlFor="search">Buscar:</label>
           <input
             type="text"
             id="search"
@@ -251,16 +215,13 @@ export default function Asignaciones() {
             className="search-input"
           />
         </div>
+
         <div className="filter-group">
           <label htmlFor="period-filter">Período:</label>
           <select
             id="period-filter"
             value={selectedPeriodId || ''}
-            onChange={(e) =>
-              setSelectedPeriodId(
-                e.target.value ? parseInt(e.target.value) : null
-              )
-            }
+            onChange={(e) => setSelectedPeriodId(e.target.value ? parseInt(e.target.value) : null)}
             className="filter-select"
           >
             <option value="">Todos</option>
@@ -277,11 +238,7 @@ export default function Asignaciones() {
           <select
             id="collaborator-filter"
             value={selectedCollaboratorId || ''}
-            onChange={(e) =>
-              setSelectedCollaboratorId(
-                e.target.value ? parseInt(e.target.value) : null
-              )
-            }
+            onChange={(e) => setSelectedCollaboratorId(e.target.value ? parseInt(e.target.value) : null)}
             className="filter-select"
           >
             <option value="">Todos</option>
@@ -298,11 +255,7 @@ export default function Asignaciones() {
           <select
             id="kpi-filter"
             value={selectedKPIId || ''}
-            onChange={(e) =>
-              setSelectedKPIId(
-                e.target.value ? parseInt(e.target.value) : null
-              )
-            }
+            onChange={(e) => setSelectedKPIId(e.target.value ? parseInt(e.target.value) : null)}
             className="filter-select"
           >
             <option value="">Todos</option>
@@ -331,11 +284,41 @@ export default function Asignaciones() {
           </select>
         </div>
 
+        <div className="filter-group">
+          <label htmlFor="subperiod-filter">Subperiodo:</label>
+          <select
+            id="subperiod-filter"
+            value={selectedSubPeriodId ?? ''}
+            onChange={(e) => setSelectedSubPeriodId(e.target.value ? parseInt(e.target.value, 10) : null)}
+            className="filter-select"
+            disabled={!selectedPeriodId}
+          >
+            <option value="">Todos</option>
+            {subPeriods?.map((sp: any) => (
+              <option key={sp.id as number} value={sp.id as number}>
+                {sp.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="filter-group toggle-group">
+          <label>Ver mensuales:</label>
+          <input
+            type="checkbox"
+            checked={showMonthly}
+            onChange={(e) => setShowMonthly(e.target.checked)}
+            title="Mostrar/ocultar asignaciones por subperiodo"
+          />
+        </div>
+
         {(selectedPeriodId ||
           selectedCollaboratorId ||
           selectedKPIId ||
           selectedArea ||
-          searchTerm) && (
+          searchTerm ||
+          selectedSubPeriodId !== null ||
+          showMonthly) && (
           <button
             className="btn-clear-filters"
             onClick={() => {
@@ -344,6 +327,8 @@ export default function Asignaciones() {
               setSelectedKPIId(null)
               setSelectedArea('')
               setSearchTerm('')
+              setSelectedSubPeriodId(null)
+              setShowMonthly(false)
             }}
           >
             Limpiar Filtros
@@ -352,10 +337,7 @@ export default function Asignaciones() {
       </div>
 
       {selectedPeriodId && selectedCollaboratorId && (
-        <ConsistencyAlerts
-          collaboratorId={selectedCollaboratorId}
-          periodId={selectedPeriodId}
-        />
+        <ConsistencyAlerts collaboratorId={selectedCollaboratorId} periodId={selectedPeriodId} />
       )}
 
       <div className="table-container">
@@ -373,6 +355,7 @@ export default function Asignaciones() {
                   <th>Colaborador</th>
                   <th>KPI</th>
                   <th>Período</th>
+                  <th>Subperiodo</th>
                   <th>Target</th>
                   <th>Actual</th>
                   <th>Peso</th>
@@ -384,49 +367,46 @@ export default function Asignaciones() {
               </thead>
               <tbody>
                 {filteredAssignments.map((assignment) => {
-                  const totalWeight = getTotalWeightByCollaborator(
-                    assignment.collaboratorId,
-                    assignment.periodId
-                  )
+                  const totalWeight = getTotalWeightByCollaborator(assignment.collaboratorId, assignment.periodId)
                   return (
                     <tr key={assignment.id}>
                       <td>{assignment.id}</td>
                       <td className="name-cell">
-                        {collaborators?.find(
-                          (c: any) => c.id === assignment.collaboratorId
-                        )?.name || `Colaborador #${assignment.collaboratorId}`}
+                        {collaborators?.find((c: any) => c.id === assignment.collaboratorId)?.name ||
+                          `Colaborador #${assignment.collaboratorId}`}
                       </td>
+                      <td>{(assignment as any).kpiName || `KPI #${assignment.kpiId}`}</td>
+                      <td>{(assignment as any).periodName || `Período #${assignment.periodId}`}</td>
                       <td>
-                        {(assignment as any).kpiName ||
-                          `KPI #${assignment.kpiId}`}
+                        {(assignment as any).subPeriodName
+                          ? (assignment as any).subPeriodName
+                          : (assignment as any).subPeriodId
+                          ? `Subperiodo #${(assignment as any).subPeriodId}`
+                          : 'Resumen'}
                       </td>
-                      <td>
-                        {(assignment as any).periodName ||
-                          `Período #${assignment.periodId}`}
-                      </td>
-                      <td className="number-cell">{toNumber(assignment.target) ?? assignment.target}</td>
                       <td className="number-cell">
-                        {toNumber(assignment.actual) ?? assignment.actual ?? '-'}
+                        {toNumber(assignment.target) !== null ? toNumber(assignment.target) : assignment.target}
+                      </td>
+                      <td className="number-cell">
+                        {toNumber(assignment.actual) !== null && assignment.actual !== undefined
+                          ? toNumber(assignment.actual)
+                          : '-'}
                       </td>
                       <td className="number-cell">
                         {toNumber(assignment.weight) ?? assignment.weight}%
                         {totalWeight !== 100 && (
                           <span
-                            className={`weight-warning ${
-                              totalWeight > 100 ? 'error' : 'warning'
-                            }`}
+                            className={`weight-warning ${totalWeight > 100 ? 'error' : 'warning'}`}
                             title={`Suma total: ${totalWeight}%`}
                           >
-                            {totalWeight > 100 ? '⚠' : '!'}
+                            {totalWeight > 100 ? '!' : '!'}
                           </span>
                         )}
                       </td>
                       <td className="number-cell">
                         {(() => {
                           const variationValue = toNumber(assignment.variation)
-                          return variationValue !== null
-                            ? `${variationValue.toFixed(1)}%`
-                            : '-'
+                          return variationValue !== null ? `${variationValue.toFixed(1)}%` : '-'
                         })()}
                       </td>
                       <td>{getStatusBadge(assignment.status)}</td>
@@ -455,7 +435,7 @@ export default function Asignaciones() {
                                 }
                                 title="Aprobar asignación"
                               >
-                                ✓ Aprobar
+                                Aprobar
                               </button>
                               <button
                                 className="btn-reject-small"
@@ -467,31 +447,23 @@ export default function Asignaciones() {
                                 }
                                 title="Rechazar asignación"
                               >
-                                ✕ Rechazar
+                                Rechazar
                               </button>
                             </>
                           )}
                           {canEditAssignment(assignment) && assignment.status !== 'proposed' && (
                             <>
-                              <button
-                                className="btn-icon"
-                                onClick={() => handleEdit(assignment)}
-                                title="Editar"
-                              >
-                                ✏️
+                              <button className="btn-icon" onClick={() => handleEdit(assignment)} title="Editar">
+                                Editar
                               </button>
-                              <button
-                                className="btn-icon"
-                                onClick={() => handleDelete(assignment.id)}
-                                title="Eliminar"
-                              >
-                                🗑️
+                              <button className="btn-icon" onClick={() => handleDelete(assignment.id)} title="Eliminar">
+                                Eliminar
                               </button>
                             </>
                           )}
                           {!canEditAssignment(assignment) && assignment.status !== 'proposed' && (
                             <span className="locked-badge" title="Parrilla cerrada - No se puede editar">
-                              🔒 Cerrada
+                              Cerrada
                             </span>
                           )}
                         </div>
@@ -502,53 +474,31 @@ export default function Asignaciones() {
               </tbody>
             </table>
 
-            {/* Resumen de ponderaciones */}
             {selectedPeriodId && (
               <div className="weight-summary">
                 <h3>Resumen de Ponderaciones por Colaborador</h3>
                 <div className="summary-table">
                   {collaborators
                     ?.filter((c: any) =>
-                      assignments?.some(
-                        (a) =>
-                          a.collaboratorId === c.id &&
-                          a.periodId === selectedPeriodId
-                      )
+                      assignments?.some((a) => a.collaboratorId === c.id && a.periodId === selectedPeriodId)
                     )
                     .map((collaborator: any) => {
-                      const totalWeight = getTotalWeightByCollaborator(
-                        collaborator.id,
-                        selectedPeriodId
-                      )
+                      const totalWeight = getTotalWeightByCollaborator(collaborator.id, selectedPeriodId)
                       return (
                         <div
                           key={collaborator.id}
                           className={`summary-row ${
-                            totalWeight === 100
-                              ? 'valid'
-                              : totalWeight > 100
-                              ? 'error'
-                              : 'warning'
+                            totalWeight === 100 ? 'valid' : totalWeight > 100 ? 'error' : 'warning'
                           }`}
                         >
-                          <span className="summary-name">
-                            {collaborator.name}
-                          </span>
-                          <span className="summary-weight">
-                            {totalWeight.toFixed(1)}%
-                          </span>
-                          {totalWeight === 100 && (
-                            <span className="summary-status">✓ Válido</span>
-                          )}
+                          <span className="summary-name">{collaborator.name}</span>
+                          <span className="summary-weight">{totalWeight.toFixed(1)}%</span>
+                          {totalWeight === 100 && <span className="summary-status">Válido</span>}
                           {totalWeight > 100 && (
-                            <span className="summary-status">
-                              ⚠ Excede por {(totalWeight - 100).toFixed(1)}%
-                            </span>
+                            <span className="summary-status">Excede por {(totalWeight - 100).toFixed(1)}%</span>
                           )}
                           {totalWeight < 100 && (
-                            <span className="summary-status">
-                              ! Falta {(100 - totalWeight).toFixed(1)}%
-                            </span>
+                            <span className="summary-status">Falta {(100 - totalWeight).toFixed(1)}%</span>
                           )}
                         </div>
                       )
@@ -559,11 +509,9 @@ export default function Asignaciones() {
           </>
         ) : (
           <div className="empty-state">
-            <div className="empty-icon">📋</div>
+            <div className="empty-icon">:/</div>
             <h3>No hay asignaciones registradas</h3>
-            <p>
-              Crea una nueva asignación para vincular KPIs con colaboradores
-            </p>
+            <p>Crea una nueva asignación para vincular KPIs con colaboradores</p>
             <button className="btn-primary" onClick={handleCreate}>
               Nueva Asignación
             </button>
@@ -588,11 +536,7 @@ export default function Asignaciones() {
           periodId={selectedPeriodId}
           collaboratorId={closingCollaboratorId || undefined}
           collaboratorName={
-            closingCollaboratorId
-              ? collaborators?.find(
-                  (c: any) => c.id === closingCollaboratorId
-                )?.name
-              : undefined
+            closingCollaboratorId ? collaborators?.find((c: any) => c.id === closingCollaboratorId)?.name : undefined
           }
           periodName={periods?.find((p: any) => p.id === selectedPeriodId)?.name}
           onClose={() => {

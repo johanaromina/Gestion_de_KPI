@@ -19,6 +19,7 @@ import exportRoutes from './routes/export.routes.js'
 import auditRoutes from './routes/audit.routes.js'
 import dashboardRoutes from './routes/dashboard.routes.js'
 import configRoutes from './routes/config.routes.js'
+import areasRoutes from './routes/areas.routes.js'
 
 dotenv.config()
 
@@ -56,6 +57,7 @@ app.use('/api/export', exportRoutes)
 app.use('/api', auditRoutes)
 app.use('/api/dashboard', dashboardRoutes)
 app.use('/api/config', configRoutes)
+app.use('/api/areas', areasRoutes)
 
 // Start server
 app.listen(PORT, async () => {

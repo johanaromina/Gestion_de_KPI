@@ -12,6 +12,8 @@
     "test:db": "tsx scripts/test-connection.ts",
     "add:audit": "tsx scripts/add-audit-table.ts",
     "verify:audit": "tsx scripts/verify-audit-table.ts",
+    "add:collaborator-kpi-plan": "tsx scripts/add-collaborator-kpi-plan-table.ts",
+    "import:plan": "tsx scripts/import-kpi-plan.ts",
     "add:objective-kpis": "tsx scripts/add-objective-trees-kpis-table.ts",
     "import:excel": "tsx scripts/import-objectives-from-excel.ts",
     "seed:objectives": "tsx scripts/seed-objectives-tree.ts",

@@ -1,17 +1,46 @@
 import { Request, Response } from 'express'
+import { RowDataPacket } from 'mysql2/promise'
 import { pool } from '../config/database'
 import { Collaborator } from '../types'
 import { logAudit } from '../utils/audit'
 import { AuthRequest } from '../middleware/auth.middleware'
 
+type CollaboratorRow = Collaborator & RowDataPacket
+
 const canEditCollaborator = (
   user: AuthRequest['user'],
-  collaboratorArea?: string
+  collaboratorArea?: string,
+  collaboratorId?: number
 ) => {
   if (!user) return false
-  if (['admin', 'director'].includes(user.role)) return true
-  return collaboratorArea ? user.area === collaboratorArea : false
+
+  const role = (user.role || '').trim().toLowerCase()
+  const userId =
+    (user as any).id ??
+    (user as any).userId ??
+    (user as any).sub ??
+    null
+  const superpower =
+    Boolean(user.hasSuperpowers) ||
+    Boolean(user.permissions?.includes('config.manage'))
+
+  // Bypass
+  if (superpower) return true
+  if (['admin', 'director'].includes(role)) return true
+  if (userId && collaboratorId && Number(userId) === Number(collaboratorId)) return true
+
+  // Líder/manager sólo misma área
+  const userArea = (user.area || '').trim().toLowerCase()
+  const targetArea = (collaboratorArea || '').trim().toLowerCase()
+
+  if (['manager', 'leader'].includes(role)) {
+    if (!targetArea && userArea) return true
+    return userArea && targetArea ? userArea === targetArea : false
+  }
+
+  return false
 }
+
 
 export const getCollaborators = async (req: Request, res: Response) => {
   try {
@@ -19,8 +48,8 @@ export const getCollaborators = async (req: Request, res: Response) => {
     const query = includeInactive
       ? 'SELECT * FROM collaborators ORDER BY name ASC'
       : "SELECT * FROM collaborators WHERE status = 'active' ORDER BY name ASC"
-    const [rows] = await pool.query<Collaborator[]>(query)
-    res.json(rows)
+    const [rows] = await pool.query<CollaboratorRow[]>(query)
+    res.json(rows as Collaborator[])
   } catch (error: any) {
     console.error('Error fetching collaborators:', error)
     res.status(500).json({ error: 'Error al obtener colaboradores' })
@@ -30,7 +59,7 @@ export const getCollaborators = async (req: Request, res: Response) => {
 export const getCollaboratorById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const [rows] = await pool.query<Collaborator[]>(
+    const [rows] = await pool.query<CollaboratorRow[]>(
       'SELECT * FROM collaborators WHERE id = ?',
       [id]
     )
@@ -105,15 +134,16 @@ export const updateCollaborator = async (req: Request, res: Response) => {
     const { id } = req.params
     const { name, position, area, managerId, role } = req.body
     const user = (req as AuthRequest).user
+    console.log('updateCollaborator user:', user)
 
     // Obtener valores anteriores
-    const [oldRows] = await pool.query<any[]>(
+    const [oldRows] = await pool.query<CollaboratorRow[]>(
       'SELECT * FROM collaborators WHERE id = ?',
       [id]
     )
     const oldValues = Array.isArray(oldRows) && oldRows.length > 0 ? oldRows[0] : null
 
-    if (!canEditCollaborator(user, oldValues?.area)) {
+    if (!canEditCollaborator(user, oldValues?.area, Number(id))) {
       return res.status(403).json({ error: 'No autorizado para editar fuera de tu área' })
     }
 
@@ -152,13 +182,13 @@ export const deleteCollaborator = async (req: Request, res: Response) => {
     const user = (req as AuthRequest).user
 
     // Obtener valores antes de eliminar
-    const [oldRows] = await pool.query<any[]>(
+    const [oldRows] = await pool.query<CollaboratorRow[]>(
       'SELECT * FROM collaborators WHERE id = ?',
       [id]
     )
     const oldValues = Array.isArray(oldRows) && oldRows.length > 0 ? oldRows[0] : null
 
-    if (!canEditCollaborator(user, oldValues?.area)) {
+    if (!canEditCollaborator(user, oldValues?.area, Number(id))) {
       return res.status(403).json({ error: 'No autorizado para eliminar fuera de tu área' })
     }
 
@@ -194,7 +224,7 @@ export const deactivateCollaborator = async (req: Request, res: Response) => {
     const { reason } = req.body
     const user = (req as AuthRequest).user
 
-    const [currentRows] = await pool.query<any[]>(
+    const [currentRows] = await pool.query<CollaboratorRow[]>(
       'SELECT * FROM collaborators WHERE id = ?',
       [id]
     )
@@ -204,7 +234,7 @@ export const deactivateCollaborator = async (req: Request, res: Response) => {
 
     const current = currentRows[0]
 
-    if (!canEditCollaborator(user, current?.area)) {
+    if (!canEditCollaborator(user, current?.area, Number(id))) {
       return res.status(403).json({ error: 'No autorizado para desactivar fuera de tu área' })
     }
 
@@ -326,4 +356,3 @@ export const getCollaboratorEvents = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Error al obtener eventos del colaborador' })
   }
 }
-

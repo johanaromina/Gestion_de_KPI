@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import api from '../services/api'
-import { Collaborator } from '../types'
+import { Area, Collaborator } from '../types'
 import CollaboratorForm from '../components/CollaboratorForm'
 import { useAuth } from '../hooks/useAuth'
 import './Colaboradores.css'
@@ -16,6 +16,15 @@ export default function Colaboradores() {
 
   const queryClient = useQueryClient()
   const { user, isAdmin, isDirector, isManager, isLeader } = useAuth()
+
+  const { data: areas } = useQuery<Area[]>(
+    'areas',
+    async () => {
+      const response = await api.get('/areas')
+      return response.data
+    },
+    { retry: false }
+  )
 
   const { data: collaborators, isLoading } = useQuery<Collaborator[]>(
     ['collaborators', showInactive],
@@ -62,6 +71,35 @@ export default function Colaboradores() {
     }
   )
 
+  const createAreaMutation = useMutation(
+    async (name: string) => {
+      const response = await api.post('/areas', { name })
+      return response.data as Area
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('areas')
+      },
+      onError: (error: any) => {
+        alert(error.response?.data?.error || 'Error al crear área')
+      },
+    }
+  )
+
+  const deleteAreaMutation = useMutation(
+    async (id: number) => {
+      await api.delete(`/areas/${id}`)
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('areas')
+      },
+      onError: (error: any) => {
+        alert(error.response?.data?.error || 'Error al eliminar área')
+      },
+    }
+  )
+
   const handleCreate = () => {
     setEditingCollaborator(undefined)
     setShowForm(true)
@@ -94,8 +132,6 @@ export default function Colaboradores() {
     const manager = collaborators?.find((c) => c.id === managerId)
     return manager ? manager.name : `ID: ${managerId}`
   }
-
-  const areas = Array.from(new Set(collaborators?.map((c) => c.area).filter(Boolean) || [])).sort()
 
   const filteredCollaborators = collaborators?.filter((collaborator) => {
     const matchesSearch =
@@ -141,9 +177,9 @@ export default function Colaboradores() {
             onChange={(e) => setFilterArea(e.target.value)}
           >
             <option value="">Todas las areas</option>
-            {areas.map((area) => (
-              <option key={area} value={area}>
-                {area}
+            {areas?.map((area) => (
+              <option key={area.id} value={area.name}>
+                {area.name}
               </option>
             ))}
           </select>
@@ -298,6 +334,45 @@ export default function Colaboradores() {
               Agregar Colaborador
             </button>
           </div>
+        )}
+      </div>
+
+      <div className="areas-panel">
+        <div className="areas-header">
+          <h3>Áreas</h3>
+          <button
+            className="btn-primary"
+            onClick={() => {
+              const name = window.prompt('Nombre del área')
+              if (name && name.trim()) {
+                createAreaMutation.mutate(name.trim())
+              }
+            }}
+          >
+            + Nueva área
+          </button>
+        </div>
+        {areas && areas.length > 0 ? (
+          <ul className="areas-list">
+            {areas.map((area) => (
+              <li key={area.id}>
+                <span>{area.name}</span>
+                <button
+                  className="btn-icon"
+                  title="Eliminar área"
+                  onClick={() => {
+                    if (window.confirm(`¿Eliminar el área "${area.name}"?`)) {
+                      deleteAreaMutation.mutate(area.id)
+                    }
+                  }}
+                >
+                  Eliminar
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="empty-areas">Aún no hay áreas creadas.</p>
         )}
       </div>
 

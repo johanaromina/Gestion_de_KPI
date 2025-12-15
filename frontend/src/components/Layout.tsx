@@ -104,6 +104,15 @@ export default function Layout({ children }: LayoutProps) {
             <span className="nav-icon" aria-hidden="true">•</span>
             Auditoría
           </Link>
+          {user?.hasSuperpowers && (
+            <Link
+              to="/parrilla-general"
+              className={`nav-item ${isActive('/parrilla-general') ? 'active' : ''}`}
+            >
+              <span className="nav-icon" aria-hidden="true">•</span>
+              Parrilla General
+            </Link>
+          )}
           {canConfig && (
             <Link
               to="/configuracion"

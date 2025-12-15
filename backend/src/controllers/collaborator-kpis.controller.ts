@@ -5,17 +5,122 @@ import { calculateVariation, calculateWeightedResult } from '../utils/kpi-formul
 import { AuthRequest } from '../middleware/auth.middleware'
 
 const canEditAssignment = async (user: AuthRequest['user'], collaboratorId: number) => {
+  // Solo usuarios con permisos de configuración (o superpoderes) pueden modificar datos
   if (!user) return false
-  if (
-    user.hasSuperpowers ||
-    user.permissions?.includes('config.manage') ||
-    ['admin', 'director'].includes(user.role)
-  ) {
-    return true
+  if (user.hasSuperpowers || user.permissions?.includes('config.manage')) return true
+  return false
+}
+
+const canManageConfig = (user: AuthRequest['user']) =>
+  !!user && (user.hasSuperpowers || user.permissions?.includes('config.manage'))
+
+const recalcSummaryAssignment = async (collaboratorId: number, kpiId: number, periodId: number) => {
+  const [[kpiRow]] = await pool.query<any[]>(`SELECT type FROM kpis WHERE id = ?`, [kpiId])
+  if (!kpiRow) return
+
+  const kpiType: KPIType = kpiRow.type
+
+  const [subRows] = await pool.query<any[]>(
+    `SELECT ck.*, sp.endDate
+     FROM collaborator_kpis ck
+     LEFT JOIN sub_periods sp ON ck.subPeriodId = sp.id
+     WHERE ck.collaboratorId = ? AND ck.kpiId = ? AND ck.periodId = ? AND ck.subPeriodId IS NOT NULL`,
+    [collaboratorId, kpiId, periodId]
+  )
+
+  if (!Array.isArray(subRows) || subRows.length === 0) return
+
+  let targetTotal = 0
+  let weightTotal = 0
+  let weightedTotal = 0
+
+  for (const row of subRows) {
+    const t = Number(row.target ?? 0)
+    const w = Number(row.weight ?? 0)
+    targetTotal += t
+    weightTotal += w
+    const vr = row.variation !== null && row.variation !== undefined ? Number(row.variation) : null
+    const wr =
+      row.weightedResult !== null && row.weightedResult !== undefined
+        ? Number(row.weightedResult)
+        : vr !== null
+        ? calculateWeightedResult(vr, w)
+        : null
+    if (wr !== null && Number.isFinite(wr)) {
+      weightedTotal += wr
+    }
   }
-  const [rows] = await pool.query<any[]>('SELECT area FROM collaborators WHERE id = ?', [collaboratorId])
-  const area = rows?.[0]?.area
-  return area ? area === user.area : false
+
+  let summaryTarget = targetTotal
+  let summaryWeight = weightTotal
+  let summaryActual: number | null = null
+  let summaryVariation: number | null = null
+  let summaryWeightedResult: number | null = null
+
+  if (kpiType === 'exact') {
+    const sorted = subRows
+      .slice()
+      .sort((a, b) => {
+        const ea = a.endDate ? new Date(a.endDate).getTime() : 0
+        const eb = b.endDate ? new Date(b.endDate).getTime() : 0
+        if (ea === eb) return (a.id || 0) - (b.id || 0)
+        return ea - eb
+      })
+    const latest = sorted[sorted.length - 1]
+    summaryTarget = Number(latest.target ?? 0)
+    summaryWeight = Number(latest.weight ?? 0)
+    summaryActual =
+      latest.actual !== null && latest.actual !== undefined ? Number(latest.actual) : null
+    summaryVariation =
+      latest.variation !== null && latest.variation !== undefined ? Number(latest.variation) : null
+    summaryWeightedResult =
+      latest.weightedResult !== null && latest.weightedResult !== undefined
+        ? Number(latest.weightedResult)
+        : null
+  } else {
+    if (weightTotal > 0) {
+      summaryWeightedResult = weightedTotal
+      summaryVariation = (weightedTotal / weightTotal) * 100
+    }
+  }
+
+  const [existingParent] = await pool.query<any[]>(
+    `SELECT id FROM collaborator_kpis 
+     WHERE collaboratorId = ? AND kpiId = ? AND periodId = ? AND subPeriodId IS NULL
+     ORDER BY id ASC`,
+    [collaboratorId, kpiId, periodId]
+  )
+
+  if (Array.isArray(existingParent) && existingParent.length > 0) {
+    const parentId = existingParent[0].id
+    const duplicateIds = existingParent.slice(1).map((r) => r.id)
+    if (duplicateIds.length > 0) {
+      await pool.query(`DELETE FROM collaborator_kpis WHERE id IN (${duplicateIds.map(() => '?').join(',')})`, duplicateIds)
+    }
+    await pool.query(
+      `UPDATE collaborator_kpis 
+         SET target = ?, weight = ?, actual = ?, variation = ?, weightedResult = ?
+       WHERE id = ?`,
+      [summaryTarget, summaryWeight, summaryActual, summaryVariation, summaryWeightedResult, parentId]
+    )
+  } else {
+    await pool.query(
+      `INSERT INTO collaborator_kpis
+         (collaboratorId, kpiId, periodId, subPeriodId, target, weight, actual, variation, weightedResult, status)
+       VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)`,
+      [
+        collaboratorId,
+        kpiId,
+        periodId,
+        summaryTarget,
+        summaryWeight,
+        summaryActual,
+        summaryVariation,
+        summaryWeightedResult,
+        'draft',
+      ]
+    )
+  }
 }
 
 export const getCollaboratorKPIs = async (req: Request, res: Response) => {
@@ -28,11 +133,13 @@ export const getCollaboratorKPIs = async (req: Request, res: Response) => {
               k.criteria as kpiCriteria,
               c.name as collaboratorName,
               p.name as periodName,
-              p.status as periodStatus
+              p.status as periodStatus,
+              sp.name as subPeriodName
        FROM collaborator_kpis ck
        JOIN kpis k ON ck.kpiId = k.id
        JOIN collaborators c ON ck.collaboratorId = c.id
        JOIN periods p ON ck.periodId = p.id
+       LEFT JOIN sub_periods sp ON ck.subPeriodId = sp.id
        ORDER BY ck.createdAt DESC`
     )
     res.json(rows)
@@ -53,6 +160,7 @@ export const getCollaboratorKPIById = async (req: Request, res: Response) => {
               k.criteria as kpiCriteria
        FROM collaborator_kpis ck
        JOIN kpis k ON ck.kpiId = k.id
+       LEFT JOIN sub_periods sp ON ck.subPeriodId = sp.id
        WHERE ck.id = ?`,
       [id]
     )
@@ -79,10 +187,12 @@ export const getCollaboratorKPIsByCollaborator = async (req: Request, res: Respo
                         k.description as kpiDescription,
                         k.criteria as kpiCriteria,
                         p.name as periodName,
-                        p.status as periodStatus
+                        p.status as periodStatus,
+                        sp.name as subPeriodName
                  FROM collaborator_kpis ck
                  JOIN kpis k ON ck.kpiId = k.id
                  JOIN periods p ON ck.periodId = p.id
+                 LEFT JOIN sub_periods sp ON ck.subPeriodId = sp.id
                  WHERE ck.collaboratorId = ?`
 
     const params: any[] = [collaboratorId]
@@ -111,10 +221,12 @@ export const getCollaboratorKPIsByPeriod = async (req: Request, res: Response) =
               k.name as kpiName,
               k.description as kpiDescription,
               k.criteria as kpiCriteria,
-              c.name as collaboratorName
+              c.name as collaboratorName,
+              sp.name as subPeriodName
        FROM collaborator_kpis ck
        JOIN kpis k ON ck.kpiId = k.id
        JOIN collaborators c ON ck.collaboratorId = c.id
+       LEFT JOIN sub_periods sp ON ck.subPeriodId = sp.id
        WHERE ck.periodId = ?
        ORDER BY c.name ASC`,
       [periodId]
@@ -147,21 +259,24 @@ export const createCollaboratorKPI = async (req: Request, res: Response) => {
       })
     }
 
-    const [existingWeights] = await pool.query<any[]>(
-      `SELECT SUM(weight) as totalWeight 
-       FROM collaborator_kpis 
-       WHERE collaboratorId = ? AND periodId = ?`,
-      [collaboratorId, periodId]
-    )
+    // Validación de ponderación: solo aplica a filas resumen (subPeriodId NULL)
+    if (!subPeriodId) {
+      const [existingWeights] = await pool.query<any[]>(
+        `SELECT SUM(weight) as totalWeight 
+         FROM collaborator_kpis 
+         WHERE collaboratorId = ? AND periodId = ? AND subPeriodId IS NULL`,
+        [collaboratorId, periodId]
+      )
 
-    if (Array.isArray(existingWeights) && existingWeights.length > 0) {
-      const currentTotal = parseFloat(existingWeights[0].totalWeight || 0)
-      const newTotal = currentTotal + (Number(weight) || 0)
+      if (Array.isArray(existingWeights) && existingWeights.length > 0) {
+        const currentTotal = parseFloat(existingWeights[0].totalWeight || 0)
+        const newTotal = currentTotal + (Number(weight) || 0)
 
-      if (newTotal > 100.01) {
-        return res.status(400).json({
-          error: `La suma de ponderaciones no puede superar el 100%`,
-        })
+        if (newTotal > 100.01) {
+          return res.status(400).json({
+            error: `La suma de ponderaciones no puede superar el 100%`,
+          })
+        }
       }
     }
 
@@ -192,6 +307,12 @@ export const createCollaboratorKPI = async (req: Request, res: Response) => {
       status: status || 'draft',
     })
   } catch (error: any) {
+    if (error?.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({
+        error:
+          'Ya existe una asignación para este colaborador, KPI, período y subperíodo. Edítala en lugar de crearla nuevamente.',
+      })
+    }
     console.error('Error creating collaborator KPI:', error)
     res.status(500).json({ error: 'Error al crear asignación' })
   }
@@ -201,6 +322,9 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
     const { target, actual, weight, status, comments, subPeriodId } = req.body
+    let collaboratorId: number | null = null
+    let kpiId: number | null = null
+    let periodId: number | null = null
 
     const [ckRows] = await pool.query<any[]>(
       `SELECT ck.status as assignmentStatus, p.status as periodStatus, ck.collaboratorId
@@ -214,7 +338,17 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Asignación no encontrada' })
     }
 
-    const { assignmentStatus, periodStatus, collaboratorId } = ckRows[0]
+    const { assignmentStatus, periodStatus, collaboratorId: collabId } = ckRows[0]
+    collaboratorId = collabId
+
+    const [kpiInfo] = await pool.query<any[]>(
+      `SELECT kpiId, periodId FROM collaborator_kpis WHERE id = ?`,
+      [id]
+    )
+    if (Array.isArray(kpiInfo) && kpiInfo.length > 0) {
+      kpiId = kpiInfo[0].kpiId
+      periodId = kpiInfo[0].periodId
+    }
 
     const canEdit = await canEditAssignment((req as AuthRequest).user, collaboratorId)
     if (!canEdit) {
@@ -239,24 +373,49 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
     }
 
     if (weight !== undefined) {
-      const [existingWeights] = await pool.query<any[]>(
-        `SELECT SUM(weight) as totalWeight 
-         FROM collaborator_kpis 
-         WHERE collaboratorId = (SELECT collaboratorId FROM collaborator_kpis WHERE id = ?)
-         AND periodId = (SELECT periodId FROM collaborator_kpis WHERE id = ?)
-         AND id != ?`,
-        [id, id, id]
+      // Valida ponderación solo si esta fila es resumen (sin subperiodo)
+      const [selfRow] = await pool.query<any[]>(
+        `SELECT subPeriodId FROM collaborator_kpis WHERE id = ?`,
+        [id]
       )
+      const isSummary = Array.isArray(selfRow) && selfRow[0]?.subPeriodId === null
 
-      if (Array.isArray(existingWeights) && existingWeights.length > 0) {
-        const currentTotal = parseFloat(existingWeights[0].totalWeight || 0)
-        const newTotal = currentTotal + (Number(weight) || 0)
+      if (isSummary) {
+        const [existingWeights] = await pool.query<any[]>(
+          `SELECT SUM(weight) as totalWeight 
+           FROM collaborator_kpis 
+           WHERE collaboratorId = (SELECT collaboratorId FROM collaborator_kpis WHERE id = ?)
+           AND periodId = (SELECT periodId FROM collaborator_kpis WHERE id = ?)
+           AND subPeriodId IS NULL
+           AND id != ?`,
+          [id, id, id]
+        )
 
-        if (newTotal > 100.01) {
-          return res.status(400).json({
-            error: `La suma de ponderaciones no puede superar el 100%`,
-          })
+        if (Array.isArray(existingWeights) && existingWeights.length > 0) {
+          const currentTotal = parseFloat(existingWeights[0].totalWeight || 0)
+          const newTotal = currentTotal + (Number(weight) || 0)
+
+          if (newTotal > 100.01) {
+            return res.status(400).json({
+              error: `La suma de ponderaciones no puede superar el 100%`,
+            })
+          }
         }
+      }
+    }
+
+    // Evitar duplicados al cambiar subperiodo
+    if (subPeriodId !== undefined) {
+      const [dupRows] = await pool.query<any[]>(
+        `SELECT id FROM collaborator_kpis
+         WHERE collaboratorId = ? AND kpiId = ? AND periodId = ? AND (subPeriodId <=> ?)
+         AND id != ?`,
+        [collaboratorId, kpiId, periodId, subPeriodId || null, id]
+      )
+      if (Array.isArray(dupRows) && dupRows.length > 0) {
+        return res.status(400).json({
+          error: 'Ya existe una asignación para este KPI y subperiodo. Edita la existente en lugar de moverla.',
+        })
       }
     }
 
@@ -266,7 +425,7 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
 
     if (actual !== undefined) {
       const [ckDataRows] = await pool.query<any[]>(
-        `SELECT ck.target, k.type 
+        `SELECT ck.target, ck.weight, k.type 
          FROM collaborator_kpis ck
          JOIN kpis k ON ck.kpiId = k.id
          WHERE ck.id = ?`,
@@ -275,10 +434,18 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
 
       if (Array.isArray(ckDataRows) && ckDataRows.length > 0) {
         const kpiType = ckDataRows[0].type
-        const currentTarget = target || ckDataRows[0].target
+        const currentTarget = Number(target ?? ckDataRows[0].target ?? 0)
+        const currentWeight = Number(weight ?? ckDataRows[0].weight ?? 0)
+
+        if (!currentTarget || currentTarget <= 0) {
+          return res.status(400).json({
+            error:
+              'No se puede actualizar el valor actual porque el target es 0 o no está definido. Ajusta el target antes de registrar el alcance.',
+          })
+        }
 
         const variation = calculateVariation(kpiType, currentTarget, actual)
-        const weightedResult = calculateWeightedResult(variation, weight)
+        const weightedResult = calculateWeightedResult(variation, currentWeight)
 
         updateQuery += `, actual = ?, variation = ?, weightedResult = ?`
         params.push(actual, variation, weightedResult)
@@ -292,6 +459,10 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
     params.push(id)
 
     await pool.query(updateQuery, params)
+
+    if (actual !== undefined && collaboratorId && kpiId && periodId) {
+      await recalcSummaryAssignment(collaboratorId, kpiId, periodId)
+    }
 
     res.json({ message: 'Asignación actualizada correctamente' })
   } catch (error: any) {
@@ -310,7 +481,7 @@ export const updateActualValue = async (req: Request, res: Response) => {
     }
 
     const [ckRows] = await pool.query<any[]>(
-      `SELECT ck.status, p.status as periodStatus, ck.collaboratorId
+      `SELECT ck.status, p.status as periodStatus, ck.collaboratorId, ck.periodId, ck.kpiId
        FROM collaborator_kpis ck
        JOIN periods p ON ck.periodId = p.id
        WHERE ck.id = ?`,
@@ -332,6 +503,9 @@ export const updateActualValue = async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'No autorizado para editar asignaciones fuera de tu área' })
     }
 
+    const kpiId = ckRows[0].kpiId
+    const periodId = ckRows[0].periodId
+
     const [ckDataRows] = await pool.query<any[]>(
       `SELECT ck.target, ck.weight, k.type 
        FROM collaborator_kpis ck
@@ -341,9 +515,18 @@ export const updateActualValue = async (req: Request, res: Response) => {
     )
 
     const { target, weight, type } = ckDataRows[0]
+    const currentTarget = Number(target ?? 0)
+    const currentWeight = Number(weight ?? 0)
 
-    const variation = calculateVariation(type, target, actual)
-    const weightedResult = calculateWeightedResult(variation, weight)
+    if (!currentTarget || currentTarget <= 0) {
+      return res.status(400).json({
+        error:
+          'No se puede actualizar el valor actual porque el target es 0 o no está definido. Ajusta el target antes de registrar el alcance.',
+      })
+    }
+
+    const variation = calculateVariation(type, currentTarget, actual)
+    const weightedResult = calculateWeightedResult(variation, currentWeight)
 
     await pool.query(
       `UPDATE collaborator_kpis 
@@ -351,6 +534,8 @@ export const updateActualValue = async (req: Request, res: Response) => {
        WHERE id = ?`,
       [actual, variation, weightedResult, id]
     )
+
+    await recalcSummaryAssignment(ckRows[0].collaboratorId, kpiId, periodId)
 
     res.json({
       message: 'Valor actualizado correctamente',
@@ -464,8 +649,18 @@ export const proposeCollaboratorKPI = async (req: Request, res: Response) => {
         const kpiType = kpiRows[0].type
         const customFormula = kpiRows[0].formula || undefined
 
-        const variation = calculateVariation(kpiType, assignment.target, actual)
-        const weightedResult = calculateWeightedResult(variation, assignment.weight)
+        const targetValue = Number(assignment.target ?? 0)
+        const weightValue = Number(assignment.weight ?? 0)
+
+        if (!targetValue || targetValue <= 0) {
+          return res.status(400).json({
+            error:
+              'No se puede actualizar el valor actual porque el target es 0 o no está definido. Ajusta el target antes de registrar el alcance.',
+          })
+        }
+
+        const variation = calculateVariation(kpiType, targetValue, actual, customFormula)
+        const weightedResult = calculateWeightedResult(variation, weightValue)
 
         updateData.actual = actual
         updateData.variation = variation
@@ -680,7 +875,7 @@ export const deleteCollaboratorKPI = async (req: Request, res: Response) => {
 
 export const generateBaseGrids = async (req: Request, res: Response) => {
   try {
-    const { area, periodId, kpiIds, defaultTarget, defaultWeight } = req.body
+    const { area, periodId, kpiIds, defaultTarget, defaultWeight, kpiOverrides } = req.body
 
     if (!area || !periodId) {
       return res.status(400).json({
@@ -720,10 +915,60 @@ export const generateBaseGrids = async (req: Request, res: Response) => {
       })
     }
 
+    const overridesMap = new Map<
+      number,
+      {
+        target?: number
+        weight?: number
+      }
+    >()
+
+    if (Array.isArray(kpiOverrides)) {
+      for (const ov of kpiOverrides) {
+        if (!ov || typeof ov.kpiId !== 'number') continue
+        overridesMap.set(ov.kpiId, {
+          target: ov.target !== undefined && ov.target !== null ? Number(ov.target) : undefined,
+          weight: ov.weight !== undefined && ov.weight !== null ? Number(ov.weight) : undefined,
+        })
+      }
+    }
+
     const target = defaultTarget || 0
     const weight = defaultWeight || 0
 
     const weightPerKpi = weight > 0 ? weight : kpis.length > 0 ? 100 / kpis.length : 0
+
+    // Traer plan mensual si existe para los colaboradores/KPIs del período
+    const collaboratorIds = collaborators.map((c: any) => c.id)
+    let planMap = new Map<string, any[]>()
+
+    if (collaboratorIds.length > 0) {
+      const collaboratorPlaceholders = collaboratorIds.map(() => '?').join(',')
+      const params: any[] = [periodId, ...collaboratorIds]
+
+      let planQuery = `SELECT collaboratorId, kpiId, subPeriodId, target, weight 
+                       FROM collaborator_kpi_plan 
+                       WHERE periodId = ? 
+                       AND collaboratorId IN (${collaboratorPlaceholders})`
+
+      if (kpiIds && Array.isArray(kpiIds) && kpiIds.length > 0) {
+        const kpiPlaceholders = kpiIds.map(() => '?').join(',')
+        planQuery += ` AND kpiId IN (${kpiPlaceholders})`
+        params.push(...kpiIds)
+      }
+
+      const [planRows] = await pool.query<any[]>(planQuery, params)
+
+      if (Array.isArray(planRows)) {
+        planMap = planRows.reduce((map, row) => {
+          const key = `${row.collaboratorId}-${row.kpiId}`
+          const existing = map.get(key) || []
+          existing.push(row)
+          map.set(key, existing)
+          return map
+        }, new Map<string, any[]>())
+      }
+    }
 
     const createdAssignments: any[] = []
     const errors: any[] = []
@@ -731,9 +976,70 @@ export const generateBaseGrids = async (req: Request, res: Response) => {
     for (const collaborator of collaborators) {
       for (const kpi of kpis) {
         try {
+          const planKey = `${collaborator.id}-${kpi.id}`
+          const planRows = planMap.get(planKey) || []
+
+          if (planRows.length > 0) {
+            // El peso en el plan es el peso total del KPI para todo el período
+            // Lo distribuimos entre los subperíodos para no inflar el total (>100%)
+            const baseWeight = Number(planRows[0].weight ?? 0)
+            // Si hay múltiples subperíodos, dividimos el peso entre ellos
+            // Si solo hay uno, usamos el peso completo
+            const distributedWeight =
+              baseWeight > 0 && planRows.length > 1 ? baseWeight / planRows.length : baseWeight || weightPerKpi
+
+            for (const plan of planRows) {
+              const planTarget = Number(plan.target ?? 0)
+              // Usar el peso distribuido para cada subperíodo
+              const planWeight = Number.isFinite(distributedWeight) ? distributedWeight : weightPerKpi
+              const subPeriodId = plan.subPeriodId || null
+
+              if (!planTarget || planTarget < 0) {
+                errors.push({
+                  collaboratorId: collaborator.id,
+                  kpiId: kpi.id,
+                  subPeriodId,
+                  error: 'Target inválido en plan',
+                })
+                continue
+              }
+
+              const [existing] = await pool.query<any[]>(
+                `SELECT id FROM collaborator_kpis 
+                 WHERE collaboratorId = ? AND kpiId = ? AND periodId = ? AND (subPeriodId <=> ?)`,
+                [collaborator.id, kpi.id, periodId, subPeriodId]
+              )
+
+              if (Array.isArray(existing) && existing.length > 0) {
+                continue
+              }
+
+              const [result] = await pool.query(
+                `INSERT INTO collaborator_kpis 
+                 (collaboratorId, kpiId, periodId, subPeriodId, target, weight, status) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [collaborator.id, kpi.id, periodId, subPeriodId, planTarget, planWeight, 'draft']
+              )
+
+              const insertResult = result as any
+              createdAssignments.push({
+                id: insertResult.insertId,
+                collaboratorId: collaborator.id,
+                kpiId: kpi.id,
+                periodId,
+                subPeriodId,
+                target: planTarget,
+                weight: planWeight,
+              })
+            }
+
+            continue
+          }
+
+          // Sin plan: crear asignación única con defaults
           const [existing] = await pool.query<any[]>(
             `SELECT id FROM collaborator_kpis 
-             WHERE collaboratorId = ? AND kpiId = ? AND periodId = ?`,
+             WHERE collaboratorId = ? AND kpiId = ? AND periodId = ? AND subPeriodId IS NULL`,
             [collaborator.id, kpi.id, periodId]
           )
 
@@ -741,11 +1047,20 @@ export const generateBaseGrids = async (req: Request, res: Response) => {
             continue
           }
 
+          const override = overridesMap.get(kpi.id)
+          const targetValue = override?.target !== undefined ? override.target : target
+          const weightValue =
+            override?.weight !== undefined
+              ? override.weight
+              : weight > 0
+              ? weight
+              : weightPerKpi
+
           const [result] = await pool.query(
             `INSERT INTO collaborator_kpis 
              (collaboratorId, kpiId, periodId, target, weight, status) 
              VALUES (?, ?, ?, ?, ?, ?)`,
-            [collaborator.id, kpi.id, periodId, target, weightPerKpi, 'draft']
+            [collaborator.id, kpi.id, periodId, targetValue, weightValue, 'draft']
           )
 
           const insertResult = result as any
@@ -754,8 +1069,8 @@ export const generateBaseGrids = async (req: Request, res: Response) => {
             collaboratorId: collaborator.id,
             kpiId: kpi.id,
             periodId,
-            target,
-            weight: weightPerKpi,
+            target: targetValue,
+            weight: weightValue,
           })
         } catch (error: any) {
           errors.push({
@@ -783,6 +1098,117 @@ export const generateBaseGrids = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Error generating base grids:', error)
     res.status(500).json({ error: 'Error al generar parrillas base' })
+  }
+}
+
+// --- PLAN MENSUAL POR KPI / SUBPERIODO ---
+
+export const getMonthlyPlan = async (req: Request, res: Response) => {
+  try {
+    const { collaboratorId, kpiId, periodId } = req.params
+
+    if (!collaboratorId || !kpiId || !periodId) {
+      return res.status(400).json({ error: 'collaboratorId, kpiId y periodId son requeridos' })
+    }
+
+    const [rows] = await pool.query<any[]>(
+      `SELECT id, collaboratorId, kpiId, periodId, subPeriodId, target, weight
+       FROM collaborator_kpi_plan
+       WHERE collaboratorId = ? AND kpiId = ? AND periodId = ?
+       ORDER BY subPeriodId ASC`,
+      [collaboratorId, kpiId, periodId]
+    )
+
+    res.json(rows)
+  } catch (error: any) {
+    console.error('Error fetching monthly plan:', error)
+    res.status(500).json({ error: 'Error al obtener el plan mensual' })
+  }
+}
+
+export const upsertMonthlyPlan = async (req: Request, res: Response) => {
+  try {
+    const { collaboratorId, kpiId, periodId } = req.params
+    const { items } = req.body
+
+    if (!collaboratorId || !kpiId || !periodId) {
+      return res.status(400).json({ error: 'collaboratorId, kpiId y periodId son requeridos' })
+    }
+
+    const user = (req as AuthRequest).user
+    if (!canManageConfig(user)) {
+      return res.status(403).json({ error: 'No autorizado: se requieren permisos de configuración' })
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Debe enviar al menos un item con subPeriodId, target y weight' })
+    }
+
+    const conn = await pool.getConnection()
+    try {
+      await conn.beginTransaction()
+
+      for (const item of items) {
+        if (!item || typeof item.subPeriodId !== 'number') continue
+
+        const target = Number(item.target ?? 0)
+        const weight = Number(item.weight ?? 0)
+
+        if (target < 0) {
+          await conn.rollback()
+          return res.status(400).json({ error: 'Target no puede ser negativo' })
+        }
+
+        if (weight < 0 || weight > 100) {
+          await conn.rollback()
+          return res.status(400).json({ error: 'La ponderación debe estar entre 0 y 100' })
+        }
+
+        await conn.query(
+          `INSERT INTO collaborator_kpi_plan (collaboratorId, kpiId, periodId, subPeriodId, target, weight)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE target = VALUES(target), weight = VALUES(weight)`,
+          [collaboratorId, kpiId, periodId, item.subPeriodId, target, weight]
+        )
+
+        // Si existe una asignación para ese subperiodo, actualizamos target/weight allí también
+        const [existingAssignments] = await conn.query<any[]>(
+          `SELECT id FROM collaborator_kpis 
+           WHERE collaboratorId = ? AND kpiId = ? AND periodId = ? AND (subPeriodId <=> ?)`,
+          [collaboratorId, kpiId, periodId, item.subPeriodId]
+        )
+
+        if (Array.isArray(existingAssignments) && existingAssignments.length > 0) {
+          await conn.query(
+            `UPDATE collaborator_kpis 
+               SET target = ?, weight = ?
+             WHERE id = ?`,
+            [target, weight, existingAssignments[0].id]
+          )
+        } else {
+          await conn.query(
+            `INSERT INTO collaborator_kpis 
+               (collaboratorId, kpiId, periodId, subPeriodId, target, weight, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [collaboratorId, kpiId, periodId, item.subPeriodId, target, weight, 'draft']
+          )
+        }
+      }
+
+      await conn.commit()
+    } catch (err) {
+      await conn.rollback()
+      throw err
+    } finally {
+      conn.release()
+    }
+
+    await recalcSummaryAssignment(Number(collaboratorId), Number(kpiId), Number(periodId))
+
+    res.json({ message: 'Plan mensual actualizado' })
+  } catch (error: any) {
+    console.error('Error upserting monthly plan:', error)
+    res.status(500).json({ error: 'Error al actualizar plan mensual' })
   }
 }
 

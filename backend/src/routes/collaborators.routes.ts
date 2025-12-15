@@ -9,8 +9,12 @@ import {
   changeCollaboratorRole,
   getCollaboratorEvents,
 } from '../controllers/collaborators.controller'
+import { authenticate } from '../middleware/auth.middleware'
 
 const router = Router()
+
+// Todas las rutas requieren usuario autenticado
+router.use(authenticate)
 
 router.get('/', getCollaborators)
 router.get('/:id/events', getCollaboratorEvents)

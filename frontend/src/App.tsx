@@ -15,6 +15,7 @@ import VistasAgregadas from './pages/VistasAgregadas'
 import VistasReduccion from './pages/VistasReduccion'
 import Auditoria from './pages/Auditoria'
 import Configuracion from './pages/Configuracion'
+import ParrillaGeneral from './pages/ParrillaGeneral'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -152,6 +153,14 @@ function App() {
                 </RequireAuth>
               }
             />
+            <Route
+              path="/parrilla-general"
+              element={
+                <RequireAuth>
+                  <ParrillaGeneral />
+                </RequireAuth>
+              }
+            />
           </Routes>
         </Layout>
       </Router>
@@ -160,4 +169,3 @@ function App() {
 }
 
 export default App
-

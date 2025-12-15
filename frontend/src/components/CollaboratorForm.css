@@ -5,3 +5,13 @@
   padding: 24px;
 }
 
+.area-input {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-secondary.small {
+  padding: 8px 10px;
+  font-size: 12px;
+}

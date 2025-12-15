@@ -72,6 +72,77 @@ $plainPassword = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.Int
 Get-Content scripts/add_objective_trees_kpis_table.sql | mysql -u root -p$plainPassword gestion_kpi
 ```
 
+### 7. `add_collaborator_kpi_plan_table.sql`
+Script SQL que crea la tabla `collaborator_kpi_plan` para almacenar el plan mensual de KPIs por colaborador.
+
+**Uso:**
+```bash
+npm run add:collaborator-kpi-plan
+```
+
+### 8. `import-kpi-plan.ts`
+Script TypeScript que importa el plan de KPIs desde un archivo Excel a la tabla `collaborator_kpi_plan`.
+
+**Requisitos:**
+- El archivo Excel debe tener columnas de fechas en la cabecera (formato serial de Excel)
+- Los subperíodos en la base de datos deben tener `startDate` que coincida con las fechas del Excel (formato YYYY-MM-DD, ej: 2025-03-01, 2025-04-01)
+- Los nombres de colaboradores y KPIs en la DB deben coincidir exactamente con los del Excel
+- El peso del KPI se toma de la columna 7 del Excel y se guarda en cada fila del plan
+
+**Uso:**
+```bash
+cd backend
+npm run import:plan "OKR KPI Total v0.xlsx" <periodId> "KPI Equipo Producto "
+```
+
+O directamente con tsx:
+```bash
+cd backend
+npx tsx scripts/import-kpi-plan.ts "OKR KPI Total v0.xlsx" <periodId> "KPI Equipo Producto "
+```
+
+**Parámetros:**
+- `<archivo.xlsx>`: Ruta al archivo Excel (puede estar en la raíz del proyecto o ruta relativa/absoluta)
+- `<periodId>`: ID del período en la base de datos
+- `[sheetName]`: Nombre de la hoja del Excel (opcional, por defecto: "KPI Equipo Producto ")
+
+**Notas:**
+- Los pesos se guardan tal cual vienen del Excel (si vienen como 0.35 se convierten a 35%)
+- Los targets se toman de las columnas de fechas
+- Si un colaborador o KPI no hace match, se omite esa fila
+- Si un subperíodo no se encuentra para una fecha, se muestra una advertencia y se omite
+
+### 9. Generar Parrillas Base (API)
+Una vez importado el plan, puedes generar las parrillas base usando la API:
+
+**Endpoint:**
+```
+POST /api/collaborator-kpis/generate-base-grids
+```
+
+**Body:**
+```json
+{
+  "area": "Producto",
+  "periodId": 1,
+  "kpiIds": [1, 2, 3]  // Opcional: si no se especifica, usa todos los KPIs
+}
+```
+
+**Comportamiento:**
+- Si existe plan en `collaborator_kpi_plan` para los colaboradores/KPIs del período:
+  - Crea asignaciones mensuales (una por subperíodo) con target y peso del plan
+  - **Los pesos se distribuyen entre los subperíodos** para no inflar el total (>100%)
+    - Ejemplo: Si un KPI tiene peso 35% y hay 12 subperíodos, cada uno recibe 35% / 12 = 2.92%
+- Si no existe plan:
+  - Usa el comportamiento anterior (asignación única sin subperíodo)
+  - Distribuye el peso equitativamente entre todos los KPIs si no se especifica `defaultWeight`
+
+## 📖 Guía Completa: Importar Plan y Generar Parrillas Base
+
+Para una guía detallada paso a paso sobre cómo importar el plan y generar las parrillas base, consulta:
+**[GUIA-IMPORTAR-PLAN.md](./GUIA-IMPORTAR-PLAN.md)**
+
 ## Ejecución Manual de Scripts SQL
 
 Si prefieres ejecutar los scripts SQL manualmente:

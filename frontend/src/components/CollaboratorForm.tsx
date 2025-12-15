@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import api from '../services/api'
-import { Collaborator } from '../types'
+import { Area, Collaborator } from '../types'
 import './CollaboratorForm.css'
 
 interface CollaboratorFormProps {
@@ -36,6 +36,31 @@ export default function CollaboratorForm({
     },
     {
       retry: false,
+    }
+  )
+
+  const { data: areas } = useQuery<Area[]>(
+    'areas',
+    async () => {
+      const response = await api.get('/areas')
+      return response.data
+    },
+    { retry: false }
+  )
+
+  const createAreaMutation = useMutation(
+    async (name: string) => {
+      const response = await api.post('/areas', { name })
+      return response.data as Area
+    },
+    {
+      onSuccess: (newArea) => {
+        queryClient.invalidateQueries('areas')
+        setFormData((prev) => ({ ...prev, area: newArea.name }))
+      },
+      onError: (error: any) => {
+        alert(error.response?.data?.error || 'Error al crear área')
+      },
     }
   )
 
@@ -164,16 +189,35 @@ export default function CollaboratorForm({
 
             <div className="form-group">
               <label htmlFor="area">Área *</label>
-              <input
-                type="text"
-                id="area"
-                value={formData.area || ''}
-                onChange={(e) =>
-                  setFormData({ ...formData, area: e.target.value })
-                }
-                placeholder="Ej: Tecnología"
-                className={errors.area ? 'error' : ''}
-              />
+              <div className="area-input">
+                <select
+                  id="area"
+                  value={formData.area || ''}
+                  onChange={(e) =>
+                    setFormData({ ...formData, area: e.target.value })
+                  }
+                  className={errors.area ? 'error' : ''}
+                >
+                  <option value="">Seleccione un área</option>
+                  {areas?.map((a) => (
+                    <option key={a.id} value={a.name}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="btn-secondary small"
+                  onClick={() => {
+                    const name = window.prompt('Nombre del área')
+                    if (name && name.trim()) {
+                      createAreaMutation.mutate(name.trim())
+                    }
+                  }}
+                >
+                  + Nueva
+                </button>
+              </div>
               {errors.area && (
                 <span className="error-message">{errors.area}</span>
               )}
@@ -250,4 +294,3 @@ export default function CollaboratorForm({
     </div>
   )
 }
-

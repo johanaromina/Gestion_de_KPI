@@ -1,0 +1,11 @@
+-- Tabla de relación KPI - Área (muchos a muchos)
+CREATE TABLE IF NOT EXISTS kpi_areas (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  kpiId INT NOT NULL,
+  area VARCHAR(255) NOT NULL,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_kpi_area (kpiId, area),
+  FOREIGN KEY (kpiId) REFERENCES kpis(id) ON DELETE CASCADE,
+  INDEX idx_area (area)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

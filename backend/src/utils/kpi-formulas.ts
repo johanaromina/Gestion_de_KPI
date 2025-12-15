@@ -14,19 +14,22 @@ export function calculateVariation(
   actual: number,
   customFormula?: string
 ): number {
+  const targetValue = Number(target)
+  const actualValue = Number(actual)
+
   // Validaciones básicas
-  if (!target || target === 0) {
-    throw new Error('El target debe ser mayor a 0')
+  if (!Number.isFinite(targetValue) || targetValue <= 0) {
+    return 0
   }
 
-  if (actual === null || actual === undefined || isNaN(actual)) {
+  if (actual === null || actual === undefined || !Number.isFinite(actualValue)) {
     return 0
   }
 
   // Si hay una fórmula personalizada, usarla
   if (customFormula) {
     try {
-      return evaluateCustomFormula(customFormula, { target, actual })
+      return evaluateCustomFormula(customFormula, { target: targetValue, actual: actualValue })
     } catch (error) {
       console.error('Error evaluando fórmula personalizada:', error)
       // Fallback a fórmula por defecto según tipo
@@ -39,24 +42,24 @@ export function calculateVariation(
       // Crecimiento: (Actual / Target) * 100
       // Ejemplo: Target=100, Actual=120 → 120%
       // Si Actual > Target, el resultado puede ser > 100%
-      if (actual <= 0) return 0
-      return (actual / target) * 100
+      if (actualValue <= 0) return 0
+      return (actualValue / targetValue) * 100
 
     case 'reduction':
       // Reducción: (Target / Actual) * 100
       // Ejemplo: Target=100 (tiempo objetivo), Actual=80 (tiempo real) → 125%
       // Menor actual = mejor resultado (más alto el %)
       // Si Actual = 0, retornar 0 para evitar división por cero
-      if (actual <= 0) return 0
-      return (target / actual) * 100
+      if (actualValue <= 0) return 0
+      return (targetValue / actualValue) * 100
 
     case 'exact':
       // Exacto: 100 si es igual, penalización por diferencia
       // Ejemplo: Target=100, Actual=100 → 100%
       // Ejemplo: Target=100, Actual=90 → 90% (penalización del 10%)
       // Ejemplo: Target=100, Actual=110 → 90% (penalización del 10%)
-      const diff = Math.abs(actual - target)
-      const percentageDiff = (diff / target) * 100
+      const diff = Math.abs(actualValue - targetValue)
+      const percentageDiff = (diff / targetValue) * 100
       return Math.max(0, 100 - percentageDiff)
 
     default:
@@ -197,4 +200,3 @@ export function getDefaultFormula(type: KPIType): string {
       return '(actual / target) * 100'
   }
 }
-

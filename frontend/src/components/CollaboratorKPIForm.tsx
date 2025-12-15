@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQueryClient, useQuery } from 'react-query'
 import api from '../services/api'
+import { useAuth } from '../hooks/useAuth'
 import './CollaboratorKPIForm.css'
 
 const toNumber = (value: any): number => {
@@ -51,16 +52,30 @@ export default function CollaboratorKPIForm({
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const queryClient = useQueryClient()
+  const { user } = useAuth()
+  const isReadOnlyCollaborator = user?.role === 'collaborator'
 
   const { data: collaborators } = useQuery('collaborators', async () => {
     const response = await api.get('/collaborators')
     return response.data
   })
 
-  const { data: kpis } = useQuery('kpis', async () => {
-    const response = await api.get('/kpis')
-    return response.data
-  })
+  const selectedCollaborator = collaborators?.find((c: any) => c.id === formData.collaboratorId)
+  const collaboratorArea = selectedCollaborator?.area
+
+  const { data: kpis } = useQuery(
+    ['kpis', collaboratorArea],
+    async () => {
+      const response = await api.get('/kpis', {
+        params: collaboratorArea ? { area: collaboratorArea } : undefined,
+      })
+      return response.data
+    },
+    {
+      // Permitir fetch inicial aunque no haya área para que no quede vacío cuando aún no se seleccionó
+      enabled: true,
+    }
+  )
 
   const { data: subPeriods } = useQuery(
     ['sub-periods', periodId],
@@ -81,6 +96,16 @@ export default function CollaboratorKPIForm({
   )
 
   const isPeriodClosed = periodInfo?.status === 'closed'
+  const canConfig = useMemo(
+    () =>
+      !!(
+        user?.hasSuperpowers ||
+        user?.permissions?.includes('config.manage') ||
+        user?.permissions?.includes('config.view')
+      ),
+    [user]
+  )
+  const canEditPlan = canConfig && !isReadOnlyCollaborator
 
   const { data: existingAssignments } = useQuery(
     ['collaborator-kpis', formData.collaboratorId, periodId],
@@ -201,6 +226,8 @@ export default function CollaboratorKPIForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
+    if (isReadOnlyCollaborator) return
+
     if (!validate()) return
 
     if (assignment?.id) {
@@ -212,6 +239,67 @@ export default function CollaboratorKPIForm({
 
   const totalWeight = toNumber(calculateTotalWeight())
   const remainingWeight = 100 - (totalWeight - toNumber(formData.weight))
+
+  // --- PLAN MENSUAL POR SUBPERIODO ---
+  const shouldLoadPlan = !!formData.collaboratorId && !!formData.kpiId && !!periodId
+  const { data: planData, refetch: refetchPlan } = useQuery(
+    ['plan', formData.collaboratorId, formData.kpiId, periodId],
+    async () => {
+      const res = await api.get(
+        `/collaborator-kpis/plan/${formData.collaboratorId}/${formData.kpiId}/${periodId}`
+      )
+      return res.data
+    },
+    { enabled: shouldLoadPlan }
+  )
+
+  type PlanRow = { subPeriodId: number; name: string; target: number | ''; weight: number | '' }
+  const [planRows, setPlanRows] = useState<PlanRow[]>([])
+  const [planErrors, setPlanErrors] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!subPeriods || !Array.isArray(subPeriods)) return
+    const planMap = new Map<number, { target: number; weight: number }>()
+    if (Array.isArray(planData)) {
+      for (const p of planData) {
+        planMap.set(p.subPeriodId, { target: Number(p.target ?? 0), weight: Number(p.weight ?? 0) })
+      }
+    }
+    const merged = subPeriods.map((sp: any) => ({
+      subPeriodId: sp.id,
+      name: sp.name,
+      target: planMap.get(sp.id)?.target ?? '',
+      weight: planMap.get(sp.id)?.weight ?? '',
+    }))
+    setPlanRows(merged)
+  }, [planData, subPeriods])
+
+  const planWeightTotal = planRows.reduce((acc, r) => acc + (Number(r.weight) || 0), 0)
+
+  const upsertPlanMutation = useMutation(
+    async (items: PlanRow[]) => {
+      const body = {
+        items: items.map((r) => ({
+          subPeriodId: r.subPeriodId,
+          target: Number(r.target) || 0,
+          weight: Number(r.weight) || 0,
+        })),
+      }
+      return api.post(
+        `/collaborator-kpis/plan/${formData.collaboratorId}/${formData.kpiId}/${periodId}`,
+        body
+      )
+    },
+    {
+      onSuccess: () => {
+        refetchPlan()
+        queryClient.invalidateQueries(['collaborator-kpis', formData.collaboratorId, periodId])
+      },
+      onError: (err: any) => {
+        setPlanErrors(err?.response?.data?.error || 'Error al guardar plan mensual')
+      },
+    }
+  )
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -252,7 +340,7 @@ export default function CollaboratorKPIForm({
                     collaboratorId: parseInt(e.target.value),
                   })
                 }
-                disabled={!!assignment?.id || !!collaboratorId || isPeriodClosed}
+                disabled={!!assignment?.id || !!collaboratorId || isPeriodClosed || isReadOnlyCollaborator}
                 className={errors.collaboratorId ? 'error' : ''}
               >
                 <option value="0">Seleccione un colaborador</option>
@@ -276,7 +364,7 @@ export default function CollaboratorKPIForm({
                     kpiId: parseInt(e.target.value),
                   })
                 }
-                disabled={!!assignment?.id || isPeriodClosed}
+                disabled={!!assignment?.id || isPeriodClosed || isReadOnlyCollaborator}
                 className={errors.kpiId ? 'error' : ''}
               >
                 <option value="0">Seleccione un KPI</option>
@@ -302,6 +390,7 @@ export default function CollaboratorKPIForm({
                     subPeriodId: e.target.value ? parseInt(e.target.value) : undefined,
                   })
                 }
+                disabled={isReadOnlyCollaborator}
               >
                 <option value="">Sin subperiodo específico</option>
                 {subPeriods.map((sp: any) => (
@@ -331,6 +420,7 @@ export default function CollaboratorKPIForm({
                   }
                   className={errors.target ? 'error' : ''}
                   placeholder="Ej: 100"
+                  disabled={isReadOnlyCollaborator}
                 />
                 {errors.target && <span className="error-message">{errors.target}</span>}
               </div>
@@ -352,6 +442,7 @@ export default function CollaboratorKPIForm({
                   }
                   className={errors.weight ? 'error' : ''}
                   placeholder="Ej: 25.00"
+                  disabled={isReadOnlyCollaborator}
                 />
                 {errors.weight && <span className="error-message">{errors.weight}</span>}
                 <div className="weight-info">
@@ -371,12 +462,26 @@ export default function CollaboratorKPIForm({
           {assignment?.id && (
             <div className="form-row">
               <div className="form-group">
-                <label>Target (solo lectura)</label>
-                <input type="number" value={formData.target || ''} disabled />
+                <label>Target</label>
+                <input
+                  type="number"
+                  value={formData.target || ''}
+                  onChange={(e) =>
+                    setFormData({ ...formData, target: parseFloat(e.target.value) || 0 })
+                  }
+                  disabled={isPeriodClosed || isAssignmentClosed || isReadOnlyCollaborator}
+                />
               </div>
               <div className="form-group">
-                <label>Ponderación (%) (solo lectura)</label>
-                <input type="number" value={formData.weight || ''} disabled />
+                <label>Ponderación (%)</label>
+                <input
+                  type="number"
+                  value={formData.weight || ''}
+                  onChange={(e) =>
+                    setFormData({ ...formData, weight: parseFloat(e.target.value) || 0 })
+                  }
+                  disabled={isPeriodClosed || isAssignmentClosed || isReadOnlyCollaborator}
+                />
               </div>
             </div>
           )}
@@ -397,6 +502,7 @@ export default function CollaboratorKPIForm({
               }
               placeholder="Ingresa el valor logrado este mes"
               className={errors.actual ? 'error' : ''}
+              disabled={isReadOnlyCollaborator}
             />
             {errors.actual && <span className="error-message">{errors.actual}</span>}
             <small className="form-hint">
@@ -416,6 +522,7 @@ export default function CollaboratorKPIForm({
                     status: e.target.value as CollaboratorKPI['status'],
                   })
                 }
+                disabled={isReadOnlyCollaborator}
               >
                 <option value="proposed">Propuesto</option>
                 <option value="approved">Aprobado</option>
@@ -433,8 +540,93 @@ export default function CollaboratorKPIForm({
               onChange={(e) => setFormData({ ...formData, comments: e.target.value })}
               rows={3}
               placeholder="Comentarios adicionales sobre esta asignación..."
+              disabled={isReadOnlyCollaborator}
             />
           </div>
+
+          {subPeriods && subPeriods.length > 0 && formData.kpiId !== 0 && formData.collaboratorId !== 0 && (
+            <div className="plan-section">
+              <div className="plan-header">
+                <h3>Plan mensual por subperiodo</h3>
+                <span className="plan-helper">
+                  Ajusta target y peso por mes. Solo usuarios con permisos de configuración pueden editar.
+                </span>
+              </div>
+              {planErrors && <div className="error-message">{planErrors}</div>}
+              <table className="plan-table">
+                <thead>
+                  <tr>
+                    <th>Subperiodo</th>
+                    <th>Target</th>
+                    <th>Ponderación (%)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {planRows.map((row) => (
+                    <tr key={row.subPeriodId}>
+                      <td>{row.name}</td>
+                      <td>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={row.target}
+                          disabled={!canEditPlan}
+                          onChange={(e) =>
+                            setPlanRows((prev) =>
+                              prev.map((r) =>
+                                r.subPeriodId === row.subPeriodId
+                                  ? { ...r, target: e.target.value === '' ? '' : parseFloat(e.target.value) }
+                                  : r
+                              )
+                            )
+                          }
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.01"
+                          value={row.weight}
+                          disabled={!canEditPlan}
+                          onChange={(e) =>
+                            setPlanRows((prev) =>
+                              prev.map((r) =>
+                                r.subPeriodId === row.subPeriodId
+                                  ? { ...r, weight: e.target.value === '' ? '' : parseFloat(e.target.value) }
+                                  : r
+                              )
+                            )
+                          }
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="plan-footer">
+                <span>Total ponderación plan: {planWeightTotal.toFixed(2)}%</span>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={!canEditPlan || upsertPlanMutation.isLoading}
+                  onClick={() => {
+                    setPlanErrors(null)
+                    const total = planRows.reduce((acc, r) => acc + (Number(r.weight) || 0), 0)
+                    if (total > 100.01) {
+                      setPlanErrors(`La suma de ponderaciones del plan no puede superar 100% (actual: ${total.toFixed(2)}%)`)
+                      return
+                    }
+                    upsertPlanMutation.mutate(planRows)
+                  }}
+                >
+                  {upsertPlanMutation.isLoading ? 'Guardando plan...' : 'Guardar plan'}
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="form-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>
@@ -443,7 +635,12 @@ export default function CollaboratorKPIForm({
             <button
               type="submit"
               className="btn-primary"
-              disabled={createMutation.isLoading || updateMutation.isLoading || isAssignmentClosed}
+              disabled={
+                createMutation.isLoading ||
+                updateMutation.isLoading ||
+                isAssignmentClosed ||
+                isReadOnlyCollaborator
+              }
             >
               {createMutation.isLoading || updateMutation.isLoading
                 ? 'Guardando...'

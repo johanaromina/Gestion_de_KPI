@@ -16,6 +16,8 @@ import {
   proposeCollaboratorKPI,
   approveCollaboratorKPI,
   rejectCollaboratorKPI,
+  getMonthlyPlan,
+  upsertMonthlyPlan,
 } from '../controllers/collaborator-kpis.controller'
 import { authenticate, authorize } from '../middleware/auth.middleware'
 
@@ -28,9 +30,11 @@ router.get('/', getCollaboratorKPIs)
 router.get('/collaborator/:collaboratorId/consolidated', getConsolidatedByCollaborator)
 router.get('/collaborator/:collaboratorId', getCollaboratorKPIsByCollaborator)
 router.get('/period/:periodId', getCollaboratorKPIsByPeriod)
-router.get('/:id', getCollaboratorKPIById)
 router.post('/', createCollaboratorKPI)
 router.post('/generate-base-grids', generateBaseGrids)
+router.get('/plan/:collaboratorId/:kpiId/:periodId', getMonthlyPlan)
+router.post('/plan/:collaboratorId/:kpiId/:periodId', upsertMonthlyPlan)
+router.get('/:id', getCollaboratorKPIById)
 router.put('/:id', updateCollaboratorKPI)
 router.patch('/:id/actual', updateActualValue)
 router.post('/:id/close', closeCollaboratorKPI)

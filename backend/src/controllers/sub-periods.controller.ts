@@ -2,6 +2,13 @@ import { Request, Response } from 'express'
 import { pool } from '../config/database'
 import { SubPeriod } from '../types'
 
+const normalizeDate = (value: any): string | null => {
+  if (!value) return null
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toISOString().slice(0, 10)
+}
+
 export const getSubPeriods = async (req: Request, res: Response) => {
   try {
     const { periodId } = req.query
@@ -51,10 +58,17 @@ export const createSubPeriod = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Faltan campos requeridos' })
     }
 
+    const start = normalizeDate(startDate)
+    const end = normalizeDate(endDate)
+
+    if (!start || !end) {
+      return res.status(400).json({ error: 'Fechas inválidas' })
+    }
+
     const [result] = await pool.query(
       `INSERT INTO sub_periods (periodId, name, startDate, endDate, weight) 
        VALUES (?, ?, ?, ?, ?)`,
-      [periodId, name, startDate, endDate, weight || null]
+      [periodId, name, start, end, weight || null]
     )
 
     const insertResult = result as any
@@ -62,8 +76,8 @@ export const createSubPeriod = async (req: Request, res: Response) => {
       id: insertResult.insertId,
       periodId,
       name,
-      startDate,
-      endDate,
+      startDate: start,
+      endDate: end,
       weight: weight || null,
     })
   } catch (error: any) {
@@ -77,11 +91,18 @@ export const updateSubPeriod = async (req: Request, res: Response) => {
     const { id } = req.params
     const { name, startDate, endDate, weight } = req.body
 
+    const start = normalizeDate(startDate)
+    const end = normalizeDate(endDate)
+
+    if (!start || !end) {
+      return res.status(400).json({ error: 'Fechas inválidas' })
+    }
+
     await pool.query(
       `UPDATE sub_periods 
        SET name = ?, startDate = ?, endDate = ?, weight = ? 
        WHERE id = ?`,
-      [name, startDate, endDate, weight || null, id]
+      [name, start, end, weight || null, id]
     )
 
     res.json({ message: 'Subperíodo actualizado correctamente' })
@@ -103,4 +124,3 @@ export const deleteSubPeriod = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Error al eliminar subperíodo' })
   }
 }
-

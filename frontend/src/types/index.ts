@@ -12,6 +12,14 @@ export interface Collaborator {
   inactiveAt?: string | null
 }
 
+export interface Area {
+  id: number
+  name: string
+  parentId?: number | null
+  createdAt?: string
+  updatedAt?: string
+}
+
 export interface Period {
   id: number
   name: string
@@ -39,6 +47,7 @@ export interface KPI {
   criteria: string
   formula?: string
   macroKPIId?: number
+  areas?: string[]
 }
 
 export interface CollaboratorKPI {

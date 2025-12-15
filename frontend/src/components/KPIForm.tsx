@@ -18,6 +18,7 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
     criteria: kpi?.criteria || '',
     formula: kpi?.formula || '',
     macroKPIId: kpi?.macroKPIId || undefined,
+    areas: kpi?.areas || [],
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -26,7 +27,7 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
 
   // Obtener lista de KPIs para el selector de macro KPI
   const { data: kpis } = useQuery<KPI[]>(
-    'kpis',
+    ['kpis'],
     async () => {
       const response = await api.get('/kpis')
       return response.data
@@ -195,6 +196,26 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
           </div>
 
           <div className="form-group">
+            <label htmlFor="areas">Áreas</label>
+            <input
+              type="text"
+              id="areas"
+              value={(formData.areas || []).join(', ')}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  areas: e.target.value
+                    .split(',')
+                    .map((a) => a.trim())
+                    .filter((a) => a.length > 0),
+                })
+              }
+              placeholder="Ej: QA, Desarrollo, Producto"
+            />
+            <small className="form-hint">Separa múltiples áreas con coma.</small>
+          </div>
+
+          <div className="form-group">
             <label htmlFor="criteria">Criterio de Cálculo</label>
             <textarea
               id="criteria"
@@ -270,4 +291,3 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
     </div>
   )
 }
-

@@ -20,6 +20,8 @@ export default function GenerateBaseGridModal({
     defaultTarget: '',
     defaultWeight: '',
     useAllKPIs: true,
+    showAllKpis: false,
+    overrides: {} as Record<number, { target?: string; weight?: string }>,
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -38,11 +40,20 @@ export default function GenerateBaseGridModal({
     return response.data
   })
 
-  // Obtener KPIs
-  const { data: kpis } = useQuery<KPI[]>('kpis', async () => {
-    const response = await api.get('/kpis')
-    return response.data
-  })
+  // Obtener KPIs (filtrados por área, a menos que se pida mostrar todos)
+  const { data: kpis } = useQuery<KPI[]>(
+    ['kpis', formData.area, formData.showAllKpis],
+    async () => {
+      const response = await api.get('/kpis', {
+        params:
+          formData.area && !formData.showAllKpis
+            ? { area: formData.area }
+            : undefined,
+      })
+      return response.data
+    },
+    { enabled: true }
+  )
 
   const generateMutation = useMutation(
     async (data: any) => {
@@ -110,6 +121,20 @@ export default function GenerateBaseGridModal({
       submitData.kpiIds = formData.kpiIds
     }
 
+    if (!formData.useAllKPIs && formData.kpiIds.length > 0) {
+      const overrides = formData.kpiIds
+        .map((id) => {
+          const ov = formData.overrides[id] || {}
+          const target = ov.target ? parseFloat(ov.target) : undefined
+          const weight = ov.weight ? parseFloat(ov.weight) : undefined
+          return { kpiId: id, target, weight }
+        })
+        .filter((o) => o.target !== undefined || o.weight !== undefined)
+      if (overrides.length > 0) {
+        submitData.kpiOverrides = overrides
+      }
+    }
+
     if (formData.defaultTarget) {
       submitData.defaultTarget = parseFloat(formData.defaultTarget)
     }
@@ -126,11 +151,19 @@ export default function GenerateBaseGridModal({
       setFormData({
         ...formData,
         kpiIds: formData.kpiIds.filter((id) => id !== kpiId),
+        overrides: {
+          ...formData.overrides,
+          [kpiId]: formData.overrides[kpiId] || {},
+        },
       })
     } else {
       setFormData({
         ...formData,
         kpiIds: [...formData.kpiIds, kpiId],
+        overrides: {
+          ...formData.overrides,
+          [kpiId]: formData.overrides[kpiId] || {},
+        },
       })
     }
   }
@@ -209,19 +242,86 @@ export default function GenerateBaseGridModal({
           </div>
 
           {!formData.useAllKPIs && (
+            <div className="form-group inline-group">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={formData.showAllKpis}
+                  onChange={(e) =>
+                    setFormData({ ...formData, showAllKpis: e.target.checked })
+                  }
+                />
+                <span style={{ marginLeft: '8px' }}>
+                  Mostrar KPIs de todas las áreas
+                </span>
+              </label>
+              <small className="form-hint">
+                Por defecto se listan los KPIs del área seleccionada.
+              </small>
+            </div>
+          )}
+
+          {!formData.useAllKPIs && (
             <div className="form-group">
               <label>Seleccionar KPIs *</label>
               <div className="kpi-selection">
                 {kpis && kpis.length > 0 ? (
                   kpis.map((kpi) => (
-                    <label key={kpi.id} className="kpi-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={formData.kpiIds.includes(kpi.id)}
-                        onChange={() => handleKpiToggle(kpi.id)}
-                      />
-                      <span>{kpi.name}</span>
-                    </label>
+                    <div key={kpi.id} className="kpi-checkbox kpi-row">
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={formData.kpiIds.includes(kpi.id)}
+                          onChange={() => handleKpiToggle(kpi.id)}
+                        />
+                        <span>
+                          {kpi.name}
+                          {kpi.areas && kpi.areas.length > 0
+                            ? ` · ${kpi.areas.join(', ')}`
+                            : ''}
+                        </span>
+                      </label>
+                      {formData.kpiIds.includes(kpi.id) && (
+                        <div className="kpi-overrides">
+                          <input
+                            type="number"
+                            step="any"
+                            placeholder="Target"
+                            value={formData.overrides[kpi.id]?.target || ''}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                overrides: {
+                                  ...formData.overrides,
+                                  [kpi.id]: {
+                                    ...formData.overrides[kpi.id],
+                                    target: e.target.value,
+                                  },
+                                },
+                              })
+                            }
+                          />
+                          <input
+                            type="number"
+                            step="any"
+                            placeholder="Ponderación"
+                            value={formData.overrides[kpi.id]?.weight || ''}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                overrides: {
+                                  ...formData.overrides,
+                                  [kpi.id]: {
+                                    ...formData.overrides[kpi.id],
+                                    weight: e.target.value,
+                                  },
+                                },
+                              })
+                            }
+                          />
+                        </div>
+                      )}
+                    </div>
                   ))
                 ) : (
                   <p className="no-kpis">No hay KPIs disponibles</p>
@@ -288,4 +388,3 @@ export default function GenerateBaseGridModal({
     </div>
   )
 }
-
