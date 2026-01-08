@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { useParams } from 'react-router-dom'
@@ -31,7 +32,7 @@ interface CollaboratorKPI {
 
 export default function MiParrilla() {
   const { collaboratorId } = useParams<{ collaboratorId: string }>()
-  const { user, isLoading: loadingUser } = useAuth()
+  const { user, isLoading: loadingUser, isCollaborator } = useAuth()
   const resolvedId = useMemo(() => {
     if (collaboratorId) return collaboratorId
     if (user?.collaboratorId) return String(user.collaboratorId)
@@ -158,6 +159,7 @@ export default function MiParrilla() {
   }
 
   const canEdit = (kpi: CollaboratorKPI) => {
+    if (isCollaborator) return false
     return kpi.status !== 'closed' && periodStatus !== 'closed'
   }
 

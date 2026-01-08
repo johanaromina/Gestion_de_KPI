@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react'
 import { useQuery } from 'react-query'
 import api from '../services/api'
@@ -9,8 +10,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  LineChart,
-  Line,
   Legend,
 } from 'recharts'
 import './VistasAgregadas.css'
@@ -298,4 +297,3 @@ export default function VistasAgregadas() {
     </div>
   )
 }
-

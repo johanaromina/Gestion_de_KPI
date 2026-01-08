@@ -1,5 +1,6 @@
 import { useQuery } from 'react-query'
 import api from '../services/api'
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import './ConsistencyAlerts.css'
 
 interface ConsistencyAlertsProps {
@@ -107,4 +108,3 @@ export default function ConsistencyAlerts({
     </div>
   )
 }
-

@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from 'react-query'
 import { useParams } from 'react-router-dom'
 import api from '../services/api'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { useAuth } from '../hooks/useAuth'
 import './HistorialIndividual.css'
 
@@ -182,14 +183,6 @@ export default function HistorialIndividual() {
       variation: kpi.variation || 0,
     })) || []
 
-  const evolutionData =
-    periods?.map((period) => {
-      return {
-        period: period.name,
-        result: 0,
-      }
-    }) || []
-
   const handlePeriodChange = (periodId: string) => {
     const periodIdNum = periodId ? parseInt(periodId) : null
     setSelectedPeriodId(periodIdNum)
@@ -351,19 +344,19 @@ export default function HistorialIndividual() {
                       <td className="kpi-name">{kpi.kpiName || `KPI ${kpi.kpiId}`}</td>
                       <td className="kpi-description">{kpi.kpiDescription || '-'}</td>
                       <td className="kpi-target">{kpi.target}</td>
-                      <td className="kpi-actual">
-                        {kpi.actual !== null && kpi.actual !== undefined ? kpi.actual : '-'}
-                      </td>
-                      <td className="kpi-variation">
-                        {kpi.variation !== null && kpi.variation !== undefined
-                          ? `${kpi.variation.toFixed(1)}%`
-                          : '-'}
-                      </td>
-                      <td className="kpi-weight">{kpi.weight}%</td>
-                      <td className="kpi-weighted">
-                        {kpi.weightedResult !== null && kpi.weightedResult !== undefined
-                          ? `${kpi.weightedResult.toFixed(1)}%`
-                          : '-'}
+                  <td className="kpi-actual">
+                    {kpi.actual !== null && kpi.actual !== undefined ? kpi.actual : '-'}
+                  </td>
+                  <td className="kpi-variation">
+                    {kpi.variation !== null && kpi.variation !== undefined
+                      ? `${Number(kpi.variation).toFixed(1)}%`
+                      : '-'}
+                  </td>
+                  <td className="kpi-weight">{kpi.weight}%</td>
+                  <td className="kpi-weighted">
+                    {kpi.weightedResult !== null && kpi.weightedResult !== undefined
+                      ? `${Number(kpi.weightedResult).toFixed(1)}%`
+                      : '-'}
                       </td>
                       <td className="kpi-criteria">{kpi.kpiCriteria || '-'}</td>
                       <td>

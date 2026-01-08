@@ -141,17 +141,6 @@ export function validateFormula(formula: string): {
     return { valid: false, error: 'La fórmula no puede estar vacía' }
   }
 
-  // Verificar que contenga las variables necesarias
-  const hasTarget = /\btarget\b/i.test(formula)
-  const hasActual = /\bactual\b/i.test(formula)
-
-  if (!hasTarget || !hasActual) {
-    return {
-      valid: false,
-      error: 'La fórmula debe contener las variables "target" y "actual"',
-    }
-  }
-
   // Validar caracteres permitidos
   const allowedPattern = /^[a-zA-Z0-9+\-*/().\s]+$/
   if (!allowedPattern.test(formula)) {

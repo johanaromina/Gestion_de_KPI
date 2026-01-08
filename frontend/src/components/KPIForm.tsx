@@ -19,13 +19,31 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
     formula: kpi?.formula || '',
     macroKPIId: kpi?.macroKPIId || undefined,
     areas: kpi?.areas || [],
+    periodIds: kpi?.periodIds || [],
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const queryClient = useQueryClient()
 
-  // Obtener lista de KPIs para el selector de macro KPI
+  const { data: areas } = useQuery<string[]>(
+    ['areas-for-kpi-form'],
+    async () => {
+      const res = await api.get('/areas')
+      return (res.data || []).map((a: { name: string }) => a.name)
+    },
+    { retry: false }
+  )
+
+  const { data: periods } = useQuery(
+    ['periods-for-kpi-form'],
+    async () => {
+      const res = await api.get('/periods')
+      return res.data as { id: number; name: string }[]
+    },
+    { retry: false }
+  )
+
   const { data: kpis } = useQuery<KPI[]>(
     ['kpis'],
     async () => {
@@ -102,8 +120,21 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
     }
   }
 
-  // Filtrar KPIs para el selector de macro KPI (excluir el actual si está editando)
-  const availableMacroKPIs = kpis?.filter((k) => k.id !== kpi?.id) || []
+  const availableMacroKPIs = kpis?.filter((item) => item.id !== kpi?.id) || []
+
+  const toggleArea = (area: string, checked: boolean) => {
+    const current = new Set(formData.areas || [])
+    if (checked) current.add(area)
+    else current.delete(area)
+    setFormData({ ...formData, areas: Array.from(current) })
+  }
+
+  const togglePeriod = (pid: number, checked: boolean) => {
+    const current = new Set(formData.periodIds || [])
+    if (checked) current.add(pid)
+    else current.delete(pid)
+    setFormData({ ...formData, periodIds: Array.from(current) })
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -111,7 +142,7 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
         <div className="modal-header">
           <h2>{kpi?.id ? 'Editar KPI' : 'Crear KPI'}</h2>
           <button className="close-button" onClick={onClose}>
-            ×
+            x
           </button>
         </div>
 
@@ -122,9 +153,7 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
               type="text"
               id="name"
               value={formData.name || ''}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="Ej: Tiempo de respuesta promedio"
               className={errors.name ? 'error' : ''}
             />
@@ -136,9 +165,7 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
             <textarea
               id="description"
               value={formData.description || ''}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Describe el KPI y cómo se mide..."
               rows={3}
             />
@@ -162,12 +189,9 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
                 <option value="reduction">Reducción</option>
                 <option value="exact">Exacto</option>
               </select>
-              {errors.type && (
-                <span className="error-message">{errors.type}</span>
-              )}
+              {errors.type && <span className="error-message">{errors.type}</span>}
               <small className="form-hint">
-                Crecimiento: mayor es mejor | Reducción: menor es mejor |
-                Exacto: debe alcanzar el valor exacto
+                Crecimiento: mayor es mejor | Reducción: menor es mejor | Exacto: debe alcanzar el valor exacto
               </small>
             </div>
 
@@ -179,9 +203,7 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    macroKPIId: e.target.value
-                      ? parseInt(e.target.value)
-                      : undefined,
+                    macroKPIId: e.target.value ? parseInt(e.target.value) : undefined,
                   })
                 }
               >
@@ -196,23 +218,37 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
           </div>
 
           <div className="form-group">
-            <label htmlFor="areas">Áreas</label>
-            <input
-              type="text"
-              id="areas"
-              value={(formData.areas || []).join(', ')}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  areas: e.target.value
-                    .split(',')
-                    .map((a) => a.trim())
-                    .filter((a) => a.length > 0),
-                })
-              }
-              placeholder="Ej: QA, Desarrollo, Producto"
-            />
-            <small className="form-hint">Separa múltiples áreas con coma.</small>
+            <label>Áreas</label>
+            <div className="checkbox-list">
+              {areas?.map((area) => (
+                <label key={area} className="checkbox-item">
+                  <input
+                    type="checkbox"
+                    checked={formData.areas?.includes(area) || false}
+                    onChange={(e) => toggleArea(area, e.target.checked)}
+                  />
+                  <span>{area}</span>
+                </label>
+              ))}
+            </div>
+            <small className="form-hint">Selecciona todas las áreas donde aplica este KPI.</small>
+          </div>
+
+          <div className="form-group">
+            <label>Períodos</label>
+            <div className="checkbox-list">
+              {periods?.map((p) => (
+                <label key={p.id} className="checkbox-item">
+                  <input
+                    type="checkbox"
+                    checked={formData.periodIds?.includes(p.id) || false}
+                    onChange={(e) => togglePeriod(p.id, e.target.checked)}
+                  />
+                  <span>{p.name}</span>
+                </label>
+              ))}
+            </div>
+            <small className="form-hint">Selecciona los períodos donde estará vigente este KPI.</small>
           </div>
 
           <div className="form-group">
@@ -220,53 +256,41 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
             <textarea
               id="criteria"
               value={formData.criteria || ''}
-              onChange={(e) =>
-                setFormData({ ...formData, criteria: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, criteria: e.target.value })}
               placeholder="Describe cómo se calcula este KPI (fórmulas, reglas, etc.)"
               rows={3}
             />
-            <small className="form-hint">
-              Ej: (Actual - Target) / Target * 100 para crecimiento
-            </small>
+            <small className="form-hint">Ej: (Actual - Target) / Target * 100 para crecimiento</small>
           </div>
 
           <div className="form-group">
             <label htmlFor="formula">
               Fórmula Personalizada (Opcional)
-              <span className="formula-help-icon" title="Ver ayuda">ℹ️</span>
+              <span className="formula-help-icon" title="Ver ayuda">??</span>
             </label>
             <textarea
               id="formula"
               value={formData.formula || ''}
-              onChange={(e) =>
-                setFormData({ ...formData, formula: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, formula: e.target.value })}
               placeholder="Ej: (actual / target) * 100"
               rows={3}
               className={errors.formula ? 'error' : ''}
             />
-            {errors.formula && (
-              <span className="error-message">{errors.formula}</span>
-            )}
+            {errors.formula && <span className="error-message">{errors.formula}</span>}
             <small className="form-hint">
-              <strong>Variables disponibles:</strong> <code>target</code>,{' '}
-              <code>actual</code>
+              <strong>Variables disponibles:</strong> <code>target</code>, <code>actual</code>
               <br />
               <strong>Operadores:</strong> +, -, *, /, ( )
               <br />
               <strong>Ejemplos:</strong>
               <br />
-              • Crecimiento: <code>(actual / target) * 100</code>
+              ➜ Crecimiento: <code>(actual / target) * 100</code>
               <br />
-              • Reducción: <code>(target / actual) * 100</code>
+              ➜ Reducción: <code>(target / actual) * 100</code>
               <br />
-              • Exacto: <code>100 - (Math.abs(actual - target) / target) * 100</code>
+              ➜ Exacto: <code>100 - (Math.abs(actual - target) / target) * 100</code>
               <br />
-              <em>
-                Si se deja vacío, se usará la fórmula por defecto según el tipo
-                de KPI.
-              </em>
+              <em>Si se deja vacío, se usará la fórmula por defecto según el tipo de KPI.</em>
             </small>
           </div>
 
@@ -274,16 +298,8 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
             <button type="button" className="btn-secondary" onClick={onClose}>
               Cancelar
             </button>
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={createMutation.isLoading || updateMutation.isLoading}
-            >
-              {createMutation.isLoading || updateMutation.isLoading
-                ? 'Guardando...'
-                : kpi?.id
-                ? 'Actualizar'
-                : 'Crear'}
+            <button type="submit" className="btn-primary" disabled={createMutation.isLoading || updateMutation.isLoading}>
+              {createMutation.isLoading || updateMutation.isLoading ? 'Guardando...' : kpi?.id ? 'Actualizar' : 'Crear'}
             </button>
           </div>
         </form>

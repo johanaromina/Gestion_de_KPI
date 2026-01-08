@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useState } from 'react'
 import { useQuery } from 'react-query'
 import { Navigate, useNavigate } from 'react-router-dom'
@@ -18,19 +19,25 @@ export default function ParrillaGeneral() {
   const [search, setSearch] = useState('')
   const navigate = useNavigate()
 
-  if (!user?.hasSuperpowers) {
-    return <Navigate to="/" replace />
-  }
+  const canView = !!user?.hasSuperpowers
 
-  const { data: periods } = useQuery('periods', async () => {
+  const { data: periods } = useQuery(
+    'periods',
+    async () => {
     const res = await api.get('/periods')
     return res.data
-  })
+    },
+    { enabled: canView }
+  )
 
-  const { data: collaborators } = useQuery('collaborators', async () => {
+  const { data: collaborators } = useQuery(
+    'collaborators',
+    async () => {
     const res = await api.get('/collaborators')
     return res.data
-  })
+    },
+    { enabled: canView }
+  )
 
   const { data: assignments, isLoading } = useQuery<CollaboratorKPI[]>(
     ['collaborator-kpis', selectedPeriodId, selectedCollaboratorId],
@@ -44,7 +51,7 @@ export default function ParrillaGeneral() {
       const res = await api.get(url)
       return res.data
     },
-    { enabled: true }
+    { enabled: canView }
   )
 
   const summaryRows = useMemo(
@@ -63,7 +70,7 @@ export default function ParrillaGeneral() {
         map.set(key, arr)
       })
     // sort by subPeriodId asc
-    map.forEach((arr, key) => {
+    map.forEach((arr) => {
       arr.sort((a: any, b: any) => (a.subPeriodId || 0) - (b.subPeriodId || 0))
     })
     return map
@@ -118,6 +125,10 @@ export default function ParrillaGeneral() {
     if (v >= 100) return 'var-good'
     if (v >= 90) return 'var-warn'
     return 'var-bad'
+  }
+
+  if (!canView) {
+    return <Navigate to="/" replace />
   }
 
   return (

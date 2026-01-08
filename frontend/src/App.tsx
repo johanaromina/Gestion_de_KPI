@@ -16,6 +16,9 @@ import VistasReduccion from './pages/VistasReduccion'
 import Auditoria from './pages/Auditoria'
 import Configuracion from './pages/Configuracion'
 import ParrillaGeneral from './pages/ParrillaGeneral'
+import Evolutivo from './pages/Evolutivo'
+import NotFound from './pages/NotFound'
+import { isTokenExpired } from './hooks/useAuth'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,7 +31,12 @@ const queryClient = new QueryClient({
 
 const RequireAuth = ({ children }: { children: JSX.Element }) => {
   const token = localStorage.getItem('token')
-  if (!token) {
+  const expired = isTokenExpired(token)
+
+  if (!token || expired) {
+    if (expired) {
+      localStorage.removeItem('token')
+    }
     return <Navigate to="/login" replace />
   }
   return children
@@ -130,6 +138,14 @@ function App() {
               }
             />
             <Route
+              path="/evolutivo"
+              element={
+                <RequireAuth>
+                  <Evolutivo />
+                </RequireAuth>
+              }
+            />
+            <Route
               path="/auditoria"
               element={
                 <RequireAuth>
@@ -158,6 +174,14 @@ function App() {
               element={
                 <RequireAuth>
                   <ParrillaGeneral />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="*"
+              element={
+                <RequireAuth>
+                  <NotFound />
                 </RequireAuth>
               }
             />

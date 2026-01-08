@@ -48,6 +48,7 @@ export interface KPI {
   formula?: string
   macroKPIId?: number
   areas?: string[]
+  periodIds?: number[]
 }
 
 export interface CollaboratorKPI {

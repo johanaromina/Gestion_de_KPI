@@ -27,14 +27,13 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && window.location.pathname !== '/login') {
       // Handle unauthorized access
       localStorage.removeItem('token')
-      window.location.href = '/login'
+      window.location.replace('/login?session=expired')
     }
     return Promise.reject(error)
   }
 )
 
 export default api
-

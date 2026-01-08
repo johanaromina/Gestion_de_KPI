@@ -104,10 +104,11 @@ export const validateConsistency = async (req: Request, res: Response) => {
     }
 
     // 4. Detectar saturación de KPIs (más de 10 KPIs asignados)
+    // Contar KPIs distintos (no subperiodos) para evitar multiplicar por cada mes
     const [saturationRows] = await pool.query<any[]>(
-      `SELECT COUNT(*) as kpiCount
+      `SELECT COUNT(DISTINCT kpiId) as kpiCount
        FROM collaborator_kpis
-       WHERE collaboratorId = ? AND periodId = ?`,
+       WHERE collaboratorId = ? AND periodId = ? AND subPeriodId IS NULL`,
       [collaboratorId, periodId]
     )
 
@@ -198,4 +199,3 @@ export const validatePeriodConsistency = async (req: Request, res: Response) => 
     res.status(500).json({ error: 'Error al validar consistencia del período' })
   }
 }
-

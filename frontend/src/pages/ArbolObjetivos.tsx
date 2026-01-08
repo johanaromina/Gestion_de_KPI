@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Fragment, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import api from '../services/api'
@@ -9,6 +10,7 @@ export default function ArbolObjetivos() {
   const [showForm, setShowForm] = useState(false)
   const [editingObjective, setEditingObjective] = useState<ObjectiveTree | undefined>(undefined)
   const [expandedObjectives, setExpandedObjectives] = useState<Set<number>>(new Set())
+  const [expandedKpis, setExpandedKpis] = useState<Set<number>>(new Set())
 
   const queryClient = useQueryClient()
 
@@ -20,6 +22,16 @@ export default function ArbolObjetivos() {
     },
     { retry: false }
   )
+
+  const { data: collaborators } = useQuery(
+    'collaborators',
+    async () => {
+      const res = await api.get('/collaborators')
+      return res.data as any[]
+    },
+    { retry: false }
+  )
+  const collaboratorNames = new Set((collaborators || []).map((c: any) => (c.name || '').trim().toLowerCase()))
 
   const deleteMutation = useMutation(
     async (id: number) => {
@@ -83,6 +95,16 @@ export default function ArbolObjetivos() {
     setExpandedObjectives(next)
   }
 
+  const toggleKpiExpansion = (id: number) => {
+    const next = new Set(expandedKpis)
+    if (next.has(id)) {
+      next.delete(id)
+    } else {
+      next.add(id)
+    }
+    setExpandedKpis(next)
+  }
+
   const isOKR = (name?: string) => {
     if (!name) return false
     return name.trim().toUpperCase().startsWith('OKR')
@@ -96,10 +118,15 @@ export default function ArbolObjetivos() {
   const buildHierarchy = (): (ObjectiveTree & { level: number; children?: any[] })[] => {
     if (!objectives) return []
 
-    const rootObjectives = objectives.filter((o) => !o.parentId)
+    const filtered = objectives.filter((o) => {
+      const isCollaboratorName = collaboratorNames.has((o.name || '').trim().toLowerCase())
+      return !isCollaboratorName
+    })
+
+    const rootObjectives = filtered.filter((o) => !o.parentId)
     const childrenMap = new Map<number, ObjectiveTree[]>()
 
-    objectives.forEach((obj) => {
+    filtered.forEach((obj) => {
       if (obj.parentId) {
         if (!childrenMap.has(obj.parentId)) {
           childrenMap.set(obj.parentId, [])
@@ -148,7 +175,9 @@ export default function ArbolObjetivos() {
   ) => {
     const hasChildren = objective.children && objective.children.length > 0
     const isExpanded = expandedObjectives.has(objective.id)
+    const isKpiExpanded = expandedKpis.has(objective.id)
     const okr = isOKR(objective.name)
+    const kpiCount = objective.kpis?.length || 0
 
     return (
       <Fragment key={objective.id}>
@@ -171,7 +200,16 @@ export default function ArbolObjetivos() {
                 `Objetivo #${objective.parentId}`
               : '-'}
           </td>
-          <td>{objective.kpis?.length || 0} KPIs</td>
+          <td>
+            <div className="kpis-cell">
+              <span>{kpiCount} KPIs</span>
+              {kpiCount > 0 && (
+                <button className="link-button" onClick={() => toggleKpiExpansion(objective.id)}>
+                  {isKpiExpanded ? 'Ocultar' : 'Ver'}
+                </button>
+              )}
+            </div>
+          </td>
           <td>
             <div className="action-buttons">
               <button className="btn-icon" title="Editar" onClick={() => handleEdit(objective)}>
@@ -188,6 +226,25 @@ export default function ArbolObjetivos() {
             </div>
           </td>
         </tr>
+        {isKpiExpanded && kpiCount > 0 && (
+          <tr className="kpi-row">
+            <td />
+            <td colSpan={4}>
+              <div className="kpi-list">
+                {objective.kpis?.map((kpi) => (
+                  <div key={kpi.id} className="kpi-pill">
+                    <div className="kpi-title">{kpi.name}</div>
+                    <div className="kpi-meta">
+                      <span className="kpi-type">{kpi.type}</span>
+                      {kpi.area && <span className="kpi-area">Área: {kpi.area}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </td>
+            <td />
+          </tr>
+        )}
         {hasChildren && isExpanded && objective.children?.map((child) => renderObjectiveRow(child, true))}
       </Fragment>
     )

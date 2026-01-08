@@ -1,0 +1,138 @@
+.evolutivo-page {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.evolutivo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.evolutivo-header h1 {
+  margin: 0;
+}
+
+.kpi-pill {
+  background: #0f172a;
+  color: #fff;
+  padding: 12px 16px;
+  border-radius: 12px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.pill-title {
+  font-weight: 700;
+}
+
+.pill-sub {
+  font-size: 14px;
+  opacity: 0.85;
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.filter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter select {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.card-label {
+  margin: 0;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.card-value {
+  margin: 4px 0 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.card-value.accent {
+  color: #f97316;
+}
+
+.chart-block,
+.table-block {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.chart-block h3,
+.table-block h3 {
+  margin: 0 0 12px 0;
+}
+
+.table-wrapper {
+  overflow: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 10px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+th {
+  background: #f8fafc;
+}
+
+.empty-state {
+  background: #fff;
+  border: 1px dashed #e5e7eb;
+  padding: 24px;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 28px;
+}
+
+.loading {
+  padding: 16px;
+}
+
+@media (max-width: 768px) {
+  .evolutivo-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+

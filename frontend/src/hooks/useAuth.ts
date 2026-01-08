@@ -1,3 +1,4 @@
+import { useEffect, useMemo } from 'react'
 import { useQuery } from 'react-query'
 import api from '../services/api'
 
@@ -11,8 +12,34 @@ export interface User {
   permissions?: string[]
 }
 
+export function isTokenExpired(token: string | null) {
+  if (!token) return true
+  try {
+    const [, payload] = token.split('.')
+    if (!payload) return false
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const decoded = JSON.parse(atob(normalized))
+    if (!decoded.exp) return false
+    return decoded.exp * 1000 < Date.now()
+  } catch {
+    return false
+  }
+}
+
 export function useAuth() {
   const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null
+  const expired = isTokenExpired(token)
+
+  useEffect(() => {
+    if (expired && token) {
+      localStorage.removeItem('token')
+    }
+  }, [expired, token])
+
+  const effectiveToken = useMemo(() => {
+    if (expired) return null
+    return token
+  }, [expired, token])
 
   const { data: user, isLoading, error } = useQuery<User>(
     'currentUser',
@@ -21,7 +48,7 @@ export function useAuth() {
       return response.data
     },
     {
-      enabled: !!token,
+      enabled: !!effectiveToken,
       retry: false,
       staleTime: 5 * 60 * 1000, // 5 minutos
     }
@@ -44,6 +71,7 @@ export function useAuth() {
 
   // Líderes = Leader, Manager, Director
   const isLeadership = isLeader || isManager || isDirector
+  const isAuthenticated = !!effectiveToken && !!user
 
   return {
     user,
@@ -57,5 +85,6 @@ export function useAuth() {
     isHR,
     isLeadership,
     canConfig,
+    isAuthenticated,
   }
 }

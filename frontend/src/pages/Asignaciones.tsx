@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import api from '../services/api'
@@ -58,10 +59,18 @@ export default function Asignaciones() {
   })
 
   // KPIs
-  const { data: kpis } = useQuery('kpis', async () => {
-    const response = await api.get('/kpis')
-    return response.data
-  })
+  const selectedCollab = collaborators?.find((c: any) => c.id === selectedCollaboratorId)
+  const effectiveArea = selectedArea || selectedCollab?.area || ''
+
+  const { data: kpis } = useQuery(
+    ['kpis', effectiveArea],
+    async () => {
+      const response = await api.get('/kpis', {
+        params: effectiveArea ? { area: effectiveArea } : undefined,
+      })
+      return response.data
+    }
+  )
 
   // Asignaciones
   const { data: assignments, isLoading } = useQuery<CollaboratorKPI[]>(
@@ -155,6 +164,9 @@ export default function Asignaciones() {
 
   // Filtro local
   const filteredAssignments = assignments?.filter((assignment) => {
+    const matchesCollaborator =
+      !selectedCollaboratorId || assignment.collaboratorId === selectedCollaboratorId
+    const matchesPeriod = !selectedPeriodId || assignment.periodId === selectedPeriodId
     const matchesKPI = !selectedKPIId || assignment.kpiId === selectedKPIId
     const matchesSubPeriod =
       selectedSubPeriodId === null
@@ -173,15 +185,59 @@ export default function Asignaciones() {
         .toLowerCase()
         .includes(searchTerm.toLowerCase())
 
-    return matchesKPI && matchesArea && matchesSearch && matchesSubPeriod && matchesShowMonthly
+    return (
+      matchesCollaborator &&
+      matchesPeriod &&
+      matchesKPI &&
+      matchesArea &&
+      matchesSearch &&
+      matchesSubPeriod &&
+      matchesShowMonthly
+    )
   })
 
   const getTotalWeightByCollaborator = (collaboratorId: number, periodId: number): number => {
     if (!assignments) return 0
+    // Usa solo filas resumen (subPeriodId null) para no duplicar pesos por subperiodo
     return assignments
-      .filter((a) => a.collaboratorId === collaboratorId && a.periodId === periodId)
+      .filter(
+        (a) => a.collaboratorId === collaboratorId && a.periodId === periodId && (a as any).subPeriodId == null
+      )
       .reduce((sum, a) => sum + (toNumber(a.weight) || 0), 0)
   }
+
+  const today = new Date()
+
+  const monthlyAssignments = assignments?.filter(
+    (a) => (a as any).subPeriodId && a.periodId === selectedPeriodId && a.collaboratorId === selectedCollaboratorId
+  )
+
+  const dueMonthlyAssignments =
+    monthlyAssignments?.filter((a) => {
+      const sp = subPeriods?.find((s) => s.id === (a as any).subPeriodId)
+      if (!sp?.endDate) return false
+      return new Date(sp.endDate) <= today
+    }) || []
+
+  const pendingMonthly = dueMonthlyAssignments.filter((a) => a.actual === null || a.actual === undefined)
+
+  const growthReductionTotals = dueMonthlyAssignments.reduce<Record<
+    number,
+    { name: string; type: string; total: number }
+  >>((acc, a) => {
+    const type = (a as any).kpiType
+    if (type !== 'growth' && type !== 'reduction') return acc
+    const key = a.kpiId
+    const current = acc[key] || {
+      name: (a as any).kpiName || `KPI #${a.kpiId}`,
+      type,
+      total: 0,
+    }
+    const actualVal = toNumber(a.actual) || 0
+    current.total += actualVal
+    acc[key] = current
+    return acc
+  }, {})
 
   return (
     <div className="asignaciones-page">
@@ -338,6 +394,38 @@ export default function Asignaciones() {
 
       {selectedPeriodId && selectedCollaboratorId && (
         <ConsistencyAlerts collaboratorId={selectedCollaboratorId} periodId={selectedPeriodId} />
+      )}
+
+      {selectedPeriodId && selectedCollaboratorId && dueMonthlyAssignments.length > 0 && (
+        <div className="info-banner">
+          {pendingMonthly.length === 0 ? (
+            <div className="banner-ok">
+              ✅ Todos los subperiodos con fecha vencida tienen valor cargado.
+            </div>
+          ) : (
+            <div className="banner-warn">
+              ⚠️ Faltan {pendingMonthly.length} subperiodos con fecha vencida sin “Actual”.
+              <div className="pending-list">
+                {pendingMonthly.slice(0, 4).map((p) => (
+                  <div key={p.id}>
+                    {(p as any).subPeriodName || 'Subperiodo'} · {(p as any).kpiName || `KPI #${p.kpiId}`}
+                  </div>
+                ))}
+                {pendingMonthly.length > 4 && <div>+ {pendingMonthly.length - 4} más</div>}
+              </div>
+            </div>
+          )}
+          {Object.values(growthReductionTotals).length > 0 && (
+            <div className="banner-totals">
+              Totales al día para KPIs de crecimiento/reducción:
+              {Object.entries(growthReductionTotals).map(([kpiId, info]) => (
+                <div key={kpiId}>
+                  {info.name}: <strong>{info.total.toFixed(2)}</strong>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       <div className="table-container">

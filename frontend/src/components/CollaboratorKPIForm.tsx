@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQueryClient, useQuery } from 'react-query'
 import api from '../services/api'
@@ -72,7 +73,7 @@ export default function CollaboratorKPIForm({
       return response.data
     },
     {
-      // Permitir fetch inicial aunque no haya área para que no quede vacío cuando aún no se seleccionó
+      // Siempre activo; si no hay área, traerá todos.
       enabled: true,
     }
   )
@@ -300,6 +301,19 @@ export default function CollaboratorKPIForm({
       },
     }
   )
+
+  // Prefill target/peso desde el plan mensual cuando se selecciona un subperiodo (solo en creación)
+  useEffect(() => {
+    if (assignment?.id) return
+    if (!formData.subPeriodId) return
+    const row = planRows.find((r) => r.subPeriodId === formData.subPeriodId)
+    if (!row) return
+    setFormData((prev) => ({
+      ...prev,
+      target: row.target !== '' ? Number(row.target) : prev.target,
+      weight: row.weight !== '' ? Number(row.weight) : prev.weight,
+    }))
+  }, [assignment?.id, formData.subPeriodId, planRows])
 
   return (
     <div className="modal-overlay" onClick={onClose}>

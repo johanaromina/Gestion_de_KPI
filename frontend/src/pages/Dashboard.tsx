@@ -55,7 +55,7 @@ export default function Dashboard() {
   const { user, isLoading: authLoading, isHR, isLeadership, isCollaborator } = useAuth()
 
   // Estadísticas generales (para Admin/HR)
-  const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>(
+  const { data: stats } = useQuery<DashboardStats>(
     'dashboard-stats',
     async () => {
       const response = await api.get('/dashboard/stats')

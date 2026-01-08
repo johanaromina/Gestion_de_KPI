@@ -17,7 +17,9 @@
     "add:objective-kpis": "tsx scripts/add-objective-trees-kpis-table.ts",
     "import:excel": "tsx scripts/import-objectives-from-excel.ts",
     "seed:objectives": "tsx scripts/seed-objectives-tree.ts",
-    "seed:areas": "tsx scripts/seed-objectives-areas.ts"
+    "seed:areas": "tsx scripts/seed-objectives-areas.ts",
+    "add:evolution": "tsx scripts/add-evolution-table.ts",
+    "import:evolution": "tsx scripts/import-evolution-from-excel.ts"
   },
   "dependencies": {
     "@types/pdfkit": "^0.17.4",

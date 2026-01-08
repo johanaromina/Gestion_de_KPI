@@ -1,9 +1,24 @@
 import { Request, Response } from 'express'
 import { pool } from '../config/database'
-import { ObjectiveTree } from '../types'
+import { ObjectiveTree, KPI } from '../types'
 
 export const getObjectiveTrees = async (req: Request, res: Response) => {
   try {
+    // Cargar todos los KPIs con sus áreas (para asociar automáticamente por área)
+    const [allKpisRows] = await pool.query<any[]>(
+      `SELECT k.*,
+              GROUP_CONCAT(DISTINCT ka.area) as areas
+       FROM kpis k
+       LEFT JOIN kpi_areas ka ON ka.kpiId = k.id
+       GROUP BY k.id`
+    )
+    const allKpis: KPI[] = (allKpisRows || []).map((row) => ({
+      ...row,
+      areas: row.areas ? row.areas.split(',').map((a: string) => a.trim()) : [],
+    }))
+    const kpiMap = new Map<number, KPI>()
+    allKpis.forEach((kpi) => kpiMap.set(kpi.id as number, kpi))
+
     const [rows] = await pool.query<any[]>(
       `SELECT 
           ot.id,
@@ -21,16 +36,24 @@ export const getObjectiveTrees = async (req: Request, res: Response) => {
     const objectivesWithKPIs = await Promise.all(
       rows.map(async (row) => {
         const kpiIds = row.kpiIds ? row.kpiIds.split(',').map(Number) : []
-        let kpis: any[] = []
+        const kpiIdSet = new Set<number>(kpiIds)
 
-        if (kpiIds.length > 0) {
-          const placeholders = kpiIds.map(() => '?').join(',')
-          const [kpiRows] = await pool.query<any[]>(
-            `SELECT * FROM kpis WHERE id IN (${placeholders})`,
-            kpiIds
-          )
-          kpis = kpiRows || []
+        // Asociar KPIs por área (nombre del objetivo coincide con el área del KPI)
+        const objectiveArea = (row.name || '').trim().toLowerCase()
+        if (objectiveArea) {
+          allKpis.forEach((kpi) => {
+            const hasArea = (kpi.areas || []).some(
+              (a) => a && a.trim().toLowerCase() === objectiveArea
+            )
+            if (hasArea) {
+              kpiIdSet.add(kpi.id as number)
+            }
+          })
         }
+
+        const kpis: any[] = Array.from(kpiIdSet)
+          .map((id) => kpiMap.get(id))
+          .filter(Boolean)
 
         return {
           id: row.id,
@@ -171,4 +194,3 @@ export const deleteObjectiveTree = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Error al eliminar objetivo' })
   }
 }
-

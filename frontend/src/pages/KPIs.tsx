@@ -1,15 +1,43 @@
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from 'react-query'
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from 'react-query'
 import api from '../services/api'
 import { KPI } from '../types'
 import KPIForm from '../components/KPIForm'
 import './KPIs.css'
+
+const defaultFormula = (type: KPI['type']) => {
+  switch (type) {
+    case 'growth':
+      return '(actual / target) * 100'
+    case 'reduction':
+      return '(target / actual) * 100'
+    case 'exact':
+      return '100 - (Math.abs(actual - target) / target) * 100'
+    default:
+      return '(actual / target) * 100'
+  }
+}
+
+const sampleResult = (type: KPI['type']) => {
+  switch (type) {
+    case 'growth':
+      return 'Ej: target 100, actual 120 → 120%'
+    case 'reduction':
+      return 'Ej: target 100, actual 80 → 125%'
+    case 'exact':
+      return 'Ej: target 100, actual 120 → 80% (penaliza desvío)'
+    default:
+      return ''
+  }
+}
 
 export default function KPIs() {
   const [showForm, setShowForm] = useState(false)
   const [editingKPI, setEditingKPI] = useState<KPI | undefined>(undefined)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState('')
+  const [filterPeriodId, setFilterPeriodId] = useState<number | ''>('') // filtro por período
 
   const queryClient = useQueryClient()
 
@@ -19,10 +47,36 @@ export default function KPIs() {
       const response = await api.get('/kpis')
       return response.data
     },
-    {
-      retry: false,
-    }
+    { retry: false }
   )
+
+  const { data: assignments } = useQuery(
+    'collaborator-kpis-summary',
+    async () => {
+      const res = await api.get('/collaborator-kpis')
+      return res.data as any[]
+    },
+    { staleTime: 2 * 60 * 1000 }
+  )
+
+  const { data: periods } = useQuery(
+    'periods',
+    async () => {
+      const res = await api.get('/periods')
+      return res.data as any[]
+    },
+    { staleTime: 5 * 60 * 1000 }
+  )
+
+  const usageByKpi = useMemo(() => {
+    const map: Record<number, { count: number; periods: Set<number> }> = {}
+    assignments?.forEach((a: any) => {
+      if (!map[a.kpiId]) map[a.kpiId] = { count: 0, periods: new Set() }
+      map[a.kpiId].count += 1
+      map[a.kpiId].periods.add(a.periodId)
+    })
+    return map
+  }, [assignments])
 
   const deleteMutation = useMutation(
     async (id: number) => {
@@ -33,10 +87,7 @@ export default function KPIs() {
         queryClient.invalidateQueries('kpis')
       },
       onError: (error: any) => {
-        alert(
-          error.response?.data?.error ||
-            'Error al eliminar KPI. Verifica que no tenga asignaciones asociadas.'
-        )
+        alert(error.response?.data?.error || 'Error al eliminar KPI. Verifica que no tenga asignaciones asociadas.')
       },
     }
   )
@@ -78,8 +129,12 @@ export default function KPIs() {
       (kpi.description && kpi.description.toLowerCase().includes(searchTerm.toLowerCase()))
 
     const matchesType = !filterType || kpi.type === filterType
+    const matchesPeriod =
+      !filterPeriodId ||
+      kpi.periodIds?.includes(filterPeriodId as number) ||
+      usageByKpi[kpi.id]?.periods.has(filterPeriodId as number)
 
-    return matchesSearch && matchesType
+    return matchesSearch && matchesType && matchesPeriod
   })
 
   const totals = {
@@ -115,23 +170,35 @@ export default function KPIs() {
         </div>
         <div className="filter-group">
           <label htmlFor="filter-type">Tipo:</label>
-          <select
-            id="filter-type"
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
-          >
+          <select id="filter-type" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
             <option value="">Todos los tipos</option>
             <option value="growth">Crecimiento</option>
             <option value="reduction">Reducción</option>
             <option value="exact">Exacto</option>
           </select>
         </div>
-        {(searchTerm || filterType) && (
+        <div className="filter-group">
+          <label htmlFor="filter-period">Período:</label>
+          <select
+            id="filter-period"
+            value={filterPeriodId}
+            onChange={(e) => setFilterPeriodId(e.target.value ? Number(e.target.value) : '')}
+          >
+            <option value="">Todos</option>
+            {periods?.map((p: any) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        {(searchTerm || filterType || filterPeriodId) && (
           <button
             className="btn-clear-filters"
             onClick={() => {
               setSearchTerm('')
               setFilterType('')
+              setFilterPeriodId('')
             }}
           >
             Limpiar filtros
@@ -186,8 +253,35 @@ export default function KPIs() {
                     </div>
                     <div>
                       <span className="meta-label">Fórmula</span>
-                      <p className="meta-value mono">
-                        {kpi.formula ? kpi.formula : 'Por defecto'}
+                      <p className="meta-value mono" title={kpi.formula || defaultFormula(kpi.type)}>
+                        {kpi.formula ? 'Personalizada' : 'Por defecto'} - {sampleResult(kpi.type)}
+                      </p>
+                    </div>
+                    {kpi.macroKPIId && (
+                      <div>
+                        <span className="meta-label">KPI Macro</span>
+                        <p className="meta-value">ID {kpi.macroKPIId}</p>
+                      </div>
+                    )}
+                    <div>
+                      <span className="meta-label">Uso</span>
+                      <p className="meta-value">
+                        {usageByKpi[kpi.id]?.count || 0} asignaciones ·{' '}
+                        {usageByKpi[kpi.id] ? usageByKpi[kpi.id].periods.size : 0} períodos
+                      </p>
+                    </div>
+                    <div>
+                      <span className="meta-label">Períodos</span>
+                      <p className="meta-value">
+                        {kpi.periodIds && kpi.periodIds.length > 0
+                          ? kpi.periodIds
+                              .map((pid) => periods?.find((p: any) => p.id === pid)?.name || `Período #${pid}`)
+                              .join(', ')
+                          : usageByKpi[kpi.id]?.periods.size
+                          ? Array.from(usageByKpi[kpi.id].periods)
+                              .map((pid) => periods?.find((p: any) => p.id === pid)?.name || `Período #${pid}`)
+                              .join(', ')
+                          : 'Sin asignaciones'}
                       </p>
                     </div>
                   </div>
@@ -209,7 +303,7 @@ export default function KPIs() {
           </>
         ) : kpis && kpis.length > 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">??</div>
+            <div className="empty-icon">:(</div>
             <h3>No se encontraron KPIs</h3>
             <p>Intenta ajustar los filtros de búsqueda</p>
             <button
@@ -217,6 +311,7 @@ export default function KPIs() {
               onClick={() => {
                 setSearchTerm('')
                 setFilterType('')
+                setFilterPeriodId('')
               }}
             >
               Limpiar filtros
@@ -224,7 +319,7 @@ export default function KPIs() {
           </div>
         ) : (
           <div className="empty-state">
-            <div className="empty-icon">??</div>
+            <div className="empty-icon">:)</div>
             <h3>No hay KPIs definidos</h3>
             <p>Crea tu primer KPI para comenzar a evaluar el desempeño</p>
             <button className="btn-primary" onClick={handleCreate}>
