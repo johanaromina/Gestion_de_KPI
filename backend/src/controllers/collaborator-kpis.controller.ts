@@ -28,7 +28,10 @@ const recalcSummaryAssignment = async (collaboratorId: number, kpiId: number, pe
     [collaboratorId, kpiId, periodId]
   )
 
-  if (!Array.isArray(subRows) || subRows.length === 0) return
+  if (!Array.isArray(subRows) || subRows.length === 0) {
+    // No hay subperiodos: nada que recalcular
+    return
+  }
 
   let targetTotal = 0
   let weightTotal = 0
@@ -57,16 +60,43 @@ const recalcSummaryAssignment = async (collaboratorId: number, kpiId: number, pe
   let summaryVariation: number | null = null
   let summaryWeightedResult: number | null = null
 
+  const today = new Date()
+  const dueSubRows = subRows.filter((r) => !r.endDate || new Date(r.endDate) <= today)
+  const effectiveSubRows = dueSubRows.length > 0 ? dueSubRows : subRows
+  const sumActualDue = effectiveSubRows.reduce((acc, r) => {
+    const a = r.actual !== null && r.actual !== undefined ? Number(r.actual) : 0
+    return acc + a
+  }, 0)
+
   if (kpiType === 'exact') {
-    const sorted = subRows
-      .slice()
-      .sort((a, b) => {
-        const ea = a.endDate ? new Date(a.endDate).getTime() : 0
-        const eb = b.endDate ? new Date(b.endDate).getTime() : 0
-        if (ea === eb) return (a.id || 0) - (b.id || 0)
-        return ea - eb
-      })
-    const latest = sorted[sorted.length - 1]
+    const byEndDate = (a: any, b: any) => {
+      const ea = a.endDate ? new Date(a.endDate).getTime() : 0
+      const eb = b.endDate ? new Date(b.endDate).getTime() : 0
+      if (ea === eb) return (a.id || 0) - (b.id || 0)
+      return ea - eb
+    }
+
+    // 1) Último subperiodo con dato cargado
+    const completed = subRows
+      .filter((r) => r.actual !== null && r.actual !== undefined)
+      .sort(byEndDate)
+
+    // 2) Si no hay dato, último subperiodo ya transcurrido
+    const now = new Date()
+    const past = subRows
+      .filter((r) => r.endDate && new Date(r.endDate) <= now)
+      .sort(byEndDate)
+
+    // 3) fallback: último subperiodo
+    const allSorted = subRows.slice().sort(byEndDate)
+
+    const latest =
+      completed.length > 0
+        ? completed[completed.length - 1]
+        : past.length > 0
+        ? past[past.length - 1]
+        : allSorted[allSorted.length - 1]
+
     summaryTarget = Number(latest.target ?? 0)
     summaryWeight = Number(latest.weight ?? 0)
     summaryActual =
@@ -81,6 +111,12 @@ const recalcSummaryAssignment = async (collaboratorId: number, kpiId: number, pe
     if (weightTotal > 0) {
       summaryWeightedResult = weightedTotal
       summaryVariation = (weightedTotal / weightTotal) * 100
+    }
+    // Mostrar el acumulado hasta la fecha actual para KPIs de crecimiento/reducción
+    summaryActual = sumActualDue
+    // Si había datos en subperiodos, no dejes la fila resumen en 0
+    if (summaryActual === null || Number.isNaN(summaryActual)) {
+      summaryActual = sumActualDue
     }
   }
 
