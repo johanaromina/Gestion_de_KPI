@@ -115,7 +115,7 @@ export default function ArbolObjetivos() {
     return obj.level === 'company' || (obj.name || '').toLowerCase().includes('compa')
   }
 
-  const buildHierarchy = (): (ObjectiveTree & { level: number; children?: any[] })[] => {
+  const buildHierarchy = (): (ObjectiveTree & { depth: number; children?: any[] })[] => {
     if (!objectives) return []
 
     const filtered = objectives.filter((o) => {
@@ -137,8 +137,8 @@ export default function ArbolObjetivos() {
 
     const buildTree = (
       parent: ObjectiveTree,
-      level: number = 0
-    ): ObjectiveTree & { level: number; children?: any[] } => {
+      depth: number = 0
+    ): ObjectiveTree & { depth: number; children?: any[] } => {
       const children = childrenMap.get(parent.id) || []
       const sortedChildren = [...children].sort((a, b) => {
         const okrA = isOKR(a.name) ? 0 : 1
@@ -148,8 +148,8 @@ export default function ArbolObjetivos() {
       })
       return {
         ...parent,
-        level,
-        children: sortedChildren.map((child) => buildTree(child, level + 1)),
+        depth,
+        children: sortedChildren.map((child) => buildTree(child, depth + 1)),
       }
     }
 
@@ -170,7 +170,7 @@ export default function ArbolObjetivos() {
   }
 
   const renderObjectiveRow = (
-    objective: ObjectiveTree & { level?: number; children?: any[] },
+    objective: ObjectiveTree & { depth?: number; children?: any[] },
     isChild: boolean = false
   ) => {
     const hasChildren = objective.children && objective.children.length > 0
@@ -183,7 +183,7 @@ export default function ArbolObjetivos() {
       <Fragment key={objective.id}>
         <tr className={`${isChild ? 'child-row' : ''} ${okr ? 'okr-row' : ''}`}>
           <td>{objective.id}</td>
-          <td className="name-cell" style={{ paddingLeft: `${(objective.level || 0) * 20}px` }}>
+          <td className="name-cell" style={{ paddingLeft: `${(objective.depth || 0) * 20}px` }}>
             {hasChildren && (
               <button className="expand-button" onClick={() => toggleExpansion(objective.id)}>
                 {isExpanded ? '▼' : '▶'}
@@ -236,7 +236,11 @@ export default function ArbolObjetivos() {
                     <div className="kpi-title">{kpi.name}</div>
                     <div className="kpi-meta">
                       <span className="kpi-type">{kpi.type}</span>
-                      {kpi.area && <span className="kpi-area">Área: {kpi.area}</span>}
+                      {((kpi as any).area || (kpi as any).areas) && (
+                        <span className="kpi-area">
+                          Área: {(kpi as any).area || ((kpi as any).areas || []).join(', ')}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}

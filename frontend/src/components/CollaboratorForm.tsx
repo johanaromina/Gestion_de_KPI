@@ -20,6 +20,8 @@ export default function CollaboratorForm({
     name: collaborator?.name || '',
     position: collaborator?.position || '',
     area: collaborator?.area || '',
+    email: collaborator?.email || '',
+    mfaEnabled: collaborator?.mfaEnabled || false,
     managerId: collaborator?.managerId || undefined,
     role: collaborator?.role || 'collaborator',
   })
@@ -28,7 +30,6 @@ export default function CollaboratorForm({
 
   const queryClient = useQueryClient()
 
-  // Obtener lista de colaboradores para el selector de manager
   const { data: collaborators } = useQuery<Collaborator[]>(
     'collaborators',
     async () => {
@@ -60,7 +61,7 @@ export default function CollaboratorForm({
         setFormData((prev) => ({ ...prev, area: newArea.name }))
       },
       onError: (error: any) => {
-        alert(error.response?.data?.error || 'Error al crear área')
+        alert(error.response?.data?.error || 'Error al crear area')
       },
     }
   )
@@ -105,11 +106,15 @@ export default function CollaboratorForm({
     }
 
     if (!formData.area?.trim()) {
-      newErrors.area = 'El área es requerida'
+      newErrors.area = 'El area es requerida'
     }
 
     if (!formData.role) {
       newErrors.role = 'El rol es requerido'
+    }
+
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Email invalido'
     }
 
     setErrors(newErrors)
@@ -125,7 +130,7 @@ export default function CollaboratorForm({
 
     const submitData = {
       ...formData,
-      managerId: formData.managerId || null,
+      managerId: formData.managerId || undefined,
     }
 
     if (collaborator?.id) {
@@ -135,7 +140,6 @@ export default function CollaboratorForm({
     }
   }
 
-  // Filtrar colaboradores para el selector de manager (excluir el actual si está editando)
   const availableManagers = collaborators?.filter(
     (c) => c.id !== collaborator?.id
   ) || []
@@ -148,7 +152,7 @@ export default function CollaboratorForm({
             {collaborator?.id ? 'Editar Colaborador' : 'Crear Colaborador'}
           </h2>
           <button className="close-button" onClick={onClose}>
-            ×
+            x
           </button>
         </div>
 
@@ -162,7 +166,7 @@ export default function CollaboratorForm({
               onChange={(e) =>
                 setFormData({ ...formData, name: e.target.value })
               }
-              placeholder="Ej: Juan Pérez"
+              placeholder="Ej: Juan Perez"
               className={errors.name ? 'error' : ''}
             />
             {errors.name && (
@@ -189,7 +193,7 @@ export default function CollaboratorForm({
             </div>
 
             <div className="form-group">
-              <label htmlFor="area">Área *</label>
+              <label htmlFor="area">Area *</label>
               <div className="area-input">
                 <select
                   id="area"
@@ -199,7 +203,7 @@ export default function CollaboratorForm({
                   }
                   className={errors.area ? 'error' : ''}
                 >
-                  <option value="">Seleccione un área</option>
+                  <option value="">Seleccione un area</option>
                   {areas?.map((a) => (
                     <option key={a.id} value={a.name}>
                       {a.name}
@@ -210,7 +214,7 @@ export default function CollaboratorForm({
                   type="button"
                   className="btn-secondary small"
                   onClick={() => {
-                    const name = window.prompt('Nombre del área')
+                    const name = window.prompt('Nombre del area')
                     if (name && name.trim()) {
                       createAreaMutation.mutate(name.trim())
                     }
@@ -222,6 +226,39 @@ export default function CollaboratorForm({
               {errors.area && (
                 <span className="error-message">{errors.area}</span>
               )}
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="email">Email</label>
+              <input
+                type="email"
+                id="email"
+                value={formData.email || ''}
+                onChange={(e) =>
+                  setFormData({ ...formData, email: e.target.value })
+                }
+                placeholder="usuario@sidom.io"
+                className={errors.email ? 'error' : ''}
+              />
+              {errors.email && (
+                <span className="error-message">{errors.email}</span>
+              )}
+            </div>
+            <div className="form-group">
+              <label htmlFor="mfaEnabled">Requiere MFA</label>
+              <div className="checkbox-row">
+                <input
+                  type="checkbox"
+                  id="mfaEnabled"
+                  checked={!!formData.mfaEnabled}
+                  onChange={(e) =>
+                    setFormData({ ...formData, mfaEnabled: e.target.checked })
+                  }
+                />
+                <span>Activar verificacion por email</span>
+              </div>
             </div>
           </div>
 
@@ -240,7 +277,7 @@ export default function CollaboratorForm({
                 className={errors.role ? 'error' : ''}
               >
                 <option value="collaborator">Colaborador</option>
-                <option value="leader">Líder</option>
+                <option value="leader">Lider</option>
                 <option value="manager">Gerente</option>
                 <option value="director">Director</option>
                 <option value="admin">Administrador</option>

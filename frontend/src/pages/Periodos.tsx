@@ -3,19 +3,11 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import { format } from 'date-fns'
 import api from '../services/api'
-import { Period } from '../types'
+import { Period, SubPeriod } from '../types'
 import PeriodForm from '../components/PeriodForm'
 import SubPeriodForm from '../components/SubPeriodForm'
+import { useAuth } from '../hooks/useAuth'
 import './Periodos.css'
-
-interface SubPeriod {
-  id: number
-  periodId: number
-  name: string
-  startDate: string
-  endDate: string
-  weight?: number
-}
 
 function SubPeriodsSection({
   period,
@@ -23,12 +15,18 @@ function SubPeriodsSection({
   onCreate,
   onEdit,
   onDelete,
+  onClose,
+  canConfig,
+  closeNotice,
 }: {
   period: Period
   expanded: boolean
   onCreate: () => void
   onEdit: (sub: SubPeriod) => void
   onDelete: (sub: SubPeriod) => void
+  onClose: (sub: SubPeriod) => void
+  canConfig: boolean
+  closeNotice: { periodId: number; text: string; tone: 'success' | 'warning' } | null
 }) {
   const { data, isLoading } = useQuery<SubPeriod[]>(
     ['sub-periods', period.id],
@@ -43,14 +41,28 @@ function SubPeriodsSection({
 
   if (!expanded) return null
 
+  const getStatusBadge = (status?: SubPeriod['status']) => {
+    if (status === 'closed') {
+      return <span className="status-badge status-closed">Cerrado</span>
+    }
+    return <span className="status-badge status-open">Abierto</span>
+  }
+
   return (
     <div className="subperiods-section">
       <div className="subperiods-header">
         <h4>Subperiodos</h4>
-        <button className="btn-small" onClick={onCreate}>
-          + Agregar subperiodo
-        </button>
+        {canConfig && (
+          <button className="btn-small" onClick={onCreate}>
+            + Agregar subperiodo
+          </button>
+        )}
       </div>
+      {closeNotice && closeNotice.periodId === period.id && (
+        <div className={`subperiods-notice ${closeNotice.tone}`}>
+          {closeNotice.text}
+        </div>
+      )}
 
       {isLoading ? (
         <div className="loading-row">Cargando subperiodos...</div>
@@ -62,6 +74,7 @@ function SubPeriodsSection({
               <th>Fecha Inicio</th>
               <th>Fecha Fin</th>
               <th>Peso</th>
+              <th>Estado</th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -72,13 +85,34 @@ function SubPeriodsSection({
                 <td>{format(new Date(subPeriod.startDate), 'dd MMM yyyy')}</td>
                 <td>{format(new Date(subPeriod.endDate), 'dd MMM yyyy')}</td>
                 <td>{subPeriod.weight ? `${subPeriod.weight}%` : '-'}</td>
+                <td>{getStatusBadge(subPeriod.status)}</td>
                 <td className="row-actions">
-                  <button className="btn-text" onClick={() => onEdit(subPeriod)}>
-                    Editar
-                  </button>
-                  <button className="btn-text danger" onClick={() => onDelete(subPeriod)}>
-                    Eliminar
-                  </button>
+                  {canConfig && (
+                    <>
+                      <button
+                        className="btn-text"
+                        onClick={() => onEdit(subPeriod)}
+                        disabled={subPeriod.status === 'closed'}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        className="btn-text danger"
+                        onClick={() => onDelete(subPeriod)}
+                        disabled={subPeriod.status === 'closed'}
+                      >
+                        Eliminar
+                      </button>
+                      {subPeriod.status !== 'closed' && (
+                        <button
+                          className="btn-text"
+                          onClick={() => onClose(subPeriod)}
+                        >
+                          Cerrar
+                        </button>
+                      )}
+                    </>
+                  )}
                 </td>
               </tr>
             ))}
@@ -87,9 +121,11 @@ function SubPeriodsSection({
       ) : (
         <div className="empty-subperiods">
           <p>No hay subperiodos definidos</p>
-          <button className="btn-small" onClick={onCreate}>
-            Crear primer subperiodo
-          </button>
+          {canConfig && (
+            <button className="btn-small" onClick={onCreate}>
+              Crear primer subperiodo
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -97,6 +133,7 @@ function SubPeriodsSection({
 }
 
 export default function Periodos() {
+  const { canConfig } = useAuth()
   const [showPeriodForm, setShowPeriodForm] = useState(false)
   const [showSubPeriodForm, setShowSubPeriodForm] = useState(false)
   const [selectedPeriod, setSelectedPeriod] = useState<Period | null>(null)
@@ -107,6 +144,11 @@ export default function Periodos() {
   const [filterStatus, setFilterStatus] = useState('')
   const [filterStartDate, setFilterStartDate] = useState('')
   const [filterEndDate, setFilterEndDate] = useState('')
+  const [closeNotice, setCloseNotice] = useState<{
+    periodId: number
+    text: string
+    tone: 'success' | 'warning'
+  } | null>(null)
 
   const queryClient = useQueryClient()
 
@@ -141,6 +183,40 @@ export default function Periodos() {
       onSuccess: (_data, subPeriod) => {
         queryClient.invalidateQueries('periods')
         queryClient.invalidateQueries(['sub-periods', subPeriod.periodId])
+      },
+    }
+  )
+
+  const closeSubPeriodMutation = useMutation(
+    async (subPeriod: SubPeriod) => {
+      const response = await api.post(`/sub-periods/${subPeriod.id}/close`)
+      return { subPeriod, data: response.data }
+    },
+    {
+      onSuccess: (result) => {
+        const { subPeriod, data } = result || {}
+        if (subPeriod) {
+          if (data?.failed?.length) {
+            setCloseNotice({
+              periodId: subPeriod.periodId,
+              tone: 'warning',
+              text: `Subperíodo cerrado. Emails enviados: ${data.sent ?? 0}. Fallidos: ${data.failed.length}.`,
+            })
+          } else {
+            setCloseNotice({
+              periodId: subPeriod.periodId,
+              tone: 'success',
+              text: `Subperíodo cerrado. Emails enviados: ${data?.sent ?? 0}.`,
+            })
+          }
+        }
+        queryClient.invalidateQueries('periods')
+        if (subPeriod) {
+          queryClient.invalidateQueries(['sub-periods', subPeriod.periodId])
+        }
+      },
+      onError: (error: any) => {
+        alert(error.response?.data?.error || 'No se pudo cerrar el subperíodo')
       },
     }
   )
@@ -211,6 +287,16 @@ export default function Periodos() {
       )
     ) {
       deleteSubPeriodMutation.mutate(subPeriod)
+    }
+  }
+
+  const handleCloseSubPeriod = (subPeriod: SubPeriod) => {
+    if (
+      window.confirm(
+        `Estas seguro de cerrar el subperiodo "${subPeriod.name}"? Se enviara un resumen por email.`
+      )
+    ) {
+      closeSubPeriodMutation.mutate(subPeriod)
     }
   }
 
@@ -413,6 +499,9 @@ export default function Periodos() {
                       onCreate={() => handleCreateSubPeriod(period)}
                       onEdit={(sub) => handleEditSubPeriod(period, sub)}
                       onDelete={(sub) => handleDeleteSubPeriod(sub)}
+                      onClose={(sub) => handleCloseSubPeriod(sub)}
+                      canConfig={canConfig}
+                      closeNotice={closeNotice}
                     />
                   </div>
                 )

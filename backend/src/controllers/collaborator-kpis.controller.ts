@@ -14,7 +14,7 @@ const canEditAssignment = async (user: AuthRequest['user'], collaboratorId: numb
 const canManageConfig = (user: AuthRequest['user']) =>
   !!user && (user.hasSuperpowers || user.permissions?.includes('config.manage'))
 
-const recalcSummaryAssignment = async (collaboratorId: number, kpiId: number, periodId: number) => {
+export const recalcSummaryAssignment = async (collaboratorId: number, kpiId: number, periodId: number) => {
   const [[kpiRow]] = await pool.query<any[]>(`SELECT type FROM kpis WHERE id = ?`, [kpiId])
   if (!kpiRow) return
 
@@ -170,12 +170,27 @@ export const getCollaboratorKPIs = async (req: Request, res: Response) => {
               c.name as collaboratorName,
               p.name as periodName,
               p.status as periodStatus,
-              sp.name as subPeriodName
+              sp.name as subPeriodName,
+              COALESCE(cv_active.criteriaText, cv_latest.criteriaText, k.criteria) as criteriaText,
+              COALESCE(cv_active.createdAt, cv_latest.createdAt) as criteriaUpdatedAt,
+              COALESCE(cv_active.dataSource, cv_latest.dataSource, ck.dataSource) as dataSource,
+              COALESCE(cv_active.sourceConfig, cv_latest.sourceConfig, ck.sourceConfig) as sourceConfig,
+              km.capturedAt as lastMeasurementAt,
+              mc.name as lastMeasurementBy
        FROM collaborator_kpis ck
        JOIN kpis k ON ck.kpiId = k.id
        JOIN collaborators c ON ck.collaboratorId = c.id
        JOIN periods p ON ck.periodId = p.id
        LEFT JOIN sub_periods sp ON ck.subPeriodId = sp.id
+       LEFT JOIN kpi_criteria_versions cv_active ON cv_active.id = ck.activeCriteriaVersionId
+       LEFT JOIN kpi_criteria_versions cv_latest 
+         ON cv_latest.id = (
+           SELECT id FROM kpi_criteria_versions 
+           WHERE assignmentId = ck.id 
+           ORDER BY createdAt DESC LIMIT 1
+         )
+       LEFT JOIN kpi_measurements km ON km.id = ck.lastMeasurementId
+       LEFT JOIN collaborators mc ON km.capturedBy = mc.id
        ORDER BY ck.createdAt DESC`
     )
     res.json(rows)
@@ -193,10 +208,25 @@ export const getCollaboratorKPIById = async (req: Request, res: Response) => {
               k.type as kpiType,
               k.name as kpiName,
               k.description as kpiDescription,
-              k.criteria as kpiCriteria
+              k.criteria as kpiCriteria,
+              COALESCE(cv_active.criteriaText, cv_latest.criteriaText, k.criteria) as criteriaText,
+              COALESCE(cv_active.createdAt, cv_latest.createdAt) as criteriaUpdatedAt,
+              COALESCE(cv_active.dataSource, cv_latest.dataSource, ck.dataSource) as dataSource,
+              COALESCE(cv_active.sourceConfig, cv_latest.sourceConfig, ck.sourceConfig) as sourceConfig,
+              km.capturedAt as lastMeasurementAt,
+              mc.name as lastMeasurementBy
        FROM collaborator_kpis ck
        JOIN kpis k ON ck.kpiId = k.id
        LEFT JOIN sub_periods sp ON ck.subPeriodId = sp.id
+       LEFT JOIN kpi_criteria_versions cv_active ON cv_active.id = ck.activeCriteriaVersionId
+       LEFT JOIN kpi_criteria_versions cv_latest 
+         ON cv_latest.id = (
+           SELECT id FROM kpi_criteria_versions 
+           WHERE assignmentId = ck.id 
+           ORDER BY createdAt DESC LIMIT 1
+         )
+       LEFT JOIN kpi_measurements km ON km.id = ck.lastMeasurementId
+       LEFT JOIN collaborators mc ON km.capturedBy = mc.id
        WHERE ck.id = ?`,
       [id]
     )
@@ -224,11 +254,26 @@ export const getCollaboratorKPIsByCollaborator = async (req: Request, res: Respo
                         k.criteria as kpiCriteria,
                         p.name as periodName,
                         p.status as periodStatus,
-                        sp.name as subPeriodName
+                        sp.name as subPeriodName,
+                        COALESCE(cv_active.criteriaText, cv_latest.criteriaText, k.criteria) as criteriaText,
+                        COALESCE(cv_active.createdAt, cv_latest.createdAt) as criteriaUpdatedAt,
+                        COALESCE(cv_active.dataSource, cv_latest.dataSource, ck.dataSource) as dataSource,
+                        COALESCE(cv_active.sourceConfig, cv_latest.sourceConfig, ck.sourceConfig) as sourceConfig,
+                        km.capturedAt as lastMeasurementAt,
+                        mc.name as lastMeasurementBy
                  FROM collaborator_kpis ck
                  JOIN kpis k ON ck.kpiId = k.id
                  JOIN periods p ON ck.periodId = p.id
                  LEFT JOIN sub_periods sp ON ck.subPeriodId = sp.id
+                 LEFT JOIN kpi_criteria_versions cv_active ON cv_active.id = ck.activeCriteriaVersionId
+                 LEFT JOIN kpi_criteria_versions cv_latest 
+                   ON cv_latest.id = (
+                     SELECT id FROM kpi_criteria_versions 
+                     WHERE assignmentId = ck.id 
+                     ORDER BY createdAt DESC LIMIT 1
+                   )
+                 LEFT JOIN kpi_measurements km ON km.id = ck.lastMeasurementId
+                 LEFT JOIN collaborators mc ON km.capturedBy = mc.id
                  WHERE ck.collaboratorId = ?`
 
     const params: any[] = [collaboratorId]
@@ -258,11 +303,26 @@ export const getCollaboratorKPIsByPeriod = async (req: Request, res: Response) =
               k.description as kpiDescription,
               k.criteria as kpiCriteria,
               c.name as collaboratorName,
-              sp.name as subPeriodName
+              sp.name as subPeriodName,
+              COALESCE(cv_active.criteriaText, cv_latest.criteriaText, k.criteria) as criteriaText,
+              COALESCE(cv_active.createdAt, cv_latest.createdAt) as criteriaUpdatedAt,
+              COALESCE(cv_active.dataSource, cv_latest.dataSource, ck.dataSource) as dataSource,
+              COALESCE(cv_active.sourceConfig, cv_latest.sourceConfig, ck.sourceConfig) as sourceConfig,
+              km.capturedAt as lastMeasurementAt,
+              mc.name as lastMeasurementBy
        FROM collaborator_kpis ck
        JOIN kpis k ON ck.kpiId = k.id
        JOIN collaborators c ON ck.collaboratorId = c.id
        LEFT JOIN sub_periods sp ON ck.subPeriodId = sp.id
+       LEFT JOIN kpi_criteria_versions cv_active ON cv_active.id = ck.activeCriteriaVersionId
+       LEFT JOIN kpi_criteria_versions cv_latest 
+         ON cv_latest.id = (
+           SELECT id FROM kpi_criteria_versions 
+           WHERE assignmentId = ck.id 
+           ORDER BY createdAt DESC LIMIT 1
+         )
+       LEFT JOIN kpi_measurements km ON km.id = ck.lastMeasurementId
+       LEFT JOIN collaborators mc ON km.capturedBy = mc.id
        WHERE ck.periodId = ?
        ORDER BY c.name ASC`,
       [periodId]
@@ -276,7 +336,23 @@ export const getCollaboratorKPIsByPeriod = async (req: Request, res: Response) =
 
 export const createCollaboratorKPI = async (req: Request, res: Response) => {
   try {
-    const { collaboratorId, kpiId, periodId, subPeriodId, target, weight, status } = req.body
+    const {
+      collaboratorId,
+      kpiId,
+      periodId,
+      subPeriodId,
+      target,
+      weight,
+      status,
+      dataSource,
+      sourceConfig,
+      inputMode,
+      curationStatus,
+      criteriaText,
+      evidenceUrl,
+      curatorUserId,
+      curatorAssignee,
+    } = req.body
 
     if (!collaboratorId || !kpiId || !periodId || !target || !weight) {
       return res.status(400).json({ error: 'Faltan campos requeridos' })
@@ -324,16 +400,57 @@ export const createCollaboratorKPI = async (req: Request, res: Response) => {
 
     const kpiType = kpiRows[0].type
 
+    let resolvedCuratorId = curatorUserId || null
+    if (!resolvedCuratorId && curatorAssignee) {
+      const [curatorRows] = await pool.query<any[]>(
+        `SELECT id FROM collaborators WHERE name = ? LIMIT 1`,
+        [curatorAssignee]
+      )
+      resolvedCuratorId = Array.isArray(curatorRows) && curatorRows.length > 0 ? curatorRows[0].id : null
+    }
+
     const [result] = await pool.query(
       `INSERT INTO collaborator_kpis 
-       (collaboratorId, kpiId, periodId, subPeriodId, target, weight, status) 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [collaboratorId, kpiId, periodId, subPeriodId || null, target, weight, status || 'draft']
+       (collaboratorId, kpiId, periodId, subPeriodId, target, weight, status, curationStatus, dataSource, sourceConfig, curatorUserId, inputMode) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        collaboratorId,
+        kpiId,
+        periodId,
+        subPeriodId || null,
+        target,
+        weight,
+        status || 'draft',
+        curationStatus || 'pending',
+        dataSource || null,
+        sourceConfig || null,
+        resolvedCuratorId,
+        inputMode || 'manual',
+      ]
     )
 
     const insertResult = result as any
+    const assignmentId = insertResult.insertId
+
+    if (criteriaText || dataSource || sourceConfig) {
+      await pool.query(
+        `INSERT INTO kpi_criteria_versions
+         (assignmentId, dataSource, sourceConfig, criteriaText, evidenceUrl, status, createdBy)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          assignmentId,
+          dataSource || null,
+          sourceConfig || null,
+          criteriaText || null,
+          evidenceUrl || null,
+          curationStatus === 'in_review' ? 'in_review' : 'pending',
+          (req as AuthRequest).user?.id || null,
+        ]
+      )
+    }
+
     res.status(201).json({
-      id: insertResult.insertId,
+      id: assignmentId,
       collaboratorId,
       kpiId,
       periodId,
@@ -357,7 +474,23 @@ export const createCollaboratorKPI = async (req: Request, res: Response) => {
 export const updateCollaboratorKPI = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const { target, actual, weight, status, comments, subPeriodId } = req.body
+    const {
+      target,
+      actual,
+      weight,
+      status,
+      comments,
+      subPeriodId,
+      dataSource,
+      sourceConfig,
+      curationStatus,
+      inputMode,
+      criteriaText,
+      evidenceUrl,
+      createCriteriaVersion,
+      curatorUserId,
+      curatorAssignee,
+    } = req.body
     let collaboratorId: number | null = null
     let kpiId: number | null = null
     let periodId: number | null = null
@@ -459,6 +592,40 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
                        SET target = ?, weight = ?, status = ?, comments = ?, subPeriodId = ?`
     const params: any[] = [target, weight, status, comments, subPeriodId || null]
 
+    let resolvedCuratorId = curatorUserId || null
+    if (!resolvedCuratorId && curatorAssignee) {
+      const [curatorRows] = await pool.query<any[]>(
+        `SELECT id FROM collaborators WHERE name = ? LIMIT 1`,
+        [curatorAssignee]
+      )
+      resolvedCuratorId = Array.isArray(curatorRows) && curatorRows.length > 0 ? curatorRows[0].id : null
+    }
+
+    if (dataSource !== undefined) {
+      updateQuery += `, dataSource = ?`
+      params.push(dataSource || null)
+    }
+
+    if (sourceConfig !== undefined) {
+      updateQuery += `, sourceConfig = ?`
+      params.push(sourceConfig || null)
+    }
+
+    if (curationStatus !== undefined) {
+      updateQuery += `, curationStatus = ?`
+      params.push(curationStatus)
+    }
+
+    if (inputMode !== undefined) {
+      updateQuery += `, inputMode = ?`
+      params.push(inputMode || 'manual')
+    }
+
+    if (resolvedCuratorId !== null) {
+      updateQuery += `, curatorUserId = ?`
+      params.push(resolvedCuratorId)
+    }
+
     if (actual !== undefined) {
       const [ckDataRows] = await pool.query<any[]>(
         `SELECT ck.target, ck.weight, k.type 
@@ -496,6 +663,31 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
 
     await pool.query(updateQuery, params)
 
+    if (createCriteriaVersion && (criteriaText || dataSource || sourceConfig)) {
+      const criteriaStatus = curationStatus || 'in_review'
+      await pool.query(
+        `INSERT INTO kpi_criteria_versions
+         (assignmentId, dataSource, sourceConfig, criteriaText, evidenceUrl, status, createdBy)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          dataSource || null,
+          sourceConfig || null,
+          criteriaText || null,
+          evidenceUrl || null,
+          criteriaStatus,
+          (req as AuthRequest).user?.id || null,
+        ]
+      )
+
+      if (!curationStatus) {
+        await pool.query(
+          `UPDATE collaborator_kpis SET curationStatus = ? WHERE id = ?`,
+          ['in_review', id]
+        )
+      }
+    }
+
     if (actual !== undefined && collaboratorId && kpiId && periodId) {
       await recalcSummaryAssignment(collaboratorId, kpiId, periodId)
     }
@@ -517,7 +709,8 @@ export const updateActualValue = async (req: Request, res: Response) => {
     }
 
     const [ckRows] = await pool.query<any[]>(
-      `SELECT ck.status, p.status as periodStatus, ck.collaboratorId, ck.periodId, ck.kpiId
+      `SELECT ck.status, p.status as periodStatus, ck.collaboratorId, ck.periodId, ck.kpiId,
+              ck.activeCriteriaVersionId, ck.inputMode
        FROM collaborator_kpis ck
        JOIN periods p ON ck.periodId = p.id
        WHERE ck.id = ?`,
@@ -570,6 +763,26 @@ export const updateActualValue = async (req: Request, res: Response) => {
        WHERE id = ?`,
       [actual, variation, weightedResult, id]
     )
+
+    const userId = (req as AuthRequest).user?.id || null
+    const [measurementResult] = await pool.query<any>(
+      `INSERT INTO kpi_measurements
+       (assignmentId, periodId, value, mode, status, capturedBy, criteriaVersionId)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        periodId,
+        actual,
+        ckRows[0].inputMode || 'manual',
+        'approved',
+        userId,
+        ckRows[0].activeCriteriaVersionId || null,
+      ]
+    )
+    const measurementId = (measurementResult as any)?.insertId
+    if (measurementId) {
+      await pool.query(`UPDATE collaborator_kpis SET lastMeasurementId = ? WHERE id = ?`, [measurementId, id])
+    }
 
     await recalcSummaryAssignment(ckRows[0].collaboratorId, kpiId, periodId)
 
@@ -646,7 +859,7 @@ export const reopenCollaboratorKPI = async (req: Request, res: Response) => {
 export const proposeCollaboratorKPI = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const { actual, comments } = req.body
+    const { actual, comments, reason, evidenceUrl } = req.body
 
     const [ckRows] = await pool.query<any[]>(
       `SELECT ck.*, p.status as periodStatus
@@ -714,6 +927,26 @@ export const proposeCollaboratorKPI = async (req: Request, res: Response) => {
 
     await pool.query(`UPDATE collaborator_kpis SET ${updateFields} WHERE id = ?`, updateValues)
 
+    if (actual !== undefined) {
+      const userId = (req as AuthRequest).user?.id || null
+      await pool.query(
+        `INSERT INTO kpi_measurements
+         (assignmentId, periodId, value, mode, status, capturedBy, criteriaVersionId, reason, evidenceUrl)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          assignment.periodId,
+          actual,
+          assignment.inputMode || 'manual',
+          'proposed',
+          userId,
+          assignment.activeCriteriaVersionId || null,
+          reason || null,
+          evidenceUrl || null,
+        ]
+      )
+    }
+
     res.json({ message: 'Valores propuestos correctamente' })
   } catch (error: any) {
     console.error('Error proposing collaborator KPI:', error)
@@ -771,6 +1004,28 @@ export const approveCollaboratorKPI = async (req: Request, res: Response) => {
        WHERE id = ?`,
       ['approved', comments || assignment.comments || null, id]
     )
+
+    if (assignment.actual !== null && assignment.actual !== undefined) {
+      const userId = (req as AuthRequest).user?.id || null
+      const [measurementResult] = await pool.query<any>(
+        `INSERT INTO kpi_measurements
+         (assignmentId, periodId, value, mode, status, capturedBy, criteriaVersionId)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          assignment.periodId,
+          assignment.actual,
+          assignment.inputMode || 'manual',
+          'approved',
+          userId,
+          assignment.activeCriteriaVersionId || null,
+        ]
+      )
+      const measurementId = (measurementResult as any)?.insertId
+      if (measurementId) {
+        await pool.query(`UPDATE collaborator_kpis SET lastMeasurementId = ? WHERE id = ?`, [measurementId, id])
+      }
+    }
 
     res.json({ message: 'Asignación aprobada correctamente' })
   } catch (error: any) {

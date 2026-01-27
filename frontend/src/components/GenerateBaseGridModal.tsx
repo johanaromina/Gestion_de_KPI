@@ -85,7 +85,7 @@ export default function GenerateBaseGridModal({
   // Obtener áreas únicas de colaboradores
   const uniqueAreas = Array.from(
     new Set(collaborators?.map((c: any) => c.area) || [])
-  ).sort()
+  ).sort() as string[]
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {}

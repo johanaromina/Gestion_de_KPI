@@ -107,10 +107,10 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
 
     const submitData = {
       ...formData,
-      macroKPIId: formData.macroKPIId || null,
-      description: formData.description || null,
-      criteria: formData.criteria || null,
-      formula: formData.formula?.trim() || null,
+      macroKPIId: formData.macroKPIId || undefined,
+      description: formData.description || undefined,
+      criteria: formData.criteria || undefined,
+      formula: formData.formula?.trim() || undefined,
     }
 
     if (kpi?.id) {

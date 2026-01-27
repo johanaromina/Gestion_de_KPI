@@ -27,12 +27,16 @@ export function isTokenExpired(token: string | null) {
 }
 
 export function useAuth() {
-  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null
+  const token =
+    typeof localStorage !== 'undefined'
+      ? localStorage.getItem('token') || sessionStorage.getItem('token')
+      : null
   const expired = isTokenExpired(token)
 
   useEffect(() => {
     if (expired && token) {
       localStorage.removeItem('token')
+      sessionStorage.removeItem('token')
     }
   }, [expired, token])
 

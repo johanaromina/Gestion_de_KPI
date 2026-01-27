@@ -21,6 +21,13 @@ import dashboardRoutes from './routes/dashboard.routes.js'
 import configRoutes from './routes/config.routes.js'
 import areasRoutes from './routes/areas.routes.js'
 import evolutionRoutes from './routes/evolution.routes.js'
+import notificationsRoutes from './routes/notifications.routes'
+import curationRoutes from './routes/curation.routes.js'
+import measurementsRoutes from './routes/measurements.routes.js'
+import integrationsRoutes from './routes/integrations.routes.js'
+import orgScopesRoutes from './routes/org-scopes.routes.js'
+import { startIntegrationsScheduler } from './utils/integrations-scheduler'
+import { runNotifications } from './utils/notifications'
 
 dotenv.config()
 
@@ -60,6 +67,11 @@ app.use('/api/dashboard', dashboardRoutes)
 app.use('/api/config', configRoutes)
 app.use('/api/areas', areasRoutes)
 app.use('/api', evolutionRoutes)
+app.use('/api/notifications', notificationsRoutes)
+app.use('/api/curation', curationRoutes)
+app.use('/api/measurements', measurementsRoutes)
+app.use('/api/integrations', integrationsRoutes)
+app.use('/api/org-scopes', orgScopesRoutes)
 
 // Start server
 app.listen(PORT, async () => {
@@ -87,3 +99,21 @@ app.listen(PORT, async () => {
     console.log('   3. Run the database setup script: npm run setup:db')
   }
 })
+
+const NOTIFY_INTERVAL_MIN = parseInt(process.env.NOTIFY_INTERVAL_MIN || '10')
+const shouldNotify = (process.env.NOTIFY_ENABLED || 'true').toLowerCase() === 'true'
+const notifyOnStart = (process.env.NOTIFY_RUN_ON_START || 'false').toLowerCase() === 'true'
+
+if (shouldNotify) {
+  if (notifyOnStart) {
+    setTimeout(() => {
+      runNotifications().catch((error) => console.error('[notifications] error:', error))
+    }, 5000)
+  }
+
+  setInterval(() => {
+    runNotifications().catch((error) => console.error('[notifications] error:', error))
+  }, NOTIFY_INTERVAL_MIN * 60 * 1000)
+}
+
+startIntegrationsScheduler()

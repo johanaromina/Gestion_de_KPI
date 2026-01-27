@@ -20,6 +20,26 @@ PORT=5000
 # JWT Secret (IMPORTANTE: Cambiar en producción)
 # Genera una clave segura con: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 JWT_SECRET=tu-clave-secreta-jwt-muy-segura-aqui
+
+# URL base de la app (para links de recuperacion)
+APP_BASE_URL=http://localhost:5173
+
+# SMTP (envio de emails)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=tu_usuario@sidom.io
+SMTP_PASS=tu_app_password
+SMTP_FROM=KPI Manager <no-reply@sidom.io>
+
+# MFA y reset (minutos)
+MFA_TTL_MIN=10
+RESET_TTL_MIN=60
+
+# Notificaciones
+NOTIFY_ENABLED=true
+NOTIFY_INTERVAL_MIN=10
+NOTIFY_RUN_ON_START=false
+NOTIFY_WINDOW_DAYS=7
 ```
 
 ## Generar JWT_SECRET Seguro

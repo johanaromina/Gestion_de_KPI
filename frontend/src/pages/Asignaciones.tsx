@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import api from '../services/api'
 import { CollaboratorKPI } from '../types'
@@ -32,6 +33,8 @@ export default function Asignaciones() {
     assignment: CollaboratorKPI
     action: 'approve' | 'reject'
   } | null>(null)
+
+  const navigate = useNavigate()
 
   const queryClient = useQueryClient()
 
@@ -152,6 +155,40 @@ export default function Asignaciones() {
     const config = status ? statusConfig[status] : undefined
     if (!config) return <span className="status-badge status-unknown">{status || 'Sin estado'}</span>
     return <span className={`status-badge ${config.class}`}>{config.label}</span>
+  }
+
+  const getCurationBadge = (assignment: CollaboratorKPI) => {
+    if (isAssignmentClosed(assignment)) {
+      return <span className="curation-badge locked">Bloqueado</span>
+    }
+    const status = assignment.curationStatus || 'pending'
+    const config = {
+      pending: { label: 'Pendiente', class: 'curation-pending' },
+      in_review: { label: 'En revision', class: 'curation-review' },
+      approved: { label: 'Aprobada', class: 'curation-approved' },
+      rejected: { label: 'Rechazada', class: 'curation-rejected' },
+    } as const
+    const entry = config[status as keyof typeof config]
+    return <span className={`curation-badge ${entry.class}`}>{entry.label}</span>
+  }
+
+  const getInputBadge = (mode?: CollaboratorKPI['inputMode']) => {
+    const normalized = mode || 'manual'
+    const config = {
+      manual: { label: 'Manual', class: 'input-manual' },
+      import: { label: 'Import', class: 'input-import' },
+      auto: { label: 'Auto', class: 'input-auto' },
+    } as const
+    const entry = config[normalized]
+    return <span className={`input-badge ${entry.class}`}>{entry.label}</span>
+  }
+
+  const formatMeasurement = (assignment: CollaboratorKPI) => {
+    if (!assignment.lastMeasurementAt) return '-'
+    const label = assignment.lastMeasurementBy
+      ? `${assignment.lastMeasurementAt} · ${assignment.lastMeasurementBy}`
+      : assignment.lastMeasurementAt
+    return label
   }
 
   // Áreas únicas
@@ -449,8 +486,11 @@ export default function Asignaciones() {
                   <th>Peso</th>
                   <th>Variación</th>
                   <th>Estado</th>
+                  <th>Curaduría</th>
+                  <th>Input</th>
+                  <th>Última medición</th>
                   <th>Comentarios</th>
-                  <th>Acciones</th>
+                  <th className="actions-column">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -498,6 +538,17 @@ export default function Asignaciones() {
                         })()}
                       </td>
                       <td>{getStatusBadge(assignment.status)}</td>
+                      <td
+                        title={
+                          assignment.dataSourceName || assignment.dataSource
+                            ? `${assignment.dataSourceName || assignment.dataSource} · ${assignment.sourceConfig || ''}`.trim()
+                            : 'Sin fuente configurada'
+                        }
+                      >
+                        {getCurationBadge(assignment)}
+                      </td>
+                      <td>{getInputBadge(assignment.inputMode)}</td>
+                      <td className="measurement-cell">{formatMeasurement(assignment)}</td>
                       <td className="comments-cell">
                         {assignment.comments ? (
                           <span className="comments-text" title={assignment.comments}>
@@ -509,7 +560,7 @@ export default function Asignaciones() {
                           '-'
                         )}
                       </td>
-                      <td>
+                      <td className="actions-column">
                         <div className="action-buttons">
                           {assignment.status === 'proposed' && (
                             <>
@@ -554,6 +605,27 @@ export default function Asignaciones() {
                               Cerrada
                             </span>
                           )}
+                          <button
+                            className="btn-icon"
+                            onClick={() => navigate(`/curaduria?assignmentId=${assignment.id}`)}
+                            title="Abrir curaduría"
+                          >
+                            Curaduría
+                          </button>
+                          <button
+                            className="btn-icon"
+                            onClick={() => navigate(`/input-datos?assignmentId=${assignment.id}`)}
+                            title="Ver mediciones"
+                          >
+                            Mediciones
+                          </button>
+                          <button
+                            className="btn-icon"
+                            onClick={() => alert('Recalculo solicitado')}
+                            title="Forzar recalculo"
+                          >
+                            Recalcular
+                          </button>
                         </div>
                       </td>
                     </tr>

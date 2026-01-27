@@ -2,11 +2,14 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from 'react-query'
 import Layout from './components/Layout'
 import Login from './pages/Login'
+import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
 import Colaboradores from './pages/Colaboradores'
 import Periodos from './pages/Periodos'
 import KPIs from './pages/KPIs'
 import Asignaciones from './pages/Asignaciones'
+import InputDatos from './pages/InputDatos'
+import Curaduria from './pages/Curaduria'
 import ArbolObjetivos from './pages/ArbolObjetivos'
 import MiParrilla from './pages/MiParrilla'
 import HistorialIndividual from './pages/HistorialIndividual'
@@ -30,12 +33,13 @@ const queryClient = new QueryClient({
 })
 
 const RequireAuth = ({ children }: { children: JSX.Element }) => {
-  const token = localStorage.getItem('token')
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token')
   const expired = isTokenExpired(token)
 
   if (!token || expired) {
     if (expired) {
       localStorage.removeItem('token')
+      sessionStorage.removeItem('token')
     }
     return <Navigate to="/login" replace />
   }
@@ -49,6 +53,7 @@ function App() {
         <Layout>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route
               path="/"
               element={
@@ -86,6 +91,22 @@ function App() {
               element={
                 <RequireAuth>
                   <Asignaciones />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/input-datos"
+              element={
+                <RequireAuth>
+                  <InputDatos />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/curaduria"
+              element={
+                <RequireAuth>
+                  <Curaduria />
                 </RequireAuth>
               }
             />

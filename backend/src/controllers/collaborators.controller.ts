@@ -24,12 +24,10 @@ const canEditCollaborator = (
     Boolean(user.hasSuperpowers) ||
     Boolean(user.permissions?.includes('config.manage'))
 
-  // Bypass
   if (superpower) return true
   if (['admin', 'director'].includes(role)) return true
   if (userId && collaboratorId && Number(userId) === Number(collaboratorId)) return true
 
-  // Líder/manager sólo misma área
   const userArea = (user.area || '').trim().toLowerCase()
   const targetArea = (collaboratorArea || '').trim().toLowerCase()
 
@@ -40,7 +38,6 @@ const canEditCollaborator = (
 
   return false
 }
-
 
 export const getCollaborators = async (req: Request, res: Response) => {
   try {
@@ -77,8 +74,9 @@ export const getCollaboratorById = async (req: Request, res: Response) => {
 
 export const createCollaborator = async (req: Request, res: Response) => {
   try {
-    const { name, position, area, managerId, role } = req.body
+    const { name, position, area, managerId, role, email, mfaEnabled } = req.body
     const user = (req as AuthRequest).user
+    const normalizedEmail = email ? String(email).trim().toLowerCase() : null
 
     if (!name || !position || !area || !role) {
       return res.status(400).json({ error: 'Faltan campos requeridos' })
@@ -88,25 +86,43 @@ export const createCollaborator = async (req: Request, res: Response) => {
       !canEditCollaborator(user, area) &&
       !['admin', 'director'].includes(user?.role || '')
     ) {
-      return res.status(403).json({ error: 'Solo puedes crear colaboradores en tu área' })
+      return res.status(403).json({ error: 'Solo puedes crear colaboradores en tu area' })
+    }
+
+    if (normalizedEmail) {
+      const [existing] = await pool.query<any[]>(
+        'SELECT id FROM collaborators WHERE email = ?',
+        [normalizedEmail]
+      )
+      if (Array.isArray(existing) && existing.length > 0) {
+        return res.status(400).json({ error: 'Email ya registrado' })
+      }
     }
 
     const [result] = await pool.query(
-      `INSERT INTO collaborators (name, position, area, managerId, role, status) 
-       VALUES (?, ?, ?, ?, ?, 'active')`,
-      [name, position, area, managerId || null, role]
+      `INSERT INTO collaborators (name, position, area, managerId, role, status, email, mfaEnabled) 
+       VALUES (?, ?, ?, ?, ?, 'active', ?, ?)`,
+      [name, position, area, managerId || null, role, normalizedEmail, mfaEnabled ? 1 : 0]
     )
 
     const insertResult = result as any
     const newId = insertResult.insertId
 
-    // Registrar auditoría
     await logAudit(
       'collaborators',
       newId,
       'CREATE',
       undefined,
-      { name, position, area, managerId: managerId || null, role, status: 'active' },
+      {
+        name,
+        position,
+        area,
+        managerId: managerId || null,
+        role,
+        status: 'active',
+        email: normalizedEmail,
+        mfaEnabled: mfaEnabled ? 1 : 0,
+      },
       {
         userId: (req as any).user?.id,
         userName: (req as any).user?.name,
@@ -122,6 +138,8 @@ export const createCollaborator = async (req: Request, res: Response) => {
       area,
       managerId: managerId || null,
       role,
+      email: normalizedEmail,
+      mfaEnabled: mfaEnabled ? 1 : 0,
     })
   } catch (error: any) {
     console.error('Error creating collaborator:', error)
@@ -132,11 +150,11 @@ export const createCollaborator = async (req: Request, res: Response) => {
 export const updateCollaborator = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const { name, position, area, managerId, role } = req.body
+    const { name, position, area, managerId, role, email, mfaEnabled } = req.body
     const user = (req as AuthRequest).user
     console.log('updateCollaborator user:', user)
+    const normalizedEmail = email ? String(email).trim().toLowerCase() : null
 
-    // Obtener valores anteriores
     const [oldRows] = await pool.query<CollaboratorRow[]>(
       'SELECT * FROM collaborators WHERE id = ?',
       [id]
@@ -144,23 +162,40 @@ export const updateCollaborator = async (req: Request, res: Response) => {
     const oldValues = Array.isArray(oldRows) && oldRows.length > 0 ? oldRows[0] : null
 
     if (!canEditCollaborator(user, oldValues?.area, Number(id))) {
-      return res.status(403).json({ error: 'No autorizado para editar fuera de tu área' })
+      return res.status(403).json({ error: 'No autorizado para editar fuera de tu area' })
+    }
+
+    if (normalizedEmail) {
+      const [existing] = await pool.query<any[]>(
+        'SELECT id FROM collaborators WHERE email = ? AND id <> ?',
+        [normalizedEmail, id]
+      )
+      if (Array.isArray(existing) && existing.length > 0) {
+        return res.status(400).json({ error: 'Email ya registrado' })
+      }
     }
 
     await pool.query(
       `UPDATE collaborators 
-       SET name = ?, position = ?, area = ?, managerId = ?, role = ? 
+       SET name = ?, position = ?, area = ?, managerId = ?, role = ?, email = ?, mfaEnabled = ? 
        WHERE id = ?`,
-      [name, position, area, managerId || null, role, id]
+      [name, position, area, managerId || null, role, normalizedEmail, mfaEnabled ? 1 : 0, id]
     )
 
-    // Registrar auditoría
     await logAudit(
       'collaborators',
       parseInt(id),
       'UPDATE',
       oldValues,
-      { name, position, area, managerId: managerId || null, role },
+      {
+        name,
+        position,
+        area,
+        managerId: managerId || null,
+        role,
+        email: normalizedEmail,
+        mfaEnabled: mfaEnabled ? 1 : 0,
+      },
       {
         userId: (req as any).user?.id,
         userName: (req as any).user?.name,
@@ -181,7 +216,6 @@ export const deleteCollaborator = async (req: Request, res: Response) => {
     const { id } = req.params
     const user = (req as AuthRequest).user
 
-    // Obtener valores antes de eliminar
     const [oldRows] = await pool.query<CollaboratorRow[]>(
       'SELECT * FROM collaborators WHERE id = ?',
       [id]
@@ -189,12 +223,11 @@ export const deleteCollaborator = async (req: Request, res: Response) => {
     const oldValues = Array.isArray(oldRows) && oldRows.length > 0 ? oldRows[0] : null
 
     if (!canEditCollaborator(user, oldValues?.area, Number(id))) {
-      return res.status(403).json({ error: 'No autorizado para eliminar fuera de tu área' })
+      return res.status(403).json({ error: 'No autorizado para eliminar fuera de tu area' })
     }
 
     await pool.query('DELETE FROM collaborators WHERE id = ?', [id])
 
-    // Registrar auditoría
     if (oldValues) {
       await logAudit(
         'collaborators',
@@ -235,7 +268,7 @@ export const deactivateCollaborator = async (req: Request, res: Response) => {
     const current = currentRows[0]
 
     if (!canEditCollaborator(user, current?.area, Number(id))) {
-      return res.status(403).json({ error: 'No autorizado para desactivar fuera de tu área' })
+      return res.status(403).json({ error: 'No autorizado para desactivar fuera de tu area' })
     }
 
     await pool.query(
@@ -300,7 +333,7 @@ export const changeCollaboratorRole = async (req: Request, res: Response) => {
     const current = currentRows[0]
 
     if (!canEditCollaborator(user, current?.area)) {
-      return res.status(403).json({ error: 'No autorizado para cambiar rol fuera de tu área' })
+      return res.status(403).json({ error: 'No autorizado para cambiar rol fuera de tu area' })
     }
 
     await pool.query(

@@ -333,3 +333,11 @@
   margin-top: 8px;
 }
 
+.read-only-pill {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #e5e7eb;
+  color: #374151;
+  font-weight: 600;
+}

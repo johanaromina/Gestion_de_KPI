@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from 'react-query'
 import api from '../services/api'
 import { KPI } from '../types'
 import KPIForm from '../components/KPIForm'
+import { useAuth } from '../hooks/useAuth'
 import './KPIs.css'
 
 const defaultFormula = (type: KPI['type']) => {
@@ -40,6 +41,7 @@ export default function KPIs() {
   const [filterPeriodId, setFilterPeriodId] = useState<number | ''>('') // filtro por período
 
   const queryClient = useQueryClient()
+  const { isCollaborator } = useAuth()
 
   const { data: kpis, isLoading } = useQuery<KPI[]>(
     'kpis',
@@ -103,18 +105,21 @@ export default function KPIs() {
   }
 
   const handleCreate = () => {
-    setEditingKPI(undefined)
-    setShowForm(true)
-  }
+  if (isCollaborator) return
+  setEditingKPI(undefined)
+  setShowForm(true)
+}
 
   const handleEdit = (kpi: KPI) => {
-    setEditingKPI(kpi)
-    setShowForm(true)
-  }
+  if (isCollaborator) return
+  setEditingKPI(kpi)
+  setShowForm(true)
+}
 
   const handleDelete = async (id: number, name: string) => {
-    if (
-      window.confirm(
+  if (isCollaborator) return
+  if (
+    window.confirm(
         `¿Estás seguro de eliminar el KPI "${name}"? Esta acción no se puede deshacer y eliminará todas las asignaciones asociadas.`
       )
     ) {
@@ -151,9 +156,11 @@ export default function KPIs() {
           <h1>KPIs</h1>
           <p className="subtitle">Gestiona las definiciones de KPIs</p>
         </div>
-        <button className="btn-primary" onClick={handleCreate}>
-          + Crear KPI
-        </button>
+        {!isCollaborator && (
+          <button className="btn-primary" onClick={handleCreate}>
+            + Crear KPI
+          </button>
+        )}
       </div>
 
       <div className="filters-section">
@@ -286,16 +293,22 @@ export default function KPIs() {
                     </div>
                   </div>
                   <div className="action-row">
-                    <button className="btn-text" onClick={() => handleEdit(kpi)}>
-                      Editar
-                    </button>
-                    <button
-                      className="btn-text danger"
-                      onClick={() => handleDelete(kpi.id, kpi.name)}
-                      disabled={deleteMutation.isLoading}
-                    >
-                      Eliminar
-                    </button>
+                    {isCollaborator ? (
+                      <span className="read-only-pill">Solo lectura</span>
+                    ) : (
+                      <>
+                        <button className="btn-text" onClick={() => handleEdit(kpi)}>
+                          Editar
+                        </button>
+                        <button
+                          className="btn-text danger"
+                          onClick={() => handleDelete(kpi.id, kpi.name)}
+                          disabled={deleteMutation.isLoading}
+                        >
+                          Eliminar
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}

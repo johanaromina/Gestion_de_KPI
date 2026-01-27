@@ -21,6 +21,13 @@ interface CollaboratorKPI {
   weight: number
   status: 'draft' | 'proposed' | 'approved' | 'closed'
   comments?: string
+  dataSource?: string
+  sourceConfig?: string
+  criteriaText?: string
+  evidenceUrl?: string
+  curatorAssignee?: string
+  curationStatus?: 'pending' | 'in_review' | 'approved' | 'rejected'
+  createCriteriaVersion?: boolean
 }
 
 interface CollaboratorKPIFormProps {
@@ -48,13 +55,26 @@ export default function CollaboratorKPIForm({
     weight: assignment?.weight ?? 0,
     status: assignment?.status || 'draft',
     comments: assignment?.comments || '',
+    dataSource: assignment?.dataSource,
+    sourceConfig: assignment?.sourceConfig || '',
+    criteriaText: assignment?.criteriaText || '',
+    evidenceUrl: assignment?.evidenceUrl || '',
+    curatorAssignee: assignment?.curatorAssignee || 'Gise',
+    curationStatus: assignment?.curationStatus || 'pending',
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [criteriaDirty, setCriteriaDirty] = useState(false)
 
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const isReadOnlyCollaborator = user?.role === 'collaborator'
+  const canCurate =
+    user?.role === 'admin' ||
+    user?.role === 'director' ||
+    user?.permissions?.includes('curation.manage')
+
+  const dataSourceOptions = ['Jira', 'Xray', 'DB MySQL', 'CSV upload', 'Manual', 'Otro']
 
   const { data: collaborators } = useQuery('collaborators', async () => {
     const response = await api.get('/collaborators')
@@ -77,6 +97,18 @@ export default function CollaboratorKPIForm({
       enabled: true,
     }
   )
+
+  useEffect(() => {
+    if (assignment?.id) return
+    if (!formData.kpiId || !kpis) return
+    const selected = kpis.find((k: any) => k.id === formData.kpiId)
+    if (!selected) return
+    setFormData((prev) => ({
+      ...prev,
+      dataSource: prev.dataSource || selected.defaultDataSource || '',
+      criteriaText: prev.criteriaText || selected.defaultCriteriaTemplate || '',
+    }))
+  }, [assignment?.id, formData.kpiId, kpis])
 
   const { data: subPeriods } = useQuery(
     ['sub-periods', periodId],
@@ -149,6 +181,13 @@ export default function CollaboratorKPIForm({
         status: data.status,
         comments: data.comments,
         actual: data.actual,
+        dataSource: data.dataSource,
+        sourceConfig: data.sourceConfig,
+        criteriaText: data.criteriaText,
+        evidenceUrl: data.evidenceUrl,
+        curatorAssignee: data.curatorAssignee,
+        curationStatus: data.curationStatus,
+        createCriteriaVersion: data.createCriteriaVersion,
       }
       const response = await api.put(`/collaborator-kpis/${assignment.id}`, payload)
       return response.data
@@ -220,6 +259,14 @@ export default function CollaboratorKPIForm({
       }
     }
 
+    if (!formData.dataSource) {
+      newErrors.dataSource = 'Selecciona una fuente'
+    }
+
+    if (!formData.criteriaText?.trim()) {
+      newErrors.criteriaText = 'El criterio es requerido'
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -272,7 +319,7 @@ export default function CollaboratorKPIForm({
       target: planMap.get(sp.id)?.target ?? '',
       weight: planMap.get(sp.id)?.weight ?? '',
     }))
-    setPlanRows(merged)
+    setPlanRows(merged as any)
   }, [planData, subPeriods])
 
   const planWeightTotal = planRows.reduce((acc, r) => acc + (Number(r.weight) || 0), 0)
@@ -472,6 +519,145 @@ export default function CollaboratorKPIForm({
               </div>
             </div>
           )}
+
+          <div className="curation-section">
+            <div className="curation-header">
+              <h3>Fuente y criterio (Curaduría)</h3>
+              <span className={`curation-pill curation-${formData.curationStatus}`}>
+                {formData.curationStatus === 'pending'
+                  ? 'Pendiente'
+                  : formData.curationStatus === 'in_review'
+                  ? 'En revision'
+                  : formData.curationStatus === 'approved'
+                  ? 'Aprobado'
+                  : 'Rechazado'}
+              </span>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="dataSource">Fuente del dato *</label>
+                <select
+                  id="dataSource"
+                  value={formData.dataSource || ''}
+                  onChange={(e) => {
+                    setCriteriaDirty(true)
+                    setFormData({ ...formData, dataSource: e.target.value })
+                  }}
+                  className={errors.dataSource ? 'error' : ''}
+                  disabled={isReadOnlyCollaborator}
+                >
+                  <option value="">Seleccione una fuente</option>
+                  {dataSourceOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+                {errors.dataSource && <span className="error-message">{errors.dataSource}</span>}
+              </div>
+              <div className="form-group">
+                <label htmlFor="sourceConfig">Origen / Query / Endpoint</label>
+                <input
+                  type="text"
+                  id="sourceConfig"
+                  value={formData.sourceConfig || ''}
+                  onChange={(e) => {
+                    setCriteriaDirty(true)
+                    setFormData({ ...formData, sourceConfig: e.target.value })
+                  }}
+                  placeholder="JQL / SQL / URL / reporte"
+                  disabled={isReadOnlyCollaborator}
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="criteriaText">Criterio de cálculo *</label>
+              <textarea
+                id="criteriaText"
+                value={formData.criteriaText || ''}
+                onChange={(e) => {
+                  setCriteriaDirty(true)
+                  setFormData({ ...formData, criteriaText: e.target.value })
+                }}
+                rows={3}
+                placeholder="Describe cómo se calcula target/alcance/variación"
+                className={errors.criteriaText ? 'error' : ''}
+                disabled={isReadOnlyCollaborator}
+              />
+              {errors.criteriaText && <span className="error-message">{errors.criteriaText}</span>}
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="evidenceUrl">Evidencia / adjunto (opcional)</label>
+                <input
+                  type="text"
+                  id="evidenceUrl"
+                  value={formData.evidenceUrl || ''}
+                  onChange={(e) => {
+                    setCriteriaDirty(true)
+                    setFormData({ ...formData, evidenceUrl: e.target.value })
+                  }}
+                  placeholder="Link o referencia"
+                  disabled={isReadOnlyCollaborator}
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="curatorAssignee">Responsable de curaduría</label>
+                <input
+                  type="text"
+                  id="curatorAssignee"
+                  value={formData.curatorAssignee || ''}
+                  onChange={(e) => setFormData({ ...formData, curatorAssignee: e.target.value })}
+                  disabled={isReadOnlyCollaborator}
+                />
+              </div>
+            </div>
+
+            <div className="curation-actions">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setFormData({ ...formData, curationStatus: 'in_review', createCriteriaVersion: true })}
+                disabled={isReadOnlyCollaborator}
+              >
+                Enviar a curaduría
+              </button>
+              {assignment?.id && (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() =>
+                    setFormData({
+                      ...formData,
+                      curationStatus: 'in_review',
+                      createCriteriaVersion: true,
+                    })
+                  }
+                  disabled={!criteriaDirty || isReadOnlyCollaborator}
+                >
+                  Actualizar criterio
+                </button>
+              )}
+              {canCurate && (
+                <select
+                  value={formData.curationStatus}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      curationStatus: e.target.value as CollaboratorKPI['curationStatus'],
+                    })
+                  }
+                >
+                  <option value="pending">Pendiente</option>
+                  <option value="in_review">En revision</option>
+                  <option value="approved">Aprobado</option>
+                  <option value="rejected">Rechazado</option>
+                </select>
+              )}
+            </div>
+          </div>
 
           {assignment?.id && (
             <div className="form-row">

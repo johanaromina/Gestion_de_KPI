@@ -19,7 +19,10 @@
     "seed:objectives": "tsx scripts/seed-objectives-tree.ts",
     "seed:areas": "tsx scripts/seed-objectives-areas.ts",
     "add:evolution": "tsx scripts/add-evolution-table.ts",
-    "import:evolution": "tsx scripts/import-evolution-from-excel.ts"
+    "import:evolution": "tsx scripts/import-evolution-from-excel.ts",
+    "add:auth-columns": "tsx scripts/add-auth-columns.ts",
+    "add:notifications-table": "tsx scripts/add-notifications-table.ts",
+    "add:subperiod-status": "tsx scripts/add-subperiod-status.ts"
   },
   "dependencies": {
     "@types/pdfkit": "^0.17.4",
@@ -33,6 +36,8 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.6.5",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.9.12",
     "pdfkit": "^0.17.2",
     "zod": "^3.22.4"
   },

@@ -6,7 +6,7 @@ import { pool } from '../config/database'
  */
 export const getReductionKPIs = async (req: Request, res: Response) => {
   try {
-    const { periodId, collaboratorId, area } = req.query
+    const { periodId, collaboratorId, area, areaId } = req.query
 
     let query = `
       SELECT 
@@ -51,7 +51,10 @@ export const getReductionKPIs = async (req: Request, res: Response) => {
       params.push(collaboratorId)
     }
 
-    if (area) {
+    if (areaId) {
+      query += ' AND EXISTS (SELECT 1 FROM areas a WHERE a.name = c.area AND a.id = ?)'
+      params.push(areaId)
+    } else if (area) {
       query += ' AND c.area = ?'
       params.push(area)
     }
@@ -160,7 +163,7 @@ export const getReductionKPIs = async (req: Request, res: Response) => {
  */
 export const getReductionStatistics = async (req: Request, res: Response) => {
   try {
-    const { periodId, area } = req.query
+    const { periodId, area, areaId } = req.query
 
     let query = `
       SELECT 
@@ -189,7 +192,10 @@ export const getReductionStatistics = async (req: Request, res: Response) => {
       params.push(periodId)
     }
 
-    if (area) {
+    if (areaId) {
+      query += ' AND EXISTS (SELECT 1 FROM areas a WHERE a.name = c.area AND a.id = ?)'
+      params.push(areaId)
+    } else if (area) {
       query += ' AND c.area = ?'
       params.push(area)
     }

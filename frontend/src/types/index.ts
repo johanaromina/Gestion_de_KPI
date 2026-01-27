@@ -5,6 +5,8 @@ export interface Collaborator {
   name: string
   position: string
   area: string
+  email?: string | null
+  mfaEnabled?: boolean
   managerId?: number
   role: 'admin' | 'director' | 'manager' | 'leader' | 'collaborator'
   status?: 'active' | 'inactive'
@@ -34,6 +36,7 @@ export interface SubPeriod {
   name: string
   startDate: string
   endDate: string
+  status?: 'open' | 'closed'
   weight?: number
 }
 
@@ -46,6 +49,9 @@ export interface KPI {
   type: KPIType
   criteria: string
   formula?: string
+  defaultDataSource?: string
+  defaultCriteriaTemplate?: string
+  defaultCalcRule?: string
   macroKPIId?: number
   areas?: string[]
   periodIds?: number[]
@@ -64,6 +70,17 @@ export interface CollaboratorKPI {
   weightedResult?: number
   status: 'draft' | 'proposed' | 'approved' | 'closed'
   comments?: string
+  curationStatus?: 'pending' | 'in_review' | 'approved' | 'rejected'
+  dataSource?: string
+  dataSourceName?: string
+  sourceConfig?: string
+  criteriaText?: string
+  criteriaVersion?: string
+  criteriaUpdatedAt?: string
+  criteriaUpdatedBy?: string
+  inputMode?: 'manual' | 'import' | 'auto'
+  lastMeasurementAt?: string
+  lastMeasurementBy?: string
 }
 
 export interface ObjectiveTree {

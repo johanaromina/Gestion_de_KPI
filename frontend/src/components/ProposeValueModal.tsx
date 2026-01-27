@@ -12,12 +12,16 @@ interface ProposeValueModalProps {
     actual?: number
     status: string
   }
+  requiresReason?: boolean
+  evidenceEnabled?: boolean
   onClose: () => void
   onSuccess?: () => void
 }
 
 export default function ProposeValueModal({
   assignment,
+  requiresReason = false,
+  evidenceEnabled = false,
   onClose,
   onSuccess,
 }: ProposeValueModalProps) {
@@ -25,6 +29,8 @@ export default function ProposeValueModal({
     assignment.actual?.toString() || ''
   )
   const [comments, setComments] = useState<string>('')
+  const [reason, setReason] = useState<string>('')
+  const [evidenceUrl, setEvidenceUrl] = useState<string>('')
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const queryClient = useQueryClient()
@@ -64,6 +70,10 @@ export default function ProposeValueModal({
       }
     }
 
+    if (requiresReason && !reason.trim()) {
+      newErrors.reason = 'El motivo es requerido para override'
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -78,6 +88,8 @@ export default function ProposeValueModal({
     proposeMutation.mutate({
       actual: parseFloat(actual),
       comments: comments.trim() || undefined,
+      reason: reason.trim() || undefined,
+      evidenceUrl: evidenceUrl.trim() || undefined,
     })
   }
 
@@ -134,6 +146,36 @@ export default function ProposeValueModal({
               Explica el contexto o razones de este valor propuesto
             </small>
           </div>
+
+          <div className="form-group">
+            <label htmlFor="reason">
+              Motivo del override {requiresReason && '*'}
+            </label>
+            <textarea
+              id="reason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Detalla por qué se propone un override"
+              rows={3}
+              className={errors.reason ? 'error' : ''}
+            />
+            {errors.reason && (
+              <span className="error-message">{errors.reason}</span>
+            )}
+          </div>
+
+          {evidenceEnabled && (
+            <div className="form-group">
+              <label htmlFor="evidenceUrl">Evidencia (opcional)</label>
+              <input
+                type="text"
+                id="evidenceUrl"
+                value={evidenceUrl}
+                onChange={(e) => setEvidenceUrl(e.target.value)}
+                placeholder="Link o adjunto"
+              />
+            </div>
+          )}
 
           <div className="form-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>

@@ -89,7 +89,7 @@ export default function VistasReduccion() {
 
   const areas = Array.from(
     new Set(collaborators?.map((c: any) => c.area).filter(Boolean) || [])
-  )
+  ) as string[]
 
   // Obtener KPIs de reducción
   const { data: reductionKPIs, isLoading: isLoadingKPIs } = useQuery<

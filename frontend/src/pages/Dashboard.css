@@ -33,9 +33,19 @@
 }
 
 .user-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 600;
   color: #1f2937;
   font-size: 16px;
+}
+
+.user-icon svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+  color: #111827;
 }
 
 .user-role {
@@ -69,8 +79,19 @@
 }
 
 .stat-icon {
-  font-size: 48px;
+  width: 48px;
+  height: 48px;
   margin-right: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #f97316;
+}
+
+.stat-icon svg {
+  width: 40px;
+  height: 40px;
+  display: block;
 }
 
 .stat-content h3 {
@@ -147,8 +168,219 @@
   transform: translateY(-1px);
 }
 
+/* Colaborador: resumen y tablas */
+.collab-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.collab-card {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.collab-kpi-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.collab-kpi-table th,
+.collab-kpi-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+}
+
+.collab-kpi-table th {
+  background: #f9fafb;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.mini-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.mini-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px;
+  background: #fff;
+}
+
+.mini-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.mini-title {
+  font-weight: 700;
+  color: #111827;
+}
+
+.mini-weight {
+  background: #f97316;
+  color: #111827;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.mini-body {
+  color: #374151;
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.progress-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.progress-card {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 18px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.progress-label {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.progress-value {
+  margin: 10px 0 6px;
+  font-size: 28px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.progress-caption {
+  margin: 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.progress-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 16px;
+}
+
+.detail-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 18px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.detail-card.highlight {
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+  border-color: #fdba74;
+}
+
+.detail-card h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.risk-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.risk-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  font-size: 14px;
+}
+
+.risk-name {
+  font-weight: 600;
+  color: #111827;
+}
+
+.risk-value {
+  font-weight: 700;
+  color: #b45309;
+}
+
+.empty-note {
+  margin: 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.btn-primary.ghost {
+  margin-top: 12px;
+  background: transparent;
+  border: 1px solid #fb923c;
+  color: #9a3412;
+  box-shadow: none;
+}
+
 .action-btn:active {
   transform: scale(0.98);
+}
+
+/* Banner de alertas (superpoderes) */
+.notify-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: 16px;
+  margin-bottom: 24px;
+  border: 1px solid #fdba74;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+}
+
+.notify-main h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.notify-main p {
+  margin: 0;
+  color: #7c2d12;
+  font-weight: 600;
+  font-size: 14px;
 }
 
 /* KPIs del colaborador */
@@ -272,5 +504,14 @@
 
   .dashboard-grid {
     grid-template-columns: 1fr;
+  }
+
+  .progress-detail {
+    grid-template-columns: 1fr;
+  }
+
+  .notify-banner {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

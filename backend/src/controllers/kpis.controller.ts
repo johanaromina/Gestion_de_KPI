@@ -19,14 +19,24 @@ const ensureKPIPeriodsTable = async () => {
 
 export const getKPIs = async (req: Request, res: Response) => {
   try {
-    const { area, periodId } = req.query
+    const { area, areaId, periodId } = req.query
     await ensureKPIPeriodsTable()
 
     let query = 'SELECT * FROM kpis'
     const params: any[] = []
     const where: string[] = []
 
-    if (area) {
+    if (areaId) {
+      where.push(
+        `EXISTS (
+          SELECT 1
+          FROM kpi_areas ka
+          JOIN areas a ON a.name = ka.area
+          WHERE ka.kpiId = kpis.id AND a.id = ?
+        )`
+      )
+      params.push(areaId)
+    } else if (area) {
       where.push('EXISTS (SELECT 1 FROM kpi_areas ka WHERE ka.kpiId = kpis.id AND ka.area = ?)')
       params.push(area)
     }
@@ -102,7 +112,19 @@ export const getKPIById = async (req: Request, res: Response) => {
 
 export const createKPI = async (req: Request, res: Response) => {
   try {
-    const { name, description, type, criteria, formula, macroKPIId, areas, periodIds } = req.body
+    const {
+      name,
+      description,
+      type,
+      criteria,
+      formula,
+      macroKPIId,
+      areas,
+      periodIds,
+      defaultDataSource,
+      defaultCriteriaTemplate,
+      defaultCalcRule,
+    } = req.body
 
     if (!name || !type) {
       return res.status(400).json({ error: 'Faltan campos requeridos' })
@@ -121,8 +143,9 @@ export const createKPI = async (req: Request, res: Response) => {
       await conn.beginTransaction()
 
       const [result] = await conn.query(
-        `INSERT INTO kpis (name, description, type, criteria, formula, macroKPIId) 
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO kpis 
+         (name, description, type, criteria, formula, macroKPIId, defaultDataSource, defaultCriteriaTemplate, defaultCalcRule) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           name,
           description || null,
@@ -130,6 +153,9 @@ export const createKPI = async (req: Request, res: Response) => {
           criteria || null,
           formula || null,
           macroKPIId || null,
+          defaultDataSource || null,
+          defaultCriteriaTemplate || null,
+          defaultCalcRule || null,
         ]
       )
 
@@ -166,6 +192,9 @@ export const createKPI = async (req: Request, res: Response) => {
         criteria: criteria || null,
         formula: formula || null,
         macroKPIId: macroKPIId || null,
+        defaultDataSource: defaultDataSource || null,
+        defaultCriteriaTemplate: defaultCriteriaTemplate || null,
+        defaultCalcRule: defaultCalcRule || null,
         areas: Array.isArray(areas) ? areas : [],
         periodIds: Array.isArray(periodIds)
           ? periodIds.filter((p: any) => Number.isFinite(Number(p))).map((p: number) => Number(p))
@@ -186,7 +215,19 @@ export const createKPI = async (req: Request, res: Response) => {
 export const updateKPI = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const { name, description, type, criteria, formula, macroKPIId, areas, periodIds } = req.body
+    const {
+      name,
+      description,
+      type,
+      criteria,
+      formula,
+      macroKPIId,
+      areas,
+      periodIds,
+      defaultDataSource,
+      defaultCriteriaTemplate,
+      defaultCalcRule,
+    } = req.body
 
     // Validar fórmula si se proporciona
     if (formula !== undefined) {
@@ -204,7 +245,8 @@ export const updateKPI = async (req: Request, res: Response) => {
 
       await conn.query(
         `UPDATE kpis 
-         SET name = ?, description = ?, type = ?, criteria = ?, formula = ?, macroKPIId = ? 
+         SET name = ?, description = ?, type = ?, criteria = ?, formula = ?, macroKPIId = ?,
+             defaultDataSource = ?, defaultCriteriaTemplate = ?, defaultCalcRule = ?
          WHERE id = ?`,
         [
           name,
@@ -213,6 +255,9 @@ export const updateKPI = async (req: Request, res: Response) => {
           criteria,
           formula || null,
           macroKPIId || null,
+          defaultDataSource || null,
+          defaultCriteriaTemplate || null,
+          defaultCalcRule || null,
           id,
         ]
       )

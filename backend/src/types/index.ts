@@ -5,6 +5,8 @@ export interface Collaborator {
   name: string
   position: string
   area: string
+  email?: string | null
+  mfaEnabled?: boolean
   managerId?: number
   role: 'admin' | 'director' | 'manager' | 'leader' | 'collaborator'
   hasSuperpowers?: boolean
@@ -32,6 +34,7 @@ export interface SubPeriod {
   name: string
   startDate: Date
   endDate: Date
+  status?: 'open' | 'closed'
   weight?: number
   createdAt?: Date
   updatedAt?: Date
@@ -46,6 +49,9 @@ export interface KPI {
   type: KPIType
   criteria: string
   formula?: string
+  defaultDataSource?: string | null
+  defaultCriteriaTemplate?: string | null
+  defaultCalcRule?: string | null
   macroKPIId?: number
   areas?: string[]
   createdAt?: Date
@@ -65,8 +71,46 @@ export interface CollaboratorKPI {
   weightedResult?: number
   status: 'draft' | 'proposed' | 'approved' | 'closed'
   comments?: string
+  curationStatus?: 'pending' | 'in_review' | 'approved' | 'rejected'
+  dataSource?: string | null
+  sourceConfig?: string | null
+  curatorUserId?: number | null
+  activeCriteriaVersionId?: number | null
+  inputMode?: 'manual' | 'import' | 'auto'
+  lastMeasurementId?: number | null
   createdAt?: Date
   updatedAt?: Date
+}
+
+export interface KPICriteriaVersion {
+  id: number
+  assignmentId: number
+  dataSource?: string | null
+  sourceConfig?: string | null
+  criteriaText?: string | null
+  evidenceUrl?: string | null
+  status: 'pending' | 'in_review' | 'approved' | 'rejected'
+  createdBy?: number | null
+  reviewedBy?: number | null
+  comment?: string | null
+  createdAt?: Date
+  reviewedAt?: Date | null
+}
+
+export interface KPIMeasurement {
+  id: number
+  assignmentId: number
+  periodId?: number | null
+  subPeriodId?: number | null
+  value: number
+  mode: 'manual' | 'import' | 'auto'
+  status: 'draft' | 'proposed' | 'approved' | 'rejected'
+  capturedBy?: number | null
+  capturedAt?: Date
+  criteriaVersionId?: number | null
+  reason?: string | null
+  evidenceUrl?: string | null
+  sourceRunId?: string | null
 }
 
 export interface CollaboratorKPIPlan {

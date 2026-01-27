@@ -25,9 +25,17 @@ interface CollaboratorKPI {
   kpiName?: string
   kpiDescription?: string
   kpiCriteria?: string
+  criteriaText?: string
   kpiType?: 'growth' | 'reduction' | 'exact'
   periodName?: string
   periodStatus?: string
+  curationStatus?: 'pending' | 'in_review' | 'approved' | 'rejected'
+  dataSourceName?: string
+  dataSource?: string
+  sourceConfig?: string
+  inputMode?: 'manual' | 'import' | 'auto'
+  lastMeasurementAt?: string
+  lastMeasurementBy?: string
 }
 
 export default function MiParrilla() {
@@ -134,10 +142,35 @@ export default function MiParrilla() {
     )
   }
 
+  const getCurationBadge = (status?: CollaboratorKPI['curationStatus']) => {
+    const effective = status || 'pending'
+    const config = {
+      pending: { label: 'Pendiente', class: 'curation-pending' },
+      in_review: { label: 'En revision', class: 'curation-review' },
+      approved: { label: 'Aprobada', class: 'curation-approved' },
+      rejected: { label: 'Rechazada', class: 'curation-rejected' },
+    } as const
+    const entry = config[effective]
+    return <span className={`curation-badge ${entry.class}`}>{entry.label}</span>
+  }
+
+  const getInputLabel = (mode?: CollaboratorKPI['inputMode']) => {
+    const normalized = mode || 'manual'
+    return normalized === 'auto' ? 'Auto' : normalized === 'import' ? 'Import' : 'Manual'
+  }
+
   const handleEditActual = (kpi: CollaboratorKPI) => {
     // Verificar si está cerrado
     if (kpi.status === 'closed' || periodStatus === 'closed') {
       alert('No se puede editar el valor de una parrilla cerrada')
+      return
+    }
+    if (kpi.curationStatus !== 'approved') {
+      alert('El criterio no está aprobado. Solo se permite proponer valores.')
+      return
+    }
+    if (kpi.inputMode === 'auto') {
+      alert('Este KPI es automático. Proponé un override si corresponde.')
       return
     }
     setEditingKPIId(kpi.id)
@@ -158,9 +191,18 @@ export default function MiParrilla() {
     setActualValue('')
   }
 
-  const canEdit = (kpi: CollaboratorKPI) => {
+  const canEditInline = (kpi: CollaboratorKPI) => {
     if (isCollaborator) return false
-    return kpi.status !== 'closed' && periodStatus !== 'closed'
+    if (kpi.status === 'closed' || periodStatus === 'closed') return false
+    if (kpi.curationStatus !== 'approved') return false
+    if (kpi.inputMode === 'auto') return false
+    return true
+  }
+
+  const canProposeValue = (kpi: CollaboratorKPI) => {
+    if (kpi.status !== 'draft') return false
+    if (periodStatus === 'closed') return false
+    return true
   }
 
   if (loadingUser || loadingCollaborator || loadingKPIs) {
@@ -320,7 +362,7 @@ export default function MiParrilla() {
                               ? kpi.actual
                               : '-'}
                           </span>
-                          {canEdit(kpi) && (
+                          {canEditInline(kpi) && (
                             <button
                               className="btn-edit-actual"
                               onClick={() => handleEditActual(kpi)}
@@ -346,7 +388,22 @@ export default function MiParrilla() {
                         : '-'}
                     </td>
                     <td className="kpi-criteria">
-                      {kpi.kpiCriteria || '-'}
+                      <div className="criteria-text">{kpi.criteriaText || kpi.kpiCriteria || '-'}</div>
+                      <div className="criteria-meta">
+                        {getCurationBadge(kpi.curationStatus)}
+                        <span className="criteria-source">
+                          {kpi.dataSourceName || kpi.dataSource || 'Sin fuente'}
+                        </span>
+                        <span className="criteria-input">
+                          Input: {getInputLabel(kpi.inputMode)}
+                        </span>
+                        <span className="criteria-update">
+                          Último dato:{' '}
+                          {kpi.lastMeasurementAt
+                            ? `${kpi.lastMeasurementAt}${kpi.lastMeasurementBy ? ` · ${kpi.lastMeasurementBy}` : ''}`
+                            : '-'}
+                        </span>
+                      </div>
                     </td>
                     <td>
                       <span
@@ -371,7 +428,7 @@ export default function MiParrilla() {
                     </td>
                     <td>
                       <div className="kpi-actions">
-                        {canEdit(kpi) && (
+                        {canProposeValue(kpi) && (
                           <>
                             {kpi.status === 'draft' && (
                               <button
@@ -431,6 +488,8 @@ export default function MiParrilla() {
       {proposingKPI && (
         <ProposeValueModal
           assignment={proposingKPI}
+          requiresReason={proposingKPI.inputMode === 'auto' || proposingKPI.curationStatus !== 'approved'}
+          evidenceEnabled
           onClose={() => setProposingKPI(null)}
           onSuccess={() => {
             setProposingKPI(null)

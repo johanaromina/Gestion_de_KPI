@@ -12,7 +12,7 @@ export const api = axios.create({
 // Request interceptor for adding auth token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -30,6 +30,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && window.location.pathname !== '/login') {
       // Handle unauthorized access
       localStorage.removeItem('token')
+      sessionStorage.removeItem('token')
       window.location.replace('/login?session=expired')
     }
     return Promise.reject(error)
