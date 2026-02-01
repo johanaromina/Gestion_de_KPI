@@ -6,6 +6,7 @@ import './SubPeriodForm.css'
 interface SubPeriod {
   id?: number
   periodId: number
+  calendarProfileId?: number | null
   name: string
   startDate: string
   endDate: string
@@ -14,6 +15,7 @@ interface SubPeriod {
 
 interface SubPeriodFormProps {
   periodId: number
+  calendarProfileId?: number | null
   subPeriod?: SubPeriod
   onClose: () => void
   onSuccess?: () => void
@@ -21,12 +23,14 @@ interface SubPeriodFormProps {
 
 export default function SubPeriodForm({
   periodId,
+  calendarProfileId,
   subPeriod,
   onClose,
   onSuccess,
 }: SubPeriodFormProps) {
   const [formData, setFormData] = useState<SubPeriod>({
     periodId: subPeriod?.periodId || periodId,
+    calendarProfileId: subPeriod?.calendarProfileId ?? calendarProfileId ?? null,
     name: subPeriod?.name || '',
     startDate: subPeriod?.startDate || '',
     endDate: subPeriod?.endDate || '',
@@ -44,7 +48,7 @@ export default function SubPeriodForm({
     },
     {
       onSuccess: () => {
-        queryClient.invalidateQueries(['sub-periods', periodId])
+        queryClient.invalidateQueries(['sub-periods', periodId, calendarProfileId ?? null])
         queryClient.invalidateQueries('periods')
         onSuccess?.()
         onClose()
@@ -59,7 +63,7 @@ export default function SubPeriodForm({
     },
     {
       onSuccess: () => {
-        queryClient.invalidateQueries(['sub-periods', periodId])
+        queryClient.invalidateQueries(['sub-periods', periodId, calendarProfileId ?? null])
         queryClient.invalidateQueries('periods')
         onSuccess?.()
         onClose()

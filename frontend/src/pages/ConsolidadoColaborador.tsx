@@ -3,13 +3,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from 'react-query'
 import api from '../services/api'
 import { Collaborator, Period, CollaboratorKPI } from '../types'
+import { calculateVariationPercent, calculateWeightedImpact, resolveDirection } from '../utils/kpi'
 import './ConsolidadoColaborador.css'
 
 type ConsolidatedKPI = CollaboratorKPI & {
   kpiName?: string
   kpiDescription?: string
   kpiCriteria?: string
-  kpiType?: 'growth' | 'reduction' | 'exact'
+  kpiType?: string
+  kpiDirection?: 'growth' | 'reduction' | 'exact'
   subPeriodName?: string
   subPeriodWeight?: number | null
 }
@@ -235,7 +237,16 @@ export default function ConsolidadoColaborador() {
                       </tr>
                     </thead>
                     <tbody>
-                      {sub.kpis.map((kpi) => (
+                      {sub.kpis.map((kpi) => {
+                        const direction = resolveDirection(
+                          (kpi as any).assignmentDirection,
+                          kpi.kpiDirection,
+                          kpi.kpiType
+                        )
+                        const variation =
+                          kpi.variation ?? calculateVariationPercent(direction, kpi.target, kpi.actual ?? null)
+                        const weightedImpact = calculateWeightedImpact(variation, kpi.weight, kpi.subPeriodWeight)
+                        return (
                         <tr key={kpi.id}>
                           <td>
                             <div className="kpi-name">{kpi.kpiName || `KPI ${kpi.kpiId}`}</div>
@@ -243,11 +254,12 @@ export default function ConsolidadoColaborador() {
                           </td>
                           <td>{kpi.target}</td>
                           <td>{kpi.actual ?? '-'}</td>
-                          <td>{kpi.variation !== undefined ? formatPercent(kpi.variation) : '-'}</td>
+                          <td>{variation !== undefined && variation !== null ? formatPercent(variation) : '-'}</td>
                           <td>{kpi.weight}%</td>
-                          <td>{kpi.weightedResult !== undefined ? formatPercent(kpi.weightedResult) : '-'}</td>
+                          <td>{weightedImpact !== undefined && weightedImpact !== null ? formatPercent(weightedImpact) : '-'}</td>
                         </tr>
-                      ))}
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>

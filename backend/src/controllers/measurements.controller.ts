@@ -23,11 +23,11 @@ export const applyMeasurementToAssignment = async (
 
   const assignment = assignmentRows[0]
   const [kpiRows] = await pool.query<any[]>(
-    `SELECT type, formula FROM kpis WHERE id = ?`,
+    `SELECT type, direction, formula FROM kpis WHERE id = ?`,
     [assignment.kpiId]
   )
 
-  const kpiType = kpiRows?.[0]?.type || 'growth'
+  const kpiDirection = kpiRows?.[0]?.direction || kpiRows?.[0]?.type || 'growth'
   const customFormula = kpiRows?.[0]?.formula || undefined
 
   const targetValue = Number(assignment.target ?? 0)
@@ -36,7 +36,7 @@ export const applyMeasurementToAssignment = async (
     return
   }
 
-  const variation = calculateVariation(kpiType, targetValue, value, customFormula)
+  const variation = calculateVariation(kpiDirection, targetValue, value, customFormula)
   const weightedResult = calculateWeightedResult(variation, weightValue)
 
   await pool.query(
@@ -107,6 +107,7 @@ export const createMeasurement = async (req: Request, res: Response) => {
 
     const userId = (req as AuthRequest).user?.id || null
 
+    let warning: string | null = null
     if ((status || 'draft') === 'approved') {
       const [assignmentRows] = await pool.query<any[]>(
         `SELECT curationStatus FROM collaborator_kpis WHERE id = ?`,
@@ -114,9 +115,31 @@ export const createMeasurement = async (req: Request, res: Response) => {
       )
       if (Array.isArray(assignmentRows) && assignmentRows.length > 0) {
         const curationStatus = assignmentRows[0].curationStatus || 'pending'
-        if (curationStatus !== 'approved') {
+        if (curationStatus === 'in_review') {
+          warning = 'Curaduría en revisión: medición aprobada con warning'
+        } else if (curationStatus !== 'approved') {
           return res.status(400).json({
             error: 'No se puede aprobar una medición si la curaduría no está aprobada',
+          })
+        }
+      }
+    }
+
+    if (subPeriodId) {
+      const [subRows] = await pool.query<any[]>(
+        `SELECT status FROM calendar_subperiods WHERE id = ?`,
+        [subPeriodId]
+      )
+      if (Array.isArray(subRows) && subRows.length > 0) {
+        const isClosed = subRows[0].status === 'closed'
+        const user = (req as AuthRequest).user
+        const canOverride =
+          user?.hasSuperpowers ||
+          user?.permissions?.includes('curation_review') ||
+          user?.permissions?.includes('config.manage')
+        if (isClosed && !canOverride) {
+          return res.status(400).json({
+            error: 'El subperíodo está cerrado. Solo Admin/Curator pueden overridear.',
           })
         }
       }
@@ -148,7 +171,7 @@ export const createMeasurement = async (req: Request, res: Response) => {
       await applyMeasurementToAssignment(assignmentId, Number(value), mode || 'manual', measurementId, criteriaVersionId)
     }
 
-    res.status(201).json({ id: measurementId })
+    res.status(201).json({ id: measurementId, warning })
   } catch (error: any) {
     console.error('Error creating measurement:', error)
     res.status(500).json({ error: 'Error al crear medición' })
@@ -173,12 +196,35 @@ export const approveMeasurement = async (req: Request, res: Response) => {
       `SELECT curationStatus FROM collaborator_kpis WHERE id = ?`,
       [measurement.assignmentId]
     )
+    let warning: string | null = null
     if (Array.isArray(assignmentRows) && assignmentRows.length > 0) {
       const curationStatus = assignmentRows[0].curationStatus || 'pending'
-      if (curationStatus !== 'approved') {
+      if (curationStatus === 'in_review') {
+        warning = 'Curaduría en revisión: medición aprobada con warning'
+      } else if (curationStatus !== 'approved') {
         return res.status(400).json({
           error: 'No se puede aprobar una medición si la curaduría no está aprobada',
         })
+      }
+    }
+
+    if (measurement.subPeriodId) {
+      const [subRows] = await pool.query<any[]>(
+        `SELECT status FROM calendar_subperiods WHERE id = ?`,
+        [measurement.subPeriodId]
+      )
+      if (Array.isArray(subRows) && subRows.length > 0) {
+        const isClosed = subRows[0].status === 'closed'
+        const user = (req as AuthRequest).user
+        const canOverride =
+          user?.hasSuperpowers ||
+          user?.permissions?.includes('curation_review') ||
+          user?.permissions?.includes('config.manage')
+        if (isClosed && !canOverride) {
+          return res.status(400).json({
+            error: 'El subperíodo está cerrado. Solo Admin/Curator pueden overridear.',
+          })
+        }
       }
     }
 
@@ -191,7 +237,7 @@ export const approveMeasurement = async (req: Request, res: Response) => {
       measurement.criteriaVersionId
     )
 
-    res.json({ message: 'Medición aprobada correctamente' })
+    res.json({ message: 'Medición aprobada correctamente', warning })
   } catch (error: any) {
     console.error('Error approving measurement:', error)
     res.status(500).json({ error: 'Error al aprobar medición' })

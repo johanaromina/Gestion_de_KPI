@@ -3,7 +3,10 @@ CREATE TABLE IF NOT EXISTS notification_states (
   type VARCHAR(50) NOT NULL,
   entityKey VARCHAR(100) NOT NULL,
   stateHash VARCHAR(64) NOT NULL,
+  lastNotifiedAt DATETIME NULL,
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uniq_notification_state (type, entityKey)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE notification_states ADD COLUMN lastNotifiedAt DATETIME NULL;

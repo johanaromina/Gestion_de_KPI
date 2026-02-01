@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS integration_templates (
   name VARCHAR(255) NOT NULL,
   connector ENUM('jira', 'xray', 'azure_devops', 'github', 'servicenow', 'zendesk', 'other') NOT NULL DEFAULT 'jira',
   metricType ENUM('count', 'ratio') NOT NULL DEFAULT 'ratio',
+  metricTypeUi VARCHAR(20) NULL,
   queryTestsTemplate TEXT NULL,
   queryStoriesTemplate TEXT NULL,
   formulaTemplate VARCHAR(255) NULL,

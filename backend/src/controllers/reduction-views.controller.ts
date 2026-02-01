@@ -1,5 +1,20 @@
 import { Request, Response } from 'express'
 import { pool } from '../config/database'
+import { calculateVariation } from '../utils/kpi-formulas'
+import { KPIDirection } from '../types'
+
+const resolveDirection = (direction?: string | null): KPIDirection => {
+  if (direction === 'growth' || direction === 'reduction' || direction === 'exact') return direction
+  return 'growth'
+}
+
+const calculateWeightedImpact = (variation: number, weight: number, subPeriodWeight?: number | null) => {
+  const weightValue = Number(weight ?? 0)
+  const subWeightValue = Number(subPeriodWeight ?? 100)
+  const normalizedSubWeight = Number.isFinite(subWeightValue) && subWeightValue > 0 ? subWeightValue : 100
+  if (!Number.isFinite(weightValue) || weightValue <= 0) return 0
+  return (variation * (weightValue / 100)) * (normalizedSubWeight / 100)
+}
 
 /**
  * Obtiene todos los KPIs de tipo reducción con sus asignaciones y evolución temporal
@@ -28,6 +43,7 @@ export const getReductionKPIs = async (req: Request, res: Response) => {
         ck.weight,
         ck.variation,
         ck.weightedResult,
+        sp.weight as subPeriodWeight,
         ck.status,
         ck.comments,
         ck.createdAt,
@@ -36,7 +52,8 @@ export const getReductionKPIs = async (req: Request, res: Response) => {
       INNER JOIN collaborator_kpis ck ON k.id = ck.kpiId
       INNER JOIN collaborators c ON ck.collaboratorId = c.id
       INNER JOIN periods p ON ck.periodId = p.id
-      WHERE k.type = 'reduction'
+      LEFT JOIN calendar_subperiods sp ON ck.subPeriodId = sp.id
+      WHERE k.direction = 'reduction'
     `
 
     const params: any[] = []
@@ -102,6 +119,13 @@ export const getReductionKPIs = async (req: Request, res: Response) => {
           }
         }
 
+        const direction = resolveDirection('reduction')
+        const variation =
+          row.variation !== null && row.variation !== undefined
+            ? Number(row.variation)
+            : calculateVariation(direction, Number(row.target ?? 0), Number(row.actual ?? 0))
+        const weightedImpact = calculateWeightedImpact(variation, row.weight, row.subPeriodWeight)
+
         grouped[key].assignments.push({
           assignmentId: row.assignmentId,
           collaboratorId: row.collaboratorId,
@@ -115,10 +139,8 @@ export const getReductionKPIs = async (req: Request, res: Response) => {
           target: parseFloat(row.target),
           actual: row.actual ? parseFloat(row.actual) : null,
           weight: parseFloat(row.weight),
-          variation: row.variation ? parseFloat(row.variation) : null,
-          weightedResult: row.weightedResult
-            ? parseFloat(row.weightedResult)
-            : null,
+          variation: Number.isFinite(variation) ? variation : null,
+          weightedResult: Number.isFinite(weightedImpact) ? weightedImpact : null,
           status: row.status,
           comments: row.comments,
           createdAt: row.createdAt,
@@ -133,10 +155,8 @@ export const getReductionKPIs = async (req: Request, res: Response) => {
           periodEndDate: row.periodEndDate,
           target: parseFloat(row.target),
           actual: row.actual ? parseFloat(row.actual) : null,
-          variation: row.variation ? parseFloat(row.variation) : null,
-          weightedResult: row.weightedResult
-            ? parseFloat(row.weightedResult)
-            : null,
+          variation: Number.isFinite(variation) ? variation : null,
+          weightedResult: Number.isFinite(weightedImpact) ? weightedImpact : null,
           status: row.status,
         })
       }
@@ -169,20 +189,17 @@ export const getReductionStatistics = async (req: Request, res: Response) => {
       SELECT 
         k.id as kpiId,
         k.name as kpiName,
-        COUNT(DISTINCT ck.collaboratorId) as totalCollaborators,
-        COUNT(ck.id) as totalAssignments,
-        AVG(ck.target) as avgTarget,
-        AVG(ck.actual) as avgActual,
-        AVG(ck.variation) as avgVariation,
-        AVG(ck.weightedResult) as avgWeightedResult,
-        MIN(ck.actual) as minActual,
-        MAX(ck.actual) as maxActual,
-        SUM(CASE WHEN ck.actual IS NOT NULL THEN 1 ELSE 0 END) as completedCount,
-        SUM(CASE WHEN ck.actual IS NULL THEN 1 ELSE 0 END) as pendingCount
+        ck.collaboratorId,
+        ck.target,
+        ck.actual,
+        ck.weight,
+        ck.variation,
+        sp.weight as subPeriodWeight
       FROM kpis k
       INNER JOIN collaborator_kpis ck ON k.id = ck.kpiId
       INNER JOIN collaborators c ON ck.collaboratorId = c.id
-      WHERE k.type = 'reduction'
+      LEFT JOIN calendar_subperiods sp ON ck.subPeriodId = sp.id
+      WHERE k.direction = 'reduction'
     `
 
     const params: any[] = []
@@ -200,30 +217,103 @@ export const getReductionStatistics = async (req: Request, res: Response) => {
       params.push(area)
     }
 
-    query += ' GROUP BY k.id, k.name ORDER BY k.name ASC'
-
     const [rows] = await pool.query<any[]>(query, params)
 
-    const statistics = Array.isArray(rows)
-      ? rows.map((row) => ({
-          kpiId: row.kpiId,
-          kpiName: row.kpiName,
-          totalCollaborators: parseInt(row.totalCollaborators),
-          totalAssignments: parseInt(row.totalAssignments),
-          avgTarget: parseFloat(row.avgTarget) || 0,
-          avgActual: parseFloat(row.avgActual) || 0,
-          avgVariation: parseFloat(row.avgVariation) || 0,
-          avgWeightedResult: parseFloat(row.avgWeightedResult) || 0,
-          minActual: parseFloat(row.minActual) || null,
-          maxActual: parseFloat(row.maxActual) || null,
-          completedCount: parseInt(row.completedCount),
-          pendingCount: parseInt(row.pendingCount),
-          completionRate:
-            (parseInt(row.completedCount) /
-              (parseInt(row.completedCount) + parseInt(row.pendingCount))) *
-            100,
-        }))
-      : []
+    const statsMap = new Map<
+      number,
+      {
+        kpiId: number
+        kpiName: string
+        collaboratorIds: Set<number>
+        totalAssignments: number
+        totalTarget: number
+        totalActual: number
+        totalVariation: number
+        totalWeightedImpact: number
+        variationCount: number
+        weightedCount: number
+        minActual: number | null
+        maxActual: number | null
+        completedCount: number
+        pendingCount: number
+      }
+    >()
+
+    if (Array.isArray(rows)) {
+      for (const row of rows) {
+        const existing =
+          statsMap.get(row.kpiId) ||
+          {
+            kpiId: row.kpiId,
+            kpiName: row.kpiName,
+            collaboratorIds: new Set<number>(),
+            totalAssignments: 0,
+            totalTarget: 0,
+            totalActual: 0,
+            totalVariation: 0,
+            totalWeightedImpact: 0,
+            variationCount: 0,
+            weightedCount: 0,
+            minActual: null,
+            maxActual: null,
+            completedCount: 0,
+            pendingCount: 0,
+          }
+
+        existing.collaboratorIds.add(Number(row.collaboratorId))
+        existing.totalAssignments += 1
+        existing.totalTarget += Number(row.target ?? 0)
+
+        if (row.actual !== null && row.actual !== undefined) {
+          const actualValue = Number(row.actual)
+          existing.totalActual += actualValue
+          existing.completedCount += 1
+          existing.minActual =
+            existing.minActual === null ? actualValue : Math.min(existing.minActual, actualValue)
+          existing.maxActual =
+            existing.maxActual === null ? actualValue : Math.max(existing.maxActual, actualValue)
+        } else {
+          existing.pendingCount += 1
+        }
+
+        const direction = resolveDirection('reduction')
+        const variation =
+          row.variation !== null && row.variation !== undefined
+            ? Number(row.variation)
+            : calculateVariation(direction, Number(row.target ?? 0), Number(row.actual ?? 0))
+
+        if (Number.isFinite(variation)) {
+          existing.totalVariation += variation
+          existing.variationCount += 1
+          const weightedImpact = calculateWeightedImpact(variation, row.weight, row.subPeriodWeight)
+          if (Number.isFinite(weightedImpact)) {
+            existing.totalWeightedImpact += weightedImpact
+            existing.weightedCount += 1
+          }
+        }
+
+        statsMap.set(row.kpiId, existing)
+      }
+    }
+
+    const statistics = Array.from(statsMap.values()).map((stat) => ({
+      kpiId: stat.kpiId,
+      kpiName: stat.kpiName,
+      totalCollaborators: stat.collaboratorIds.size,
+      totalAssignments: stat.totalAssignments,
+      avgTarget: stat.totalAssignments > 0 ? stat.totalTarget / stat.totalAssignments : 0,
+      avgActual: stat.completedCount > 0 ? stat.totalActual / stat.completedCount : 0,
+      avgVariation: stat.variationCount > 0 ? stat.totalVariation / stat.variationCount : 0,
+      avgWeightedResult: stat.weightedCount > 0 ? stat.totalWeightedImpact / stat.weightedCount : 0,
+      minActual: stat.minActual,
+      maxActual: stat.maxActual,
+      completedCount: stat.completedCount,
+      pendingCount: stat.pendingCount,
+      completionRate:
+        stat.completedCount + stat.pendingCount > 0
+          ? (stat.completedCount / (stat.completedCount + stat.pendingCount)) * 100
+          : 0,
+    }))
 
     res.json(statistics)
   } catch (error: any) {
@@ -251,13 +341,15 @@ export const getReductionEvolution = async (req: Request, res: Response) => {
         ck.actual,
         ck.variation,
         ck.weightedResult,
+        sp.weight as subPeriodWeight,
         ck.status,
         c.name as collaboratorName
       FROM collaborator_kpis ck
       INNER JOIN kpis k ON ck.kpiId = k.id
       INNER JOIN periods p ON ck.periodId = p.id
       INNER JOIN collaborators c ON ck.collaboratorId = c.id
-      WHERE k.id = ? AND k.type = 'reduction'
+      LEFT JOIN calendar_subperiods sp ON ck.subPeriodId = sp.id
+      WHERE k.id = ? AND k.direction = 'reduction'
         ${collaboratorId ? 'AND ck.collaboratorId = ?' : ''}
       ORDER BY p.startDate ASC
     `,
@@ -265,21 +357,27 @@ export const getReductionEvolution = async (req: Request, res: Response) => {
     )
 
     const evolution = Array.isArray(rows)
-      ? rows.map((row) => ({
-          assignmentId: row.assignmentId,
-          periodId: row.periodId,
-          periodName: row.periodName,
-          periodStartDate: row.periodStartDate,
-          periodEndDate: row.periodEndDate,
-          target: parseFloat(row.target),
-          actual: row.actual ? parseFloat(row.actual) : null,
-          variation: row.variation ? parseFloat(row.variation) : null,
-          weightedResult: row.weightedResult
-            ? parseFloat(row.weightedResult)
-            : null,
-          status: row.status,
-          collaboratorName: row.collaboratorName,
-        }))
+      ? rows.map((row) => {
+          const direction = resolveDirection('reduction')
+          const variation =
+            row.variation !== null && row.variation !== undefined
+              ? Number(row.variation)
+              : calculateVariation(direction, Number(row.target ?? 0), Number(row.actual ?? 0))
+          const weightedImpact = calculateWeightedImpact(variation, row.weight, row.subPeriodWeight)
+          return {
+            assignmentId: row.assignmentId,
+            periodId: row.periodId,
+            periodName: row.periodName,
+            periodStartDate: row.periodStartDate,
+            periodEndDate: row.periodEndDate,
+            target: parseFloat(row.target),
+            actual: row.actual ? parseFloat(row.actual) : null,
+            variation: Number.isFinite(variation) ? variation : null,
+            weightedResult: Number.isFinite(weightedImpact) ? weightedImpact : null,
+            status: row.status,
+            collaboratorName: row.collaboratorName,
+          }
+        })
       : []
 
     res.json(evolution)

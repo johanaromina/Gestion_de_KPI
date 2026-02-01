@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useMemo } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import api from '../services/api'
+import { calculateVariationPercent, calculateWeightedImpact, resolveDirection } from '../utils/kpi'
 import {
   BarChart,
   Bar,
@@ -74,11 +75,13 @@ interface CollaboratorKPI {
   target: number
   actual?: number
   weight: number
+  subPeriodWeight?: number | null
   variation?: number
   weightedResult?: number
   status: 'draft' | 'proposed' | 'approved' | 'closed'
   kpiName?: string
-  kpiType?: 'growth' | 'reduction' | 'exact'
+  kpiType?: string
+  kpiDirection?: 'growth' | 'reduction' | 'exact'
 }
 
 export default function Dashboard() {
@@ -247,19 +250,44 @@ export default function Dashboard() {
     return summary.length > 0 ? summary : collaboratorKPIs
   }, [collaboratorKPIs])
 
+  const impactKPIs = useMemo(() => {
+    if (!collaboratorKPIs || collaboratorKPIs.length === 0) return []
+    const hasSubPeriods = collaboratorKPIs.some((k) => k.subPeriodId !== null && k.subPeriodId !== undefined)
+    if (hasSubPeriods) {
+      return collaboratorKPIs.filter((k) => k.subPeriodId !== null && k.subPeriodId !== undefined)
+    }
+    return summaryKPIs
+  }, [collaboratorKPIs, summaryKPIs])
+
   const collaboratorSummary = useMemo(() => {
     if (!summaryKPIs || summaryKPIs.length === 0) return null
     const totalWeight = summaryKPIs.reduce((sum, k) => sum + (k.weight || 0), 0) || 0
-    const weightedAchieved = summaryKPIs.reduce((sum, k) => sum + (k.weightedResult || 0), 0) || 0
-    const overall = totalWeight > 0 ? (weightedAchieved / totalWeight) * 100 : 0
+    const weightedAchieved =
+      impactKPIs.reduce((sum, k) => {
+        const direction = resolveDirection(
+          (k as any).assignmentDirection,
+          (k as any).kpiDirection,
+          k.kpiType
+        )
+        const variation =
+          k.variation ?? calculateVariationPercent(direction, k.target, k.actual ?? null)
+        const impact = calculateWeightedImpact(variation, k.weight, k.subPeriodWeight)
+        return sum + (impact || 0)
+      }, 0) || 0
+    const overall = weightedAchieved
     const totalGap =
       summaryKPIs.reduce((sum, k) => {
         const target = Number(k.target) || 0
         const actual = Number(k.actual) || 0
+        const direction = resolveDirection(
+          (k as any).assignmentDirection,
+          (k as any).kpiDirection,
+          k.kpiType
+        )
         const gap =
-          k.kpiType === 'reduction'
+          direction === 'reduction'
             ? Math.max(actual - target, 0)
-            : k.kpiType === 'exact'
+            : direction === 'exact'
             ? Math.abs(target - actual)
             : Math.max(target - actual, 0)
         return sum + gap
@@ -270,7 +298,7 @@ export default function Dashboard() {
       .reduce<Record<string, { name: string; weight: number; target: number; actual: number }>>(
         (acc, k) => {
           const key = k.subPeriodName || String(k.subPeriodId || 'Subperiodo')
-          const weight = Number(k.weight) || 0
+          const weight = Number(k.subPeriodWeight ?? k.weight) || 0
           const target = Number(k.target) || 0
           const actual = Number(k.actual) || 0
           if (!acc[key]) {
@@ -290,7 +318,7 @@ export default function Dashboard() {
       totalGap,
       monthly: monthly ? Object.values(monthly) : [],
     }
-  }, [collaboratorKPIs, summaryKPIs])
+  }, [collaboratorKPIs, summaryKPIs, impactKPIs])
 
   const progressInsights = useMemo(() => {
     if (!summaryKPIs || summaryKPIs.length === 0) return null
@@ -299,14 +327,13 @@ export default function Dashboard() {
       const targetValue = Number(kpi.target) || 0
       const actualValue =
         kpi.actual !== null && kpi.actual !== undefined ? Number(kpi.actual) : null
+      const direction = resolveDirection(
+        (kpi as any).assignmentDirection,
+        (kpi as any).kpiDirection,
+        kpi.kpiType
+      )
       const variation =
-        actualValue !== null && targetValue > 0
-          ? kpi.kpiType === 'reduction'
-            ? actualValue > 0
-              ? (targetValue / actualValue) * 100
-              : 0
-            : (actualValue / targetValue) * 100
-          : null
+        kpi.variation ?? calculateVariationPercent(direction, targetValue, actualValue)
       const isOnTrack = variation !== null && variation >= 100
       const isRisk = variation !== null && variation < 80
       return {
@@ -726,20 +753,19 @@ export default function Dashboard() {
                   const targetValue = Number(kpi.target) || 0
                   const actualValue =
                     kpi.actual !== null && kpi.actual !== undefined ? Number(kpi.actual) : null
+                  const direction = resolveDirection(
+                    (kpi as any).assignmentDirection,
+                    kpi.kpiDirection,
+                    kpi.kpiType
+                  )
                   const variation =
-                    actualValue !== null && targetValue > 0
-                      ? kpi.kpiType === 'reduction'
-                        ? actualValue > 0
-                          ? (targetValue / actualValue) * 100
-                          : 0
-                        : (actualValue / targetValue) * 100
-                      : null
+                    kpi.variation ?? calculateVariationPercent(direction, targetValue, actualValue)
                   const gap =
                     actualValue === null
                       ? targetValue
-                      : kpi.kpiType === 'reduction'
+                      : direction === 'reduction'
                       ? Math.max(actualValue - targetValue, 0)
-                      : kpi.kpiType === 'exact'
+                      : direction === 'exact'
                       ? Math.abs(targetValue - actualValue)
                       : Math.max(targetValue - actualValue, 0)
                   return (

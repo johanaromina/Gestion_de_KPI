@@ -54,6 +54,7 @@ export const getKPIs = async (req: Request, res: Response) => {
 
     const ids = Array.isArray(rows) ? rows.map((r) => r.id) : []
     let periodsMap: Record<number, number[]> = {}
+    let weightsMap: Record<number, Array<{ scopeId: number; weight: number }>> = {}
     if (ids.length > 0) {
       const [periodRows] = await pool.query<any[]>(
         `SELECT kpiId, periodId FROM kpi_periods WHERE kpiId IN (${ids.map(() => '?').join(',')})`,
@@ -64,12 +65,26 @@ export const getKPIs = async (req: Request, res: Response) => {
         acc[row.kpiId].push(Number(row.periodId))
         return acc
       }, {})
+
+      const [weightRows] = await pool.query<any[]>(
+        `SELECT kpiId, scopeId, weight FROM kpi_scope_weights WHERE kpiId IN (${ids.map(() => '?').join(',')})`,
+        ids
+      )
+      weightsMap = (weightRows || []).reduce(
+        (acc: Record<number, Array<{ scopeId: number; weight: number }>>, row) => {
+          if (!acc[row.kpiId]) acc[row.kpiId] = []
+          acc[row.kpiId].push({ scopeId: Number(row.scopeId), weight: Number(row.weight) })
+          return acc
+        },
+        {}
+      )
     }
 
     const enriched = Array.isArray(rows)
       ? rows.map((r) => ({
           ...r,
           periodIds: periodsMap[r.id] || [],
+          scopeWeights: weightsMap[r.id] || [],
         }))
       : []
 
@@ -103,7 +118,12 @@ export const getKPIById = async (req: Request, res: Response) => {
     )
     const periodIds = Array.isArray(periodRows) ? periodRows.map((p) => Number(p.periodId)) : []
 
-    res.json({ ...rows[0], areas, periodIds })
+    const [weightsRows] = await pool.query<any[]>(
+      'SELECT scopeId, weight FROM kpi_scope_weights WHERE kpiId = ?',
+      [id]
+    )
+
+    res.json({ ...rows[0], areas, periodIds, scopeWeights: weightsRows || [] })
   } catch (error: any) {
     console.error('Error fetching KPI:', error)
     res.status(500).json({ error: 'Error al obtener KPI' })
@@ -116,6 +136,7 @@ export const createKPI = async (req: Request, res: Response) => {
       name,
       description,
       type,
+      direction,
       criteria,
       formula,
       macroKPIId,
@@ -124,11 +145,15 @@ export const createKPI = async (req: Request, res: Response) => {
       defaultDataSource,
       defaultCriteriaTemplate,
       defaultCalcRule,
+      scopeWeights,
     } = req.body
 
     if (!name || !type) {
       return res.status(400).json({ error: 'Faltan campos requeridos' })
     }
+
+    const resolvedDirection =
+      direction && ['growth', 'reduction', 'exact'].includes(direction) ? direction : type === 'sla' ? 'reduction' : 'growth'
 
     // Validar fórmula si se proporciona
     if (formula) {
@@ -144,12 +169,13 @@ export const createKPI = async (req: Request, res: Response) => {
 
       const [result] = await conn.query(
         `INSERT INTO kpis 
-         (name, description, type, criteria, formula, macroKPIId, defaultDataSource, defaultCriteriaTemplate, defaultCalcRule) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (name, description, type, direction, criteria, formula, macroKPIId, defaultDataSource, defaultCriteriaTemplate, defaultCalcRule) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           name,
           description || null,
           type,
+          resolvedDirection,
           criteria || null,
           formula || null,
           macroKPIId || null,
@@ -182,6 +208,18 @@ export const createKPI = async (req: Request, res: Response) => {
         }
       }
 
+      if (Array.isArray(scopeWeights) && scopeWeights.length > 0) {
+        const values = scopeWeights
+          .filter((item: any) => Number.isFinite(Number(item.scopeId)))
+          .map((item: any) => [kpiId, Number(item.scopeId), Number(item.weight) || 0])
+        if (values.length > 0) {
+          await conn.query(
+            `INSERT INTO kpi_scope_weights (kpiId, scopeId, weight) VALUES ?`,
+            [values]
+          )
+        }
+      }
+
       await conn.commit()
 
       res.status(201).json({
@@ -189,6 +227,7 @@ export const createKPI = async (req: Request, res: Response) => {
         name,
         description: description || null,
         type,
+        direction: resolvedDirection,
         criteria: criteria || null,
         formula: formula || null,
         macroKPIId: macroKPIId || null,
@@ -196,6 +235,7 @@ export const createKPI = async (req: Request, res: Response) => {
         defaultCriteriaTemplate: defaultCriteriaTemplate || null,
         defaultCalcRule: defaultCalcRule || null,
         areas: Array.isArray(areas) ? areas : [],
+        scopeWeights: Array.isArray(scopeWeights) ? scopeWeights : [],
         periodIds: Array.isArray(periodIds)
           ? periodIds.filter((p: any) => Number.isFinite(Number(p))).map((p: number) => Number(p))
           : [],
@@ -219,6 +259,7 @@ export const updateKPI = async (req: Request, res: Response) => {
       name,
       description,
       type,
+      direction,
       criteria,
       formula,
       macroKPIId,
@@ -227,6 +268,7 @@ export const updateKPI = async (req: Request, res: Response) => {
       defaultDataSource,
       defaultCriteriaTemplate,
       defaultCalcRule,
+      scopeWeights,
     } = req.body
 
     // Validar fórmula si se proporciona
@@ -243,15 +285,19 @@ export const updateKPI = async (req: Request, res: Response) => {
     try {
       await conn.beginTransaction()
 
+      const resolvedDirection =
+        direction && ['growth', 'reduction', 'exact'].includes(direction) ? direction : type === 'sla' ? 'reduction' : 'growth'
+
       await conn.query(
         `UPDATE kpis 
-         SET name = ?, description = ?, type = ?, criteria = ?, formula = ?, macroKPIId = ?,
+         SET name = ?, description = ?, type = ?, direction = ?, criteria = ?, formula = ?, macroKPIId = ?,
              defaultDataSource = ?, defaultCriteriaTemplate = ?, defaultCalcRule = ?
          WHERE id = ?`,
         [
           name,
           description,
           type,
+          resolvedDirection,
           criteria,
           formula || null,
           macroKPIId || null,
@@ -284,6 +330,19 @@ export const updateKPI = async (req: Request, res: Response) => {
         }
       }
 
+      if (Array.isArray(scopeWeights)) {
+        await conn.query('DELETE FROM kpi_scope_weights WHERE kpiId = ?', [id])
+        const values = scopeWeights
+          .filter((item: any) => Number.isFinite(Number(item.scopeId)))
+          .map((item: any) => [id, Number(item.scopeId), Number(item.weight) || 0])
+        if (values.length > 0) {
+          await conn.query(
+            `INSERT INTO kpi_scope_weights (kpiId, scopeId, weight) VALUES ?`,
+            [values]
+          )
+        }
+      }
+
       // Recalcular las asignaciones existentes con el nuevo tipo/fórmula
       const [affectedAssignments] = await conn.query<any[]>(
         'SELECT id, target, actual, weight FROM collaborator_kpis WHERE kpiId = ?',
@@ -293,7 +352,7 @@ export const updateKPI = async (req: Request, res: Response) => {
       if (Array.isArray(affectedAssignments) && affectedAssignments.length > 0) {
         for (const row of affectedAssignments) {
           const variation = calculateVariation(
-            type,
+            resolvedDirection,
             Number(row.target ?? 0),
             Number(row.actual ?? 0),
             formula || undefined

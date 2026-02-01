@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { pool } from '../config/database'
 import { SubPeriod } from '../types'
 import { sendMail } from '../utils/mailer'
+import { AuthRequest } from '../middleware/auth.middleware'
 
 const normalizeDate = (value: any): string | null => {
   if (!value) return null
@@ -17,16 +18,31 @@ const formatNumber = (value: any): string => {
   return parsed.toFixed(2)
 }
 
+const getDefaultCalendarProfileId = async (): Promise<number | null> => {
+  const [rows] = await pool.query<any[]>(
+    `SELECT id FROM calendar_profiles ORDER BY id ASC LIMIT 1`
+  )
+  return Array.isArray(rows) && rows.length > 0 ? Number(rows[0].id) : null
+}
+
 export const getSubPeriods = async (req: Request, res: Response) => {
   try {
-    const { periodId } = req.query
+    const { periodId, calendarProfileId } = req.query
 
-    let query = 'SELECT * FROM sub_periods'
+    let query = 'SELECT * FROM calendar_subperiods'
     const params: any[] = []
 
-    if (periodId) {
-      query += ' WHERE periodId = ?'
-      params.push(periodId)
+    if (periodId || calendarProfileId) {
+      const clauses: string[] = []
+      if (periodId) {
+        clauses.push('periodId = ?')
+        params.push(periodId)
+      }
+      if (calendarProfileId) {
+        clauses.push('calendarProfileId = ?')
+        params.push(calendarProfileId)
+      }
+      query += ` WHERE ${clauses.join(' AND ')}`
     }
 
     query += ' ORDER BY startDate ASC'
@@ -43,7 +59,7 @@ export const getSubPeriodById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
     const [rows] = await pool.query<SubPeriod[]>(
-      'SELECT * FROM sub_periods WHERE id = ?',
+      'SELECT * FROM calendar_subperiods WHERE id = ?',
       [id]
     )
 
@@ -60,11 +76,17 @@ export const getSubPeriodById = async (req: Request, res: Response) => {
 
 export const createSubPeriod = async (req: Request, res: Response) => {
   try {
-    const { periodId, name, startDate, endDate, weight } = req.body
+    const { periodId, name, startDate, endDate, weight, calendarProfileId } = req.body
 
     if (!periodId || !name || !startDate || !endDate) {
       return res.status(400).json({ error: 'Faltan campos requeridos' })
     }
+
+    const [existingRows] = await pool.query<any[]>(
+      'SELECT COUNT(*) as count FROM calendar_subperiods WHERE periodId = ?',
+      [periodId]
+    )
+    const isFirstSubPeriod = Number(existingRows?.[0]?.count || 0) === 0
 
     const start = normalizeDate(startDate)
     const end = normalizeDate(endDate)
@@ -73,16 +95,55 @@ export const createSubPeriod = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Fechas inválidas' })
     }
 
+    const resolvedCalendarProfileId =
+      calendarProfileId || (await getDefaultCalendarProfileId())
+
     const [result] = await pool.query(
-      `INSERT INTO sub_periods (periodId, name, startDate, endDate, status, weight) 
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [periodId, name, start, end, 'open', weight || null]
+      `INSERT INTO calendar_subperiods (periodId, calendarProfileId, name, startDate, endDate, status, weight) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [periodId, resolvedCalendarProfileId, name, start, end, 'open', weight || null]
     )
 
     const insertResult = result as any
+
+    if (isFirstSubPeriod) {
+      const createdBy = (req as AuthRequest).user?.id || null
+
+      await pool.query(
+        `INSERT INTO kpi_criteria_versions
+         (assignmentId, dataSource, sourceConfig, criteriaText, status, createdBy)
+         SELECT
+           ck.id,
+           ck.dataSource,
+           ck.sourceConfig,
+           COALESCE(cv_active.criteriaText, cv_latest.criteriaText, k.criteria),
+           'in_review',
+           ?
+         FROM collaborator_kpis ck
+         JOIN kpis k ON k.id = ck.kpiId
+         LEFT JOIN kpi_criteria_versions cv_active ON cv_active.id = ck.activeCriteriaVersionId
+         LEFT JOIN kpi_criteria_versions cv_latest
+           ON cv_latest.id = (
+             SELECT id FROM kpi_criteria_versions
+             WHERE assignmentId = ck.id
+             ORDER BY createdAt DESC LIMIT 1
+           )
+         WHERE ck.periodId = ?`,
+        [createdBy, periodId]
+      )
+
+      await pool.query(
+        `UPDATE collaborator_kpis
+         SET curationStatus = 'in_review'
+         WHERE periodId = ?`,
+        [periodId]
+      )
+    }
+
     res.status(201).json({
       id: insertResult.insertId,
       periodId,
+      calendarProfileId: resolvedCalendarProfileId,
       name,
       startDate: start,
       endDate: end,
@@ -108,7 +169,7 @@ export const updateSubPeriod = async (req: Request, res: Response) => {
     }
 
     const [existingRows] = await pool.query<SubPeriod[]>(
-      'SELECT * FROM sub_periods WHERE id = ?',
+      'SELECT * FROM calendar_subperiods WHERE id = ?',
       [id]
     )
 
@@ -122,7 +183,7 @@ export const updateSubPeriod = async (req: Request, res: Response) => {
     }
 
     await pool.query(
-      `UPDATE sub_periods 
+      `UPDATE calendar_subperiods 
        SET name = ?, startDate = ?, endDate = ?, weight = ? 
        WHERE id = ?`,
       [name, start, end, weight || null, id]
@@ -140,7 +201,7 @@ export const deleteSubPeriod = async (req: Request, res: Response) => {
     const { id } = req.params
 
     const [existingRows] = await pool.query<SubPeriod[]>(
-      'SELECT * FROM sub_periods WHERE id = ?',
+      'SELECT * FROM calendar_subperiods WHERE id = ?',
       [id]
     )
 
@@ -153,7 +214,7 @@ export const deleteSubPeriod = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'No se puede eliminar un subperíodo cerrado' })
     }
 
-    await pool.query('DELETE FROM sub_periods WHERE id = ?', [id])
+    await pool.query('DELETE FROM calendar_subperiods WHERE id = ?', [id])
 
     res.json({ message: 'Subperíodo eliminado correctamente' })
   } catch (error: any) {
@@ -168,7 +229,7 @@ export const closeSubPeriod = async (req: Request, res: Response) => {
 
     const [subRows] = await pool.query<any[]>(
       `SELECT sp.*, p.name as periodName
-       FROM sub_periods sp
+       FROM calendar_subperiods sp
        JOIN periods p ON p.id = sp.periodId
        WHERE sp.id = ?`,
       [id]
@@ -183,7 +244,7 @@ export const closeSubPeriod = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'El subperíodo ya está cerrado' })
     }
 
-    await pool.query('UPDATE sub_periods SET status = ? WHERE id = ?', [
+    await pool.query('UPDATE calendar_subperiods SET status = ? WHERE id = ?', [
       'closed',
       id,
     ])

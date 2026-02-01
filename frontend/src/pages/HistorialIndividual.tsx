@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from 'react-query'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { useAuth } from '../hooks/useAuth'
+import { calculateVariationPercent, calculateWeightedImpact, resolveDirection } from '../utils/kpi'
 import './HistorialIndividual.css'
 
 interface Period {
@@ -33,6 +34,7 @@ interface CollaboratorKPI {
   target: number
   actual?: number
   weight: number
+  subPeriodWeight?: number | null
   variation?: number
   weightedResult?: number
   status: 'draft' | 'proposed' | 'approved' | 'closed'
@@ -40,7 +42,8 @@ interface CollaboratorKPI {
   kpiName?: string
   kpiDescription?: string
   kpiCriteria?: string
-  kpiType?: 'growth' | 'reduction' | 'exact'
+  kpiType?: string
+  kpiDirection?: 'growth' | 'reduction' | 'exact'
   periodName?: string
   subPeriodName?: string
 }
@@ -66,8 +69,33 @@ interface CollaboratorEvent {
   createdAt: string
 }
 
+interface PeriodSummary {
+  id: number
+  periodId: number
+  collaboratorId: number
+  collaboratorName: string
+  totalWeight: number
+  totalWeightedResult: number
+  overallResult: number
+  generatedAt?: string
+}
+
+interface PeriodSummaryItem {
+  id: number
+  summaryId: number
+  kpiId: number
+  kpiName: string
+  target?: number | null
+  actual?: number | null
+  variation?: number | null
+  weight?: number | null
+  weightedResult?: number | null
+  status?: string
+}
+
 export default function HistorialIndividual() {
   const { collaboratorId } = useParams<{ collaboratorId: string }>()
+  const [searchParams] = useSearchParams()
   const { user } = useAuth()
   const resolvedId = useMemo(() => {
     if (collaboratorId) return collaboratorId
@@ -77,6 +105,15 @@ export default function HistorialIndividual() {
 
   const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null)
   const [selectedSubPeriodId, setSelectedSubPeriodId] = useState<number | null>(null)
+
+  useEffect(() => {
+    const periodParam = searchParams.get('periodId')
+    if (!periodParam) return
+    const parsed = Number(periodParam)
+    if (Number.isFinite(parsed)) {
+      setSelectedPeriodId(parsed)
+    }
+  }, [searchParams])
 
   const { data: collaborator } = useQuery<Collaborator>(
     ['collaborator', resolvedId],
@@ -111,6 +148,19 @@ export default function HistorialIndividual() {
     {
       enabled: !!selectedPeriodId,
     }
+  )
+
+  const { data: periodSummary } = useQuery<{
+    summaries: PeriodSummary[]
+    items: PeriodSummaryItem[]
+  }>(
+    ['period-summary', selectedPeriodId],
+    async () => {
+      if (!selectedPeriodId) return { summaries: [], items: [] }
+      const response = await api.get(`/periods/${selectedPeriodId}/summary`)
+      return response.data
+    },
+    { enabled: !!selectedPeriodId }
   )
 
   const { data: kpis, isLoading: loadingKPIs } = useQuery<CollaboratorKPI[]>(
@@ -163,25 +213,50 @@ export default function HistorialIndividual() {
     return selectedSubPeriodId ? byPeriod?.filter((kpi) => kpi.subPeriodId === selectedSubPeriodId) : byPeriod
   }, [kpis, selectedPeriodId, selectedSubPeriodId])
 
-  const totalWeightedResult =
-    filteredKPIs?.reduce((sum, kpi) => {
-      return sum + (kpi.weightedResult || 0)
+  const summaryForCollaborator = useMemo(() => {
+    if (!periodSummary || !resolvedId) return null
+    const collaboratorIdNum = Number(resolvedId)
+    const summary = periodSummary.summaries?.find(
+      (item) => Number(item.collaboratorId) === collaboratorIdNum
+    )
+    if (!summary) return null
+    const items = periodSummary.items?.filter((item) => item.summaryId === summary.id) || []
+    return { summary, items }
+  }, [periodSummary, resolvedId])
+
+  const summaryForGlobal = useMemo(() => {
+    if (!filteredKPIs || filteredKPIs.length === 0) return []
+    const hasSubPeriods = filteredKPIs.some((kpi) => kpi.subPeriodId !== null && kpi.subPeriodId !== undefined)
+    if (hasSubPeriods) {
+      return filteredKPIs.filter((kpi) => kpi.subPeriodId !== null && kpi.subPeriodId !== undefined)
+    }
+    const summary = filteredKPIs.filter((kpi) => kpi.subPeriodId === null || kpi.subPeriodId === undefined)
+    return summary.length > 0 ? summary : filteredKPIs
+  }, [filteredKPIs])
+
+  const totalWeightedImpact =
+    summaryForGlobal?.reduce((sum, kpi) => {
+      const direction = resolveDirection((kpi as any).assignmentDirection, kpi.kpiDirection, kpi.kpiType)
+      const variation =
+        kpi.variation ?? calculateVariationPercent(direction, kpi.target, kpi.actual ?? null)
+      const impact = calculateWeightedImpact(variation, kpi.weight, kpi.subPeriodWeight)
+      return sum + (impact || 0)
     }, 0) || 0
 
-  const totalWeight =
-    filteredKPIs?.reduce((sum, kpi) => {
-      return sum + kpi.weight
-    }, 0) || 0
-
-  const globalResult = totalWeight > 0 ? (totalWeightedResult / totalWeight) * 100 : 0
+  const globalResult = totalWeightedImpact
 
   const chartData =
-    filteredKPIs?.map((kpi) => ({
-      name: kpi.kpiName || `KPI ${kpi.kpiId}`,
-      target: kpi.target,
-      actual: kpi.actual || 0,
-      variation: kpi.variation || 0,
-    })) || []
+    filteredKPIs?.map((kpi) => {
+      const direction = resolveDirection((kpi as any).assignmentDirection, kpi.kpiDirection, kpi.kpiType)
+      const variation =
+        kpi.variation ?? calculateVariationPercent(direction, kpi.target, kpi.actual ?? null) ?? 0
+      return {
+        name: kpi.kpiName || `KPI ${kpi.kpiId}`,
+        target: kpi.target,
+        actual: kpi.actual || 0,
+        variation,
+      }
+    }) || []
 
   const handlePeriodChange = (periodId: string) => {
     const periodIdNum = periodId ? parseInt(periodId) : null
@@ -300,6 +375,71 @@ export default function HistorialIndividual() {
 
       {selectedPeriodId && !loadingKPIs && filteredKPIs && filteredKPIs.length > 0 && (
         <>
+          {summaryForCollaborator && (
+            <div className="annual-summary-card">
+              <div className="summary-header">
+                <h2>Resumen anual (al cierre del periodo)</h2>
+                <span className="summary-pill">
+                  {summaryForCollaborator.summary.overallResult.toFixed(1)}%
+                </span>
+              </div>
+              <div className="summary-metrics">
+                <div>
+                  <span className="metric-label">Peso total</span>
+                  <span className="metric-value">
+                    {summaryForCollaborator.summary.totalWeight.toFixed(1)}%
+                  </span>
+                </div>
+                <div>
+                  <span className="metric-label">Resultado ponderado</span>
+                  <span className="metric-value">
+                    {summaryForCollaborator.summary.totalWeightedResult.toFixed(1)}
+                  </span>
+                </div>
+              </div>
+              {summaryForCollaborator.items.length > 0 && (
+                <div className="summary-table-container">
+                  <table className="summary-table">
+                    <thead>
+                      <tr>
+                        <th>KPI</th>
+                        <th>Target</th>
+                        <th>Actual</th>
+                        <th>Variacion</th>
+                        <th>Peso</th>
+                        <th>Ponderado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {summaryForCollaborator.items.map((item) => (
+                        <tr key={item.id}>
+                          <td>{item.kpiName}</td>
+                          <td>{item.target ?? '-'}</td>
+                          <td>{item.actual ?? '-'}</td>
+                          <td>
+                            {item.variation !== null && item.variation !== undefined
+                              ? `${Number(item.variation).toFixed(1)}%`
+                              : '-'}
+                          </td>
+                          <td>
+                            {item.weight !== null && item.weight !== undefined
+                              ? `${Number(item.weight).toFixed(1)}%`
+                              : '-'}
+                          </td>
+                          <td>
+                            {item.weightedResult !== null && item.weightedResult !== undefined
+                              ? Number(item.weightedResult).toFixed(1)
+                              : '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="global-result-card">
             <div className="result-content">
               <h2>Resultado Global del Periodo</h2>
@@ -339,7 +479,16 @@ export default function HistorialIndividual() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredKPIs.map((kpi) => (
+                  {filteredKPIs.map((kpi) => {
+                    const direction = resolveDirection(
+                      (kpi as any).assignmentDirection,
+                      kpi.kpiDirection,
+                      kpi.kpiType
+                    )
+                    const variation =
+                      kpi.variation ?? calculateVariationPercent(direction, kpi.target, kpi.actual ?? null)
+                    const weightedImpact = calculateWeightedImpact(variation, kpi.weight, kpi.subPeriodWeight)
+                    return (
                     <tr key={kpi.id}>
                       <td className="kpi-name">{kpi.kpiName || `KPI ${kpi.kpiId}`}</td>
                       <td className="kpi-description">{kpi.kpiDescription || '-'}</td>
@@ -348,14 +497,14 @@ export default function HistorialIndividual() {
                     {kpi.actual !== null && kpi.actual !== undefined ? kpi.actual : '-'}
                   </td>
                   <td className="kpi-variation">
-                    {kpi.variation !== null && kpi.variation !== undefined
-                      ? `${Number(kpi.variation).toFixed(1)}%`
+                    {variation !== null && variation !== undefined
+                      ? `${Number(variation).toFixed(1)}%`
                       : '-'}
                   </td>
                   <td className="kpi-weight">{kpi.weight}%</td>
                   <td className="kpi-weighted">
-                    {kpi.weightedResult !== null && kpi.weightedResult !== undefined
-                      ? `${Number(kpi.weightedResult).toFixed(1)}%`
+                    {weightedImpact !== null && weightedImpact !== undefined
+                      ? `${Number(weightedImpact).toFixed(1)}%`
                       : '-'}
                       </td>
                       <td className="kpi-criteria">{kpi.kpiCriteria || '-'}</td>
@@ -369,7 +518,8 @@ export default function HistorialIndividual() {
                       </td>
                       {selectedSubPeriodId && <td>{kpi.subPeriodName || '-'}</td>}
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

@@ -18,6 +18,7 @@ import VistasAgregadas from './pages/VistasAgregadas'
 import VistasReduccion from './pages/VistasReduccion'
 import Auditoria from './pages/Auditoria'
 import Configuracion from './pages/Configuracion'
+import Seguridad from './pages/Seguridad'
 import ParrillaGeneral from './pages/ParrillaGeneral'
 import Evolutivo from './pages/Evolutivo'
 import NotFound from './pages/NotFound'
@@ -179,6 +180,14 @@ function App() {
               element={
                 <RequireAuth>
                   <Configuracion />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/seguridad"
+              element={
+                <RequireAuth>
+                  <Seguridad />
                 </RequireAuth>
               }
             />

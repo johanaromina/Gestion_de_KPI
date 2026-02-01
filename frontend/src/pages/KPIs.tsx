@@ -7,10 +7,8 @@ import KPIForm from '../components/KPIForm'
 import { useAuth } from '../hooks/useAuth'
 import './KPIs.css'
 
-const defaultFormula = (type: KPI['type']) => {
-  switch (type) {
-    case 'growth':
-      return '(actual / target) * 100'
+const defaultFormula = (direction?: KPI['direction']) => {
+  switch (direction) {
     case 'reduction':
       return '(target / actual) * 100'
     case 'exact':
@@ -20,16 +18,14 @@ const defaultFormula = (type: KPI['type']) => {
   }
 }
 
-const sampleResult = (type: KPI['type']) => {
-  switch (type) {
-    case 'growth':
-      return 'Ej: target 100, actual 120 → 120%'
+const sampleResult = (direction?: KPI['direction']) => {
+  switch (direction) {
     case 'reduction':
       return 'Ej: target 100, actual 80 → 125%'
     case 'exact':
       return 'Ej: target 100, actual 120 → 80% (penaliza desvío)'
     default:
-      return ''
+      return 'Ej: target 100, actual 120 → 120%'
   }
 }
 
@@ -94,13 +90,45 @@ export default function KPIs() {
     }
   )
 
+  const closePeriodKpiMutation = useMutation(
+    async ({ periodId, kpiId }: { periodId: number; kpiId: number }) => {
+      await api.post('/collaborator-kpis/close-period', { periodId, kpiId })
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('collaborator-kpis')
+        queryClient.invalidateQueries('collaborator-kpis-summary')
+      },
+      onError: (error: any) => {
+        alert(error.response?.data?.error || 'Error al cerrar el KPI en el período.')
+      },
+    }
+  )
+
+  const getPeriodName = (periodId?: number | '') => {
+    if (!periodId) return ''
+    return periods?.find((p: any) => p.id === periodId)?.name || `Período #${periodId}`
+  }
+
   const getTypeBadge = (type: KPI['type']) => {
     const typeConfig = {
+      manual: { label: 'Manual', class: 'type-manual' },
+      count: { label: 'Count', class: 'type-count' },
+      ratio: { label: 'Ratio', class: 'type-ratio' },
+      sla: { label: 'SLA', class: 'type-sla' },
+      value: { label: 'Value', class: 'type-value' },
+    }
+    const config = typeConfig[type] || typeConfig.value
+    return <span className={`type-badge ${config.class}`}>{config.label}</span>
+  }
+
+  const getDirectionBadge = (direction?: KPI['direction']) => {
+    const dirConfig = {
       growth: { label: 'Crecimiento', class: 'type-growth' },
       reduction: { label: 'Reducción', class: 'type-reduction' },
       exact: { label: 'Exacto', class: 'type-exact' },
     }
-    const config = typeConfig[type]
+    const config = dirConfig[direction || 'growth']
     return <span className={`type-badge ${config.class}`}>{config.label}</span>
   }
 
@@ -144,9 +172,11 @@ export default function KPIs() {
 
   const totals = {
     total: filteredKPIs?.length || 0,
-    growth: filteredKPIs?.filter((k) => k.type === 'growth').length || 0,
-    reduction: filteredKPIs?.filter((k) => k.type === 'reduction').length || 0,
-    exact: filteredKPIs?.filter((k) => k.type === 'exact').length || 0,
+    manual: filteredKPIs?.filter((k) => k.type === 'manual').length || 0,
+    count: filteredKPIs?.filter((k) => k.type === 'count').length || 0,
+    ratio: filteredKPIs?.filter((k) => k.type === 'ratio').length || 0,
+    sla: filteredKPIs?.filter((k) => k.type === 'sla').length || 0,
+    value: filteredKPIs?.filter((k) => k.type === 'value').length || 0,
   }
 
   return (
@@ -179,9 +209,11 @@ export default function KPIs() {
           <label htmlFor="filter-type">Tipo:</label>
           <select id="filter-type" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
             <option value="">Todos los tipos</option>
-            <option value="growth">Crecimiento</option>
-            <option value="reduction">Reducción</option>
-            <option value="exact">Exacto</option>
+            <option value="manual">Manual</option>
+            <option value="count">Count</option>
+            <option value="ratio">Ratio</option>
+            <option value="sla">SLA</option>
+            <option value="value">Value</option>
           </select>
         </div>
         <div className="filter-group">
@@ -219,17 +251,25 @@ export default function KPIs() {
             <span className="stat-label">Total</span>
             <span className="stat-value">{totals.total}</span>
           </div>
-          <div className="stat-pill stat-growth">
-            <span className="stat-label">Crecimiento</span>
-            <span className="stat-value">{totals.growth}</span>
+          <div className="stat-pill stat-manual">
+            <span className="stat-label">Manual</span>
+            <span className="stat-value">{totals.manual}</span>
           </div>
-          <div className="stat-pill stat-reduction">
-            <span className="stat-label">Reducción</span>
-            <span className="stat-value">{totals.reduction}</span>
+          <div className="stat-pill stat-count">
+            <span className="stat-label">Count</span>
+            <span className="stat-value">{totals.count}</span>
           </div>
-          <div className="stat-pill stat-exact">
-            <span className="stat-label">Exacto</span>
-            <span className="stat-value">{totals.exact}</span>
+          <div className="stat-pill stat-ratio">
+            <span className="stat-label">Ratio</span>
+            <span className="stat-value">{totals.ratio}</span>
+          </div>
+          <div className="stat-pill stat-sla">
+            <span className="stat-label">SLA</span>
+            <span className="stat-value">{totals.sla}</span>
+          </div>
+          <div className="stat-pill stat-value">
+            <span className="stat-label">Value</span>
+            <span className="stat-value">{totals.value}</span>
           </div>
         </div>
       )}
@@ -250,7 +290,10 @@ export default function KPIs() {
                       <p className="kpi-id">ID {kpi.id}</p>
                       <h3 className="kpi-name">{kpi.name}</h3>
                     </div>
-                    {getTypeBadge(kpi.type)}
+                    <div className="badge-group">
+                      {getTypeBadge(kpi.type)}
+                      {getDirectionBadge(kpi.direction)}
+                    </div>
                   </div>
                   <p className="kpi-description">{kpi.description || 'Sin descripción'}</p>
                   <div className="kpi-meta">
@@ -260,8 +303,8 @@ export default function KPIs() {
                     </div>
                     <div>
                       <span className="meta-label">Fórmula</span>
-                      <p className="meta-value mono" title={kpi.formula || defaultFormula(kpi.type)}>
-                        {kpi.formula ? 'Personalizada' : 'Por defecto'} - {sampleResult(kpi.type)}
+                      <p className="meta-value mono" title={kpi.formula || defaultFormula(kpi.direction)}>
+                        {kpi.formula ? 'Personalizada' : 'Por defecto'} - {sampleResult(kpi.direction)}
                       </p>
                     </div>
                     {kpi.macroKPIId && (
@@ -306,6 +349,31 @@ export default function KPIs() {
                           disabled={deleteMutation.isLoading}
                         >
                           Eliminar
+                        </button>
+                        <button
+                          className="btn-text warning"
+                          onClick={() => {
+                            const periodName = getPeriodName(filterPeriodId)
+                            if (
+                              filterPeriodId &&
+                              window.confirm(
+                                `¿Cerrar el KPI "${kpi.name}" en ${periodName}? Esta acción cerrará todas sus asignaciones en ese período.`
+                              )
+                            ) {
+                              closePeriodKpiMutation.mutate({
+                                periodId: filterPeriodId as number,
+                                kpiId: kpi.id,
+                              })
+                            }
+                          }}
+                          disabled={!filterPeriodId || closePeriodKpiMutation.isLoading}
+                          title={
+                            filterPeriodId
+                              ? 'Cerrar KPI en el período seleccionado'
+                              : 'Selecciona un período para cerrar el KPI'
+                          }
+                        >
+                          Cerrar KPI (período)
                         </button>
                       </>
                     )}

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
 import { pool } from '../config/database'
-import { CollaboratorKPI, KPIType } from '../types'
+import { CollaboratorKPI, KPIDirection, KPIType } from '../types'
 import { calculateVariation, calculateWeightedResult } from '../utils/kpi-formulas'
 import { AuthRequest } from '../middleware/auth.middleware'
 
@@ -14,16 +14,58 @@ const canEditAssignment = async (user: AuthRequest['user'], collaboratorId: numb
 const canManageConfig = (user: AuthRequest['user']) =>
   !!user && (user.hasSuperpowers || user.permissions?.includes('config.manage'))
 
+const resolveDirection = (direction?: string | null, type?: string | null): KPIDirection => {
+  if (direction === 'growth' || direction === 'reduction' || direction === 'exact') return direction
+  if (type === 'growth' || type === 'reduction' || type === 'exact') return type
+  if (type === 'sla') return 'reduction'
+  return 'growth'
+}
+
+const getDefaultCalendarProfileId = async (): Promise<number | null> => {
+  const [rows] = await pool.query<any[]>(
+    `SELECT id FROM calendar_profiles ORDER BY id ASC LIMIT 1`
+  )
+  return Array.isArray(rows) && rows.length > 0 ? Number(rows[0].id) : null
+}
+
+const resolveCalendarProfileId = async (options: {
+  calendarProfileId?: number | null
+  subPeriodId?: number | null
+  collaboratorId?: number | null
+}): Promise<number | null> => {
+  if (options.calendarProfileId) return options.calendarProfileId
+  if (options.subPeriodId) {
+    const [rows] = await pool.query<any[]>(
+      `SELECT calendarProfileId FROM calendar_subperiods WHERE id = ?`,
+      [options.subPeriodId]
+    )
+    const value = rows?.[0]?.calendarProfileId
+    if (value) return Number(value)
+  }
+  if (options.collaboratorId) {
+    const [rows] = await pool.query<any[]>(
+      `SELECT s.calendarProfileId
+       FROM collaborators c
+       LEFT JOIN org_scopes s ON s.id = c.orgScopeId
+       WHERE c.id = ?`,
+      [options.collaboratorId]
+    )
+    const value = rows?.[0]?.calendarProfileId
+    if (value) return Number(value)
+  }
+  return await getDefaultCalendarProfileId()
+}
+
 export const recalcSummaryAssignment = async (collaboratorId: number, kpiId: number, periodId: number) => {
-  const [[kpiRow]] = await pool.query<any[]>(`SELECT type FROM kpis WHERE id = ?`, [kpiId])
+  const [[kpiRow]] = await pool.query<any[]>(`SELECT type, direction FROM kpis WHERE id = ?`, [kpiId])
   if (!kpiRow) return
 
-  const kpiType: KPIType = kpiRow.type
+  const kpiDirection: KPIDirection = resolveDirection(kpiRow.direction, kpiRow.type)
 
   const [subRows] = await pool.query<any[]>(
     `SELECT ck.*, sp.endDate
      FROM collaborator_kpis ck
-     LEFT JOIN sub_periods sp ON ck.subPeriodId = sp.id
+     LEFT JOIN calendar_subperiods sp ON ck.subPeriodId = sp.id
      WHERE ck.collaboratorId = ? AND ck.kpiId = ? AND ck.periodId = ? AND ck.subPeriodId IS NOT NULL`,
     [collaboratorId, kpiId, periodId]
   )
@@ -68,7 +110,7 @@ export const recalcSummaryAssignment = async (collaboratorId: number, kpiId: num
     return acc + a
   }, 0)
 
-  if (kpiType === 'exact') {
+  if (kpiDirection === 'exact') {
     const byEndDate = (a: any, b: any) => {
       const ea = a.endDate ? new Date(a.endDate).getTime() : 0
       const eb = b.endDate ? new Date(b.endDate).getTime() : 0
@@ -140,14 +182,21 @@ export const recalcSummaryAssignment = async (collaboratorId: number, kpiId: num
       [summaryTarget, summaryWeight, summaryActual, summaryVariation, summaryWeightedResult, parentId]
     )
   } else {
+    const resolvedCalendarProfileId =
+      subRows?.[0]?.calendarProfileId ||
+      (await resolveCalendarProfileId({
+        collaboratorId,
+        subPeriodId: subRows?.[0]?.subPeriodId ?? null,
+      }))
     await pool.query(
       `INSERT INTO collaborator_kpis
-         (collaboratorId, kpiId, periodId, subPeriodId, target, weight, actual, variation, weightedResult, status)
-       VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)`,
+         (collaboratorId, kpiId, periodId, calendarProfileId, subPeriodId, target, weight, actual, variation, weightedResult, status)
+       VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)`,
       [
         collaboratorId,
         kpiId,
         periodId,
+        resolvedCalendarProfileId,
         summaryTarget,
         summaryWeight,
         summaryActual,
@@ -164,6 +213,7 @@ export const getCollaboratorKPIs = async (req: Request, res: Response) => {
     const [rows] = await pool.query<CollaboratorKPI[]>(
       `SELECT ck.*, 
               k.type as kpiType,
+              k.direction as kpiDirection,
               k.name as kpiName,
               k.description as kpiDescription,
               k.criteria as kpiCriteria,
@@ -171,6 +221,7 @@ export const getCollaboratorKPIs = async (req: Request, res: Response) => {
               p.name as periodName,
               p.status as periodStatus,
               sp.name as subPeriodName,
+              sp.weight as subPeriodWeight,
               COALESCE(cv_active.criteriaText, cv_latest.criteriaText, k.criteria) as criteriaText,
               COALESCE(cv_active.createdAt, cv_latest.createdAt) as criteriaUpdatedAt,
               COALESCE(cv_active.dataSource, cv_latest.dataSource, ck.dataSource) as dataSource,
@@ -181,7 +232,7 @@ export const getCollaboratorKPIs = async (req: Request, res: Response) => {
        JOIN kpis k ON ck.kpiId = k.id
        JOIN collaborators c ON ck.collaboratorId = c.id
        JOIN periods p ON ck.periodId = p.id
-       LEFT JOIN sub_periods sp ON ck.subPeriodId = sp.id
+       LEFT JOIN calendar_subperiods sp ON ck.subPeriodId = sp.id
        LEFT JOIN kpi_criteria_versions cv_active ON cv_active.id = ck.activeCriteriaVersionId
        LEFT JOIN kpi_criteria_versions cv_latest 
          ON cv_latest.id = (
@@ -206,6 +257,7 @@ export const getCollaboratorKPIById = async (req: Request, res: Response) => {
     const [rows] = await pool.query<CollaboratorKPI[]>(
       `SELECT ck.*, 
               k.type as kpiType,
+              k.direction as kpiDirection,
               k.name as kpiName,
               k.description as kpiDescription,
               k.criteria as kpiCriteria,
@@ -213,11 +265,12 @@ export const getCollaboratorKPIById = async (req: Request, res: Response) => {
               COALESCE(cv_active.createdAt, cv_latest.createdAt) as criteriaUpdatedAt,
               COALESCE(cv_active.dataSource, cv_latest.dataSource, ck.dataSource) as dataSource,
               COALESCE(cv_active.sourceConfig, cv_latest.sourceConfig, ck.sourceConfig) as sourceConfig,
+              sp.weight as subPeriodWeight,
               km.capturedAt as lastMeasurementAt,
               mc.name as lastMeasurementBy
        FROM collaborator_kpis ck
        JOIN kpis k ON ck.kpiId = k.id
-       LEFT JOIN sub_periods sp ON ck.subPeriodId = sp.id
+       LEFT JOIN calendar_subperiods sp ON ck.subPeriodId = sp.id
        LEFT JOIN kpi_criteria_versions cv_active ON cv_active.id = ck.activeCriteriaVersionId
        LEFT JOIN kpi_criteria_versions cv_latest 
          ON cv_latest.id = (
@@ -249,12 +302,14 @@ export const getCollaboratorKPIsByCollaborator = async (req: Request, res: Respo
 
     let query = `SELECT ck.*, 
                         k.type as kpiType,
+                        k.direction as kpiDirection,
                         k.name as kpiName,
                         k.description as kpiDescription,
                         k.criteria as kpiCriteria,
                         p.name as periodName,
                         p.status as periodStatus,
                         sp.name as subPeriodName,
+                        sp.weight as subPeriodWeight,
                         COALESCE(cv_active.criteriaText, cv_latest.criteriaText, k.criteria) as criteriaText,
                         COALESCE(cv_active.createdAt, cv_latest.createdAt) as criteriaUpdatedAt,
                         COALESCE(cv_active.dataSource, cv_latest.dataSource, ck.dataSource) as dataSource,
@@ -264,7 +319,7 @@ export const getCollaboratorKPIsByCollaborator = async (req: Request, res: Respo
                  FROM collaborator_kpis ck
                  JOIN kpis k ON ck.kpiId = k.id
                  JOIN periods p ON ck.periodId = p.id
-                 LEFT JOIN sub_periods sp ON ck.subPeriodId = sp.id
+                 LEFT JOIN calendar_subperiods sp ON ck.subPeriodId = sp.id
                  LEFT JOIN kpi_criteria_versions cv_active ON cv_active.id = ck.activeCriteriaVersionId
                  LEFT JOIN kpi_criteria_versions cv_latest 
                    ON cv_latest.id = (
@@ -299,11 +354,13 @@ export const getCollaboratorKPIsByPeriod = async (req: Request, res: Response) =
     const [rows] = await pool.query<CollaboratorKPI[]>(
       `SELECT ck.*, 
               k.type as kpiType,
+              k.direction as kpiDirection,
               k.name as kpiName,
               k.description as kpiDescription,
               k.criteria as kpiCriteria,
               c.name as collaboratorName,
               sp.name as subPeriodName,
+              sp.weight as subPeriodWeight,
               COALESCE(cv_active.criteriaText, cv_latest.criteriaText, k.criteria) as criteriaText,
               COALESCE(cv_active.createdAt, cv_latest.createdAt) as criteriaUpdatedAt,
               COALESCE(cv_active.dataSource, cv_latest.dataSource, ck.dataSource) as dataSource,
@@ -313,7 +370,7 @@ export const getCollaboratorKPIsByPeriod = async (req: Request, res: Response) =
        FROM collaborator_kpis ck
        JOIN kpis k ON ck.kpiId = k.id
        JOIN collaborators c ON ck.collaboratorId = c.id
-       LEFT JOIN sub_periods sp ON ck.subPeriodId = sp.id
+       LEFT JOIN calendar_subperiods sp ON ck.subPeriodId = sp.id
        LEFT JOIN kpi_criteria_versions cv_active ON cv_active.id = ck.activeCriteriaVersionId
        LEFT JOIN kpi_criteria_versions cv_latest 
          ON cv_latest.id = (
@@ -341,6 +398,7 @@ export const createCollaboratorKPI = async (req: Request, res: Response) => {
       kpiId,
       periodId,
       subPeriodId,
+      calendarProfileId,
       target,
       weight,
       status,
@@ -392,13 +450,11 @@ export const createCollaboratorKPI = async (req: Request, res: Response) => {
       }
     }
 
-    const [kpiRows] = await pool.query<any[]>('SELECT type FROM kpis WHERE id = ?', [kpiId])
+    const [kpiRows] = await pool.query<any[]>('SELECT id FROM kpis WHERE id = ?', [kpiId])
 
     if (Array.isArray(kpiRows) && kpiRows.length === 0) {
       return res.status(404).json({ error: 'KPI no encontrado' })
     }
-
-    const kpiType = kpiRows[0].type
 
     let resolvedCuratorId = curatorUserId || null
     if (!resolvedCuratorId && curatorAssignee) {
@@ -409,14 +465,21 @@ export const createCollaboratorKPI = async (req: Request, res: Response) => {
       resolvedCuratorId = Array.isArray(curatorRows) && curatorRows.length > 0 ? curatorRows[0].id : null
     }
 
+    const resolvedCalendarProfileId = await resolveCalendarProfileId({
+      calendarProfileId,
+      subPeriodId: subPeriodId || null,
+      collaboratorId,
+    })
+
     const [result] = await pool.query(
       `INSERT INTO collaborator_kpis 
-       (collaboratorId, kpiId, periodId, subPeriodId, target, weight, status, curationStatus, dataSource, sourceConfig, curatorUserId, inputMode) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (collaboratorId, kpiId, periodId, calendarProfileId, subPeriodId, target, weight, status, curationStatus, dataSource, sourceConfig, curatorUserId, inputMode) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         collaboratorId,
         kpiId,
         periodId,
+        resolvedCalendarProfileId,
         subPeriodId || null,
         target,
         weight,
@@ -454,6 +517,7 @@ export const createCollaboratorKPI = async (req: Request, res: Response) => {
       collaboratorId,
       kpiId,
       periodId,
+      calendarProfileId: resolvedCalendarProfileId,
       subPeriodId: subPeriodId || null,
       target,
       weight,
@@ -628,7 +692,7 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
 
     if (actual !== undefined) {
       const [ckDataRows] = await pool.query<any[]>(
-        `SELECT ck.target, ck.weight, k.type 
+        `SELECT ck.target, ck.weight, k.type, k.direction 
          FROM collaborator_kpis ck
          JOIN kpis k ON ck.kpiId = k.id
          WHERE ck.id = ?`,
@@ -636,7 +700,7 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
       )
 
       if (Array.isArray(ckDataRows) && ckDataRows.length > 0) {
-        const kpiType = ckDataRows[0].type
+        const kpiDirection = resolveDirection(ckDataRows[0].direction, ckDataRows[0].type)
         const currentTarget = Number(target ?? ckDataRows[0].target ?? 0)
         const currentWeight = Number(weight ?? ckDataRows[0].weight ?? 0)
 
@@ -647,7 +711,7 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
           })
         }
 
-        const variation = calculateVariation(kpiType, currentTarget, actual)
+        const variation = calculateVariation(kpiDirection, currentTarget, actual)
         const weightedResult = calculateWeightedResult(variation, currentWeight)
 
         updateQuery += `, actual = ?, variation = ?, weightedResult = ?`
@@ -736,14 +800,14 @@ export const updateActualValue = async (req: Request, res: Response) => {
     const periodId = ckRows[0].periodId
 
     const [ckDataRows] = await pool.query<any[]>(
-      `SELECT ck.target, ck.weight, k.type 
+      `SELECT ck.target, ck.weight, k.type, k.direction 
        FROM collaborator_kpis ck
        JOIN kpis k ON ck.kpiId = k.id
        WHERE ck.id = ?`,
       [id]
     )
 
-    const { target, weight, type } = ckDataRows[0]
+    const { target, weight, type, direction } = ckDataRows[0]
     const currentTarget = Number(target ?? 0)
     const currentWeight = Number(weight ?? 0)
 
@@ -754,7 +818,7 @@ export const updateActualValue = async (req: Request, res: Response) => {
       })
     }
 
-    const variation = calculateVariation(type, currentTarget, actual)
+    const variation = calculateVariation(resolveDirection(direction, type), currentTarget, actual)
     const weightedResult = calculateWeightedResult(variation, currentWeight)
 
     await pool.query(
@@ -892,10 +956,10 @@ export const proposeCollaboratorKPI = async (req: Request, res: Response) => {
     }
 
     if (actual !== undefined) {
-      const [kpiRows] = await pool.query<any[]>('SELECT type, formula FROM kpis WHERE id = ?', [assignment.kpiId])
+      const [kpiRows] = await pool.query<any[]>('SELECT type, direction, formula FROM kpis WHERE id = ?', [assignment.kpiId])
 
       if (Array.isArray(kpiRows) && kpiRows.length > 0) {
-        const kpiType = kpiRows[0].type
+        const kpiDirection = resolveDirection(kpiRows[0].direction, kpiRows[0].type)
         const customFormula = kpiRows[0].formula || undefined
 
         const targetValue = Number(assignment.target ?? 0)
@@ -908,7 +972,7 @@ export const proposeCollaboratorKPI = async (req: Request, res: Response) => {
           })
         }
 
-        const variation = calculateVariation(kpiType, targetValue, actual, customFormula)
+        const variation = calculateVariation(kpiDirection, targetValue, actual, customFormula)
         const weightedResult = calculateWeightedResult(variation, weightValue)
 
         updateData.actual = actual
@@ -1094,7 +1158,7 @@ export const rejectCollaboratorKPI = async (req: Request, res: Response) => {
 
 export const closePeriodAssignments = async (req: Request, res: Response) => {
   try {
-    const { periodId, collaboratorId } = req.body
+    const { periodId, collaboratorId, kpiId } = req.body
 
     if (!periodId) {
       return res.status(400).json({ error: 'El período es requerido' })
@@ -1106,6 +1170,11 @@ export const closePeriodAssignments = async (req: Request, res: Response) => {
     if (collaboratorId) {
       query += ' AND collaboratorId = ?'
       params.push(collaboratorId)
+    }
+
+    if (kpiId) {
+      query += ' AND kpiId = ?'
+      params.push(kpiId)
     }
 
     query += ' AND status != ?'
@@ -1166,11 +1235,11 @@ export const deleteCollaboratorKPI = async (req: Request, res: Response) => {
 
 export const generateBaseGrids = async (req: Request, res: Response) => {
   try {
-    const { area, periodId, kpiIds, defaultTarget, defaultWeight, kpiOverrides } = req.body
+    const { area, orgScopeId, periodId, kpiIds, defaultTarget, defaultWeight, kpiOverrides } = req.body
 
-    if (!area || !periodId) {
+    if ((!area && !orgScopeId) || !periodId) {
       return res.status(400).json({
-        error: 'El área y el período son requeridos',
+        error: 'El scope/área y el período son requeridos',
       })
     }
 
@@ -1182,11 +1251,21 @@ export const generateBaseGrids = async (req: Request, res: Response) => {
       })
     }
 
-    const [collaborators] = await pool.query<any[]>('SELECT id FROM collaborators WHERE area = ?', [area])
+    let collaborators: any[] = []
+    if (orgScopeId) {
+      const [rows] = await pool.query<any[]>(
+        'SELECT id FROM collaborators WHERE orgScopeId = ?',
+        [orgScopeId]
+      )
+      collaborators = rows || []
+    } else {
+      const [rows] = await pool.query<any[]>('SELECT id FROM collaborators WHERE area = ?', [area])
+      collaborators = rows || []
+    }
 
     if (!Array.isArray(collaborators) || collaborators.length === 0) {
       return res.status(404).json({
-        error: `No se encontraron colaboradores en el área "${area}"`,
+        error: `No se encontraron colaboradores para el scope/área indicado`,
       })
     }
 
@@ -1237,7 +1316,7 @@ export const generateBaseGrids = async (req: Request, res: Response) => {
       const collaboratorPlaceholders = collaboratorIds.map(() => '?').join(',')
       const params: any[] = [periodId, ...collaboratorIds]
 
-      let planQuery = `SELECT collaboratorId, kpiId, subPeriodId, target, weight 
+      let planQuery = `SELECT collaboratorId, kpiId, subPeriodId, target, weightOverride 
                        FROM collaborator_kpi_plan 
                        WHERE periodId = ? 
                        AND collaboratorId IN (${collaboratorPlaceholders})`
@@ -1271,13 +1350,7 @@ export const generateBaseGrids = async (req: Request, res: Response) => {
           const planRows = planMap.get(planKey) || []
 
           if (planRows.length > 0) {
-            // El peso en el plan es el peso total del KPI para todo el período
-            // Lo distribuimos entre los subperíodos para no inflar el total (>100%)
-            const baseWeight = Number(planRows[0].weight ?? 0)
-            // Si hay múltiples subperíodos, dividimos el peso entre ellos
-            // Si solo hay uno, usamos el peso completo
-            const distributedWeight =
-              baseWeight > 0 && planRows.length > 1 ? baseWeight / planRows.length : baseWeight || weightPerKpi
+            const distributedWeight = weightPerKpi
 
             for (const plan of planRows) {
               const planTarget = Number(plan.target ?? 0)
@@ -1305,11 +1378,24 @@ export const generateBaseGrids = async (req: Request, res: Response) => {
                 continue
               }
 
+              const resolvedCalendarProfileId = await resolveCalendarProfileId({
+                collaboratorId: collaborator.id,
+                subPeriodId,
+              })
               const [result] = await pool.query(
                 `INSERT INTO collaborator_kpis 
-                 (collaboratorId, kpiId, periodId, subPeriodId, target, weight, status) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                [collaborator.id, kpi.id, periodId, subPeriodId, planTarget, planWeight, 'draft']
+                 (collaboratorId, kpiId, periodId, calendarProfileId, subPeriodId, target, weight, status) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                  collaborator.id,
+                  kpi.id,
+                  periodId,
+                  resolvedCalendarProfileId,
+                  subPeriodId,
+                  planTarget,
+                  planWeight,
+                  'draft',
+                ]
               )
 
               const insertResult = result as any
@@ -1347,11 +1433,15 @@ export const generateBaseGrids = async (req: Request, res: Response) => {
               ? weight
               : weightPerKpi
 
+          const resolvedCalendarProfileId = await resolveCalendarProfileId({
+            collaboratorId: collaborator.id,
+            subPeriodId: null,
+          })
           const [result] = await pool.query(
             `INSERT INTO collaborator_kpis 
-             (collaboratorId, kpiId, periodId, target, weight, status) 
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [collaborator.id, kpi.id, periodId, targetValue, weightValue, 'draft']
+             (collaboratorId, kpiId, periodId, calendarProfileId, target, weight, status) 
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [collaborator.id, kpi.id, periodId, resolvedCalendarProfileId, targetValue, weightValue, 'draft']
           )
 
           const insertResult = result as any
@@ -1403,10 +1493,18 @@ export const getMonthlyPlan = async (req: Request, res: Response) => {
     }
 
     const [rows] = await pool.query<any[]>(
-      `SELECT id, collaboratorId, kpiId, periodId, subPeriodId, target, weight
-       FROM collaborator_kpi_plan
-       WHERE collaboratorId = ? AND kpiId = ? AND periodId = ?
-       ORDER BY subPeriodId ASC`,
+      `SELECT p.id,
+              p.collaboratorId,
+              p.kpiId,
+              p.periodId,
+              p.subPeriodId,
+              p.target,
+              p.weightOverride,
+              sp.weight as subPeriodWeight
+       FROM collaborator_kpi_plan p
+       JOIN calendar_subperiods sp ON sp.id = p.subPeriodId
+       WHERE p.collaboratorId = ? AND p.kpiId = ? AND p.periodId = ?
+       ORDER BY sp.startDate ASC`,
       [collaboratorId, kpiId, periodId]
     )
 
@@ -1432,34 +1530,47 @@ export const upsertMonthlyPlan = async (req: Request, res: Response) => {
     }
 
     if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: 'Debe enviar al menos un item con subPeriodId, target y weight' })
+      return res.status(400).json({ error: 'Debe enviar al menos un item con subPeriodId y target' })
     }
 
     const conn = await pool.getConnection()
     try {
       await conn.beginTransaction()
 
+      const canOverrideWeight =
+        Boolean(user?.hasSuperpowers) ||
+        ['admin', 'director'].includes(user?.role || '') ||
+        Boolean(user?.permissions?.includes('curation.manage')) ||
+        Boolean(user?.permissions?.includes('config.manage'))
+
       for (const item of items) {
         if (!item || typeof item.subPeriodId !== 'number') continue
 
         const target = Number(item.target ?? 0)
-        const weight = Number(item.weight ?? 0)
+        const weightOverride = item.weightOverride !== undefined ? Number(item.weightOverride) : null
 
         if (target < 0) {
           await conn.rollback()
           return res.status(400).json({ error: 'Target no puede ser negativo' })
         }
 
-        if (weight < 0 || weight > 100) {
+        if (weightOverride !== null && (!canOverrideWeight || weightOverride < 0 || weightOverride > 100)) {
           await conn.rollback()
-          return res.status(400).json({ error: 'La ponderación debe estar entre 0 y 100' })
+          return res.status(400).json({ error: 'La ponderación override debe estar entre 0 y 100' })
         }
 
         await conn.query(
-          `INSERT INTO collaborator_kpi_plan (collaboratorId, kpiId, periodId, subPeriodId, target, weight)
+          `INSERT INTO collaborator_kpi_plan (collaboratorId, kpiId, periodId, subPeriodId, target, weightOverride)
            VALUES (?, ?, ?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE target = VALUES(target), weight = VALUES(weight)`,
-          [collaboratorId, kpiId, periodId, item.subPeriodId, target, weight]
+           ON DUPLICATE KEY UPDATE target = VALUES(target), weightOverride = VALUES(weightOverride)`,
+          [
+            collaboratorId,
+            kpiId,
+            periodId,
+            item.subPeriodId,
+            target,
+            canOverrideWeight ? weightOverride : null,
+          ]
         )
 
         // Si existe una asignación para ese subperiodo, actualizamos target/weight allí también
@@ -1472,16 +1583,36 @@ export const upsertMonthlyPlan = async (req: Request, res: Response) => {
         if (Array.isArray(existingAssignments) && existingAssignments.length > 0) {
           await conn.query(
             `UPDATE collaborator_kpis 
-               SET target = ?, weight = ?
+               SET target = ?
              WHERE id = ?`,
-            [target, weight, existingAssignments[0].id]
+            [target, existingAssignments[0].id]
           )
         } else {
+          const [baseRows] = await conn.query<any[]>(
+            `SELECT weight FROM collaborator_kpis 
+             WHERE collaboratorId = ? AND kpiId = ? AND periodId = ? AND subPeriodId IS NULL
+             LIMIT 1`,
+            [collaboratorId, kpiId, periodId]
+          )
+          const baseWeight = baseRows?.[0]?.weight ?? 0
+          const resolvedCalendarProfileId = await resolveCalendarProfileId({
+            collaboratorId: Number(collaboratorId),
+            subPeriodId: item.subPeriodId,
+          })
           await conn.query(
             `INSERT INTO collaborator_kpis 
-               (collaboratorId, kpiId, periodId, subPeriodId, target, weight, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [collaboratorId, kpiId, periodId, item.subPeriodId, target, weight, 'draft']
+               (collaboratorId, kpiId, periodId, calendarProfileId, subPeriodId, target, weight, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              collaboratorId,
+              kpiId,
+              periodId,
+              resolvedCalendarProfileId,
+              item.subPeriodId,
+              target,
+              baseWeight,
+              'draft',
+            ]
           )
         }
       }
@@ -1515,6 +1646,7 @@ export const getConsolidatedByCollaborator = async (req: Request, res: Response)
     const [rows] = await pool.query<any[]>(
       `SELECT ck.*,
               k.type as kpiType,
+              k.direction as kpiDirection,
               k.name as kpiName,
               k.description as kpiDescription,
               k.criteria as kpiCriteria,
@@ -1529,7 +1661,7 @@ export const getConsolidatedByCollaborator = async (req: Request, res: Response)
        JOIN kpis k ON ck.kpiId = k.id
        JOIN collaborators c ON ck.collaboratorId = c.id
        JOIN periods p ON ck.periodId = p.id
-       LEFT JOIN sub_periods sp ON ck.subPeriodId = sp.id
+       LEFT JOIN calendar_subperiods sp ON ck.subPeriodId = sp.id
        WHERE ck.collaboratorId = ? AND ck.periodId = ?
        ORDER BY sp.startDate ASC, ck.createdAt DESC`,
       [collaboratorId, periodId]
@@ -1547,7 +1679,7 @@ export const getConsolidatedByCollaborator = async (req: Request, res: Response)
       const variation =
         row.variation ??
         (row.actual !== null && row.actual !== undefined
-          ? calculateVariation(row.kpiType, row.target, row.actual, customFormula)
+          ? calculateVariation(resolveDirection(row.kpiDirection, row.kpiType), row.target, row.actual, customFormula)
           : 0)
 
       const weightedResult = row.weightedResult ?? calculateWeightedResult(variation, row.weight || 0)

@@ -4,6 +4,7 @@ import crypto from 'crypto'
 
 const NOTIFY_WINDOW_DAYS = parseInt(process.env.NOTIFY_WINDOW_DAYS || '7')
 const NOTIFY_ENABLED = (process.env.NOTIFY_ENABLED || 'true').toLowerCase() === 'true'
+const NOTIFY_COOLDOWN_MIN = parseInt(process.env.NOTIFY_COOLDOWN_MIN || '180')
 
 interface NotificationSummary {
   missingActual: { collaboratorId: number; collaboratorName: string; count: number }[]
@@ -16,7 +17,7 @@ const hashValue = (value: string) => crypto.createHash('sha256').update(value).d
 export async function buildNotificationSummary(): Promise<NotificationSummary> {
   const [kpiRows] = await pool.query<any[]>(
     `SELECT ck.id as assignmentId, ck.collaboratorId, ck.kpiId, ck.target, ck.actual, ck.status,
-            c.name as collaboratorName, k.name as kpiName, k.type as kpiType
+            c.name as collaboratorName, k.name as kpiName, k.type as kpiType, k.direction as kpiDirection
      FROM collaborator_kpis ck
      JOIN collaborators c ON c.id = ck.collaboratorId
      JOIN kpis k ON k.id = ck.kpiId
@@ -46,8 +47,9 @@ export async function buildNotificationSummary(): Promise<NotificationSummary> {
 
     if (targetValue <= 0) continue
 
+    const direction = row.kpiDirection || row.kpiType || 'growth'
     const variation =
-      row.kpiType === 'reduction'
+      direction === 'reduction'
         ? actualValue > 0
           ? (targetValue / actualValue) * 100
           : 0
@@ -110,23 +112,29 @@ async function getRecipients() {
   return (rows || []).filter((r) => r.email)
 }
 
-async function upsertState(type: string, entityKey: string, stateHash: string) {
+async function upsertState(type: string, entityKey: string, stateHash: string, notified: boolean) {
   await pool.query(
-    `INSERT INTO notification_states (type, entityKey, stateHash)
-     VALUES (?, ?, ?)
-     ON DUPLICATE KEY UPDATE stateHash = VALUES(stateHash), updatedAt = NOW()`,
-    [type, entityKey, stateHash]
+    `INSERT INTO notification_states (type, entityKey, stateHash, lastNotifiedAt)
+     VALUES (?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       stateHash = VALUES(stateHash),
+       lastNotifiedAt = CASE WHEN VALUES(lastNotifiedAt) IS NOT NULL THEN VALUES(lastNotifiedAt) ELSE lastNotifiedAt END,
+       updatedAt = NOW()`,
+    [type, entityKey, stateHash, notified ? new Date() : null]
   )
 }
 
-async function getStateMap(type: string): Promise<Map<string, string>> {
+async function getStateMap(type: string): Promise<Map<string, { stateHash: string; lastNotifiedAt: Date | null }>> {
   const [rows] = await pool.query<any[]>(
-    `SELECT entityKey, stateHash FROM notification_states WHERE type = ?`,
+    `SELECT entityKey, stateHash, lastNotifiedAt FROM notification_states WHERE type = ?`,
     [type]
   )
-  const map = new Map<string, string>()
+  const map = new Map<string, { stateHash: string; lastNotifiedAt: Date | null }>()
   for (const row of rows || []) {
-    map.set(row.entityKey, row.stateHash)
+    map.set(row.entityKey, {
+      stateHash: row.stateHash,
+      lastNotifiedAt: row.lastNotifiedAt ? new Date(row.lastNotifiedAt) : null,
+    })
   }
   return map
 }
@@ -156,6 +164,10 @@ export async function runNotifications() {
   }
 
   const newEvents: string[] = []
+  const now = Date.now()
+  const cooldownMs = NOTIFY_COOLDOWN_MIN * 60 * 1000
+  const isCoolingDown = (lastNotifiedAt: Date | null) =>
+    lastNotifiedAt ? now - lastNotifiedAt.getTime() < cooldownMs : false
 
   const missingState = await getStateMap('missing_actual')
   const activeMissingKeys = new Set<string>()
@@ -163,9 +175,13 @@ export async function runNotifications() {
     const key = `collab-${item.collaboratorId}`
     const state = hashValue(String(item.count))
     activeMissingKeys.add(key)
-    if (missingState.get(key) !== state) {
+    const prev = missingState.get(key)
+    const changed = prev?.stateHash !== state
+    if (changed && !isCoolingDown(prev?.lastNotifiedAt || null)) {
       newEvents.push(`KPI sin carga: ${item.collaboratorName} (${item.count})`)
-      await upsertState('missing_actual', key, state)
+      await upsertState('missing_actual', key, state, true)
+    } else if (changed) {
+      await upsertState('missing_actual', key, state, false)
     }
   }
   await deleteMissingStates('missing_actual', activeMissingKeys)
@@ -174,11 +190,17 @@ export async function runNotifications() {
   const activeRiskKeys = new Set<string>()
   for (const item of summary.atRisk) {
     const key = `risk-${item.collaboratorId}-${item.kpiName}`
-    const state = hashValue(`${item.variation.toFixed(1)}`)
+    // Bucket to avoid spam on tiny variation changes
+    const bucket = Math.floor(item.variation / 5) * 5
+    const state = hashValue(`${bucket}`)
     activeRiskKeys.add(key)
-    if (riskState.get(key) !== state) {
+    const prev = riskState.get(key)
+    const changed = prev?.stateHash !== state
+    if (changed && !isCoolingDown(prev?.lastNotifiedAt || null)) {
       newEvents.push(`KPI en riesgo: ${item.kpiName} (${item.collaboratorName})`)
-      await upsertState('at_risk', key, state)
+      await upsertState('at_risk', key, state, true)
+    } else if (changed) {
+      await upsertState('at_risk', key, state, false)
     }
   }
   await deleteMissingStates('at_risk', activeRiskKeys)
@@ -189,9 +211,13 @@ export async function runNotifications() {
     const key = `period-${period.periodId}`
     const state = hashValue('expiring')
     activePeriodKeys.add(key)
-    if (periodState.get(key) !== state) {
+    const prev = periodState.get(key)
+    const changed = prev?.stateHash !== state
+    if (changed && !isCoolingDown(prev?.lastNotifiedAt || null)) {
       newEvents.push(`Periodo por vencer: ${period.periodName} (${period.daysLeft} dias)`)
-      await upsertState('period_expiring', key, state)
+      await upsertState('period_expiring', key, state, true)
+    } else if (changed) {
+      await upsertState('period_expiring', key, state, false)
     }
   }
   await deleteMissingStates('period_expiring', activePeriodKeys)

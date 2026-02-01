@@ -14,6 +14,7 @@ export const getEvolution = async (req: Request, res: Response) => {
         ev.kpiId,
         k.name as kpiName,
         k.type as kpiType,
+        k.direction as kpiDirection,
         ev.periodId,
         p.name as periodName,
         ev.monthDate,
@@ -85,7 +86,8 @@ export const getEvolution = async (req: Request, res: Response) => {
           c.area as collaboratorArea,
           ck.kpiId,
           k.name as kpiName,
-          k.type as kpiType,
+        k.type as kpiType,
+        k.direction as kpiDirection,
           ck.periodId,
           p.name as periodName,
           sp.endDate as monthDate,
@@ -97,7 +99,7 @@ export const getEvolution = async (req: Request, res: Response) => {
         INNER JOIN collaborators c ON ck.collaboratorId = c.id
         INNER JOIN kpis k ON ck.kpiId = k.id
         INNER JOIN periods p ON ck.periodId = p.id
-        LEFT JOIN sub_periods sp ON ck.subPeriodId = sp.id
+        LEFT JOIN calendar_subperiods sp ON ck.subPeriodId = sp.id
         WHERE ck.subPeriodId IS NOT NULL
       `
       const fallbackParams: any[] = []

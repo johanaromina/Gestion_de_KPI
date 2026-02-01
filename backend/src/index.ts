@@ -26,6 +26,8 @@ import curationRoutes from './routes/curation.routes.js'
 import measurementsRoutes from './routes/measurements.routes.js'
 import integrationsRoutes from './routes/integrations.routes.js'
 import orgScopesRoutes from './routes/org-scopes.routes.js'
+import calendarProfilesRoutes from './routes/calendar-profiles.routes.js'
+import securityRoutes from './routes/security.routes.js'
 import { startIntegrationsScheduler } from './utils/integrations-scheduler'
 import { runNotifications } from './utils/notifications'
 
@@ -72,6 +74,8 @@ app.use('/api/curation', curationRoutes)
 app.use('/api/measurements', measurementsRoutes)
 app.use('/api/integrations', integrationsRoutes)
 app.use('/api/org-scopes', orgScopesRoutes)
+app.use('/api/calendar-profiles', calendarProfilesRoutes)
+app.use('/api/security', securityRoutes)
 
 // Start server
 app.listen(PORT, async () => {

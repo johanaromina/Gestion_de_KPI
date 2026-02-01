@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import api from '../services/api'
-import { Area, Collaborator } from '../types'
+import { OrgScope, Collaborator } from '../types'
 import './CollaboratorForm.css'
 
 interface CollaboratorFormProps {
@@ -20,6 +20,7 @@ export default function CollaboratorForm({
     name: collaborator?.name || '',
     position: collaborator?.position || '',
     area: collaborator?.area || '',
+    orgScopeId: collaborator?.orgScopeId || undefined,
     email: collaborator?.email || '',
     mfaEnabled: collaborator?.mfaEnabled || false,
     managerId: collaborator?.managerId || undefined,
@@ -41,24 +42,38 @@ export default function CollaboratorForm({
     }
   )
 
-  const { data: areas } = useQuery<Area[]>(
-    'areas',
+  const { data: orgScopes } = useQuery<OrgScope[]>(
+    'org-scopes',
     async () => {
-      const response = await api.get('/areas')
+      const response = await api.get('/org-scopes')
       return response.data
     },
     { retry: false }
   )
 
+  const areaScopes = (orgScopes || []).filter((s) => s.type === 'area')
+
+  useEffect(() => {
+    if (formData.orgScopeId || !formData.area || areaScopes.length === 0) return
+    const match = areaScopes.find((scope) => scope.name === formData.area)
+    if (match) {
+      setFormData((prev) => ({ ...prev, orgScopeId: match.id }))
+    }
+  }, [areaScopes, formData.area, formData.orgScopeId])
+
   const createAreaMutation = useMutation(
     async (name: string) => {
-      const response = await api.post('/areas', { name })
-      return response.data as Area
+      const response = await api.post('/org-scopes', { name, type: 'area' })
+      return response.data as { id: number }
     },
     {
-      onSuccess: (newArea) => {
-        queryClient.invalidateQueries('areas')
-        setFormData((prev) => ({ ...prev, area: newArea.name }))
+      onSuccess: (newScope, variables) => {
+        queryClient.invalidateQueries('org-scopes')
+        setFormData((prev) => ({
+          ...prev,
+          area: variables,
+          orgScopeId: newScope?.id || prev.orgScopeId,
+        }))
       },
       onError: (error: any) => {
         alert(error.response?.data?.error || 'Error al crear area')
@@ -105,7 +120,7 @@ export default function CollaboratorForm({
       newErrors.position = 'El cargo es requerido'
     }
 
-    if (!formData.area?.trim()) {
+    if (!formData.area?.trim() && !formData.orgScopeId) {
       newErrors.area = 'El area es requerida'
     }
 
@@ -131,6 +146,7 @@ export default function CollaboratorForm({
     const submitData = {
       ...formData,
       managerId: formData.managerId || undefined,
+      orgScopeId: formData.orgScopeId || undefined,
     }
 
     if (collaborator?.id) {
@@ -198,13 +214,19 @@ export default function CollaboratorForm({
                 <select
                   id="area"
                   value={formData.area || ''}
-                  onChange={(e) =>
-                    setFormData({ ...formData, area: e.target.value })
-                  }
+                  onChange={(e) => {
+                    const nextArea = e.target.value
+                    const scopeMatch = areaScopes.find((scope) => scope.name === nextArea)
+                    setFormData({
+                      ...formData,
+                      area: nextArea,
+                      orgScopeId: scopeMatch ? scopeMatch.id : undefined,
+                    })
+                  }}
                   className={errors.area ? 'error' : ''}
                 >
                   <option value="">Seleccione un area</option>
-                  {areas?.map((a) => (
+                  {areaScopes.map((a) => (
                     <option key={a.id} value={a.name}>
                       {a.name}
                     </option>

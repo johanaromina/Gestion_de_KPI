@@ -1,4 +1,4 @@
-import { KPIType } from '../types'
+import { KPIDirection, KPIType } from '../types'
 
 /**
  * Calcula la variación (porcentaje de cumplimiento) según el tipo de KPI
@@ -8,14 +8,21 @@ import { KPIType } from '../types'
  * @param customFormula Fórmula personalizada opcional (ej: "(actual / target) * 100")
  * @returns Porcentaje de cumplimiento (0-100+)
  */
+const resolveDirection = (value: KPIType | KPIDirection | string | undefined): KPIDirection => {
+  if (value === 'growth' || value === 'reduction' || value === 'exact') return value
+  if (value === 'sla') return 'reduction'
+  return 'growth'
+}
+
 export function calculateVariation(
-  type: KPIType,
+  typeOrDirection: KPIType | KPIDirection | string,
   target: number,
   actual: number,
   customFormula?: string
 ): number {
   const targetValue = Number(target)
   const actualValue = Number(actual)
+  const direction = resolveDirection(typeOrDirection)
 
   // Validaciones básicas
   if (!Number.isFinite(targetValue) || targetValue <= 0) {
@@ -37,7 +44,7 @@ export function calculateVariation(
   }
 
   // Fórmulas por defecto según tipo
-  switch (type) {
+  switch (direction) {
     case 'growth':
       // Crecimiento: (Actual / Target) * 100
       // Ejemplo: Target=100, Actual=120 → 120%

@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import api from '../services/api'
 import { CollaboratorKPI } from '../types'
+import { resolveDirection } from '../utils/kpi'
 import CollaboratorKPIForm from '../components/CollaboratorKPIForm'
 import CloseParrillaModal from '../components/CloseParrillaModal'
 import GenerateBaseGridModal from '../components/GenerateBaseGridModal'
@@ -22,9 +23,10 @@ export default function Asignaciones() {
   const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null)
   const [selectedCollaboratorId, setSelectedCollaboratorId] = useState<number | null>(null)
   const [selectedKPIId, setSelectedKPIId] = useState<number | null>(null)
-  const [selectedArea, setSelectedArea] = useState<string>('')
+  const [selectedScopeId, setSelectedScopeId] = useState<number | null>(null)
   const [selectedSubPeriodId, setSelectedSubPeriodId] = useState<number | null>(null)
   const [showMonthly, setShowMonthly] = useState(true)
+  const [compactView, setCompactView] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [showCloseModal, setShowCloseModal] = useState(false)
   const [closingCollaboratorId, setClosingCollaboratorId] = useState<number | null>(null)
@@ -46,10 +48,15 @@ export default function Asignaciones() {
 
   // Subperiodos del periodo seleccionado
   const { data: subPeriods } = useQuery<any[]>(
-    ['sub-periods', selectedPeriodId],
+    ['sub-periods', selectedPeriodId, selectedScopeId],
     async () => {
       if (!selectedPeriodId) return []
-      const res = await api.get(`/periods/${selectedPeriodId}/sub-periods`)
+      const scope = selectedScopeId ? orgScopes?.find((s: any) => s.id === selectedScopeId) : null
+      const res = await api.get(`/periods/${selectedPeriodId}/sub-periods`, {
+        params: {
+          calendarProfileId: scope?.calendarProfileId || undefined,
+        },
+      })
       return res.data
     },
     { enabled: !!selectedPeriodId }
@@ -61,19 +68,55 @@ export default function Asignaciones() {
     return response.data
   })
 
-  // KPIs
-  const selectedCollab = collaborators?.find((c: any) => c.id === selectedCollaboratorId)
-  const effectiveArea = selectedArea || selectedCollab?.area || ''
+  const { data: orgScopes } = useQuery('org-scopes', async () => {
+    const response = await api.get('/org-scopes')
+    return response.data
+  })
 
-  const { data: kpis } = useQuery(
-    ['kpis', effectiveArea],
+  const { data: calendarProfiles } = useQuery(
+    'calendar-profiles',
     async () => {
-      const response = await api.get('/kpis', {
-        params: effectiveArea ? { area: effectiveArea } : undefined,
-      })
+      const response = await api.get('/calendar-profiles')
+      return response.data
+    },
+    { staleTime: 5 * 60 * 1000 }
+  )
+
+  // KPIs
+  const { data: kpis } = useQuery(
+    ['kpis'],
+    async () => {
+      const response = await api.get('/kpis')
       return response.data
     }
   )
+
+  const calendarById = useMemo(() => {
+    const map = new Map<number, any>()
+    calendarProfiles?.forEach((profile: any) => map.set(profile.id, profile))
+    return map
+  }, [calendarProfiles])
+
+  const orgScopesById = useMemo(() => {
+    const map = new Map<number, any>()
+    orgScopes?.forEach((scope: any) => map.set(scope.id, scope))
+    return map
+  }, [orgScopes])
+
+  const collaboratorsById = useMemo(() => {
+    const map = new Map<number, any>()
+    collaborators?.forEach((c: any) => map.set(c.id, c))
+    return map
+  }, [collaborators])
+
+  const activeSubPeriodsLabel = useMemo(() => {
+    if (!subPeriods || subPeriods.length === 0) return 'Sin subperíodos activos.'
+    const active = subPeriods.filter((sp: any) => sp.status !== 'closed')
+    if (active.length === 0) return 'Sin subperíodos activos.'
+    return active
+      .map((sp: any) => `${sp.name}${sp.weight ? ` (${sp.weight}%)` : ''}`)
+      .join('\n')
+  }, [subPeriods])
 
   // Asignaciones
   const { data: assignments, isLoading } = useQuery<CollaboratorKPI[]>(
@@ -98,6 +141,34 @@ export default function Asignaciones() {
     {
       onSuccess: () => {
         queryClient.invalidateQueries('collaborator-kpis')
+      },
+    }
+  )
+
+  const closeAssignmentMutation = useMutation(
+    async (id: number) => {
+      await api.post(`/collaborator-kpis/${id}/close`)
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('collaborator-kpis')
+      },
+      onError: (error: any) => {
+        alert(error?.response?.data?.error || 'No se pudo cerrar la asignación')
+      },
+    }
+  )
+
+  const reopenAssignmentMutation = useMutation(
+    async (id: number) => {
+      await api.post(`/collaborator-kpis/${id}/reopen`)
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('collaborator-kpis')
+      },
+      onError: (error: any) => {
+        alert(error?.response?.data?.error || 'No se pudo reabrir la asignación')
       },
     }
   )
@@ -131,6 +202,24 @@ export default function Asignaciones() {
     }
   }
 
+  const handleCloseAssignment = (assignment: CollaboratorKPI) => {
+    if (isAssignmentClosed(assignment)) return
+    if (
+      window.confirm(
+        `¿Cerrar este KPI para el período? Se bloquearán ediciones sobre esta asignación.`
+      )
+    ) {
+      closeAssignmentMutation.mutate(assignment.id)
+    }
+  }
+
+  const handleReopenAssignment = (assignment: CollaboratorKPI) => {
+    if (!isAssignmentClosed(assignment)) return
+    if (window.confirm('¿Reabrir este KPI? Volverá a ser editable.')) {
+      reopenAssignmentMutation.mutate(assignment.id)
+    }
+  }
+
   const handleCloseParrilla = () => {
     if (!selectedPeriodId) {
       alert('Selecciona un período primero')
@@ -144,6 +233,14 @@ export default function Asignaciones() {
     assignment.status === 'closed' || (assignment as any).periodStatus === 'closed'
 
   const canEditAssignment = (assignment: CollaboratorKPI) => !isAssignmentClosed(assignment)
+
+  const canCloseAssignment = (assignment: CollaboratorKPI) =>
+    !isAssignmentClosed(assignment) &&
+    assignment.status !== 'proposed'
+
+  const canReopenAssignment = (assignment: CollaboratorKPI) =>
+    isAssignmentClosed(assignment) &&
+    assignment.status === 'closed'
 
   const getStatusBadge = (status: CollaboratorKPI['status']) => {
     const statusConfig = {
@@ -191,12 +288,31 @@ export default function Asignaciones() {
     return label
   }
 
-  // Áreas únicas
-  const areas: string[] = Array.from(
-    new Set<string>((collaborators?.map((c: any) => c.area).filter(Boolean) as string[]) || [])
-  ).sort()
-  const collaboratorsInArea = selectedArea
-    ? collaborators?.filter((c: any) => c.area === selectedArea)
+  const buildScopeLabel = (scope: any): string => {
+    const parts: string[] = []
+    let current = scope
+    let safety = 0
+    while (current && safety < 6) {
+      parts.unshift(current.name)
+      current = current.parentId ? orgScopesById.get(current.parentId) : null
+      safety += 1
+    }
+    return parts.join(' > ')
+  }
+
+  const areaScopes = (orgScopes || [])
+    .filter((scope: any) => scope.type === 'area' && scope.active !== 0 && scope.active !== false)
+    .map((scope: any) => ({ ...scope, label: buildScopeLabel(scope) }))
+    .sort((a: any, b: any) => String(a.label).localeCompare(String(b.label)))
+
+  const selectedScope = selectedScopeId ? orgScopesById.get(selectedScopeId) : null
+  const selectedScopeName = selectedScope?.name || ''
+
+  const collaboratorsInScope = selectedScopeId
+    ? collaborators?.filter(
+        (c: any) =>
+          c.orgScopeId === selectedScopeId || (!c.orgScopeId && c.area === selectedScopeName)
+      )
     : collaborators
 
   // Filtro local
@@ -210,9 +326,13 @@ export default function Asignaciones() {
         ? true
         : (assignment as any).subPeriodId === selectedSubPeriodId
     const matchesShowMonthly = showMonthly || (assignment as any).subPeriodId === null
-    const matchesArea =
-      !selectedArea ||
-      collaborators?.find((c: any) => c.id === assignment.collaboratorId)?.area === selectedArea
+    const matchesScope = (() => {
+      if (!selectedScopeId) return true
+      const collaborator = collaborators?.find((c: any) => c.id === assignment.collaboratorId)
+      if (!collaborator) return false
+      if (collaborator.orgScopeId) return collaborator.orgScopeId === selectedScopeId
+      return collaborator.area === selectedScopeName
+    })()
     const matchesSearch =
       !searchTerm ||
       (collaborators?.find((c: any) => c.id === assignment.collaboratorId)?.name || '')
@@ -226,7 +346,7 @@ export default function Asignaciones() {
       matchesCollaborator &&
       matchesPeriod &&
       matchesKPI &&
-      matchesArea &&
+      matchesScope &&
       matchesSearch &&
       matchesSubPeriod &&
       matchesShowMonthly
@@ -260,14 +380,18 @@ export default function Asignaciones() {
 
   const growthReductionTotals = dueMonthlyAssignments.reduce<Record<
     number,
-    { name: string; type: string; total: number }
+    { name: string; direction: string; total: number }
   >>((acc, a) => {
-    const type = (a as any).kpiType
-    if (type !== 'growth' && type !== 'reduction') return acc
+    const direction = resolveDirection(
+      (a as any).assignmentDirection,
+      (a as any).kpiDirection,
+      (a as any).kpiType
+    )
+    if (direction !== 'growth' && direction !== 'reduction') return acc
     const key = a.kpiId
     const current = acc[key] || {
       name: (a as any).kpiName || `KPI #${a.kpiId}`,
-      type,
+      direction,
       total: 0,
     }
     const actualVal = toNumber(a.actual) || 0
@@ -335,7 +459,7 @@ export default function Asignaciones() {
             className="filter-select"
           >
             <option value="">Todos</option>
-            {collaboratorsInArea?.map((collaborator: any) => (
+            {collaboratorsInScope?.map((collaborator: any) => (
               <option key={collaborator.id} value={collaborator.id}>
                 {collaborator.name}
               </option>
@@ -361,24 +485,27 @@ export default function Asignaciones() {
         </div>
 
         <div className="filter-group">
-          <label htmlFor="area-filter">Área:</label>
+          <label htmlFor="scope-filter">Scope:</label>
           <select
-            id="area-filter"
-            value={selectedArea}
-            onChange={(e) => setSelectedArea(e.target.value)}
+            id="scope-filter"
+            value={selectedScopeId || ''}
+            onChange={(e) => setSelectedScopeId(e.target.value ? parseInt(e.target.value, 10) : null)}
             className="filter-select"
           >
-            <option value="">Todas</option>
-            {areas.map((area) => (
-              <option key={area} value={area}>
-                {area}
+            <option value="">Todos</option>
+            {areaScopes.map((scope: any) => (
+              <option key={scope.id} value={scope.id}>
+                {scope.label}
               </option>
             ))}
           </select>
         </div>
 
         <div className="filter-group">
-          <label htmlFor="subperiod-filter">Subperiodo:</label>
+          <label htmlFor="subperiod-filter">
+            Subperiodo:
+            <span className="info-icon" title={activeSubPeriodsLabel}>ℹ</span>
+          </label>
           <select
             id="subperiod-filter"
             value={selectedSubPeriodId ?? ''}
@@ -404,11 +531,20 @@ export default function Asignaciones() {
             title="Mostrar/ocultar asignaciones por subperiodo"
           />
         </div>
+        <div className="filter-group toggle-group">
+          <label>Vista compacta:</label>
+          <input
+            type="checkbox"
+            checked={compactView}
+            onChange={(e) => setCompactView(e.target.checked)}
+            title="Oculta columnas secundarias para evitar scroll horizontal"
+          />
+        </div>
 
         {(selectedPeriodId ||
           selectedCollaboratorId ||
           selectedKPIId ||
-          selectedArea ||
+          selectedScopeId ||
           searchTerm ||
           selectedSubPeriodId !== null ||
           showMonthly) && (
@@ -418,7 +554,7 @@ export default function Asignaciones() {
               setSelectedPeriodId(null)
               setSelectedCollaboratorId(null)
               setSelectedKPIId(null)
-              setSelectedArea('')
+              setSelectedScopeId(null)
               setSearchTerm('')
               setSelectedSubPeriodId(null)
               setShowMonthly(false)
@@ -465,7 +601,7 @@ export default function Asignaciones() {
         </div>
       )}
 
-      <div className="table-container">
+      <div className={`table-container ${compactView ? 'compact' : ''}`}>
         {isLoading ? (
           <div className="loading">Cargando asignaciones...</div>
         ) : filteredAssignments && filteredAssignments.length > 0 ? (
@@ -473,39 +609,53 @@ export default function Asignaciones() {
             <div className="results-info">
               Mostrando {filteredAssignments.length} de {assignments?.length || 0} asignaciones
             </div>
-            <table className="data-table">
+            <table className={`data-table ${compactView ? 'compact' : ''}`}>
               <thead>
                 <tr>
-                  <th>ID</th>
+                  <th className="col-id">ID</th>
                   <th>Colaborador</th>
                   <th>KPI</th>
                   <th>Período</th>
-                  <th>Subperiodo</th>
+                  <th className="col-subperiod">Subperiodo</th>
                   <th>Target</th>
                   <th>Actual</th>
-                  <th>Peso</th>
+                  <th className="col-peso">Peso</th>
                   <th>Variación</th>
                   <th>Estado</th>
                   <th>Curaduría</th>
                   <th>Input</th>
-                  <th>Última medición</th>
-                  <th>Comentarios</th>
+                  <th className="col-last">Última medición</th>
+                  <th className="col-comments">Comentarios</th>
                   <th className="actions-column">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredAssignments.map((assignment) => {
                   const totalWeight = getTotalWeightByCollaborator(assignment.collaboratorId, assignment.periodId)
+                  const collaborator = collaboratorsById.get(assignment.collaboratorId)
+                  const scopeFromCollaborator = collaborator?.orgScopeId
+                    ? orgScopesById.get(collaborator.orgScopeId)
+                    : null
+                  const fallbackCalendarId = scopeFromCollaborator?.calendarProfileId || null
+                  const calendarProfileId = assignment.calendarProfileId || fallbackCalendarId
+                  const calendarProfile = calendarProfileId ? calendarById.get(calendarProfileId) : null
                   return (
                     <tr key={assignment.id}>
-                      <td>{assignment.id}</td>
+                      <td className="col-id">{assignment.id}</td>
                       <td className="name-cell">
                         {collaborators?.find((c: any) => c.id === assignment.collaboratorId)?.name ||
                           `Colaborador #${assignment.collaboratorId}`}
                       </td>
                       <td>{(assignment as any).kpiName || `KPI #${assignment.kpiId}`}</td>
-                      <td>{(assignment as any).periodName || `Período #${assignment.periodId}`}</td>
                       <td>
+                        {(assignment as any).periodName || `Período #${assignment.periodId}`}
+                        {calendarProfile && (
+                          <div className="calendar-pill" title={`Calendario: ${calendarProfile.name}`}>
+                            {calendarProfile.name}
+                          </div>
+                        )}
+                      </td>
+                      <td className="col-subperiod">
                         {(assignment as any).subPeriodName
                           ? (assignment as any).subPeriodName
                           : (assignment as any).subPeriodId
@@ -520,7 +670,7 @@ export default function Asignaciones() {
                           ? toNumber(assignment.actual)
                           : '-'}
                       </td>
-                      <td className="number-cell">
+                      <td className="number-cell col-peso">
                         {toNumber(assignment.weight) ?? assignment.weight}%
                         {totalWeight !== 100 && (
                           <span
@@ -548,8 +698,8 @@ export default function Asignaciones() {
                         {getCurationBadge(assignment)}
                       </td>
                       <td>{getInputBadge(assignment.inputMode)}</td>
-                      <td className="measurement-cell">{formatMeasurement(assignment)}</td>
-                      <td className="comments-cell">
+                      <td className="measurement-cell col-last">{formatMeasurement(assignment)}</td>
+                      <td className="comments-cell col-comments">
                         {assignment.comments ? (
                           <span className="comments-text" title={assignment.comments}>
                             {assignment.comments.length > 50
@@ -598,12 +748,30 @@ export default function Asignaciones() {
                               <button className="btn-icon" onClick={() => handleDelete(assignment.id)} title="Eliminar">
                                 Eliminar
                               </button>
+                              {canCloseAssignment(assignment) && (
+                                <button
+                                  className="btn-icon"
+                                  onClick={() => handleCloseAssignment(assignment)}
+                                  title="Cerrar KPI"
+                                >
+                                  Cerrar KPI
+                                </button>
+                              )}
                             </>
                           )}
                           {!canEditAssignment(assignment) && assignment.status !== 'proposed' && (
                             <span className="locked-badge" title="Parrilla cerrada - No se puede editar">
                               Cerrada
                             </span>
+                          )}
+                          {canReopenAssignment(assignment) && (
+                            <button
+                              className="btn-icon"
+                              onClick={() => handleReopenAssignment(assignment)}
+                              title="Reabrir KPI"
+                            >
+                              Reabrir KPI
+                            </button>
                           )}
                           <button
                             className="btn-icon"

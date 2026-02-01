@@ -35,6 +35,7 @@ export default function Layout({ children }: LayoutProps) {
         '/arbol-objetivos',
         '/parrilla-general',
         '/configuracion',
+        '/seguridad',
         '/consolidado',
         '/auditoria',
       ]
@@ -198,15 +199,26 @@ export default function Layout({ children }: LayoutProps) {
           )}
 
           {canConfig && !isCollaborator && (
-            <Link
-              to="/configuracion"
-              className={`nav-item ${isActive('/configuracion') ? 'active' : ''}`}
-            >
-              <span className="nav-icon" aria-hidden="true">
-                &gt;
-              </span>
-              Configuracion
-            </Link>
+            <>
+              <Link
+                to="/configuracion"
+                className={`nav-item ${isActive('/configuracion') ? 'active' : ''}`}
+              >
+                <span className="nav-icon" aria-hidden="true">
+                  &gt;
+                </span>
+                Configuracion
+              </Link>
+              <Link
+                to="/seguridad"
+                className={`nav-item ${isActive('/seguridad') ? 'active' : ''}`}
+              >
+                <span className="nav-icon" aria-hidden="true">
+                  &gt;
+                </span>
+                Seguridad
+              </Link>
+            </>
           )}
         </nav>
         <div className="sidebar-footer">

@@ -11,9 +11,14 @@ import {
   createTarget,
   updateTarget,
   listTemplateRuns,
+  archiveRun,
+  deleteRun,
+  archiveRuns,
+  deleteRuns,
   runTemplate,
   runTarget,
   testTemplate,
+  getNextCronRun,
   listIntegrations,
   getIntegrationById,
   createIntegration,
@@ -34,7 +39,12 @@ router.post('/templates', requirePermission('config.manage'), createTemplate)
 router.put('/templates/:id', requirePermission('config.manage'), updateTemplate)
 router.post('/templates/:id/run', requirePermission('measurement_run_ingest', 'config.manage'), runTemplate)
 router.get('/runs', requirePermission('config.view', 'config.manage', 'measurement_read'), listTemplateRuns)
+router.patch('/runs/:id/archive', requirePermission('config.manage'), archiveRun)
+router.delete('/runs/:id', requirePermission('config.manage'), deleteRun)
+router.post('/runs/archive', requirePermission('config.manage'), archiveRuns)
+router.post('/runs/delete', requirePermission('config.manage'), deleteRuns)
 router.post('/templates/test', requirePermission('config.manage'), testTemplate)
+router.get('/cron/next', requirePermission('config.manage'), getNextCronRun)
 
 // Targets
 router.get('/targets', requirePermission('config.view', 'config.manage'), listTargets)

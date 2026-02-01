@@ -15,6 +15,7 @@ interface CollaboratorKPI {
   collaboratorId: number
   kpiId: number
   periodId: number
+  calendarProfileId?: number | null
   subPeriodId?: number
   target: number
   actual?: number
@@ -27,6 +28,7 @@ interface CollaboratorKPI {
   evidenceUrl?: string
   curatorAssignee?: string
   curationStatus?: 'pending' | 'in_review' | 'approved' | 'rejected'
+  inputMode?: 'manual' | 'import' | 'auto'
   createCriteriaVersion?: boolean
 }
 
@@ -49,22 +51,26 @@ export default function CollaboratorKPIForm({
     collaboratorId: assignment?.collaboratorId || collaboratorId || 0,
     kpiId: assignment?.kpiId || 0,
     periodId: assignment?.periodId || periodId,
+    calendarProfileId: (assignment as any)?.calendarProfileId ?? null,
     subPeriodId: assignment?.subPeriodId,
     target: assignment?.target ?? 0,
     actual: assignment?.actual,
     weight: assignment?.weight ?? 0,
     status: assignment?.status || 'draft',
     comments: assignment?.comments || '',
-    dataSource: assignment?.dataSource,
+    dataSource: assignment?.dataSource || 'Manual',
     sourceConfig: assignment?.sourceConfig || '',
     criteriaText: assignment?.criteriaText || '',
     evidenceUrl: assignment?.evidenceUrl || '',
-    curatorAssignee: assignment?.curatorAssignee || 'Gise',
+    curatorAssignee: assignment?.curatorAssignee || 'Data Curator',
     curationStatus: assignment?.curationStatus || 'pending',
+    inputMode: assignment?.inputMode || 'manual',
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [criteriaDirty, setCriteriaDirty] = useState(false)
+  const [weightDirty, setWeightDirty] = useState(false)
+  const [criteriaPrefilled, setCriteriaPrefilled] = useState(false)
 
   const queryClient = useQueryClient()
   const { user } = useAuth()
@@ -83,13 +89,78 @@ export default function CollaboratorKPIForm({
 
   const selectedCollaborator = collaborators?.find((c: any) => c.id === formData.collaboratorId)
   const collaboratorArea = selectedCollaborator?.area
+  const [selectedScopeId, setSelectedScopeId] = useState<number | null>(null)
+
+  const { data: orgScopes } = useQuery('org-scopes', async () => {
+    const response = await api.get('/org-scopes')
+    return response.data
+  })
+
+  const { data: calendarProfiles } = useQuery(
+    'calendar-profiles',
+    async () => {
+      const response = await api.get('/calendar-profiles')
+      return response.data
+    },
+    { staleTime: 5 * 60 * 1000 }
+  )
+
+  const scopesById = useMemo(() => {
+    const map = new Map<number, any>()
+    orgScopes?.forEach((scope: any) => map.set(scope.id, scope))
+    return map
+  }, [orgScopes])
+
+  const buildScopeLabel = (scope: any): string => {
+    const parts: string[] = []
+    let current = scope
+    let safety = 0
+    while (current && safety < 6) {
+      parts.unshift(current.name)
+      current = current.parentId ? scopesById.get(current.parentId) : null
+      safety += 1
+    }
+    return parts.join(' > ')
+  }
+
+  const areaScopes = (orgScopes || [])
+    .filter((scope: any) => scope.type === 'area' && scope.active !== 0 && scope.active !== false)
+    .map((scope: any) => ({ ...scope, label: buildScopeLabel(scope) }))
+    .sort((a: any, b: any) => String(a.label).localeCompare(String(b.label)))
+
+  const selectedScope = selectedScopeId ? scopesById.get(selectedScopeId) : null
+  const selectedScopeName = selectedScope?.name || ''
+  const selectedCalendarProfileId = selectedScope?.calendarProfileId || null
+  const selectedCalendarProfile = useMemo(() => {
+    if (!calendarProfiles || !selectedCalendarProfileId) return null
+    return calendarProfiles.find((profile: any) => Number(profile.id) === Number(selectedCalendarProfileId)) || null
+  }, [calendarProfiles, selectedCalendarProfileId])
+
+  const collaboratorsByScope = useMemo(() => {
+    if (!collaborators) return []
+    if (!selectedScopeId) return collaborators
+    return collaborators.filter(
+      (c: any) => c.orgScopeId === selectedScopeId || (!c.orgScopeId && c.area === selectedScopeName)
+    )
+  }, [collaborators, selectedScopeId, selectedScopeName])
+
+  useEffect(() => {
+    if (selectedScopeId) return
+    if (selectedCollaborator?.orgScopeId) {
+      setSelectedScopeId(selectedCollaborator.orgScopeId)
+      return
+    }
+    if (!collaboratorArea) return
+    const scopeMatch = areaScopes.find((scope) => scope.name === collaboratorArea)
+    if (scopeMatch) {
+      setSelectedScopeId(scopeMatch.id)
+    }
+  }, [selectedScopeId, selectedCollaborator?.orgScopeId, collaboratorArea, areaScopes])
 
   const { data: kpis } = useQuery(
-    ['kpis', collaboratorArea],
+    ['kpis'],
     async () => {
-      const response = await api.get('/kpis', {
-        params: collaboratorArea ? { area: collaboratorArea } : undefined,
-      })
+      const response = await api.get('/kpis')
       return response.data
     },
     {
@@ -98,22 +169,83 @@ export default function CollaboratorKPIForm({
     }
   )
 
+  const selectedKpi = useMemo(() => {
+    if (!kpis || !formData.kpiId) return null
+    return kpis.find((k: any) => k.id === formData.kpiId) || null
+  }, [kpis, formData.kpiId])
+
+  const scopeWeightForSelection = useMemo(() => {
+    if (!selectedKpi || !selectedScopeId) return null
+    const scopeWeights = selectedKpi.scopeWeights || []
+    return scopeWeights.find((entry: any) => Number(entry.scopeId) === Number(selectedScopeId)) || null
+  }, [selectedKpi, selectedScopeId])
+
+  useEffect(() => {
+    if (!formData.kpiId || !selectedKpi) return
+    const nextDataSource = formData.dataSource || selectedKpi.defaultDataSource || 'Manual'
+    const kpiCriteria = selectedKpi.criteria || selectedKpi.defaultCriteriaTemplate || ''
+
+    if (!assignment?.id) {
+      if (!formData.dataSource || formData.dataSource === 'Manual') {
+        setFormData((prev) => ({
+          ...prev,
+          dataSource: nextDataSource,
+        }))
+      }
+    }
+
+    if (!criteriaDirty && !formData.criteriaText?.trim() && kpiCriteria) {
+      setFormData((prev) => ({
+        ...prev,
+        criteriaText: kpiCriteria,
+      }))
+      setCriteriaPrefilled(true)
+    }
+  }, [assignment?.id, formData.kpiId, selectedKpi, formData.dataSource, formData.criteriaText, criteriaDirty])
+
   useEffect(() => {
     if (assignment?.id) return
-    if (!formData.kpiId || !kpis) return
-    const selected = kpis.find((k: any) => k.id === formData.kpiId)
-    if (!selected) return
+    if (!selectedScopeId || !selectedKpi) return
+    if (weightDirty) return
+    const match = scopeWeightForSelection
+    if (!match) return
+    if (Number(formData.weight || 0) > 0) return
     setFormData((prev) => ({
       ...prev,
-      dataSource: prev.dataSource || selected.defaultDataSource || '',
-      criteriaText: prev.criteriaText || selected.defaultCriteriaTemplate || '',
+      weight: Number(match.weight) || 0,
     }))
-  }, [assignment?.id, formData.kpiId, kpis])
+  }, [assignment?.id, selectedScopeId, selectedKpi, formData.weight, weightDirty, scopeWeightForSelection])
+
+  useEffect(() => {
+    if (!selectedScopeId) return
+    setFormData((prev) => ({
+      ...prev,
+      calendarProfileId: selectedCalendarProfileId,
+    }))
+  }, [selectedScopeId, selectedCalendarProfileId])
+
+  useEffect(() => {
+    if (assignment?.id) return
+    if (!selectedScopeId) return
+    if (!formData.collaboratorId) return
+    const collaborator = collaborators?.find((c: any) => c.id === formData.collaboratorId)
+    if (collaborator?.orgScopeId && collaborator.orgScopeId !== selectedScopeId) {
+      setFormData((prev) => ({ ...prev, collaboratorId: 0, kpiId: 0 }))
+      return
+    }
+    if (!collaborator?.orgScopeId && collaborator?.area && collaborator.area !== selectedScopeName) {
+      setFormData((prev) => ({ ...prev, collaboratorId: 0, kpiId: 0 }))
+    }
+  }, [assignment?.id, selectedScopeId, selectedScopeName, formData.collaboratorId, collaborators])
 
   const { data: subPeriods } = useQuery(
-    ['sub-periods', periodId],
+    ['sub-periods', periodId, selectedCalendarProfileId],
     async () => {
-      const response = await api.get(`/periods/${periodId}/sub-periods`)
+      const response = await api.get(`/periods/${periodId}/sub-periods`, {
+        params: {
+          calendarProfileId: selectedCalendarProfileId || undefined,
+        },
+      })
       return response.data
     },
     { enabled: !!periodId }
@@ -139,6 +271,11 @@ export default function CollaboratorKPIForm({
     [user]
   )
   const canEditPlan = canConfig && !isReadOnlyCollaborator
+  const canOverrideWeight =
+    user?.role === 'admin' ||
+    user?.role === 'director' ||
+    user?.permissions?.includes('curation.manage') ||
+    user?.permissions?.includes('config.manage')
 
   const { data: existingAssignments } = useQuery(
     ['collaborator-kpis', formData.collaboratorId, periodId],
@@ -175,6 +312,7 @@ export default function CollaboratorKPIForm({
         collaboratorId: assignment.collaboratorId,
         kpiId: assignment.kpiId,
         periodId: assignment.periodId,
+        calendarProfileId: (assignment as any).calendarProfileId ?? formData.calendarProfileId ?? null,
         subPeriodId: data.subPeriodId,
         target: assignment.target ?? 0,
         weight: assignment.weight ?? 0,
@@ -187,6 +325,7 @@ export default function CollaboratorKPIForm({
         evidenceUrl: data.evidenceUrl,
         curatorAssignee: data.curatorAssignee,
         curationStatus: data.curationStatus,
+        inputMode: data.inputMode,
         createCriteriaVersion: data.createCriteriaVersion,
       }
       const response = await api.put(`/collaborator-kpis/${assignment.id}`, payload)
@@ -201,6 +340,40 @@ export default function CollaboratorKPIForm({
     }
   )
 
+  const closeAssignmentMutation = useMutation(
+    async () => {
+      if (!assignment?.id) return
+      await api.post(`/collaborator-kpis/${assignment.id}/close`)
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('collaborator-kpis')
+        onSuccess?.()
+        onClose()
+      },
+      onError: (error: any) => {
+        alert(error?.response?.data?.error || 'No se pudo cerrar la asignación')
+      },
+    }
+  )
+
+  const reopenAssignmentMutation = useMutation(
+    async () => {
+      if (!assignment?.id) return
+      await api.post(`/collaborator-kpis/${assignment.id}/reopen`)
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('collaborator-kpis')
+        onSuccess?.()
+        onClose()
+      },
+      onError: (error: any) => {
+        alert(error?.response?.data?.error || 'No se pudo reabrir la asignación')
+      },
+    }
+  )
+
   const calculateTotalWeight = (): number => {
     if (!existingAssignments) return toNumber(formData.weight)
 
@@ -210,6 +383,12 @@ export default function CollaboratorKPIForm({
   }
 
   const isAssignmentClosed = assignment?.status === 'closed'
+  const canCloseAssignment =
+    Boolean(assignment?.id) && !isAssignmentClosed && !isReadOnlyCollaborator
+  const canReopenAssignment =
+    Boolean(assignment?.id) &&
+    isAssignmentClosed &&
+    (user?.role === 'admin' || user?.role === 'director' || user?.hasSuperpowers)
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {}
@@ -301,28 +480,56 @@ export default function CollaboratorKPIForm({
     { enabled: shouldLoadPlan }
   )
 
-  type PlanRow = { subPeriodId: number; name: string; target: number | ''; weight: number | '' }
+  type PlanRow = {
+    subPeriodId: number
+    name: string
+    target: number | ''
+    weightOverride: number | ''
+    subPeriodWeight: number
+    actual: number | ''
+  }
   const [planRows, setPlanRows] = useState<PlanRow[]>([])
   const [planErrors, setPlanErrors] = useState<string | null>(null)
+  const [weightOverrideEnabled, setWeightOverrideEnabled] = useState(false)
 
   useEffect(() => {
     if (!subPeriods || !Array.isArray(subPeriods)) return
-    const planMap = new Map<number, { target: number; weight: number }>()
+    const planMap = new Map<number, { target: number; weightOverride: number | null }>()
     if (Array.isArray(planData)) {
       for (const p of planData) {
-        planMap.set(p.subPeriodId, { target: Number(p.target ?? 0), weight: Number(p.weight ?? 0) })
+        planMap.set(p.subPeriodId, {
+          target: Number(p.target ?? 0),
+          weightOverride: p.weightOverride !== null && p.weightOverride !== undefined ? Number(p.weightOverride) : null,
+        })
       }
     }
-    const merged = subPeriods.map((sp: any) => ({
-      subPeriodId: sp.id,
-      name: sp.name,
-      target: planMap.get(sp.id)?.target ?? '',
-      weight: planMap.get(sp.id)?.weight ?? '',
-    }))
-    setPlanRows(merged as any)
-  }, [planData, subPeriods])
+    const totalWeight = subPeriods.reduce((acc: number, sp: any) => acc + Number(sp.weight || 0), 0)
+    const useUniform = totalWeight < 99.5 || totalWeight > 100.5
+    const uniformWeight = subPeriods.length > 0 ? 100 / subPeriods.length : 0
 
-  const planWeightTotal = planRows.reduce((acc, r) => acc + (Number(r.weight) || 0), 0)
+    const merged = subPeriods.map((sp: any) => {
+      const plan = planMap.get(sp.id)
+      const subPeriodWeight = useUniform ? uniformWeight : Number(sp.weight || 0)
+      const actualValue =
+        existingAssignments?.find(
+          (a: any) => a.kpiId === formData.kpiId && a.subPeriodId === sp.id
+        )?.actual ?? ''
+      return {
+        subPeriodId: sp.id,
+        name: sp.name,
+        target: plan?.target ?? '',
+        weightOverride: plan?.weightOverride ?? '',
+        subPeriodWeight,
+        actual: actualValue === null || actualValue === undefined ? '' : Number(actualValue),
+      }
+    })
+    setPlanRows(merged as any)
+  }, [planData, subPeriods, existingAssignments, formData.kpiId])
+
+  const planWeightTotal = planRows.reduce((acc, r) => acc + (Number(r.subPeriodWeight) || 0), 0)
+  const planTargetTotal = planRows.reduce((acc, r) => acc + (Number(r.target) || 0), 0)
+  const planActualTotal = planRows.reduce((acc, r) => acc + (Number(r.actual) || 0), 0)
+  const planProgressTotal = planTargetTotal > 0 ? (planActualTotal / planTargetTotal) * 100 : 0
 
   const upsertPlanMutation = useMutation(
     async (items: PlanRow[]) => {
@@ -330,7 +537,7 @@ export default function CollaboratorKPIForm({
         items: items.map((r) => ({
           subPeriodId: r.subPeriodId,
           target: Number(r.target) || 0,
-          weight: Number(r.weight) || 0,
+          weightOverride: weightOverrideEnabled ? Number(r.weightOverride) || null : null,
         })),
       }
       return api.post(
@@ -358,7 +565,6 @@ export default function CollaboratorKPIForm({
     setFormData((prev) => ({
       ...prev,
       target: row.target !== '' ? Number(row.target) : prev.target,
-      weight: row.weight !== '' ? Number(row.weight) : prev.weight,
     }))
   }, [assignment?.id, formData.subPeriodId, planRows])
 
@@ -366,7 +572,10 @@ export default function CollaboratorKPIForm({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{assignment?.id ? 'Editar Asignación de KPI' : 'Asignar KPI a Colaborador'}</h2>
+          <div>
+            <h2>{assignment?.id ? 'Editar Asignación de KPI' : 'Asignar KPI a Colaborador'}</h2>
+            <p className="modal-subtitle">Completa en orden: Scope → Colaborador → KPI → Target.</p>
+          </div>
           <button className="close-button" onClick={onClose}>
             ×
           </button>
@@ -389,29 +598,73 @@ export default function CollaboratorKPIForm({
         )}
 
         <form onSubmit={handleSubmit} className="collaborator-kpi-form">
-          <div className="form-row">
+          <div className="form-section-title">1) Selección base</div>
+          <div className="form-row form-row-3">
+            <div className="form-group">
+              <label htmlFor="scopeId">Scope *</label>
+              <select
+                id="scopeId"
+                value={selectedScopeId || ''}
+                onChange={(e) => {
+                  const nextScopeId = e.target.value ? Number(e.target.value) : null
+                  setSelectedScopeId(nextScopeId)
+                  setFormData((prev) => ({
+                    ...prev,
+                    collaboratorId: nextScopeId ? 0 : prev.collaboratorId,
+                    kpiId: nextScopeId ? 0 : prev.kpiId,
+                  }))
+                }}
+                disabled={!!assignment?.id || isReadOnlyCollaborator}
+              >
+                <option value="">Seleccione un scope</option>
+                {areaScopes.map((scope) => (
+                  <option key={scope.id} value={scope.id}>
+                    {scope.label}
+                  </option>
+                ))}
+              </select>
+              <small className="form-hint">Esto filtra colaboradores disponibles.</small>
+              {selectedCalendarProfile && (
+                <div className="calendar-pill">
+                  Calendario: {selectedCalendarProfile.name} ({selectedCalendarProfile.frequency})
+                </div>
+              )}
+            </div>
             <div className="form-group">
               <label htmlFor="collaboratorId">Colaborador *</label>
               <select
                 id="collaboratorId"
                 value={formData.collaboratorId}
                 onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    collaboratorId: parseInt(e.target.value),
-                  })
+                  {
+                    const nextId = parseInt(e.target.value)
+                    const nextCollaborator = collaborators?.find((c: any) => c.id === nextId)
+                    if (nextCollaborator?.orgScopeId) {
+                      setSelectedScopeId(nextCollaborator.orgScopeId)
+                    } else if (nextCollaborator?.area) {
+                      const scopeMatch = areaScopes.find((scope) => scope.name === nextCollaborator.area)
+                      if (scopeMatch) {
+                        setSelectedScopeId(scopeMatch.id)
+                      }
+                    }
+                    setFormData({
+                      ...formData,
+                      collaboratorId: nextId,
+                    })
+                  }
                 }
                 disabled={!!assignment?.id || !!collaboratorId || isPeriodClosed || isReadOnlyCollaborator}
                 className={errors.collaboratorId ? 'error' : ''}
               >
                 <option value="0">Seleccione un colaborador</option>
-                {collaborators?.map((c: any) => (
+                {collaboratorsByScope?.map((c: any) => (
                   <option key={c.id} value={c.id}>
                     {c.name} - {c.position}
                   </option>
                 ))}
               </select>
               {errors.collaboratorId && <span className="error-message">{errors.collaboratorId}</span>}
+              <small className="form-hint">Selecciona un colaborador del scope.</small>
             </div>
 
             <div className="form-group">
@@ -436,11 +689,25 @@ export default function CollaboratorKPIForm({
                 ))}
               </select>
               {errors.kpiId && <span className="error-message">{errors.kpiId}</span>}
+              <small className="form-hint">Los KPIs se aplican por asignación, no por área.</small>
             </div>
           </div>
 
           {subPeriods && subPeriods.length > 0 && (
-            <div className="form-group">
+            <>
+              <div className="form-section-title">2) Periodo y subperiodo</div>
+              <div className="calendar-timeline">
+                {subPeriods.map((sp: any) => (
+                  <span
+                    key={sp.id}
+                    className={`calendar-chip ${sp.status === 'closed' ? 'closed' : 'open'}`}
+                    title={`${sp.name}${sp.weight ? ` · ${sp.weight}%` : ''}`}
+                  >
+                    {sp.name}
+                  </span>
+                ))}
+              </div>
+              <div className="form-group">
               <label htmlFor="subPeriodId">Subperiodo (opcional)</label>
               <select
                 id="subPeriodId"
@@ -460,12 +727,15 @@ export default function CollaboratorKPIForm({
                   </option>
                 ))}
               </select>
-            </div>
+              </div>
+            </>
           )}
 
           {!assignment?.id && (
-            <div className="form-row">
-              <div className="form-group">
+            <>
+              <div className="form-section-title">3) Target y ponderación</div>
+              <div className="form-row">
+                <div className="form-group">
                 <label htmlFor="target">Target *</label>
                 <input
                   type="number"
@@ -495,17 +765,29 @@ export default function CollaboratorKPIForm({
                   max="100"
                   step="0.01"
                   value={formData.weight || ''}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    setWeightDirty(true)
                     setFormData({
                       ...formData,
                       weight: parseFloat(e.target.value) || 0,
                     })
-                  }
+                  }}
                   className={errors.weight ? 'error' : ''}
                   placeholder="Ej: 25.00"
                   disabled={isReadOnlyCollaborator}
                 />
                 {errors.weight && <span className="error-message">{errors.weight}</span>}
+                {!assignment?.id && selectedKpi && selectedScopeId && !scopeWeightForSelection && (
+                  <small className="form-hint warning">
+                    No hay ponderación definida para este KPI en el scope seleccionado. Definila en KPIs para que se
+                    precargue automáticamente.
+                  </small>
+                )}
+                {!assignment?.id && scopeWeightForSelection && !weightDirty && (
+                  <small className="form-hint">
+                    Ponderación precargada desde KPI por scope.
+                  </small>
+                )}
                 <div className="weight-info">
                   <span className="weight-total">Total ponderación: {totalWeight.toFixed(1)}%</span>
                   {remainingWeight >= 0 && (
@@ -518,6 +800,7 @@ export default function CollaboratorKPIForm({
                 </div>
               </div>
             </div>
+            </>
           )}
 
           <div className="curation-section">
@@ -533,7 +816,25 @@ export default function CollaboratorKPIForm({
                   : 'Rechazado'}
               </span>
             </div>
-            <div className="form-row">
+            <div className="form-row form-row-3">
+              <div className="form-group">
+                <label htmlFor="inputMode">Modo de carga</label>
+                <select
+                  id="inputMode"
+                  value={formData.inputMode || 'manual'}
+                  onChange={(e) =>
+                    setFormData({ ...formData, inputMode: e.target.value as CollaboratorKPI['inputMode'] })
+                  }
+                  disabled={isReadOnlyCollaborator}
+                >
+                  <option value="manual">Manual</option>
+                  <option value="import">Import</option>
+                  <option value="auto">Auto</option>
+                </select>
+                <span className="helper-text">
+                  Todo KPI entra primero como manual. La automatización reemplaza la carga, no el KPI.
+                </span>
+              </div>
               <div className="form-group">
                 <label htmlFor="dataSource">Fuente del dato *</label>
                 <select
@@ -541,6 +842,7 @@ export default function CollaboratorKPIForm({
                   value={formData.dataSource || ''}
                   onChange={(e) => {
                     setCriteriaDirty(true)
+                    setCriteriaPrefilled(false)
                     setFormData({ ...formData, dataSource: e.target.value })
                   }}
                   className={errors.dataSource ? 'error' : ''}
@@ -563,6 +865,7 @@ export default function CollaboratorKPIForm({
                   value={formData.sourceConfig || ''}
                   onChange={(e) => {
                     setCriteriaDirty(true)
+                    setCriteriaPrefilled(false)
                     setFormData({ ...formData, sourceConfig: e.target.value })
                   }}
                   placeholder="JQL / SQL / URL / reporte"
@@ -578,6 +881,7 @@ export default function CollaboratorKPIForm({
                 value={formData.criteriaText || ''}
                 onChange={(e) => {
                   setCriteriaDirty(true)
+                  setCriteriaPrefilled(false)
                   setFormData({ ...formData, criteriaText: e.target.value })
                 }}
                 rows={3}
@@ -586,6 +890,9 @@ export default function CollaboratorKPIForm({
                 disabled={isReadOnlyCollaborator}
               />
               {errors.criteriaText && <span className="error-message">{errors.criteriaText}</span>}
+              {criteriaPrefilled && !criteriaDirty && (
+                <small className="form-hint">Se copió desde el KPI macro. Podés editarlo si cambia la fuente.</small>
+              )}
             </div>
 
             <div className="form-row">
@@ -597,6 +904,7 @@ export default function CollaboratorKPIForm({
                   value={formData.evidenceUrl || ''}
                   onChange={(e) => {
                     setCriteriaDirty(true)
+                    setCriteriaPrefilled(false)
                     setFormData({ ...formData, evidenceUrl: e.target.value })
                   }}
                   placeholder="Link o referencia"
@@ -604,14 +912,9 @@ export default function CollaboratorKPIForm({
                 />
               </div>
               <div className="form-group">
-                <label htmlFor="curatorAssignee">Responsable de curaduría</label>
-                <input
-                  type="text"
-                  id="curatorAssignee"
-                  value={formData.curatorAssignee || ''}
-                  onChange={(e) => setFormData({ ...formData, curatorAssignee: e.target.value })}
-                  disabled={isReadOnlyCollaborator}
-                />
+                <label>Responsable de curaduría</label>
+                <div className="role-pill">Data Curator</div>
+                <small className="form-hint">Se asigna por rol, no por persona.</small>
               </div>
             </div>
 
@@ -677,9 +980,10 @@ export default function CollaboratorKPIForm({
                 <input
                   type="number"
                   value={formData.weight || ''}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    setWeightDirty(true)
                     setFormData({ ...formData, weight: parseFloat(e.target.value) || 0 })
-                  }
+                  }}
                   disabled={isPeriodClosed || isAssignmentClosed || isReadOnlyCollaborator}
                 />
               </div>
@@ -749,16 +1053,29 @@ export default function CollaboratorKPIForm({
               <div className="plan-header">
                 <h3>Plan mensual por subperiodo</h3>
                 <span className="plan-helper">
-                  Ajusta target y peso por mes. Solo usuarios con permisos de configuración pueden editar.
+                  Ajusta targets mensuales. El peso temporal viene del período.
                 </span>
               </div>
+              {canOverrideWeight && (
+                <label className="toggle">
+                  <input
+                    type="checkbox"
+                    checked={weightOverrideEnabled}
+                    onChange={(e) => setWeightOverrideEnabled(e.target.checked)}
+                  />
+                  <span>Override de ponderación (solo casos especiales)</span>
+                </label>
+              )}
               {planErrors && <div className="error-message">{planErrors}</div>}
               <table className="plan-table">
                 <thead>
                   <tr>
                     <th>Subperiodo</th>
                     <th>Target</th>
-                    <th>Ponderación (%)</th>
+                    <th>Peso periodo</th>
+                    {weightOverrideEnabled && <th>Override</th>}
+                    <th>Actual</th>
+                    <th>% Mes</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -784,41 +1101,53 @@ export default function CollaboratorKPIForm({
                         />
                       </td>
                       <td>
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.01"
-                          value={row.weight}
-                          disabled={!canEditPlan}
-                          onChange={(e) =>
-                            setPlanRows((prev) =>
-                              prev.map((r) =>
-                                r.subPeriodId === row.subPeriodId
-                                  ? { ...r, weight: e.target.value === '' ? '' : parseFloat(e.target.value) }
-                                  : r
+                        <input type="number" value={row.subPeriodWeight.toFixed(2)} disabled />
+                      </td>
+                      {weightOverrideEnabled && (
+                        <td>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={row.weightOverride}
+                            disabled={!canEditPlan || !canOverrideWeight}
+                            onChange={(e) =>
+                              setPlanRows((prev) =>
+                                prev.map((r) =>
+                                  r.subPeriodId === row.subPeriodId
+                                    ? {
+                                        ...r,
+                                        weightOverride: e.target.value === '' ? '' : parseFloat(e.target.value),
+                                      }
+                                    : r
+                                )
                               )
-                            )
-                          }
-                        />
+                            }
+                          />
+                        </td>
+                      )}
+                      <td>{row.actual !== '' ? Number(row.actual).toFixed(2) : '-'}</td>
+                      <td>
+                        {row.target && row.actual !== ''
+                          ? `${((Number(row.actual) / Number(row.target)) * 100).toFixed(1)}%`
+                          : '-'}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               <div className="plan-footer">
-                <span>Total ponderación plan: {planWeightTotal.toFixed(2)}%</span>
+                <span>Peso total periodo: {planWeightTotal.toFixed(2)}%</span>
+                <span>Target acumulado: {planTargetTotal.toFixed(2)}</span>
+                <span>Actual acumulado: {planActualTotal.toFixed(2)}</span>
+                <span>Avance acumulado: {planProgressTotal.toFixed(1)}%</span>
                 <button
                   type="button"
                   className="btn-secondary"
                   disabled={!canEditPlan || upsertPlanMutation.isLoading}
                   onClick={() => {
                     setPlanErrors(null)
-                    const total = planRows.reduce((acc, r) => acc + (Number(r.weight) || 0), 0)
-                    if (total > 100.01) {
-                      setPlanErrors(`La suma de ponderaciones del plan no puede superar 100% (actual: ${total.toFixed(2)}%)`)
-                      return
-                    }
                     upsertPlanMutation.mutate(planRows)
                   }}
                 >
@@ -832,6 +1161,34 @@ export default function CollaboratorKPIForm({
             <button type="button" className="btn-secondary" onClick={onClose}>
               Cancelar
             </button>
+            {canCloseAssignment && (
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  if (window.confirm('¿Cerrar este KPI? Se bloquearán ediciones.')) {
+                    closeAssignmentMutation.mutate()
+                  }
+                }}
+                disabled={closeAssignmentMutation.isLoading}
+              >
+                Cerrar KPI
+              </button>
+            )}
+            {canReopenAssignment && (
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  if (window.confirm('¿Reabrir este KPI? Volverá a ser editable.')) {
+                    reopenAssignmentMutation.mutate()
+                  }
+                }}
+                disabled={reopenAssignmentMutation.isLoading}
+              >
+                Reabrir KPI
+              </button>
+            )}
             <button
               type="submit"
               className="btn-primary"

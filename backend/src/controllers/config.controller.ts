@@ -19,92 +19,22 @@ const userCanViewConfig = (req: Request) => {
   )
 }
 
-const ROLE_PRESETS: Array<{
-  code: string
-  name: string
-  permissions: string[]
-}> = [
-  {
-    code: 'admin',
-    name: 'Admin',
-    permissions: [
-      'config.manage',
-      'config.view',
-      'kpi_read',
-      'kpi_create',
-      'kpi_update',
-      'kpi_delete',
-      'assignment_read',
-      'assignment_create',
-      'assignment_update',
-      'assignment_close',
-      'curation_read',
-      'curation_submit',
-      'curation_review',
-      'curation_edit',
-      'measurement_read',
-      'measurement_create_manual',
-      'measurement_import',
-      'measurement_run_ingest',
-      'measurement_approve',
-      'view_dashboard',
-      'view_reports',
-      'view_audit',
-    ],
-  },
-  {
-    code: 'data_curator',
-    name: 'Data Curator',
-    permissions: [
-      'config.view',
-      'kpi_read',
-      'assignment_read',
-      'curation_read',
-      'curation_review',
-      'curation_edit',
-      'measurement_read',
-      'view_dashboard',
-      'view_reports',
-      'view_audit',
-    ],
-  },
-  {
-    code: 'producer',
-    name: 'Producer',
-    permissions: [
-      'kpi_read',
-      'assignment_read',
-      'curation_submit',
-      'measurement_read',
-      'measurement_create_manual',
-      'measurement_import',
-      'measurement_run_ingest',
-      'view_dashboard',
-      'view_reports',
-    ],
-  },
-  {
-    code: 'viewer',
-    name: 'Viewer',
-    permissions: ['view_dashboard', 'view_reports', 'kpi_read', 'assignment_read', 'measurement_read'],
-  },
-  {
-    code: 'leader',
-    name: 'Leader/Manager',
-    permissions: [
-      'kpi_read',
-      'assignment_read',
-      'assignment_create',
-      'assignment_update',
-      'assignment_close',
-      'curation_submit',
-      'measurement_read',
-      'measurement_approve',
-      'view_dashboard',
-      'view_reports',
-    ],
-  },
-]
+const fetchRolePermissions = async (roleIds: number[]) => {
+  if (!roleIds.length) return new Map<number, string[]>()
+  const [rows] = await pool.query<any[]>(
+    `SELECT rp.roleId, p.code
+     FROM role_permissions rp
+     JOIN permissions p ON p.id = rp.permissionId
+     WHERE rp.roleId IN (${roleIds.map(() => '?').join(',')})`,
+    roleIds
+  )
+  const map = new Map<number, string[]>()
+  rows?.forEach((row) => {
+    if (!map.has(row.roleId)) map.set(row.roleId, [])
+    map.get(row.roleId)!.push(row.code)
+  })
+  return map
+}
 
 export const listPermissions = async (_req: Request, res: Response) => {
   try {
@@ -122,30 +52,23 @@ export const listRoles = async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'No autorizado' })
     }
 
-    const [rows] = await pool.query<any[]>(
-      `SELECT cp.collaboratorId, p.code
-       FROM collaborator_permissions cp
-       JOIN permissions p ON cp.permissionId = p.id`
+    const [roles] = await pool.query<any[]>(
+      `SELECT r.*, COUNT(cr.collaboratorId) as usersCount
+       FROM roles r
+       LEFT JOIN collaborator_roles cr ON cr.roleId = r.id
+       GROUP BY r.id
+       ORDER BY r.name ASC`
     )
 
-    const permsByUser = new Map<number, Set<string>>()
-    for (const row of rows || []) {
-      if (!permsByUser.has(row.collaboratorId)) {
-        permsByUser.set(row.collaboratorId, new Set())
-      }
-      permsByUser.get(row.collaboratorId)?.add(row.code)
-    }
+    const roleIds = Array.isArray(roles) ? roles.map((r) => r.id) : []
+    const permsByRole = await fetchRolePermissions(roleIds)
 
-    const rolesWithCounts = ROLE_PRESETS.map((role) => {
-      let count = 0
-      permsByUser.forEach((set) => {
-        const hasAll = role.permissions.every((perm) => set.has(perm))
-        if (hasAll) count += 1
-      })
-      return { ...role, usersCount: count }
-    })
+    const payload = (roles || []).map((role) => ({
+      ...role,
+      permissions: permsByRole.get(role.id) || [],
+    }))
 
-    res.json(rolesWithCounts)
+    res.json(payload)
   } catch (error) {
     console.error('Error listing roles:', error)
     res.status(500).json({ error: 'Error al obtener roles' })
@@ -161,25 +84,23 @@ export const assignRoleToCollaborator = async (req: Request, res: Response) => {
     const { collaboratorId } = req.params
     const { roleCode } = req.body as { roleCode: string }
 
-    const role = ROLE_PRESETS.find((r) => r.code === roleCode)
-    if (!role) {
+    const [roleRows] = await pool.query<any[]>('SELECT id, code FROM roles WHERE code = ? LIMIT 1', [
+      roleCode,
+    ])
+    if (!Array.isArray(roleRows) || roleRows.length === 0) {
       return res.status(400).json({ error: 'Rol inválido' })
     }
+    const roleId = roleRows[0].id
 
-    const [permRows] = await pool.query<any[]>(
-      `SELECT id, code FROM permissions WHERE code IN (${role.permissions.map(() => '?').join(',')})`,
-      role.permissions
+    await pool.query(
+      `INSERT INTO collaborator_roles (collaboratorId, roleId)
+       VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE roleId = VALUES(roleId)`,
+      [collaboratorId, roleId]
     )
-    const validPermissions = Array.isArray(permRows) ? permRows : []
-
     await pool.query('DELETE FROM collaborator_permissions WHERE collaboratorId = ?', [collaboratorId])
 
-    if (validPermissions.length > 0) {
-      const values = validPermissions.map((p) => [collaboratorId, p.id])
-      await pool.query('INSERT INTO collaborator_permissions (collaboratorId, permissionId) VALUES ?', [values])
-    }
-
-    res.json({ message: 'Rol asignado', roleCode, permissions: role.permissions })
+    res.json({ message: 'Rol asignado', roleCode })
   } catch (error) {
     console.error('Error assigning role:', error)
     res.status(500).json({ error: 'Error al asignar rol' })

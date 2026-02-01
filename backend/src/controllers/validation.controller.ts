@@ -79,7 +79,7 @@ export const validateConsistency = async (req: Request, res: Response) => {
 
     // 3. Detectar KPIs no vinculados al árbol de objetivos
     const [unlinkedRows] = await pool.query<any[]>(
-      `SELECT ck.id, ck.kpiId, k.name as kpiName
+      `SELECT DISTINCT ck.kpiId, k.name as kpiName
        FROM collaborator_kpis ck
        JOIN kpis k ON ck.kpiId = k.id
        LEFT JOIN objective_trees_kpis otk ON k.id = otk.kpiId

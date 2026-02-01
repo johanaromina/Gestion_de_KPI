@@ -13,7 +13,6 @@ type PlanRow = {
   periodId: number
   subPeriodId: number
   target: number
-  weight: number
   source?: string | null
 }
 
@@ -24,13 +23,6 @@ const excelSerialToDate = (serial: number): string => {
   const ms = days * 24 * 60 * 60 * 1000
   const date = new Date(EXCEL_DATE_BASE.getTime() + ms)
   return date.toISOString().slice(0, 10)
-}
-
-const normalizeWeight = (value: number): number => {
-  if (!Number.isFinite(value)) return 0
-  // En el Excel suelen venir como 0.35 (35%). Si es <=1 lo pasamos a 0-100
-  if (value > 0 && value <= 1) return value * 100
-  return value
 }
 
 const normalizeNumber = (value: unknown): number | null => {
@@ -140,10 +132,7 @@ async function main() {
 
     const collaboratorName = String(row.getCell(10).value || '').trim()
     const kpiName = String(row.getCell(3).value || '').trim()
-    const weightRaw = normalizeNumber(row.getCell(7).value) || 0
-    const weight = normalizeWeight(weightRaw)
-
-    if (!collaboratorName || !kpiName || weight === 0) return
+    if (!collaboratorName || !kpiName) return
 
     const collaboratorId = collaboratorMap.get(collaboratorName)
     const kpiId = kpiMap.get(kpiName)
@@ -169,7 +158,6 @@ async function main() {
         periodId,
         subPeriodId,
         target,
-        weight,
         source: filePath,
       })
     }
@@ -181,17 +169,16 @@ async function main() {
   }
 
   const values = planRows.map(
-    (r) => `(${pool.escape(r.collaboratorId)}, ${pool.escape(r.kpiId)}, ${pool.escape(r.periodId)}, ${pool.escape(r.subPeriodId)}, ${pool.escape(r.target)}, ${pool.escape(r.weight)}, ${pool.escape(r.source || null)})`
+    (r) => `(${pool.escape(r.collaboratorId)}, ${pool.escape(r.kpiId)}, ${pool.escape(r.periodId)}, ${pool.escape(r.subPeriodId)}, ${pool.escape(r.target)}, ${pool.escape(r.source || null)})`
   )
 
   const sql = `
     INSERT INTO collaborator_kpi_plan
-      (collaboratorId, kpiId, periodId, subPeriodId, target, weight, source)
+      (collaboratorId, kpiId, periodId, subPeriodId, target, source)
     VALUES
       ${values.join(',')}
     ON DUPLICATE KEY UPDATE
       target = VALUES(target),
-      weight = VALUES(weight),
       source = VALUES(source),
       updatedAt = CURRENT_TIMESTAMP()
   `

@@ -30,17 +30,18 @@ export const listOrgScopes = async (_req: Request, res: Response) => {
 
 export const createOrgScope = async (req: Request, res: Response) => {
   try {
-    const { name, type, parentId, metadata, active } = req.body
+    const { name, type, parentId, metadata, active, calendarProfileId } = req.body
     if (!name) {
       return res.status(400).json({ error: 'name es requerido' })
     }
     const [result] = await pool.query(
-      `INSERT INTO org_scopes (name, type, parentId, metadata, active)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO org_scopes (name, type, parentId, calendarProfileId, metadata, active)
+       VALUES (?, ?, ?, ?, ?, ?)`,
       [
         name,
         type || 'area',
         parentId || null,
+        calendarProfileId || null,
         metadata ? JSON.stringify(metadata) : null,
         active === false ? 0 : 1,
       ]
@@ -56,21 +57,44 @@ export const createOrgScope = async (req: Request, res: Response) => {
 export const updateOrgScope = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const { name, type, parentId, metadata, active } = req.body
+    const { name, type, parentId, metadata, active, calendarProfileId } = req.body
+    const [existingRows] = await pool.query<any[]>(
+      'SELECT calendarProfileId FROM org_scopes WHERE id = ?',
+      [id]
+    )
+    const existingCalendarId = existingRows?.[0]?.calendarProfileId ?? null
+    let warning: string | null = null
+    if (
+      calendarProfileId !== undefined &&
+      Number(existingCalendarId || 0) !== Number(calendarProfileId || 0)
+    ) {
+      const [assignRows] = await pool.query<any[]>(
+        `SELECT COUNT(*) as count
+         FROM collaborator_kpis ck
+         JOIN collaborators c ON c.id = ck.collaboratorId
+         WHERE c.orgScopeId = ? AND ck.status <> 'closed'`,
+        [id]
+      )
+      const count = Number(assignRows?.[0]?.count || 0)
+      if (count > 0) {
+        warning = `Hay ${count} asignaciones activas en este scope. El nuevo calendario aplicará solo a nuevas asignaciones.`
+      }
+    }
     await pool.query(
       `UPDATE org_scopes
-       SET name = ?, type = ?, parentId = ?, metadata = ?, active = ?
+       SET name = ?, type = ?, parentId = ?, calendarProfileId = ?, metadata = ?, active = ?
        WHERE id = ?`,
       [
         name,
         type || 'area',
         parentId || null,
+        calendarProfileId || null,
         metadata ? JSON.stringify(metadata) : null,
         active === false ? 0 : 1,
         id,
       ]
     )
-    res.json({ message: 'Scope actualizado' })
+    res.json({ message: 'Scope actualizado', warning })
   } catch (error: any) {
     console.error('Error updating org scope:', error)
     res.status(500).json({ error: 'Error al actualizar scope' })

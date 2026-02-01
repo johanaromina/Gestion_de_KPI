@@ -5,6 +5,8 @@ export interface Collaborator {
   name: string
   position: string
   area: string
+  orgScopeId?: number | null
+  calendarProfileId?: number | null
   email?: string | null
   mfaEnabled?: boolean
   managerId?: number
@@ -22,6 +24,16 @@ export interface Area {
   updatedAt?: string
 }
 
+export interface OrgScope {
+  id: number
+  name: string
+  type: 'company' | 'area' | 'team' | 'person'
+  parentId?: number | null
+  calendarProfileId?: number | null
+  active?: boolean
+  metadata?: any
+}
+
 export interface Period {
   id: number
   name: string
@@ -33,6 +45,7 @@ export interface Period {
 export interface SubPeriod {
   id: number
   periodId: number
+  calendarProfileId?: number | null
   name: string
   startDate: string
   endDate: string
@@ -40,13 +53,15 @@ export interface SubPeriod {
   weight?: number
 }
 
-export type KPIType = 'growth' | 'reduction' | 'exact'
+export type KPIType = 'manual' | 'count' | 'ratio' | 'sla' | 'value'
+export type KPIDirection = 'growth' | 'reduction' | 'exact'
 
 export interface KPI {
   id: number
   name: string
   description: string
   type: KPIType
+  direction?: KPIDirection
   criteria: string
   formula?: string
   defaultDataSource?: string
@@ -55,6 +70,7 @@ export interface KPI {
   macroKPIId?: number
   areas?: string[]
   periodIds?: number[]
+  scopeWeights?: Array<{ scopeId: number; weight: number }>
 }
 
 export interface CollaboratorKPI {
@@ -62,10 +78,12 @@ export interface CollaboratorKPI {
   collaboratorId: number
   kpiId: number
   periodId: number
+  calendarProfileId?: number | null
   subPeriodId?: number
   target: number
   actual?: number
   weight: number
+  subPeriodWeight?: number | null
   variation?: number
   weightedResult?: number
   status: 'draft' | 'proposed' | 'approved' | 'closed'
@@ -81,6 +99,9 @@ export interface CollaboratorKPI {
   inputMode?: 'manual' | 'import' | 'auto'
   lastMeasurementAt?: string
   lastMeasurementBy?: string
+  kpiType?: string
+  kpiDirection?: KPIDirection
+  assignmentDirection?: KPIDirection
 }
 
 export interface ObjectiveTree {
@@ -89,4 +110,12 @@ export interface ObjectiveTree {
   name: string
   parentId?: number
   kpis: KPI[]
+}
+
+export interface CalendarProfile {
+  id: number
+  name: string
+  description?: string | null
+  frequency: 'monthly' | 'quarterly' | 'custom'
+  active: boolean
 }

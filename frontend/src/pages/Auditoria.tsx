@@ -89,7 +89,7 @@ export default function Auditoria() {
       kpis: 'KPIs',
       collaborator_kpis: 'Asignaciones',
       periods: 'Períodos',
-      sub_periods: 'Subperíodos',
+      calendar_subperiods: 'Subperíodos',
       objective_trees: 'Árbol de Objetivos',
     }
     return labels[type] || type
@@ -138,7 +138,7 @@ export default function Auditoria() {
             <option value="kpis">KPIs</option>
             <option value="collaborator_kpis">Asignaciones</option>
             <option value="periods">Períodos</option>
-            <option value="sub_periods">Subperíodos</option>
+            <option value="calendar_subperiods">Subperíodos</option>
             <option value="objective_trees">Árbol de Objetivos</option>
           </select>
         </div>

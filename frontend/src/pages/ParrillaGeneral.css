@@ -133,6 +133,26 @@
   background: #e0e7ff;
   color: #4338ca;
 }
+.badge-type.manual {
+  background: #f1f5f9;
+  color: #334155;
+}
+.badge-type.count {
+  background: #dcfce7;
+  color: #166534;
+}
+.badge-type.ratio {
+  background: #fef3c7;
+  color: #92400e;
+}
+.badge-type.sla {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.badge-type.value {
+  background: #e0f2fe;
+  color: #075985;
+}
 
 .var-good {
   color: #065f46;

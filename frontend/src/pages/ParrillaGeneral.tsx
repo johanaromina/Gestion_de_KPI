@@ -241,7 +241,10 @@ export default function ParrillaGeneral() {
                   <td>{(a as any).kpiName || a.kpiId}</td>
                   <td>{(a as any).periodName || a.periodId}</td>
                   <td>
-                    <span className={`badge-type ${(a as any).kpiType || ''}`}>{(a as any).kpiType || 'kpi'}</span>
+                    {(() => {
+                      const kpiType = (a as any).kpiType || (a as any).type || 'kpi'
+                      return <span className={`badge-type ${kpiType}`}>{kpiType}</span>
+                    })()}
                   </td>
                   <td className="number-cell">{toNumber(a.target) ?? '-'}</td>
                   <td className="number-cell">{toNumber(a.actual) ?? '-'}</td>

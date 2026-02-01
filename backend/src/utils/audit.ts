@@ -6,8 +6,14 @@ export type EntityType =
   | 'kpis'
   | 'collaborator_kpis'
   | 'periods'
-  | 'sub_periods'
+  | 'calendar_subperiods'
   | 'objective_trees'
+  | 'roles'
+  | 'role_permissions'
+  | 'collaborator_roles'
+  | 'collaborator_permissions'
+  | 'org_scope_roles'
+  | 'auth_profiles'
 
 export interface AuditLog {
   id: number

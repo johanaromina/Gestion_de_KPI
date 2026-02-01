@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from 'react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from 'react-query'
 import { format } from 'date-fns'
+import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import { Period, SubPeriod } from '../types'
 import PeriodForm from '../components/PeriodForm'
@@ -18,6 +19,9 @@ function SubPeriodsSection({
   onClose,
   canConfig,
   closeNotice,
+  calendarProfiles,
+  selectedCalendarProfileId,
+  onCalendarChange,
 }: {
   period: Period
   expanded: boolean
@@ -27,11 +31,18 @@ function SubPeriodsSection({
   onClose: (sub: SubPeriod) => void
   canConfig: boolean
   closeNotice: { periodId: number; text: string; tone: 'success' | 'warning' } | null
+  calendarProfiles: Array<{ id: number; name: string; frequency: string; active?: boolean }>
+  selectedCalendarProfileId: number | null
+  onCalendarChange: (calendarProfileId: number | null) => void
 }) {
   const { data, isLoading } = useQuery<SubPeriod[]>(
-    ['sub-periods', period.id],
+    ['sub-periods', period.id, selectedCalendarProfileId],
     async () => {
-      const response = await api.get(`/periods/${period.id}/sub-periods`)
+      const response = await api.get(`/periods/${period.id}/sub-periods`, {
+        params: {
+          calendarProfileId: selectedCalendarProfileId || undefined,
+        },
+      })
       return response.data
     },
     {
@@ -40,6 +51,8 @@ function SubPeriodsSection({
   )
 
   if (!expanded) return null
+
+  const allClosed = !!data?.length && data.every((sub) => sub.status === 'closed')
 
   const getStatusBadge = (status?: SubPeriod['status']) => {
     if (status === 'closed') {
@@ -52,12 +65,33 @@ function SubPeriodsSection({
     <div className="subperiods-section">
       <div className="subperiods-header">
         <h4>Subperiodos</h4>
-        {canConfig && (
-          <button className="btn-small" onClick={onCreate}>
-            + Agregar subperiodo
-          </button>
-        )}
+        <div className="subperiods-actions">
+          <select
+            value={selectedCalendarProfileId || ''}
+            onChange={(e) =>
+              onCalendarChange(e.target.value ? Number(e.target.value) : null)
+            }
+            className="filter-select"
+          >
+            <option value="">Calendario: Default</option>
+            {calendarProfiles?.map((profile) => (
+              <option key={profile.id} value={profile.id}>
+                {profile.name}
+              </option>
+            ))}
+          </select>
+          {canConfig && (
+            <button className="btn-small" onClick={onCreate}>
+              + Agregar subperiodo
+            </button>
+          )}
+        </div>
       </div>
+      {allClosed && period.status !== 'closed' && (
+        <div className="subperiods-notice success">
+          Todos los subperiodos estan cerrados. Podes cerrar el periodo de forma manual.
+        </div>
+      )}
       {closeNotice && closeNotice.periodId === period.id && (
         <div className={`subperiods-notice ${closeNotice.tone}`}>
           {closeNotice.text}
@@ -134,6 +168,7 @@ function SubPeriodsSection({
 
 export default function Periodos() {
   const { canConfig } = useAuth()
+  const navigate = useNavigate()
   const [showPeriodForm, setShowPeriodForm] = useState(false)
   const [showSubPeriodForm, setShowSubPeriodForm] = useState(false)
   const [selectedPeriod, setSelectedPeriod] = useState<Period | null>(null)
@@ -149,6 +184,7 @@ export default function Periodos() {
     text: string
     tone: 'success' | 'warning'
   } | null>(null)
+  const [calendarByPeriod, setCalendarByPeriod] = useState<Record<number, number | null>>({})
 
   const queryClient = useQueryClient()
 
@@ -156,6 +192,17 @@ export default function Periodos() {
     'periods',
     async () => {
       const response = await api.get('/periods')
+      return response.data
+    },
+    {
+      staleTime: 60 * 1000,
+    }
+  )
+
+  const { data: calendarProfiles } = useQuery<any[]>(
+    'calendar-profiles',
+    async () => {
+      const response = await api.get('/calendar-profiles')
       return response.data
     },
     {
@@ -222,8 +269,8 @@ export default function Periodos() {
   )
 
   const closePeriodMutation = useMutation(
-    async (id: number) => {
-      await api.post(`/periods/${id}/close`)
+    async ({ id, sendEmail }: { id: number; sendEmail: boolean }) => {
+      await api.post(`/periods/${id}/close`, { sendEmail })
     },
     {
       onSuccess: () => {
@@ -312,7 +359,10 @@ export default function Periodos() {
         `Estas seguro de cerrar el periodo "${period.name}"? Una vez cerrado no se podran editar asignaciones sin permisos especiales.`
       )
     ) {
-      closePeriodMutation.mutate(period.id)
+      const sendEmail = window.confirm(
+        'Enviar resumen anual por email a los colaboradores?'
+      )
+      closePeriodMutation.mutate({ id: period.id, sendEmail })
     }
   }
 
@@ -343,6 +393,34 @@ export default function Periodos() {
       return matchesSearch && matchesStatus && matchesStart && matchesEnd
     })
   }, [periods, searchTerm, filterStatus, filterStartDate, filterEndDate])
+
+  const closedPeriods = useMemo(
+    () => (filteredPeriods || []).filter((period) => period.status === 'closed'),
+    [filteredPeriods]
+  )
+
+  const summaryQueries = useQueries(
+    (closedPeriods || []).map((period) => ({
+      queryKey: ['period-summary-status', period.id],
+      queryFn: async () => {
+        const response = await api.get(`/periods/${period.id}/summary`)
+        return response.data
+      },
+      staleTime: 60 * 1000,
+    }))
+  )
+
+  const summaryByPeriodId = useMemo(() => {
+    const map = new Map<number, { summaries: any[]; items: any[] }>()
+    summaryQueries.forEach((query, index) => {
+      const period = closedPeriods?.[index]
+      if (!period) return
+      if (query.data) {
+        map.set(period.id, query.data as { summaries: any[]; items: any[] })
+      }
+    })
+    return map
+  }, [summaryQueries, closedPeriods])
 
   const getStatusBadge = (status: Period['status']) => {
     const statusConfig: Record<Period['status'], { label: string; class: string }> = {
@@ -447,6 +525,12 @@ export default function Periodos() {
                           </div>
                           <div className="period-meta">
                             <span className="meta-pill">Estado: {getStatusBadge(period.status)}</span>
+                            {period.status === 'closed' &&
+                              !summaryByPeriodId.get(period.id)?.summaries?.length && (
+                                <span className="status-badge status-review" style={{ marginLeft: 8 }}>
+                                  Sin resumen anual
+                                </span>
+                              )}
                           </div>
                         </div>
                         <div className="period-actions">
@@ -472,6 +556,15 @@ export default function Periodos() {
                               title="Cerrar periodo"
                             >
                               Cerrar
+                            </button>
+                          )}
+                          {period.status === 'closed' && (
+                            <button
+                              className="btn-text"
+                              onClick={() => navigate(`/historial?periodId=${period.id}`)}
+                              title="Ver resumen anual"
+                            >
+                              Ver resumen anual
                             </button>
                           )}
                           <button
@@ -502,6 +595,14 @@ export default function Periodos() {
                       onClose={(sub) => handleCloseSubPeriod(sub)}
                       canConfig={canConfig}
                       closeNotice={closeNotice}
+                      calendarProfiles={calendarProfiles || []}
+                      selectedCalendarProfileId={calendarByPeriod[period.id] ?? null}
+                      onCalendarChange={(calendarProfileId) =>
+                        setCalendarByPeriod((prev) => ({
+                          ...prev,
+                          [period.id]: calendarProfileId,
+                        }))
+                      }
                     />
                   </div>
                 )
@@ -548,6 +649,7 @@ export default function Periodos() {
       {showSubPeriodForm && selectedPeriod && (
         <SubPeriodForm
           periodId={selectedPeriod.id}
+          calendarProfileId={calendarByPeriod[selectedPeriod.id] ?? null}
           subPeriod={editingSubPeriod}
           onClose={() => {
             setShowSubPeriodForm(false)

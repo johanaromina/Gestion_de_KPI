@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import api from '../services/api'
-import { Area, Collaborator } from '../types'
+import { OrgScope, Collaborator } from '../types'
 import CollaboratorForm from '../components/CollaboratorForm'
 import { useAuth } from '../hooks/useAuth'
 import './Colaboradores.css'
@@ -18,14 +18,16 @@ export default function Colaboradores() {
   const queryClient = useQueryClient()
   const { user, isAdmin, isDirector, isManager, isLeader } = useAuth()
 
-  const { data: areas } = useQuery<Area[]>(
-    'areas',
+  const { data: orgScopes } = useQuery<OrgScope[]>(
+    'org-scopes',
     async () => {
-      const response = await api.get('/areas')
+      const response = await api.get('/org-scopes')
       return response.data
     },
     { retry: false }
   )
+
+  const areaScopes = (orgScopes || []).filter((scope) => scope.type === 'area')
 
   const { data: collaborators, isLoading } = useQuery<Collaborator[]>(
     ['collaborators', showInactive],
@@ -74,29 +76,15 @@ export default function Colaboradores() {
 
   const createAreaMutation = useMutation(
     async (name: string) => {
-      const response = await api.post('/areas', { name })
-      return response.data as Area
+      const response = await api.post('/org-scopes', { name, type: 'area' })
+      return response.data as { id: number }
     },
     {
       onSuccess: () => {
-        queryClient.invalidateQueries('areas')
+        queryClient.invalidateQueries('org-scopes')
       },
       onError: (error: any) => {
         alert(error.response?.data?.error || 'Error al crear área')
-      },
-    }
-  )
-
-  const deleteAreaMutation = useMutation(
-    async (id: number) => {
-      await api.delete(`/areas/${id}`)
-    },
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('areas')
-      },
-      onError: (error: any) => {
-        alert(error.response?.data?.error || 'Error al eliminar área')
       },
     }
   )
@@ -178,7 +166,7 @@ export default function Colaboradores() {
             onChange={(e) => setFilterArea(e.target.value)}
           >
             <option value="">Todas las areas</option>
-            {areas?.map((area) => (
+            {areaScopes.map((area) => (
               <option key={area.id} value={area.name}>
                 {area.name}
               </option>
@@ -353,22 +341,11 @@ export default function Colaboradores() {
             + Nueva área
           </button>
         </div>
-        {areas && areas.length > 0 ? (
+        {areaScopes && areaScopes.length > 0 ? (
           <ul className="areas-list">
-            {areas.map((area) => (
+            {areaScopes.map((area) => (
               <li key={area.id}>
                 <span>{area.name}</span>
-                <button
-                  className="btn-icon"
-                  title="Eliminar área"
-                  onClick={() => {
-                    if (window.confirm(`¿Eliminar el área "${area.name}"?`)) {
-                      deleteAreaMutation.mutate(area.id)
-                    }
-                  }}
-                >
-                  Eliminar
-                </button>
               </li>
             ))}
           </ul>

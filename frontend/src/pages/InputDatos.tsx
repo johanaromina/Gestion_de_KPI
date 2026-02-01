@@ -20,10 +20,9 @@ export default function InputDatos() {
   const [showOnlyPending, setShowOnlyPending] = useState(false)
   const [searchParams] = useSearchParams()
   const assignmentFromQuery = searchParams.get('assignmentId')
-  const [selectedAssignment, setSelectedAssignment] = useState<number | ''>(
-    assignmentFromQuery ? Number(assignmentFromQuery) : ''
-  )
-  const [selectedArea, setSelectedArea] = useState('')
+  const [selectedAssignmentGroupId, setSelectedAssignmentGroupId] = useState<number | ''>('')
+  const [selectedSubPeriodId, setSelectedSubPeriodId] = useState<number | ''>('')
+  const [selectedScopeId, setSelectedScopeId] = useState<number | ''>('')
   const [selectedKpiId, setSelectedKpiId] = useState<number | ''>('')
   const [showMeasurementModal, setShowMeasurementModal] = useState(false)
   const [newValue, setNewValue] = useState('')
@@ -48,35 +47,50 @@ export default function InputDatos() {
     return response.data
   })
 
+  const { data: orgScopes } = useQuery('input-org-scopes', async () => {
+    const response = await api.get('/org-scopes')
+    return response.data
+  })
+
+  const { data: calendarProfiles } = useQuery(
+    'input-calendar-profiles',
+    async () => {
+      const response = await api.get('/calendar-profiles')
+      return response.data
+    },
+    { staleTime: 5 * 60 * 1000 }
+  )
+
   const { data: kpis } = useQuery('input-kpis', async () => {
     const response = await api.get('/kpis')
     return response.data
   })
 
-  const areaOptions = useMemo(() => {
-    if (!collaborators) return []
-    const areas = Array.from(new Set(collaborators.map((c: any) => c.area).filter(Boolean)))
-    return areas.sort((a, b) => String(a).localeCompare(String(b)))
-  }, [collaborators])
+  const scopeOptions = useMemo(() => {
+    if (!orgScopes) return []
+    return orgScopes
+      .filter((scope: any) => scope.type === 'area' && scope.active !== 0 && scope.active !== false)
+      .sort((a: any, b: any) => String(a.name).localeCompare(String(b.name)))
+  }, [orgScopes])
 
-  const assignmentsWithArea = useMemo(() => {
+  const assignmentsWithScope = useMemo(() => {
     if (!assignments) return []
     return assignments.map((assignment: any) => {
+      const collaborator = collaborators?.find((c: any) => c.id === assignment.collaboratorId)
+      const collaboratorScopeId = collaborator?.orgScopeId || null
       const collaboratorArea =
-        assignment.collaboratorArea ||
-        collaborators?.find((c: any) => c.id === assignment.collaboratorId)?.area ||
-        ''
-      return { ...assignment, collaboratorArea }
+        assignment.collaboratorArea || collaborator?.area || ''
+      return { ...assignment, collaboratorArea, collaboratorScopeId }
     })
   }, [assignments, collaborators])
 
   const filteredAssignments = useMemo(() => {
-    return assignmentsWithArea.filter((assignment: any) => {
-      if (selectedArea && assignment.collaboratorArea !== selectedArea) return false
+    return assignmentsWithScope.filter((assignment: any) => {
+      if (selectedScopeId && assignment.collaboratorScopeId !== selectedScopeId) return false
       if (selectedKpiId && assignment.kpiId !== selectedKpiId) return false
       return true
     })
-  }, [assignmentsWithArea, selectedArea, selectedKpiId])
+  }, [assignmentsWithScope, selectedScopeId, selectedKpiId])
 
   const collapsedAssignments = useMemo(() => {
     const groups = new Map<string, any[]>()
@@ -87,95 +101,193 @@ export default function InputDatos() {
       groups.set(key, current)
     }
 
-    const result: Array<{ id: number; label: string }> = []
-    for (const group of groups.values()) {
+    const result: Array<{ id: number; key: string; label: string }> = []
+    for (const [key, group] of groups.entries()) {
       const sorted = [...group].sort((a, b) => Number(a.id) - Number(b.id))
       const base = sorted.find((item: any) => item.subPeriodId == null) || sorted[0]
       const label = `${base.collaboratorName || `Colaborador #${base.collaboratorId}`} · ${
         base.kpiName || `KPI #${base.kpiId}`
       } · ${base.periodName || `Período #${base.periodId}`}`
-      result.push({ id: base.id, label })
+      result.push({ id: base.id, key, label })
     }
 
     return result.sort((a, b) => a.label.localeCompare(b.label))
   }, [filteredAssignments])
 
-  const kpisByArea = useMemo(() => {
-    if (!kpis) return []
-    const kpiIdsInArea = new Set(
-      assignmentsWithArea
-        .filter((assignment: any) => (selectedArea ? assignment.collaboratorArea === selectedArea : true))
-        .map((assignment: any) => assignment.kpiId)
+  const selectedGroup = useMemo(
+    () => collapsedAssignments.find((assignment) => assignment.id === selectedAssignmentGroupId),
+    [collapsedAssignments, selectedAssignmentGroupId]
+  )
+
+  const selectedGroupAssignments = useMemo(() => {
+    if (!selectedGroup) return []
+    return assignmentsWithScope.filter(
+      (assignment: any) =>
+        `${assignment.collaboratorId}-${assignment.kpiId}-${assignment.periodId}` === selectedGroup.key
     )
-    return kpis.filter((kpi: any) => kpiIdsInArea.has(kpi.id))
-  }, [kpis, assignmentsWithArea, selectedArea])
+  }, [assignmentsWithScope, selectedGroup])
+
+  const availableSubPeriods = useMemo(() => {
+    if (!selectedGroupAssignments.length) return []
+    return selectedGroupAssignments
+      .filter((assignment: any) => assignment.subPeriodId != null)
+      .map((assignment: any) => ({
+        id: assignment.subPeriodId,
+        name: assignment.subPeriodName || `Subperiodo #${assignment.subPeriodId}`,
+      }))
+  }, [selectedGroupAssignments])
 
   useEffect(() => {
-    if (!selectedAssignment) return
-    const exists = collapsedAssignments.some((assignment) => assignment.id === selectedAssignment)
-    if (!exists) {
-      setSelectedAssignment('')
+    if (!selectedAssignmentGroupId) return
+    if (selectedSubPeriodId) return
+    if (availableSubPeriods.length > 0) {
+      setSelectedSubPeriodId(availableSubPeriods[0].id)
     }
-  }, [collapsedAssignments, selectedAssignment])
+  }, [selectedAssignmentGroupId, selectedSubPeriodId, availableSubPeriods])
+
+  const selectedAssignmentId = useMemo(() => {
+    if (!selectedGroupAssignments.length) return ''
+    if (selectedSubPeriodId) {
+      const match = selectedGroupAssignments.find(
+        (assignment: any) => assignment.subPeriodId === selectedSubPeriodId
+      )
+      if (match) return match.id
+    }
+    const base =
+      selectedGroupAssignments.find((assignment: any) => assignment.subPeriodId == null) ||
+      selectedGroupAssignments[0]
+    return base?.id || ''
+  }, [selectedGroupAssignments, selectedSubPeriodId])
+
+  const kpisByScope = useMemo(() => {
+    if (!kpis) return []
+    const kpiIdsInScope = new Set(
+      assignmentsWithScope
+        .filter((assignment: any) => (selectedScopeId ? assignment.collaboratorScopeId === selectedScopeId : true))
+        .map((assignment: any) => assignment.kpiId)
+    )
+    return kpis.filter((kpi: any) => kpiIdsInScope.has(kpi.id))
+  }, [kpis, assignmentsWithScope, selectedScopeId])
+
+  useEffect(() => {
+    if (!selectedAssignmentGroupId) return
+    const exists = collapsedAssignments.some((assignment) => assignment.id === selectedAssignmentGroupId)
+    if (!exists) {
+      setSelectedAssignmentGroupId('')
+      setSelectedSubPeriodId('')
+    }
+  }, [collapsedAssignments, selectedAssignmentGroupId])
 
   useEffect(() => {
     if (!selectedKpiId) return
-    const exists = kpisByArea.some((kpi: any) => kpi.id === selectedKpiId)
+    const exists = kpisByScope.some((kpi: any) => kpi.id === selectedKpiId)
     if (!exists) {
       setSelectedKpiId('')
     }
-  }, [kpisByArea, selectedKpiId])
+  }, [kpisByScope, selectedKpiId])
+
+  useEffect(() => {
+    if (!assignmentFromQuery || !assignmentsWithScope.length) return
+    const assignmentId = Number(assignmentFromQuery)
+    const assignment = assignmentsWithScope.find((a: any) => a.id === assignmentId)
+    if (!assignment) return
+    const key = `${assignment.collaboratorId}-${assignment.kpiId}-${assignment.periodId}`
+    const group = collapsedAssignments.find((item) => item.key === key)
+    if (group) {
+      setSelectedAssignmentGroupId(group.id)
+      setSelectedSubPeriodId(assignment.subPeriodId ?? '')
+    }
+  }, [assignmentFromQuery, assignmentsWithScope, collapsedAssignments])
 
   const selectedAssignmentData = useMemo(() => {
-    if (!assignmentsWithArea || !selectedAssignment) return null
-    return assignmentsWithArea.find((assignment: any) => assignment.id === selectedAssignment) || null
-  }, [assignmentsWithArea, selectedAssignment])
+    if (!assignmentsWithScope || !selectedAssignmentId) return null
+    return assignmentsWithScope.find((assignment: any) => assignment.id === selectedAssignmentId) || null
+  }, [assignmentsWithScope, selectedAssignmentId])
 
-  const isCurationApproved = selectedAssignmentData?.curationStatus === 'approved'
+  const selectedCalendarProfile = useMemo(() => {
+    if (!calendarProfiles || !selectedAssignmentData?.calendarProfileId) return null
+    return (
+      calendarProfiles.find(
+        (profile: any) => Number(profile.id) === Number(selectedAssignmentData.calendarProfileId)
+      ) || null
+    )
+  }, [calendarProfiles, selectedAssignmentData?.calendarProfileId])
+
+  const curationStatus = selectedAssignmentData?.curationStatus || 'pending'
+  const isCurationApproved = curationStatus === 'approved'
+  const canApproveWithWarning = curationStatus === 'in_review'
+  const canApproveMeasurement = isCurationApproved || canApproveWithWarning
+  const approvalWarning = canApproveWithWarning
+    ? 'Curaduría en revisión: la aprobación quedará registrada con advertencia.'
+    : null
 
   const { data: measurements, isLoading } = useQuery<Measurement[]>(
-    ['measurements', selectedAssignment],
+    ['measurements', selectedAssignmentId],
     async () => {
       const response = await api.get('/measurements', {
-        params: { assignmentId: selectedAssignment || undefined },
+        params: { assignmentId: selectedAssignmentId || undefined },
       })
       return response.data
     },
-    { enabled: !!selectedAssignment }
+    { enabled: !!selectedAssignmentId }
   )
 
   const createMeasurement = useMutation(
     async () => {
-      if (!selectedAssignment) return
-      await api.post('/measurements', {
-        assignmentId: selectedAssignment,
+      if (!selectedAssignmentId) return
+      const response = await api.post('/measurements', {
+        assignmentId: selectedAssignmentId,
         value: Number(newValue),
         mode: newMode,
         status: newStatus,
         reason: newReason.trim() || undefined,
         evidenceUrl: newEvidence.trim() || undefined,
       })
+      return response.data
     },
     {
-      onSuccess: () => {
-        queryClient.invalidateQueries(['measurements', selectedAssignment])
+      onSuccess: (data: any) => {
+        queryClient.invalidateQueries(['measurements', selectedAssignmentId])
         setNewValue('')
         setNewReason('')
         setNewEvidence('')
+        if (data?.warning) {
+          alert(data.warning)
+        }
       },
     }
   )
 
   const approveMeasurement = useMutation(
     async (id: number) => {
-      await api.post(`/measurements/${id}/approve`)
+      const response = await api.post(`/measurements/${id}/approve`)
+      return response.data
     },
     {
-      onSuccess: () => {
-        queryClient.invalidateQueries(['measurements', selectedAssignment])
+      onSuccess: (data: any) => {
+        queryClient.invalidateQueries(['measurements', selectedAssignmentId])
+        if (data?.warning) {
+          alert(data.warning)
+        }
       },
     }
   )
+
+  const approvalBlockedReason = useMemo(() => {
+    if (isCurationApproved || canApproveWithWarning) return null
+    return 'Curaduría pendiente, no se puede aprobar'
+  }, [isCurationApproved, canApproveWithWarning])
+
+  const handleApprove = (id: number) => {
+    if (!canApproveMeasurement) return
+    if (canApproveWithWarning) {
+      const confirmed = window.confirm(
+        'La curaduría está en revisión. ¿Querés aprobar la medición igual?'
+      )
+      if (!confirmed) return
+    }
+    approveMeasurement.mutate(id)
+  }
 
   const rejectMeasurement = useMutation(
     async (id: number) => {
@@ -183,7 +295,7 @@ export default function InputDatos() {
     },
     {
       onSuccess: () => {
-        queryClient.invalidateQueries(['measurements', selectedAssignment])
+        queryClient.invalidateQueries(['measurements', selectedAssignmentId])
       },
     }
   )
@@ -272,7 +384,7 @@ export default function InputDatos() {
 
       for (let i = 1; i < lines.length; i += 1) {
         const row = parseCsvLine(lines[i])
-        const assignmentId = idxAssignment >= 0 ? Number(row[idxAssignment]) : Number(selectedAssignment)
+        const assignmentId = idxAssignment >= 0 ? Number(row[idxAssignment]) : Number(selectedAssignmentId)
         const value = idxValue >= 0 ? Number(row[idxValue]) : Number(row[0])
         const mode = (idxMode >= 0 ? row[idxMode] : 'import') as Measurement['mode']
         const status = (idxStatus >= 0 ? row[idxStatus] : 'proposed') as Measurement['status']
@@ -305,8 +417,8 @@ export default function InputDatos() {
         }
       }
 
-      if (selectedAssignment) {
-        queryClient.invalidateQueries(['measurements', selectedAssignment])
+      if (selectedAssignmentId) {
+        queryClient.invalidateQueries(['measurements', selectedAssignmentId])
       }
 
       if (errors.length > 0) {
@@ -322,19 +434,19 @@ export default function InputDatos() {
   }
 
   const handleAutoFetch = async () => {
-    if (!selectedAssignment) {
+    if (!selectedAssignmentId) {
       alert('Selecciona una asignación primero')
       return
     }
     const value = window.prompt('Valor obtenido automáticamente:')
     if (!value) return
     await api.post('/measurements', {
-      assignmentId: selectedAssignment,
+      assignmentId: selectedAssignmentId,
       value: Number(value),
       mode: 'auto',
       status: 'proposed',
     })
-    queryClient.invalidateQueries(['measurements', selectedAssignment])
+    queryClient.invalidateQueries(['measurements', selectedAssignmentId])
   }
 
   return (
@@ -351,7 +463,7 @@ export default function InputDatos() {
           <button
             className="btn-primary"
             onClick={() => {
-              if (!selectedAssignment) {
+              if (!selectedAssignmentId) {
                 alert('Selecciona una asignación primero')
                 return
               }
@@ -394,16 +506,16 @@ export default function InputDatos() {
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="area-select">Área</label>
+              <label htmlFor="scope-select">Scope</label>
               <select
-                id="area-select"
-                value={selectedArea}
-                onChange={(e) => setSelectedArea(e.target.value)}
+                id="scope-select"
+                value={selectedScopeId}
+                onChange={(e) => setSelectedScopeId(e.target.value ? Number(e.target.value) : '')}
               >
-                <option value="">Todas las áreas</option>
-                {areaOptions.map((area) => (
-                  <option key={area} value={area}>
-                    {area}
+                <option value="">Todos los scopes</option>
+                {scopeOptions.map((scope: any) => (
+                  <option key={scope.id} value={scope.id}>
+                    {scope.name}
                   </option>
                 ))}
               </select>
@@ -416,7 +528,7 @@ export default function InputDatos() {
                 onChange={(e) => setSelectedKpiId(e.target.value ? Number(e.target.value) : '')}
               >
                 <option value="">Todos los KPIs</option>
-                {kpisByArea.map((kpi: any) => (
+                {kpisByScope.map((kpi: any) => (
                   <option key={kpi.id} value={kpi.id}>
                     {kpi.name}
                   </option>
@@ -427,13 +539,34 @@ export default function InputDatos() {
               <label htmlFor="assignment-select">Asignación</label>
               <select
                 id="assignment-select"
-                value={selectedAssignment}
-                onChange={(e) => setSelectedAssignment(e.target.value ? Number(e.target.value) : '')}
+                value={selectedAssignmentGroupId}
+                onChange={(e) => {
+                  setSelectedAssignmentGroupId(e.target.value ? Number(e.target.value) : '')
+                  setSelectedSubPeriodId('')
+                }}
               >
                 <option value="">Selecciona una asignación</option>
                 {collapsedAssignments.map((assignment) => (
                   <option key={assignment.id} value={assignment.id}>
                     {assignment.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label htmlFor="subperiod-select">Subperíodo</label>
+              <select
+                id="subperiod-select"
+                value={selectedSubPeriodId}
+                onChange={(e) =>
+                  setSelectedSubPeriodId(e.target.value ? Number(e.target.value) : '')
+                }
+                disabled={!selectedAssignmentGroupId}
+              >
+                <option value="">Resumen (sin subperíodo)</option>
+                {availableSubPeriods.map((sp: any) => (
+                  <option key={sp.id} value={sp.id}>
+                    {sp.name}
                   </option>
                 ))}
               </select>
@@ -476,6 +609,24 @@ export default function InputDatos() {
                     'Sin criterio'}
                 </span>
               </div>
+              {selectedCalendarProfile && (
+                <div>
+                  <span className="meta-label">Calendario:</span>{' '}
+                  <span className="calendar-pill">
+                    {selectedCalendarProfile.name} ({selectedCalendarProfile.frequency})
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+          {approvalWarning && (
+            <div className="info-banner warning">
+              {approvalWarning}
+            </div>
+          )}
+          {!canApproveMeasurement && approvalBlockedReason && (
+            <div className="info-banner error">
+              {approvalBlockedReason}
             </div>
           )}
           <table className="input-table">
@@ -490,7 +641,7 @@ export default function InputDatos() {
               </tr>
             </thead>
             <tbody>
-              {isLoading && selectedAssignment ? (
+              {isLoading && selectedAssignmentId ? (
                 <tr>
                   <td colSpan={6} className="empty-row">Cargando mediciones...</td>
                 </tr>
@@ -516,11 +667,19 @@ export default function InputDatos() {
                       <div className="action-buttons">
                         <button
                           className="btn-secondary"
-                          disabled={measurement.status === 'approved' || approveMeasurement.isLoading}
-                          onClick={() => approveMeasurement.mutate(measurement.id)}
+                          disabled={
+                            measurement.status === 'approved' ||
+                            approveMeasurement.isLoading ||
+                            !canApproveMeasurement
+                          }
+                          onClick={() => handleApprove(measurement.id)}
+                          title={!canApproveMeasurement ? approvalBlockedReason || '' : ''}
                         >
                           Aprobar
                         </button>
+                        {!canApproveMeasurement && approvalBlockedReason && (
+                          <span className="action-hint">{approvalBlockedReason}</span>
+                        )}
                         <button
                           className="btn-secondary"
                           disabled={measurement.status === 'rejected' || rejectMeasurement.isLoading}
@@ -533,12 +692,12 @@ export default function InputDatos() {
                   </tr>
                 ))
               )}
-              {!selectedAssignment && (
+              {!selectedAssignmentId && (
                 <tr>
                   <td colSpan={6} className="empty-row">Selecciona una asignación para ver mediciones.</td>
                 </tr>
               )}
-              {selectedAssignment && filteredMeasurements.length === 0 && !isLoading && (
+              {selectedAssignmentId && filteredMeasurements.length === 0 && !isLoading && (
                 <tr>
                   <td colSpan={6} className="empty-row">No hay mediciones registradas.</td>
                 </tr>
@@ -562,7 +721,7 @@ export default function InputDatos() {
             <button
               className="btn-primary"
               onClick={() => {
-                if (!selectedAssignment) {
+                if (!selectedAssignmentId) {
                   alert('Selecciona una asignación primero')
                   return
                 }
@@ -656,15 +815,20 @@ export default function InputDatos() {
                     value={newStatus}
                     onChange={(e) => setNewStatus(e.target.value as any)}
                   >
-                    <option value="approved" disabled={!isCurationApproved}>
+                    <option value="approved" disabled={!canApproveMeasurement}>
                       Aprobado
                     </option>
                     <option value="proposed">Propuesto</option>
                     <option value="draft">Borrador</option>
                   </select>
-                  {!isCurationApproved && selectedAssignment && (
+                  {!canApproveMeasurement && selectedAssignmentId && (
                     <small className="form-hint">
                       La curaduria no está aprobada. Solo se permite proponer o dejar en borrador.
+                    </small>
+                  )}
+                  {canApproveWithWarning && selectedAssignmentId && (
+                    <small className="form-hint warning">
+                      Curaduria en revision: la aprobación quedará con warning.
                     </small>
                   )}
                 </div>
@@ -699,7 +863,7 @@ export default function InputDatos() {
               <button
                 className="btn-primary"
                 onClick={() => createMeasurement.mutate()}
-                disabled={!selectedAssignment || !newValue || createMeasurement.isLoading}
+                disabled={!selectedAssignmentId || !newValue || createMeasurement.isLoading}
               >
                 {createMeasurement.isLoading ? 'Guardando...' : 'Guardar medición'}
               </button>

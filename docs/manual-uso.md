@@ -7,7 +7,7 @@ KPI Manager es una plataforma para gestionar objetivos y desempeno con gobernanz
 
 ## 2) Conceptos clave (antes de empezar)
 - KPI macro: plantilla del KPI (nombre, descripcion, formula base). No guarda curaduria.
-- Asignacion: el KPI aplicado a una persona y periodo (peso, target, fuente/criterio activo).
+- Asignacion: el KPI aplicado a un scope/persona y periodo (peso, target, fuente/criterio activo).
 - Curaduria: proceso de aprobacion. Sin curaduria aprobada, el KPI visible no se actualiza.
 - Mediciones: valores capturados (manual/import/auto). El actual se toma del ultimo measurement aprobado.
 
@@ -43,9 +43,10 @@ Regla clave: el KPI visible solo usa criterio aprobado + datos aprobados.
 
 ### 6.2 Asignaciones
 1. Ir a Asignaciones.
-2. Crear asignacion por colaborador y periodo.
-3. Definir peso y target.
-4. Guardar.
+2. Seleccionar Scope (area/team) y colaborador.
+3. Elegir KPI y subperiodo (opcional).
+4. Definir peso y target.
+5. Guardar.
 
 Regla de consistencia:
 - El peso debe sumar 100% por colaborador y periodo.
@@ -64,8 +65,9 @@ Buenas practicas:
 ### 6.4 Input de datos (Mediciones)
 1. Ir a Input de datos.
 2. Filtrar por Area -> KPI -> Asignacion.
-3. Cargar medicion manual, importar CSV o ejecutar fetch automatico.
-4. Si el flujo requiere, Leader/Curator aprueba la medicion.
+3. Seleccionar Subperiodo.
+4. Cargar medicion manual, importar CSV o ejecutar fetch automatico.
+5. Si el flujo requiere, Leader/Curator aprueba la medicion.
 
 Nota operativa:
 - En Input de datos, la lista de asignaciones se colapsa por Colaborador + KPI + Periodo para evitar duplicados por subperiodos.
@@ -98,25 +100,20 @@ Campos recomendados:
 - Frecuencia (cron)
 - Estado
 
-Ejemplo generico (Jira - Tests):
+Ejemplo generico (Jira - Query A):
 
 ```sql
-project IN ({projects})
-AND issuetype = {issueTypeTest}
-AND {testerField} IN ({users})
-AND updated >= {from}
-AND updated < {to}
+{filterA}
+AND {dateFieldA} >= {from}
+AND {dateFieldA} < {to}
 ```
 
-Ejemplo generico (Jira - Historias Done):
+Ejemplo generico (Jira - Query B):
 
 ```sql
-project IN ({projects})
-AND issuetype IN ({issueTypeStory})
-AND statusCategory = Done
-AND statusCategoryChangedDate >= {from}
-AND statusCategoryChangedDate < {to}
-AND {testerField} IN ({users})
+{filterB}
+AND {dateFieldB} >= {from}
+AND {dateFieldB} < {to}
 ```
 
 ### 7.4 Targets (donde van los params reales)
@@ -126,11 +123,10 @@ Ejemplo de params por target:
 
 ```json
 {
-  "projects": ["GT_MISIM"],
-  "users": ["712020:xxxxx"],
-  "testerField": "\"Tester[User Picker (single user)]\"",
-  "issueTypeTest": "Test",
-  "issueTypeStory": ["Historia"],
+  "filterA": "project IN (GT_MISIM) AND issuetype IN (Story) AND statusCategory = Done",
+  "filterB": "project IN (GT_MISIM) AND issuetype IN (Story)",
+  "dateFieldA": "statusCategoryChangedDate",
+  "dateFieldB": "created",
   "period": "previous_month"
 }
 ```

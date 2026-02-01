@@ -1,7 +1,9 @@
 import { Request, Response } from 'express'
+import cron from 'node-cron'
 import { pool } from '../config/database'
 import { AuthRequest } from '../middleware/auth.middleware'
 import { runTemplateQueued } from '../utils/integrations-runner'
+import { decryptSecret, encryptSecret } from '../utils/crypto'
 
 type IntegrationRow = {
   id: number
@@ -65,6 +67,17 @@ const parseJson = (value: any) => {
   }
 }
 
+const parseAuthConfig = (value: any) => {
+  if (!value) return null
+  const decrypted = decryptSecret(String(value))
+  return parseJson(decrypted)
+}
+
+const serializeAuthConfig = (authConfig: any) => {
+  if (!authConfig) return null
+  return encryptSecret(JSON.stringify(authConfig))
+}
+
 const formatAuthHeaders = (authType: string | undefined, authConfig: any) => {
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -85,6 +98,35 @@ const formatAuthHeaders = (authType: string | undefined, authConfig: any) => {
     }
   }
   return headers
+}
+
+const jiraSearch = async (
+  endpoint: string,
+  authType: string | undefined,
+  authConfig: any,
+  jql: string
+) => {
+  const headers = formatAuthHeaders(authType, authConfig || {})
+  headers['Content-Type'] = 'application/json'
+  const baseUrl = String(endpoint).replace(/\/$/, '')
+  const url = `${baseUrl}/rest/api/3/search/approximate-count`
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      jql: String(jql),
+    }),
+  })
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Jira error ${response.status}: ${text}`)
+  }
+  const data = await response.json()
+  const total = Number(data?.count ?? 0)
+  if (!Number.isFinite(total)) {
+    throw new Error('Respuesta de Jira inválida (count)')
+  }
+  return total
 }
 
 const formatValue = (value: any) => {
@@ -142,7 +184,18 @@ const resolvePeriodParams = (params: Record<string, any>) => {
 }
 
 const evaluateFormula = (formula: string, values: Record<string, number>) => {
-  const expression = formula.replace(/\btests\b/g, String(values.tests)).replace(/\bstories\b/g, String(values.stories))
+  const normalized = formula.trim().toLowerCase()
+  if (normalized === 'count' || normalized === 'tests' || normalized === 'a') {
+    return Number(values.tests)
+  }
+  if (normalized === 'stories' || normalized === 'b') {
+    return Number(values.stories)
+  }
+  const expression = normalized
+    .replace(/\btests\b/g, String(values.tests))
+    .replace(/\bstories\b/g, String(values.stories))
+    .replace(/\ba\b/g, String(values.tests))
+    .replace(/\bb\b/g, String(values.stories))
   if (!/^[0-9+\-*/().\s]+$/.test(expression)) {
     throw new Error('Fórmula inválida')
   }
@@ -173,6 +226,14 @@ const mergeParams = (base: any, override: any): any => {
   return result
 }
 
+const getUsersCount = (params: any) => {
+  if (!params) return 0
+  const users = params.users
+  if (Array.isArray(users)) return users.length
+  if (typeof users === 'string' && users.trim()) return 1
+  return 0
+}
+
 const loadScopeChain = async (scopeId: number) => {
   const chain: any[] = []
   let currentId: number | null = scopeId
@@ -198,19 +259,7 @@ export const testIntegrationJql = async (req: Request, res: Response) => {
     if (!endpoint || !jql) {
       return res.status(400).json({ error: 'endpoint y jql son requeridos' })
     }
-    const headers = formatAuthHeaders(authType, authConfig || {})
-    const baseUrl = String(endpoint).replace(/\/$/, '')
-    const url = `${baseUrl}/rest/api/3/search?jql=${encodeURIComponent(String(jql))}&maxResults=0`
-    const response = await fetch(url, { headers })
-    if (!response.ok) {
-      const text = await response.text()
-      return res.status(400).json({ error: `Jira error ${response.status}: ${text}` })
-    }
-    const data = await response.json()
-    const total = Number(data?.total ?? 0)
-    if (!Number.isFinite(total)) {
-      return res.status(400).json({ error: 'Respuesta de Jira inválida (total)' })
-    }
+    const total = await jiraSearch(endpoint, authType, authConfig || {}, jql)
     res.json({ total })
   } catch (error: any) {
     console.error('Error testing integration JQL:', error)
@@ -224,7 +273,7 @@ export const listAuthProfiles = async (_req: Request, res: Response) => {
     const data = Array.isArray(rows)
       ? rows.map((row) => ({
           ...row,
-          authConfig: row.authConfig ? parseJson(row.authConfig) : null,
+          authConfig: row.authConfig ? parseAuthConfig(row.authConfig) : null,
         }))
       : []
     res.json(data)
@@ -248,7 +297,7 @@ export const createAuthProfile = async (req: Request, res: Response) => {
         connector || 'jira',
         endpoint || null,
         authType || 'none',
-        authConfig ? JSON.stringify(authConfig) : null,
+        serializeAuthConfig(authConfig),
       ]
     )
     const insertResult = result as any
@@ -270,7 +319,7 @@ export const updateAuthProfile = async (req: Request, res: Response) => {
         connector || 'jira',
         endpoint || null,
         authType || 'none',
-        authConfig ? JSON.stringify(authConfig) : null,
+        serializeAuthConfig(authConfig),
         id,
       ]
     )
@@ -302,6 +351,7 @@ export const createTemplate = async (req: Request, res: Response) => {
       name,
       connector,
       metricType,
+      metricTypeUi,
       queryTestsTemplate,
       queryStoriesTemplate,
       formulaTemplate,
@@ -312,16 +362,20 @@ export const createTemplate = async (req: Request, res: Response) => {
     if (!name) {
       return res.status(400).json({ error: 'name es requerido' })
     }
+    if (schedule && !cron.validate(schedule)) {
+      return res.status(400).json({ error: 'Cron inválido' })
+    }
     const resolvedMetricType: 'count' | 'ratio' = metricType === 'count' ? 'count' : 'ratio'
     const isSpecific = computeIsSpecific(resolvedMetricType, queryTestsTemplate, queryStoriesTemplate)
     const [result] = await pool.query(
       `INSERT INTO integration_templates
-       (name, connector, metricType, queryTestsTemplate, queryStoriesTemplate, formulaTemplate, schedule, authProfileId, isSpecific, enabled)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (name, connector, metricType, metricTypeUi, queryTestsTemplate, queryStoriesTemplate, formulaTemplate, schedule, authProfileId, isSpecific, enabled)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         name,
         connector || 'jira',
         resolvedMetricType,
+        metricTypeUi || null,
         queryTestsTemplate || null,
         resolvedMetricType === 'ratio' ? queryStoriesTemplate || null : null,
         formulaTemplate || null,
@@ -346,6 +400,7 @@ export const updateTemplate = async (req: Request, res: Response) => {
       name,
       connector,
       metricType,
+      metricTypeUi,
       queryTestsTemplate,
       queryStoriesTemplate,
       formulaTemplate,
@@ -353,16 +408,20 @@ export const updateTemplate = async (req: Request, res: Response) => {
       authProfileId,
       enabled,
     } = req.body
+    if (schedule && !cron.validate(schedule)) {
+      return res.status(400).json({ error: 'Cron inválido' })
+    }
     const resolvedMetricType: 'count' | 'ratio' = metricType === 'count' ? 'count' : 'ratio'
     const isSpecific = computeIsSpecific(resolvedMetricType, queryTestsTemplate, queryStoriesTemplate)
     await pool.query(
       `UPDATE integration_templates
-       SET name = ?, connector = ?, metricType = ?, queryTestsTemplate = ?, queryStoriesTemplate = ?, formulaTemplate = ?, schedule = ?, authProfileId = ?, isSpecific = ?, enabled = ?
+       SET name = ?, connector = ?, metricType = ?, metricTypeUi = ?, queryTestsTemplate = ?, queryStoriesTemplate = ?, formulaTemplate = ?, schedule = ?, authProfileId = ?, isSpecific = ?, enabled = ?
        WHERE id = ?`,
       [
         name,
         connector || 'jira',
         resolvedMetricType,
+        metricTypeUi || null,
         queryTestsTemplate || null,
         resolvedMetricType === 'ratio' ? queryStoriesTemplate || null : null,
         formulaTemplate || null,
@@ -415,6 +474,12 @@ export const createTarget = async (req: Request, res: Response) => {
     if (!templateId || (!scopeId && !orgScopeId)) {
       return res.status(400).json({ error: 'templateId y scopeId/orgScopeId son requeridos' })
     }
+    const usersCount = getUsersCount(params)
+    if (assignmentId && usersCount > 1) {
+      return res.status(400).json({
+        error: 'Target con multiples users no puede asignarse a un KPI individual. Usa un target por persona o quita la asignacion.',
+      })
+    }
     const [result] = await pool.query(
       `INSERT INTO integration_targets
        (templateId, scopeType, scopeId, orgScopeId, params, assignmentId, enabled)
@@ -441,6 +506,12 @@ export const updateTarget = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
     const { templateId, scopeType, scopeId, orgScopeId, params, assignmentId, enabled } = req.body
+    const usersCount = getUsersCount(params)
+    if (assignmentId && usersCount > 1) {
+      return res.status(400).json({
+        error: 'Target con multiples users no puede asignarse a un KPI individual. Usa un target por persona o quita la asignacion.',
+      })
+    }
     await pool.query(
       `UPDATE integration_targets
        SET templateId = ?, scopeType = ?, scopeId = ?, orgScopeId = ?, params = ?, assignmentId = ?, enabled = ?
@@ -466,6 +537,8 @@ export const updateTarget = async (req: Request, res: Response) => {
 export const listTemplateRuns = async (req: Request, res: Response) => {
   try {
     const { templateId, targetId } = req.query
+    const includeArchived =
+      String(req.query.includeArchived || '').toLowerCase() === 'true' || String(req.query.includeArchived) === '1'
     const params: any[] = []
     let query = `SELECT r.*, c.name as triggeredByName
                  FROM integration_template_runs r
@@ -479,6 +552,9 @@ export const listTemplateRuns = async (req: Request, res: Response) => {
       query += ' AND r.targetId = ?'
       params.push(targetId)
     }
+    if (!includeArchived) {
+      query += ' AND (r.archived IS NULL OR r.archived = 0)'
+    }
     query += ' ORDER BY r.startedAt DESC'
     const [rows] = await pool.query(query, params)
     const data = Array.isArray(rows)
@@ -491,6 +567,76 @@ export const listTemplateRuns = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Error fetching template runs:', error)
     res.status(500).json({ error: 'Error al obtener ejecuciones' })
+  }
+}
+
+export const archiveRun = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    await pool.query(`UPDATE integration_template_runs SET archived = 1 WHERE id = ?`, [id])
+    res.json({ message: 'Run archivado' })
+  } catch (error: any) {
+    console.error('Error archiving run:', error)
+    res.status(500).json({ error: 'Error al archivar run' })
+  }
+}
+
+export const deleteRun = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    await pool.query(`DELETE FROM integration_template_runs WHERE id = ?`, [id])
+    res.json({ message: 'Run eliminado' })
+  } catch (error: any) {
+    console.error('Error deleting run:', error)
+    res.status(500).json({ error: 'Error al eliminar run' })
+  }
+}
+
+export const archiveRuns = async (req: Request, res: Response) => {
+  try {
+    const { templateId, targetId, status } = req.body || {}
+    if (!templateId) {
+      return res.status(400).json({ error: 'templateId es requerido' })
+    }
+    const params: any[] = [templateId]
+    let query = `UPDATE integration_template_runs SET archived = 1 WHERE templateId = ?`
+    if (targetId) {
+      query += ' AND targetId = ?'
+      params.push(targetId)
+    }
+    if (status) {
+      query += ' AND status = ?'
+      params.push(status)
+    }
+    const [result] = await pool.query(query, params)
+    res.json({ message: 'Runs archivados', result })
+  } catch (error: any) {
+    console.error('Error archiving runs:', error)
+    res.status(500).json({ error: 'Error al archivar runs' })
+  }
+}
+
+export const deleteRuns = async (req: Request, res: Response) => {
+  try {
+    const { templateId, targetId, status } = req.body || {}
+    if (!templateId) {
+      return res.status(400).json({ error: 'templateId es requerido' })
+    }
+    const params: any[] = [templateId]
+    let query = `DELETE FROM integration_template_runs WHERE templateId = ?`
+    if (targetId) {
+      query += ' AND targetId = ?'
+      params.push(targetId)
+    }
+    if (status) {
+      query += ' AND status = ?'
+      params.push(status)
+    }
+    const [result] = await pool.query(query, params)
+    res.json({ message: 'Runs eliminados', result })
+  } catch (error: any) {
+    console.error('Error deleting runs:', error)
+    res.status(500).json({ error: 'Error al eliminar runs' })
   }
 }
 
@@ -577,7 +723,7 @@ export const testTemplate = async (req: Request, res: Response) => {
           const authProfile = authRows[0]
           resolvedEndpoint = authProfile.endpoint
           resolvedAuthType = authProfile.authType
-          resolvedAuthConfig = authProfile.authConfig ? parseJson(authProfile.authConfig) : null
+          resolvedAuthConfig = authProfile.authConfig ? parseAuthConfig(authProfile.authConfig) : null
         }
       }
     }
@@ -617,7 +763,7 @@ export const testTemplate = async (req: Request, res: Response) => {
         const authProfile = authRows[0]
         resolvedEndpoint = authProfile.endpoint
         resolvedAuthType = authProfile.authType
-        resolvedAuthConfig = authProfile.authConfig ? parseJson(authProfile.authConfig) : null
+        resolvedAuthConfig = authProfile.authConfig ? parseAuthConfig(authProfile.authConfig) : null
       }
     }
 
@@ -635,29 +781,11 @@ export const testTemplate = async (req: Request, res: Response) => {
       warnings.push('JQL Historias contiene placeholders sin resolver')
     }
 
-    const headers = formatAuthHeaders(resolvedAuthType, resolvedAuthConfig || {})
-    const baseUrl = String(resolvedEndpoint).replace(/\/$/, '')
-    const testsUrl = `${baseUrl}/rest/api/3/search?jql=${encodeURIComponent(testsJql)}&maxResults=0`
-    const storiesUrl = `${baseUrl}/rest/api/3/search?jql=${encodeURIComponent(storiesJql)}&maxResults=0`
-
-    const testsRes = await fetch(testsUrl, { headers })
-    if (!testsRes.ok) {
-      const text = await testsRes.text()
-      return res.status(400).json({ error: `Jira tests error ${testsRes.status}: ${text}` })
-    }
-    const testsJson = await testsRes.json()
-    const testsTotal = Number(testsJson?.total ?? 0)
-
+    const testsTotal = await jiraSearch(resolvedEndpoint, resolvedAuthType, resolvedAuthConfig || {}, testsJql)
     let storiesJson: any = null
     let storiesTotal = 0
     if (resolvedMetricType === 'ratio' && storiesJql) {
-      const storiesRes = await fetch(storiesUrl, { headers })
-      if (!storiesRes.ok) {
-        const text = await storiesRes.text()
-        return res.status(400).json({ error: `Jira stories error ${storiesRes.status}: ${text}` })
-      }
-      storiesJson = await storiesRes.json()
-      storiesTotal = Number(storiesJson?.total ?? 0)
+      storiesTotal = await jiraSearch(resolvedEndpoint, resolvedAuthType, resolvedAuthConfig || {}, storiesJql)
     }
 
     const formula = resolvedFormula || (resolvedMetricType === 'count' ? 'tests' : 'tests / stories')
@@ -686,11 +814,31 @@ export const testTemplate = async (req: Request, res: Response) => {
       from,
       to,
       warnings,
-      raw: allowRaw ? { tests: testsJson, stories: storiesJson } : undefined,
+      raw: allowRaw ? { tests: testsTotal, stories: storiesTotal } : undefined,
     })
   } catch (error: any) {
     console.error('Error testing template:', error)
     res.status(500).json({ error: error?.message || 'Error al probar template' })
+  }
+}
+
+export const getNextCronRun = async (req: Request, res: Response) => {
+  try {
+    const { expression } = req.query
+    const expr = String(expression || '').trim()
+    if (!expr) {
+      return res.status(400).json({ error: 'expression es requerido' })
+    }
+    if (!cron.validate(expr)) {
+      return res.status(400).json({ error: 'Cron inválido' })
+    }
+    const task = cron.schedule(expr, () => {})
+    const next = (task as any)?.nextDates?.()?.toDate?.() || null
+    task.stop()
+    res.json({ nextRun: next ? next.toISOString() : null })
+  } catch (error: any) {
+    console.error('Error computing cron next run:', error)
+    res.status(500).json({ error: 'Error al calcular próxima ejecución' })
   }
 }
 
@@ -702,7 +850,7 @@ export const listIntegrations = async (_req: Request, res: Response) => {
     const data = Array.isArray(rows)
       ? rows.map((row) => ({
           ...row,
-          authConfig: row.authConfig ? parseJson(row.authConfig) : null,
+          authConfig: row.authConfig ? parseAuthConfig(row.authConfig) : null,
         }))
       : []
     res.json(data)
@@ -725,7 +873,7 @@ export const getIntegrationById = async (req: Request, res: Response) => {
     const row = rows[0]
     res.json({
       ...row,
-      authConfig: row.authConfig ? parseJson(row.authConfig) : null,
+      authConfig: row.authConfig ? parseAuthConfig(row.authConfig) : null,
     })
   } catch (error: any) {
     console.error('Error fetching integration:', error)
@@ -754,7 +902,7 @@ export const createIntegration = async (req: Request, res: Response) => {
         jqlTests || null,
         jqlStories || null,
         authType || 'none',
-        authConfig ? JSON.stringify(authConfig) : null,
+        serializeAuthConfig(authConfig),
         status || 'inactive',
         schedule || null,
       ]
@@ -787,7 +935,7 @@ export const updateIntegration = async (req: Request, res: Response) => {
         jqlTests || null,
         jqlStories || null,
         authType || 'none',
-        authConfig ? JSON.stringify(authConfig) : null,
+        serializeAuthConfig(authConfig),
         status || 'inactive',
         schedule || null,
         id,

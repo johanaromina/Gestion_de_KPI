@@ -1,4 +1,5 @@
 import { pool } from '../config/database'
+import { decryptSecret } from './crypto'
 
 type AuthProfileRow = {
   id: number
@@ -14,6 +15,7 @@ type TemplateRow = {
   name: string
   connector: string
   metricType?: 'count' | 'ratio' | null
+  metricTypeUi?: string | null
   queryTestsTemplate?: string | null
   queryStoriesTemplate?: string | null
   formulaTemplate?: string | null
@@ -56,6 +58,12 @@ const parseJson = (value: any) => {
   } catch {
     return null
   }
+}
+
+const parseAuthConfig = (value: any) => {
+  if (!value) return null
+  const decrypted = decryptSecret(String(value))
+  return parseJson(decrypted)
 }
 
 class RunQueue {
@@ -133,18 +141,30 @@ const shouldUseCache = async (templateId: number, targetId: number) => {
   return diffHours <= CACHE_TTL_HOURS
 }
 
+const hasMeasurementForSubPeriod = async (assignmentId: number, subPeriodId: number | null) => {
+  if (!subPeriodId) return false
+  const [rows] = await pool.query<any[]>(
+    `SELECT id FROM kpi_measurements
+     WHERE assignmentId = ? AND subPeriodId = ? AND status IN ('approved','proposed') LIMIT 1`,
+    [assignmentId, subPeriodId]
+  )
+  return Array.isArray(rows) && rows.length > 0
+}
+
 const createMeasurementFromRun = async (
   assignmentId: number | null | undefined,
   value: number,
   runId: number,
-  triggeredBy?: number | null
+  triggeredBy?: number | null,
+  periodId?: number | null,
+  subPeriodId?: number | null
 ) => {
   if (!assignmentId) return
   await pool.query(
     `INSERT INTO kpi_measurements
-     (assignmentId, value, mode, status, capturedBy, sourceRunId)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [assignmentId, value, 'auto', 'proposed', triggeredBy || null, String(runId)]
+     (assignmentId, periodId, subPeriodId, value, mode, status, capturedBy, sourceRunId)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [assignmentId, periodId || null, subPeriodId || null, value, 'auto', 'proposed', triggeredBy || null, String(runId)]
   )
 }
 
@@ -152,18 +172,27 @@ const executeJiraQuery = async (endpoint: string, authType: string | null | unde
   if (!endpoint || !jql) {
     throw new Error('Falta endpoint o JQL en Jira')
   }
-  const headers = formatAuthHeaders(authType, authConfig)
+  const headers = {
+    ...formatAuthHeaders(authType, authConfig),
+    'Content-Type': 'application/json',
+  }
   const baseUrl = endpoint.replace(/\/$/, '')
-  const url = `${baseUrl}/rest/api/3/search?jql=${encodeURIComponent(jql)}&maxResults=0`
-  const response = await fetch(url, { headers })
+  const url = `${baseUrl}/rest/api/3/search/approximate-count`
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      jql,
+    }),
+  })
   if (!response.ok) {
     const text = await response.text()
     throw new Error(`Jira error ${response.status}: ${text}`)
   }
   const data = await response.json()
-  const total = Number(data?.total ?? 0)
+  const total = Number(data?.count ?? 0)
   if (!Number.isFinite(total)) {
-    throw new Error('Respuesta de Jira inválida (total)')
+    throw new Error('Respuesta de Jira inválida (count)')
   }
   return total
 }
@@ -206,6 +235,172 @@ const resolvePeriodParams = (params: Record<string, any>) => {
   const toIso = to.toISOString().slice(0, 10)
   const fromIso = from.toISOString().slice(0, 10)
   return { from: fromIso, to: toIso }
+}
+
+const formatPeriodValue = (from: string, format: string) => {
+  if (!from) return ''
+  if (format === 'YYYY-MM-DD') return from
+  if (format === 'YYYY-MM') return from.slice(0, 7)
+  return from
+}
+
+const toNumber = (value: any) => {
+  if (value === null || value === undefined || value === '') return null
+  const num = Number(value)
+  return Number.isFinite(num) ? num : null
+}
+
+const findColumnIndex = (header: any[], column: any) => {
+  if (column === null || column === undefined || column === '') return null
+  if (typeof column === 'number') return column
+  const numeric = Number(column)
+  if (Number.isFinite(numeric) && String(column).trim() !== '') {
+    return numeric
+  }
+  const headerIndex = header.findIndex(
+    (cell) => String(cell).trim().toLowerCase() === String(column).trim().toLowerCase()
+  )
+  return headerIndex >= 0 ? headerIndex : null
+}
+
+const matchValue = (value: any, expected: any) => {
+  if (expected === null || expected === undefined || expected === '') return true
+  return String(value).trim().toLowerCase() === String(expected).trim().toLowerCase()
+}
+
+const executeSheetsQuery = async (
+  endpoint: string | null | undefined,
+  authType: string | null | undefined,
+  authConfig: any,
+  params: Record<string, any>
+) => {
+  const sheetKey = params.sheetKey || params.spreadsheetId
+  const range = params.range || params.tab
+  if (!sheetKey || !range) {
+    throw new Error('Falta sheetKey o rango (tab/range) en params de Sheets')
+  }
+  const baseUrl = (endpoint || 'https://sheets.googleapis.com').replace(/\/$/, '')
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+  }
+  if (authType === 'bearer' && authConfig?.token) {
+    headers.Authorization = `Bearer ${authConfig.token}`
+  }
+  const queryParams = new URLSearchParams({
+    majorDimension: 'ROWS',
+    valueRenderOption: 'UNFORMATTED_VALUE',
+  })
+  if (authType === 'apiKey' && authConfig?.apiKey) {
+    queryParams.set('key', authConfig.apiKey)
+  }
+  const url = `${baseUrl}/v4/spreadsheets/${encodeURIComponent(sheetKey)}/values/${encodeURIComponent(
+    range
+  )}?${queryParams.toString()}`
+  const response = await fetch(url, { headers })
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Sheets error ${response.status}: ${text}`)
+  }
+  const data = await response.json()
+  const values: any[] = Array.isArray(data?.values) ? data.values : []
+  if (values.length === 0) {
+    return { values: [], headers: [], rows: [] }
+  }
+  const headerRow = values[0]
+  const rows = values.slice(1)
+  return { values, headers: headerRow, rows }
+}
+
+const computeSheetsValue = (
+  template: TemplateRow,
+  params: Record<string, any>,
+  sheetData: { headers: any[]; rows: any[] }
+) => {
+  const headers = sheetData.headers || []
+  const rows = sheetData.rows || []
+  const periodFormat = params.periodFormat || 'YYYY-MM'
+  const periodValue =
+    params.periodValue ||
+    params.periodLabel ||
+    params.periodName ||
+    formatPeriodValue(params.from, periodFormat)
+  const areaValue = params.areaValue || params.area
+  const kpiValue = params.kpiValue || params.kpi
+  const periodColumn = params.periodColumn
+  const areaColumn = params.areaColumn
+  const kpiColumn = params.kpiColumn
+  const valueColumn = params.valueColumn || params.value
+
+  const periodIdx = findColumnIndex(headers, periodColumn)
+  const areaIdx = findColumnIndex(headers, areaColumn)
+  const kpiIdx = findColumnIndex(headers, kpiColumn)
+  const valueIdx = findColumnIndex(headers, valueColumn)
+
+  if (valueIdx === null || valueIdx === undefined) {
+    throw new Error('No se pudo resolver valueColumn en Sheets')
+  }
+
+  const matched = rows.filter((row) => {
+    const periodCell = periodIdx !== null ? row[periodIdx] : null
+    const areaCell = areaIdx !== null ? row[areaIdx] : null
+    const kpiCell = kpiIdx !== null ? row[kpiIdx] : null
+    return matchValue(periodCell, periodValue) && matchValue(areaCell, areaValue) && matchValue(kpiCell, kpiValue)
+  })
+
+  const values = matched.map((row) => toNumber(row[valueIdx])).filter((val) => val !== null) as number[]
+
+  const metricUi = template.metricTypeUi || ''
+  if (metricUi === 'value_agg') {
+    const agg = String(params.aggregation || 'SUM').toUpperCase()
+    if (values.length === 0) return { computed: 0, matchedRows: matched.length, values }
+    if (agg === 'AVG') {
+      const sum = values.reduce((acc, val) => acc + val, 0)
+      return { computed: sum / values.length, matchedRows: matched.length, values }
+    }
+    if (agg === 'MAX') return { computed: Math.max(...values), matchedRows: matched.length, values }
+    if (agg === 'MIN') return { computed: Math.min(...values), matchedRows: matched.length, values }
+    const sum = values.reduce((acc, val) => acc + val, 0)
+    return { computed: sum, matchedRows: matched.length, values }
+  }
+
+  const computed = values.length > 0 ? values[0] : 0
+  return { computed, matchedRows: matched.length, values }
+}
+
+const resolveSubPeriodId = async (periodId: number | null, from: string, to: string) => {
+  if (!periodId || !from || !to) return null
+  const toDate = new Date(to)
+  const endDate = new Date(toDate)
+  endDate.setDate(endDate.getDate() - 1)
+  const endIso = endDate.toISOString().slice(0, 10)
+  const [rows] = await pool.query<any[]>(
+    `SELECT id FROM calendar_subperiods
+     WHERE periodId = ? AND startDate = ? AND endDate = ?
+     LIMIT 1`,
+    [periodId, from, endIso]
+  )
+  if (Array.isArray(rows) && rows.length > 0) {
+    return rows[0].id
+  }
+  const [fallback] = await pool.query<any[]>(
+    `SELECT id FROM calendar_subperiods
+     WHERE periodId = ? AND startDate <= ? AND endDate >= ?
+     LIMIT 1`,
+    [periodId, from, endIso]
+  )
+  if (Array.isArray(fallback) && fallback.length > 0) {
+    return fallback[0].id
+  }
+  return null
+}
+
+const resolveSubPeriodName = async (subPeriodId: number | null) => {
+  if (!subPeriodId) return null
+  const [rows] = await pool.query<any[]>(`SELECT name FROM calendar_subperiods WHERE id = ? LIMIT 1`, [subPeriodId])
+  if (Array.isArray(rows) && rows.length > 0) {
+    return rows[0].name || null
+  }
+  return null
 }
 
 const mergeParams = (base: any, override: any): any => {
@@ -251,7 +446,18 @@ const loadScopeChain = async (scopeId: number) => {
 }
 
 const evaluateFormula = (formula: string, values: Record<string, number>) => {
-  const expression = formula.replace(/\btests\b/g, String(values.tests)).replace(/\bstories\b/g, String(values.stories))
+  const normalized = formula.trim().toLowerCase()
+  if (normalized === 'count' || normalized === 'tests' || normalized === 'a') {
+    return Number(values.tests)
+  }
+  if (normalized === 'stories' || normalized === 'b') {
+    return Number(values.stories)
+  }
+  const expression = normalized
+    .replace(/\btests\b/g, String(values.tests))
+    .replace(/\bstories\b/g, String(values.stories))
+    .replace(/\ba\b/g, String(values.tests))
+    .replace(/\bb\b/g, String(values.stories))
   if (!/^[0-9+\-*/().\s]+$/.test(expression)) {
     throw new Error('Fórmula inválida')
   }
@@ -295,27 +501,14 @@ const executeTemplateTarget = async (
   mergedParams = mergeParams(mergedParams, baseParams)
   const { from, to } = resolvePeriodParams(mergedParams)
   const params = { ...mergedParams, from, to }
-
-  const metricType: 'count' | 'ratio' = template.metricType === 'count' ? 'count' : 'ratio'
-  if (!template.queryTestsTemplate) {
-    throw new Error('La plantilla no tiene query de tests definida')
+  const usersCount = Array.isArray(params.users) ? params.users.length : params.users ? 1 : 0
+  if (target.assignmentId && usersCount > 1) {
+    throw new Error(
+      'Target con multiples users no puede asignarse a un KPI individual. Usa un target por persona o quita la asignacion.'
+    )
   }
-  if (metricType === 'ratio' && !template.queryStoriesTemplate) {
-    throw new Error('La plantilla ratio requiere query de historias')
-  }
-
-  const testsJql = template.queryTestsTemplate
-    ? renderTemplate(template.queryTestsTemplate, params)
-    : ''
-  const storiesJql =
-    metricType === 'ratio' && template.queryStoriesTemplate
-      ? renderTemplate(template.queryStoriesTemplate, params)
-      : ''
 
   const connector = template.connector || authProfile?.connector || 'jira'
-  if (connector !== 'jira' && connector !== 'xray') {
-    throw new Error('Connector no soportado en fase 1')
-  }
 
   let resolvedAuthProfile = authProfile
   if (scopeAuthProfileId && (!resolvedAuthProfile || resolvedAuthProfile.id !== scopeAuthProfileId)) {
@@ -326,47 +519,118 @@ const executeTemplateTarget = async (
     resolvedAuthProfile = Array.isArray(authRows) && authRows.length > 0 ? authRows[0] : resolvedAuthProfile
   }
 
-  if (!resolvedAuthProfile?.endpoint) {
-    throw new Error('Falta endpoint en auth profile')
+  const authConfig = resolvedAuthProfile?.authConfig ? parseAuthConfig(resolvedAuthProfile.authConfig) : null
+
+  let testsTotal = 0
+  let storiesTotal = 0
+  let computed = 0
+  let formula = template.formulaTemplate || ''
+  let testsJql = ''
+  let storiesJql = ''
+  let sheetMeta: any = null
+
+  if (connector === 'sheets') {
+    const sheetData = await executeSheetsQuery(
+      resolvedAuthProfile?.endpoint || null,
+      resolvedAuthProfile?.authType || null,
+      authConfig || {},
+      params
+    )
+    const sheetResult = computeSheetsValue(template, params, sheetData)
+    computed = sheetResult.computed
+    sheetMeta = {
+      sheetKey: params.sheetKey || params.spreadsheetId,
+      tab: params.tab || params.range,
+      matchedRows: sheetResult.matchedRows,
+      values: sheetResult.values,
+      periodValue: params.periodValue || params.periodLabel || params.periodName || formatPeriodValue(params.from, params.periodFormat || 'YYYY-MM'),
+    }
+    formula = template.formulaTemplate || (template.metricTypeUi === 'value_agg' ? 'AGG' : 'VALUE')
+  } else if (connector === 'jira' || connector === 'xray') {
+    const metricType: 'count' | 'ratio' = template.metricType === 'count' ? 'count' : 'ratio'
+    if (!template.queryTestsTemplate) {
+      throw new Error('La plantilla no tiene query de tests definida')
+    }
+    if (metricType === 'ratio' && !template.queryStoriesTemplate) {
+      throw new Error('La plantilla ratio requiere query de historias')
+    }
+
+    testsJql = template.queryTestsTemplate ? renderTemplate(template.queryTestsTemplate, params) : ''
+    storiesJql =
+      metricType === 'ratio' && template.queryStoriesTemplate
+        ? renderTemplate(template.queryStoriesTemplate, params)
+        : ''
+
+    if (!resolvedAuthProfile?.endpoint) {
+      throw new Error('Falta endpoint en auth profile')
+    }
+
+    const auth = authConfig || {}
+    testsTotal = await executeJiraQuery(resolvedAuthProfile.endpoint, resolvedAuthProfile.authType, auth, testsJql)
+    storiesTotal =
+      metricType === 'ratio' && storiesJql
+        ? await executeJiraQuery(resolvedAuthProfile.endpoint, resolvedAuthProfile.authType, auth, storiesJql)
+        : 0
+    formula = template.formulaTemplate || (metricType === 'count' ? 'tests' : 'tests / stories')
+    computed =
+      metricType === 'ratio'
+        ? storiesTotal > 0
+          ? evaluateFormula(formula, { tests: testsTotal, stories: storiesTotal })
+          : 0
+        : evaluateFormula(formula, { tests: testsTotal, stories: storiesTotal })
+  } else {
+    throw new Error('Connector no soportado')
   }
 
-  const authConfig = parseJson(resolvedAuthProfile.authConfig || null) || {}
-  const testsTotal = await executeJiraQuery(
-    resolvedAuthProfile.endpoint,
-    resolvedAuthProfile.authType,
-    authConfig,
-    testsJql
-  )
-  const storiesTotal =
-    metricType === 'ratio' && storiesJql
-      ? await executeJiraQuery(resolvedAuthProfile.endpoint, resolvedAuthProfile.authType, authConfig, storiesJql)
-      : 0
-  const formula = template.formulaTemplate || (metricType === 'count' ? 'tests' : 'tests / stories')
-  const computed =
-    metricType === 'ratio'
-      ? storiesTotal > 0
-        ? evaluateFormula(formula, { tests: testsTotal, stories: storiesTotal })
-        : 0
-      : evaluateFormula(formula, { tests: testsTotal, stories: storiesTotal })
+  let periodId: number | null = null
+  let subPeriodId: number | null = null
+  if (target.assignmentId) {
+    const [assignmentRows] = await pool.query<any[]>(
+      `SELECT periodId, subPeriodId FROM collaborator_kpis WHERE id = ? LIMIT 1`,
+      [target.assignmentId]
+    )
+    if (Array.isArray(assignmentRows) && assignmentRows.length > 0) {
+      periodId = assignmentRows[0].periodId || null
+      subPeriodId = assignmentRows[0].subPeriodId || null
+    }
+  }
+  if (target.assignmentId && periodId && !subPeriodId) {
+    subPeriodId = await resolveSubPeriodId(periodId, from, to)
+  }
+  const subPeriodName = await resolveSubPeriodName(subPeriodId)
+  const shouldSkip = target.assignmentId
+    ? await hasMeasurementForSubPeriod(target.assignmentId, subPeriodId)
+    : false
+  const skipReason = shouldSkip ? 'Subperiodo ya tiene medicion propuesta/aprobada' : null
 
   const insertResult = await insertRun(template.id, target.id, {
     status: 'success',
     triggeredBy: context.triggeredBy,
     message: context.note || 'Ejecución manual',
     outputs: {
-      metricType,
+      metricType: template.metricType || 'count',
+      metricTypeUi: template.metricTypeUi || null,
       testsTotal,
       storiesTotal,
       computed,
       testsJql,
       storiesJql,
       formula,
+      sheetMeta,
       mode: context.mode,
+      periodId,
+      subPeriodId,
+      subPeriodName,
+      range: { from, to },
+      skipped: shouldSkip,
+      skipReason,
     },
   })
 
   const runId = (insertResult as any).insertId
-  await createMeasurementFromRun(target.assignmentId, computed, runId, context.triggeredBy)
+  if (!shouldSkip) {
+    await createMeasurementFromRun(target.assignmentId, computed, runId, context.triggeredBy, periodId, subPeriodId)
+  }
 
   return { runId, computed }
 }

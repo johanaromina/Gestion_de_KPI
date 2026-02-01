@@ -48,3 +48,29 @@
   font-size: 0.9em;
 }
 
+.scope-weights {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.scope-weight-row {
+  display: grid;
+  grid-template-columns: 1fr 120px;
+  gap: 12px;
+  align-items: center;
+}
+
+.scope-weight-row input {
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.scope-label {
+  font-size: 13px;
+  color: #374151;
+}
+

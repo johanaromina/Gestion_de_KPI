@@ -4,28 +4,58 @@ import { AuthRequest } from '../middleware/auth.middleware'
 
 export const getCurationItems = async (req: Request, res: Response) => {
   try {
-    const { status, periodId, kpiId, collaboratorId, assignmentId, area, areaId, limit } = req.query
+    const { status, periodId, kpiId, collaboratorId, assignmentId, area, areaId, orgScopeId, limit } = req.query
 
-    let query = `SELECT cv.*,
+    let query = `SELECT
+                        cv_latest.id as id,
+                        cv_latest.id as criteriaVersionId,
+                        cv_latest.dataSource,
+                        cv_latest.sourceConfig,
+                        cv_latest.criteriaText,
+                        cv_latest.evidenceUrl,
+                        cv_latest.status as criteriaStatus,
+                        cv_latest.createdBy,
+                        cv_latest.reviewedBy,
+                        cv_latest.comment,
+                        cv_latest.createdAt,
+                        cv_latest.reviewedAt,
                         ck.id as assignmentId,
+                        ck.curationStatus as assignmentCurationStatus,
+                        ck.dataSource as assignmentDataSource,
+                        ck.sourceConfig as assignmentSourceConfig,
                         k.name as kpiName,
+                        k.criteria as kpiCriteria,
                         c.name as collaboratorName,
                         c.area as collaboratorArea,
                         p.name as periodName,
                         cb.name as createdByName
-                 FROM kpi_criteria_versions cv
-                 JOIN collaborator_kpis ck ON cv.assignmentId = ck.id
+                 FROM collaborator_kpis ck
                  JOIN kpis k ON ck.kpiId = k.id
                  JOIN collaborators c ON ck.collaboratorId = c.id
                  JOIN periods p ON ck.periodId = p.id
-                 LEFT JOIN collaborators cb ON cv.createdBy = cb.id
+                 LEFT JOIN kpi_criteria_versions cv_latest
+                   ON cv_latest.id = (
+                     SELECT id FROM kpi_criteria_versions
+                     WHERE assignmentId = ck.id
+                     ORDER BY createdAt DESC LIMIT 1
+                   )
+                 LEFT JOIN collaborators cb ON cv_latest.createdBy = cb.id
                  WHERE 1=1`
 
     const params: any[] = []
 
     if (status) {
-      query += ' AND cv.status = ?'
-      params.push(status)
+      if (status === 'pending' || status === 'in_review') {
+        query +=
+          ' AND (cv_latest.status = ? OR (cv_latest.id IS NULL AND ck.curationStatus = ?))'
+        params.push(status, status)
+      } else if (status === 'approved' || status === 'rejected') {
+        query += ' AND cv_latest.status = ?'
+        params.push(status)
+      } else {
+        query += ' AND cv_latest.status = ?'
+        params.push(status)
+      }
     }
     if (periodId) {
       query += ' AND ck.periodId = ?'
@@ -43,7 +73,10 @@ export const getCurationItems = async (req: Request, res: Response) => {
       query += ' AND ck.id = ?'
       params.push(assignmentId)
     }
-    if (areaId) {
+    if (orgScopeId) {
+      query += ' AND c.orgScopeId = ?'
+      params.push(orgScopeId)
+    } else if (areaId) {
       query += ' AND EXISTS (SELECT 1 FROM areas a WHERE a.name = c.area AND a.id = ?)'
       params.push(areaId)
     } else if (area) {
@@ -51,7 +84,7 @@ export const getCurationItems = async (req: Request, res: Response) => {
       params.push(area)
     }
 
-    query += ' ORDER BY cv.createdAt DESC'
+    query += ' ORDER BY COALESCE(cv_latest.createdAt, ck.updatedAt) DESC'
 
     if (limit) {
       query += ' LIMIT ?'

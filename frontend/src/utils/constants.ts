@@ -22,6 +22,14 @@ export const KPI_STATUS = {
 } as const
 
 export const KPI_TYPES = {
+  MANUAL: 'manual',
+  COUNT: 'count',
+  RATIO: 'ratio',
+  SLA: 'sla',
+  VALUE: 'value',
+} as const
+
+export const KPI_DIRECTIONS = {
   GROWTH: 'growth',
   REDUCTION: 'reduction',
   EXACT: 'exact',
@@ -34,4 +42,3 @@ export const OBJECTIVE_LEVELS = {
   LEADERSHIP: 'leadership',
   INDIVIDUAL: 'individual',
 } as const
-

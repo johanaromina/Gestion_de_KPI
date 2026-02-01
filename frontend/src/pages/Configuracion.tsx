@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import api from '../services/api'
 import { useAuth } from '../hooks/useAuth'
+import SubPeriodForm from '../components/SubPeriodForm'
 import './Configuracion.css'
 
 type Permission = { id: number; code: string; description?: string }
@@ -12,6 +13,7 @@ type Collaborator = {
   area: string
   role: string
   hasSuperpowers?: boolean
+  orgScopeId?: number | null
 }
 
 type AuthProfile = {
@@ -28,6 +30,7 @@ type IntegrationTemplate = {
   name: string
   connector: string
   metricType?: 'count' | 'ratio'
+  metricTypeUi?: 'count' | 'ratio' | 'sla' | 'value' | 'value_agg' | 'manual'
   queryTestsTemplate?: string
   queryStoriesTemplate?: string
   formulaTemplate?: string
@@ -62,6 +65,15 @@ type TemplateRun = {
   message?: string
   outputs?: any
   error?: string
+  archived?: number
+}
+
+type CalendarProfile = {
+  id: number
+  name: string
+  description?: string | null
+  frequency: 'monthly' | 'quarterly' | 'custom'
+  active?: boolean
 }
 
 export default function Configuracion() {
@@ -80,24 +92,152 @@ export default function Configuracion() {
   const [editingTarget, setEditingTarget] = useState<IntegrationTarget | null>(null)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [editingAuth, setEditingAuth] = useState<AuthProfile | null>(null)
+  const [showCalendarModal, setShowCalendarModal] = useState(false)
+  const [editingCalendar, setEditingCalendar] = useState<CalendarProfile | null>(null)
+  const [showCalendarSubperiods, setShowCalendarSubperiods] = useState(false)
+  const [calendarForSubperiods, setCalendarForSubperiods] = useState<CalendarProfile | null>(null)
+  const [selectedPeriodForCalendar, setSelectedPeriodForCalendar] = useState<number | ''>('')
+  const [editingCalendarSubperiod, setEditingCalendarSubperiod] = useState<any | null | undefined>(undefined)
   const [showScopeModal, setShowScopeModal] = useState(false)
   const [editingScope, setEditingScope] = useState<any | null>(null)
+  const [showTargetWizard, setShowTargetWizard] = useState(false)
+  const [wizardTarget, setWizardTarget] = useState<IntegrationTarget | null>(null)
+  const [wizardRows, setWizardRows] = useState<Array<{ userKey: string; collaboratorId: string; assignmentId: string }>>(
+    []
+  )
+  const [rawJqlInput, setRawJqlInput] = useState('')
   const [showTargetPreview, setShowTargetPreview] = useState(false)
   const [targetPreviewTarget, setTargetPreviewTarget] = useState<IntegrationTarget | null>(null)
   const [targetPreviewResult, setTargetPreviewResult] = useState<any>(null)
   const [targetPreviewMessage, setTargetPreviewMessage] = useState('')
   const [toastMessage, setToastMessage] = useState('')
+  const [templateFormError, setTemplateFormError] = useState('')
+  const [cronPreview, setCronPreview] = useState('')
   const [templateForm, setTemplateForm] = useState({
     name: '',
     connector: 'jira',
-    metricType: 'ratio' as 'count' | 'ratio',
+    metricType: 'ratio' as 'count' | 'ratio' | 'sla' | 'value' | 'value_agg' | 'manual',
     queryTestsTemplate: '',
     queryStoriesTemplate: '',
-    formulaTemplate: 'tests / stories',
+    formulaTemplate: 'A / B',
     schedule: '',
     authProfileId: '',
     enabled: true,
   })
+  const metricTypeToBackend = (metricType: string) => {
+    if (metricType === 'ratio' || metricType === 'sla') return 'ratio'
+    return 'count'
+  }
+
+  const metricTypeLabel = (metricType?: string) => {
+    switch (metricType) {
+      case 'count':
+        return 'COUNT'
+      case 'ratio':
+        return 'RATIO'
+      case 'sla':
+        return 'SLA'
+      case 'value':
+        return 'VALUE'
+      case 'value_agg':
+        return 'VALUE_AGG'
+      case 'manual':
+        return 'MANUAL'
+      default:
+        return metricType === 'count' ? 'COUNT' : 'RATIO'
+    }
+  }
+
+  const applyTemplatePreset = (preset: 'count' | 'ratio' | 'sla' | 'sheets_value' | 'sheets_agg' | 'manual') => {
+    if (preset === 'count') {
+      setTemplateForm({
+        name: 'Jira – COUNT (Generic)',
+        connector: 'jira',
+        metricType: 'count',
+        queryTestsTemplate:
+          'project IN ({projects})\nAND issuetype IN ({issueTypesA})\nAND {dateFieldA} >= {from}\nAND {dateFieldA} < {to}\n{extraJqlA}',
+        queryStoriesTemplate: '',
+        formulaTemplate: 'A',
+        schedule: '',
+        authProfileId: templateForm.authProfileId,
+        enabled: true,
+      })
+      return
+    }
+    if (preset === 'ratio') {
+      setTemplateForm({
+        name: 'Jira – RATIO A/B (Generic)',
+        connector: 'jira',
+        metricType: 'ratio',
+        queryTestsTemplate:
+          'project IN ({projects})\nAND issuetype IN ({issueTypesA})\nAND {dateFieldA} >= {from}\nAND {dateFieldA} < {to}\n{extraJqlA}',
+        queryStoriesTemplate:
+          'project IN ({projects})\nAND issuetype IN ({issueTypesB})\nAND {dateFieldB} >= {from}\nAND {dateFieldB} < {to}\n{extraJqlB}',
+        formulaTemplate: 'A / B',
+        schedule: '',
+        authProfileId: templateForm.authProfileId,
+        enabled: true,
+      })
+      return
+    }
+    if (preset === 'sla') {
+      setTemplateForm({
+        name: 'Jira – SLA (On-time / Total)',
+        connector: 'jira',
+        metricType: 'sla',
+        queryTestsTemplate:
+          'project IN ({projects})\nAND issuetype IN ({issueTypesA})\nAND statusCategory = Done\nAND {dateFieldEnd} >= {from}\nAND {dateFieldEnd} < {to}\nAND {dateFieldEnd} <= {dateFieldLimit}\n{extraJqlA}',
+        queryStoriesTemplate:
+          'project IN ({projects})\nAND issuetype IN ({issueTypesB})\nAND statusCategory = Done\nAND {dateFieldEnd} >= {from}\nAND {dateFieldEnd} < {to}\n{extraJqlB}',
+        formulaTemplate: 'A / B',
+        schedule: '',
+        authProfileId: templateForm.authProfileId,
+        enabled: true,
+      })
+      return
+    }
+    if (preset === 'sheets_value') {
+      setTemplateForm({
+        name: 'Sheets – VALUE (Direct)',
+        connector: 'sheets',
+        metricType: 'value',
+        queryTestsTemplate:
+          'sheetKey={sheetKey}\n tab={tab}\n periodColumn={periodColumn}\n areaColumn={areaColumn}\n kpiColumn={kpiColumn}\n valueColumn={valueColumn}',
+        queryStoriesTemplate: '',
+        formulaTemplate: 'VALUE',
+        schedule: '',
+        authProfileId: templateForm.authProfileId,
+        enabled: true,
+      })
+      return
+    }
+    if (preset === 'sheets_agg') {
+      setTemplateForm({
+        name: 'Sheets – AGG (SUM/AVG)',
+        connector: 'sheets',
+        metricType: 'value_agg',
+        queryTestsTemplate:
+          'sheetKey={sheetKey}\n tab={tab}\n aggregation={SUM|AVG}\n periodColumn={periodColumn}\n areaColumn={areaColumn}\n kpiColumn={kpiColumn}\n valueColumn={valueColumn}',
+        queryStoriesTemplate: '',
+        formulaTemplate: 'AGG',
+        schedule: '',
+        authProfileId: templateForm.authProfileId,
+        enabled: true,
+      })
+      return
+    }
+    setTemplateForm({
+      name: 'Manual / CSV – Measurement',
+      connector: 'manual',
+      metricType: 'manual',
+      queryTestsTemplate: 'manual',
+      queryStoriesTemplate: '',
+      formulaTemplate: 'VALUE',
+      schedule: '',
+      authProfileId: '',
+      enabled: true,
+    })
+  }
   const [targetForm, setTargetForm] = useState({
     templateId: '',
     scopeType: 'area',
@@ -120,13 +260,21 @@ export default function Configuracion() {
       header: '',
     },
   })
+  const [calendarForm, setCalendarForm] = useState({
+    name: '',
+    description: '',
+    frequency: 'monthly',
+    active: true,
+  })
   const [scopeForm, setScopeForm] = useState({
     name: '',
     type: 'area',
     parentId: '',
+    calendarProfileId: '',
     metadataText: '',
     active: true,
   })
+  const [targetFormError, setTargetFormError] = useState('')
 
   const { data: permissions } = useQuery<Permission[]>('config-permissions', async () => {
     const res = await api.get('/config/permissions')
@@ -143,6 +291,11 @@ export default function Configuracion() {
     return res.data
   })
 
+  const { data: periods } = useQuery<any[]>('config-periods', async () => {
+    const res = await api.get('/periods')
+    return res.data
+  })
+
   const { data: assignments } = useQuery<any[]>('config-assignments', async () => {
     const res = await api.get('/collaborator-kpis')
     return res.data
@@ -152,6 +305,50 @@ export default function Configuracion() {
     const res = await api.get('/org-scopes')
     return res.data
   })
+
+  const { data: calendarProfiles } = useQuery<CalendarProfile[]>('calendar-profiles', async () => {
+    const res = await api.get('/calendar-profiles')
+    return res.data
+  })
+
+  const { data: calendarSubperiods } = useQuery<any[]>(
+    ['calendar-subperiods', selectedPeriodForCalendar, calendarForSubperiods?.id],
+    async () => {
+      if (!selectedPeriodForCalendar || !calendarForSubperiods?.id) return []
+      const res = await api.get(`/periods/${selectedPeriodForCalendar}/sub-periods`, {
+        params: { calendarProfileId: calendarForSubperiods.id },
+      })
+      return res.data
+    },
+    { enabled: !!selectedPeriodForCalendar && !!calendarForSubperiods?.id }
+  )
+
+  const deleteCalendarSubperiod = useMutation(
+    async (subPeriod: any) => {
+      await api.delete(`/sub-periods/${subPeriod.id}`)
+      return subPeriod
+    },
+    {
+      onSuccess: (_data, subPeriod) => {
+        queryClient.invalidateQueries(['calendar-subperiods', subPeriod.periodId, calendarForSubperiods?.id])
+      },
+    }
+  )
+
+  const closeCalendarSubperiod = useMutation(
+    async (subPeriod: any) => {
+      const res = await api.post(`/sub-periods/${subPeriod.id}/close`)
+      return { subPeriod, data: res.data }
+    },
+    {
+      onSuccess: (result) => {
+        const { subPeriod } = result || {}
+        if (subPeriod) {
+          queryClient.invalidateQueries(['calendar-subperiods', subPeriod.periodId, calendarForSubperiods?.id])
+        }
+      },
+    }
+  )
 
   const { data: collaboratorPerms, refetch: refetchPerms } = useQuery(
     ['config-collaborator-perms', selectedCollaborator],
@@ -194,6 +391,269 @@ export default function Configuracion() {
     },
     { enabled: !!selectedTemplateId }
   )
+
+  const authProfilesByConnector = useMemo(() => {
+    if (!authProfiles) return []
+    if (!templateForm.connector) return authProfiles
+    return authProfiles.filter((profile) => profile.connector === templateForm.connector)
+  }, [authProfiles, templateForm.connector])
+
+  const areaScopes = useMemo(() => {
+    if (!orgScopes) return []
+    return orgScopes.filter((scope) => scope.type === 'area')
+  }, [orgScopes])
+
+  const activeAreaScopes = useMemo(() => {
+    return areaScopes.filter((scope) => scope.active !== 0 && scope.active !== false)
+  }, [areaScopes])
+
+  const scopeById = useMemo(() => {
+    const map = new Map<number, any>()
+    orgScopes?.forEach((scope) => map.set(scope.id, scope))
+    return map
+  }, [orgScopes])
+
+  const assignmentsByCollaborator = useMemo(() => {
+    const map = new Map<number, any[]>()
+    assignments?.forEach((assignment) => {
+      const key = Number(assignment.collaboratorId)
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(assignment)
+    })
+    return map
+  }, [assignments])
+
+  const targetScopeKey = (target: IntegrationTarget) => {
+    if (target.orgScopeId) return `org:${target.orgScopeId}`
+    return `legacy:${target.scopeType}:${target.scopeId}`.toLowerCase()
+  }
+
+  const existingTargetScopeKeys = useMemo(() => {
+    const keys = new Set<string>()
+    targets?.forEach((target) => keys.add(targetScopeKey(target)))
+    return keys
+  }, [targets])
+
+  const existingTargetUsers = useMemo(() => {
+    const map = new Map<string, Set<string>>()
+    targets?.forEach((target) => {
+      if (!target.templateId || !target.params?.users) return
+      const users = Array.isArray(target.params.users) ? target.params.users : [target.params.users]
+      if (!users.length) return
+      const key = String(target.templateId)
+      if (!map.has(key)) {
+        map.set(key, new Set())
+      }
+      const set = map.get(key)!
+      users.forEach((user) => {
+        if (user) {
+          set.add(String(user))
+        }
+      })
+    })
+    return map
+  }, [targets])
+
+  const targetByScopeKey = useMemo(() => {
+    const map = new Map<string, IntegrationTarget>()
+    targets?.forEach((target) => map.set(targetScopeKey(target), target))
+    return map
+  }, [targets])
+
+  const missingAreaScopes = useMemo(() => {
+    return activeAreaScopes.filter((scope) => {
+      const keyById = `org:${scope.id}`
+      const keyByName = `legacy:area:${scope.name}`.toLowerCase()
+      return !existingTargetScopeKeys.has(keyById) && !existingTargetScopeKeys.has(keyByName)
+    })
+  }, [activeAreaScopes, existingTargetScopeKeys])
+
+  const authProfileHint = useMemo(() => {
+    if (templateForm.connector === 'jira' || templateForm.connector === 'xray') {
+      return 'Jira/Xray: usa email + API token (Basic) o Bearer token.'
+    }
+    if (templateForm.connector === 'sheets') {
+      return 'Google Sheets: usa OAuth/Service Account (Bearer). Si la planilla es publica, podes dejar sin auth.'
+    }
+    if (templateForm.connector === 'manual') {
+      return 'Manual/CSV no requiere auth profile.'
+    }
+    return ''
+  }, [templateForm.connector])
+
+  const convertJqlToParams = () => {
+    const jql = rawJqlInput.trim()
+    if (!jql) {
+      setTargetFormError('Pega un JQL para convertir.')
+      return
+    }
+    const normalized = jql.replace(/\s+/g, ' ').trim()
+    const users: string[] = []
+    const issueTypes: string[] = []
+    let baseFilter = ''
+    let dateField = ''
+    let testerField = ''
+    let extraJql = ''
+    let period = 'previous_month'
+
+    const projectMatch = normalized.match(/project\s+in\s*\(([^)]+)\)/i)
+    if (projectMatch?.[1]) {
+      baseFilter += `project IN (${projectMatch[1].trim()})`
+    }
+
+    const issueTypeMatch = normalized.match(/issuetype\s+in\s*\(([^)]+)\)/i)
+    if (issueTypeMatch?.[1]) {
+      issueTypes.push(...issueTypeMatch[1].split(',').map((v) => v.trim()).filter(Boolean))
+    }
+    const issueTypeEqMatch = normalized.match(/issuetype\s*=\s*([^\s)]+)/i)
+    if (!issueTypes.length && issueTypeEqMatch?.[1]) {
+      issueTypes.push(issueTypeEqMatch[1].trim())
+    }
+
+    const testerMatch = normalized.match(/"([^"]+)"\s+in\s*\(([^)]+)\)/i)
+    if (testerMatch?.[1] && testerMatch?.[2]) {
+      testerField = `"${testerMatch[1]}"`
+      users.push(...testerMatch[2].split(',').map((v) => v.trim()).filter(Boolean))
+    }
+
+    const assigneeMatch = normalized.match(/assignee\s+in\s*\(([^)]+)\)/i)
+    if (assigneeMatch?.[1] && !users.length) {
+      testerField = 'assignee'
+      users.push(...assigneeMatch[1].split(',').map((v) => v.trim()).filter(Boolean))
+    }
+
+    const reporterMatch = normalized.match(/reporter\s+in\s*\(([^)]+)\)/i)
+    if (reporterMatch?.[1] && !users.length) {
+      testerField = 'reporter'
+      users.push(...reporterMatch[1].split(',').map((v) => v.trim()).filter(Boolean))
+    }
+
+    const dateFieldMatch = normalized.match(
+      /(statusCategoryChangedDate|updated|created|resolutionDate)\s*>=/i
+    )
+    if (dateFieldMatch?.[1]) {
+      dateField = dateFieldMatch[1]
+    }
+
+    const extraParts: string[] = []
+    const statusCategoryMatch = normalized.match(/statusCategory\s*=\s*([A-Za-z]+)/i)
+    if (statusCategoryMatch?.[1]) {
+      extraParts.push(`AND statusCategory = ${statusCategoryMatch[1]}`)
+    }
+    if (!baseFilter) {
+      const projectEqMatch = normalized.match(/project\s*=\s*([^\s)]+)/i)
+      if (projectEqMatch?.[1]) {
+        baseFilter = `project = ${projectEqMatch[1].trim()}`
+      }
+    }
+
+    extraJql = extraParts.join(' ')
+
+    const dateRangeMatch = normalized.match(
+      /(statusCategoryChangedDate|updated|created|resolutionDate)\s*>=\s*\"?([0-9]{4}-[0-9]{2}-[0-9]{2})\"?\s*AND\s*\1\s*<\s*\"?([0-9]{4}-[0-9]{2}-[0-9]{2})\"?/i
+    )
+    if (dateRangeMatch?.[2] && dateRangeMatch?.[3]) {
+      const fromDate = new Date(dateRangeMatch[2])
+      const toDate = new Date(dateRangeMatch[3])
+      const now = new Date()
+      const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+      const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+      if (
+        fromDate.getTime() === startOfPrevMonth.getTime() &&
+        toDate.getTime() === startOfThisMonth.getTime()
+      ) {
+        period = 'previous_month'
+      } else if (
+        fromDate.getTime() === startOfThisMonth.getTime() &&
+        toDate.getTime() === startOfNextMonth.getTime()
+      ) {
+        period = 'current_month'
+      } else {
+        period = 'custom'
+      }
+    }
+
+    const params = {
+      baseFilter: baseFilter || 'project IN (...)',
+      issueTypes: issueTypes.length ? issueTypes : ['Historia'],
+      dateField: dateField || 'statusCategoryChangedDate',
+      testerField: testerField || '"Tester[User Picker (single user)]"',
+      users: users.length ? users : ['userId'],
+      extraJqlA: extraJql || undefined,
+      period,
+    }
+
+    setTargetForm((prev) => ({
+      ...prev,
+      paramsText: JSON.stringify(params, null, 2),
+    }))
+    setTargetFormError('')
+  }
+
+  useEffect(() => {
+    if (!templateForm.schedule.trim()) {
+      setCronPreview('')
+      return
+    }
+    const value = templateForm.schedule.trim()
+    const res = api
+      .get('/integrations/cron/next', { params: { expression: value } })
+      .then((resp) => setCronPreview(resp.data?.nextRun || ''))
+      .catch(() => setCronPreview(''))
+    return () => {
+      void res
+    }
+  }, [templateForm.schedule])
+
+  const parsedTargetParams = useMemo(() => {
+    if (!targetForm.paramsText.trim()) return null
+    try {
+      return JSON.parse(targetForm.paramsText)
+    } catch {
+      return null
+    }
+  }, [targetForm.paramsText])
+
+  const targetUsersCount = useMemo(() => {
+    if (!parsedTargetParams) return 0
+    const users = (parsedTargetParams as any).users
+    if (Array.isArray(users)) return users.length
+    if (users) return 1
+    return 0
+  }, [parsedTargetParams])
+
+  const targetAssignmentBlocked = Boolean(targetForm.assignmentId) && targetUsersCount > 1
+
+  const targetPeriodPreview = useMemo(() => {
+    const period = (parsedTargetParams as any)?.period || 'previous_month'
+    const now = new Date()
+    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    let from = startOfThisMonth
+    let to = startOfThisMonth
+    if (period === 'previous_month') {
+      from = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      to = startOfThisMonth
+    } else if (period === 'current_month') {
+      from = startOfThisMonth
+      to = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+    }
+    return {
+      period,
+      from: from.toISOString().slice(0, 10),
+      to: to.toISOString().slice(0, 10),
+    }
+  }, [parsedTargetParams])
+
+  useEffect(() => {
+    if (!templateForm.authProfileId) return
+    const exists = authProfilesByConnector.some(
+      (profile) => String(profile.id) === String(templateForm.authProfileId)
+    )
+    if (!exists) {
+      setTemplateForm((prev) => ({ ...prev, authProfileId: '' }))
+    }
+  }, [authProfilesByConnector, templateForm.authProfileId])
 
   useEffect(() => {
     if (collaboratorPerms?.permissions) {
@@ -252,13 +712,17 @@ export default function Configuracion() {
 
   const saveTemplate = useMutation(
     async () => {
+      const resolvedMetricType = metricTypeToBackend(templateForm.metricType)
       const payload = {
         name: templateForm.name.trim(),
         connector: templateForm.connector,
-        metricType: templateForm.metricType,
+        metricType: resolvedMetricType,
+        metricTypeUi: templateForm.metricType,
         queryTestsTemplate: templateForm.queryTestsTemplate.trim(),
         queryStoriesTemplate:
-          templateForm.metricType === 'ratio' ? templateForm.queryStoriesTemplate.trim() : undefined,
+          templateForm.metricType === 'ratio' || templateForm.metricType === 'sla'
+            ? templateForm.queryStoriesTemplate.trim()
+            : undefined,
         formulaTemplate: templateForm.formulaTemplate.trim(),
         schedule: templateForm.schedule.trim() || undefined,
         authProfileId: templateForm.authProfileId ? Number(templateForm.authProfileId) : undefined,
@@ -275,17 +739,21 @@ export default function Configuracion() {
         queryClient.invalidateQueries('integration-templates')
         setShowTemplateModal(false)
         setEditingTemplate(null)
-        setTemplateForm({
-          name: '',
-          connector: 'jira',
-          metricType: 'ratio',
-          queryTestsTemplate: '',
-          queryStoriesTemplate: '',
-          formulaTemplate: 'tests / stories',
-          schedule: '',
-          authProfileId: '',
-          enabled: true,
-        })
+        setTemplateFormError('')
+                      setTemplateForm({
+                        name: '',
+                        connector: 'jira',
+                        metricType: 'ratio',
+                        queryTestsTemplate: '',
+                        queryStoriesTemplate: '',
+                        formulaTemplate: 'A / B',
+                        schedule: '',
+                        authProfileId: '',
+                        enabled: true,
+                      })
+      },
+      onError: (error: any) => {
+        setTemplateFormError(error?.response?.data?.error || error?.message || 'Error al guardar plantilla')
       },
     }
   )
@@ -295,6 +763,16 @@ export default function Configuracion() {
       let parsedParams: any = {}
       if (targetForm.paramsText.trim()) {
         parsedParams = JSON.parse(targetForm.paramsText)
+      }
+      const usersCount = Array.isArray(parsedParams?.users)
+        ? parsedParams.users.length
+        : parsedParams?.users
+        ? 1
+        : 0
+      if (targetForm.assignmentId && usersCount > 1) {
+        throw new Error(
+          'Target con multiples users no puede asignarse a un KPI individual. Usa un target por persona o quita la asignacion.'
+        )
       }
       const selectedScope = orgScopes?.find((scope) => scope.id === Number(targetForm.orgScopeId))
       const payload = {
@@ -317,6 +795,7 @@ export default function Configuracion() {
         queryClient.invalidateQueries(['integration-targets', selectedTemplateId])
         setShowTargetModal(false)
         setEditingTarget(null)
+        setTargetFormError('')
         setTargetForm({
           templateId: '',
           scopeType: 'area',
@@ -326,6 +805,247 @@ export default function Configuracion() {
           assignmentId: '',
           enabled: true,
         })
+      },
+      onError: (error: any) => {
+        setTargetFormError(error?.message || 'Error al guardar target')
+      },
+    }
+  )
+
+  const createTargetsForScopes = useMutation(
+    async (scopes: any[]) => {
+      const templateId = Number(selectedTemplateId)
+      if (!templateId) return { created: 0, skipped: 0 }
+      const results = await Promise.all(
+        scopes.map(async (scope) => {
+          const payload = {
+            templateId,
+            scopeType: scope.type || 'area',
+            scopeId: scope.name || '',
+            orgScopeId: scope.id,
+            params: {},
+            enabled: true,
+          }
+          await api.post('/integrations/targets', payload)
+          return scope
+        })
+      )
+      return { created: results.length, skipped: 0 }
+    },
+    {
+      onSuccess: (summary: any) => {
+        queryClient.invalidateQueries(['integration-targets', selectedTemplateId])
+        const created = summary?.created || 0
+        const skipped = summary?.skipped || 0
+        setToastMessage(`Targets creados: ${created}${skipped ? ` · ya existian: ${skipped}` : ''}`)
+        setTimeout(() => setToastMessage(''), 2500)
+      },
+    }
+  )
+
+  const createTargetsAllAreas = async () => {
+    if (!selectedTemplateId) return
+    const toCreate: any[] = []
+    const toEnable: IntegrationTarget[] = []
+    activeAreaScopes.forEach((scope) => {
+      const keyById = `org:${scope.id}`
+      const keyByName = `legacy:area:${scope.name}`.toLowerCase()
+      const existing = targetByScopeKey.get(keyById) || targetByScopeKey.get(keyByName)
+      if (!existing) {
+        toCreate.push(scope)
+      } else if (!existing.enabled) {
+        toEnable.push(existing)
+      }
+    })
+    if (toCreate.length === 0 && toEnable.length === 0) {
+      setToastMessage('No hay cambios para aplicar.')
+      setTimeout(() => setToastMessage(''), 2500)
+      return
+    }
+    if (toCreate.length > 0) {
+      createTargetsForScopes.mutate(toCreate)
+    }
+    if (toEnable.length > 0) {
+      await Promise.all(
+        toEnable.map(async (target) => {
+          await api.put(`/integrations/targets/${target.id}`, {
+            templateId: target.templateId,
+            scopeType: target.scopeType,
+            scopeId: target.scopeId,
+            orgScopeId: target.orgScopeId,
+            params: target.params || {},
+            assignmentId: target.assignmentId || undefined,
+            enabled: true,
+          })
+        })
+      )
+      queryClient.invalidateQueries(['integration-targets', selectedTemplateId])
+      setToastMessage(`Targets habilitados: ${toEnable.length}`)
+      setTimeout(() => setToastMessage(''), 2500)
+    }
+  }
+
+  const openTargetWizard = (target: IntegrationTarget) => {
+    if (!target.params?.users || !Array.isArray(target.params.users)) {
+      setToastMessage('El target no tiene lista de users para duplicar.')
+      setTimeout(() => setToastMessage(''), 2500)
+      return
+    }
+    const users = target.params.users.filter((user: any) => user)
+    if (users.length === 0) {
+      setToastMessage('No hay users en params para duplicar.')
+      setTimeout(() => setToastMessage(''), 2500)
+      return
+    }
+    setWizardTarget(target)
+    setWizardRows(
+      users.map((userKey: string) => ({
+        userKey,
+        collaboratorId: '',
+        assignmentId: '',
+      }))
+    )
+    setShowTargetWizard(true)
+  }
+
+  const createTargetsFromWizard = useMutation(
+    async () => {
+      if (!wizardTarget) return { created: 0, skipped: 0 }
+      const existing = existingTargetUsers.get(String(wizardTarget.templateId)) || new Set<string>()
+      let created = 0
+      let skipped = 0
+      for (const row of wizardRows) {
+        if (!row.collaboratorId) {
+          skipped += 1
+          continue
+        }
+        const userKey = String(row.userKey)
+        if (existing.has(userKey)) {
+          skipped += 1
+          continue
+        }
+        const collaborator = collaborators?.find((c) => String(c.id) === String(row.collaboratorId))
+        const payload = {
+          templateId: wizardTarget.templateId,
+          scopeType: 'person',
+          scopeId: collaborator?.name || userKey,
+          orgScopeId: collaborator?.orgScopeId || undefined,
+          params: { ...wizardTarget.params, users: [userKey] },
+          assignmentId: row.assignmentId ? Number(row.assignmentId) : undefined,
+          enabled: true,
+        }
+        await api.post('/integrations/targets', payload)
+        created += 1
+      }
+      return { created, skipped }
+    },
+    {
+      onSuccess: (summary: any) => {
+        queryClient.invalidateQueries(['integration-targets', selectedTemplateId])
+        const created = summary?.created || 0
+        const skipped = summary?.skipped || 0
+        setToastMessage(`Targets creados: ${created}${skipped ? ` · omitidos: ${skipped}` : ''}`)
+        setTimeout(() => setToastMessage(''), 2500)
+        setShowTargetWizard(false)
+        setWizardTarget(null)
+        setWizardRows([])
+      },
+      onError: (error: any) => {
+        setToastMessage(error?.message || 'Error al crear targets')
+        setTimeout(() => setToastMessage(''), 2500)
+      },
+    }
+  )
+
+  const duplicateTargetByUsers = useMutation(
+    async (target: IntegrationTarget) => {
+      if (!target.params?.users || !Array.isArray(target.params.users)) {
+        throw new Error('El target no tiene lista de users para duplicar.')
+      }
+      const users = target.params.users.filter((user: any) => user)
+      if (users.length <= 1) {
+        throw new Error('Necesitas al menos 2 users para duplicar.')
+      }
+      const existing = existingTargetUsers.get(String(target.templateId)) || new Set<string>()
+      let created = 0
+      let skipped = 0
+      await Promise.all(
+        users.map(async (user: any) => {
+          const userKey = String(user)
+          if (existing.has(userKey)) {
+            skipped += 1
+            return
+          }
+          const payload = {
+            templateId: target.templateId,
+            scopeType: 'person',
+            scopeId: userKey,
+            orgScopeId: undefined,
+            params: { ...target.params, users: [userKey] },
+            assignmentId: undefined,
+            enabled: true,
+          }
+          await api.post('/integrations/targets', payload)
+          created += 1
+        })
+      )
+      return { created, skipped }
+    },
+    {
+      onSuccess: (summary: any) => {
+        queryClient.invalidateQueries(['integration-targets', selectedTemplateId])
+        const created = summary?.created || 0
+        const skipped = summary?.skipped || 0
+        setToastMessage(`Targets por usuario: ${created}${skipped ? ` · ya existian: ${skipped}` : ''}`)
+        setTimeout(() => setToastMessage(''), 2500)
+      },
+      onError: (error: any) => {
+        setToastMessage(error?.message || 'Error al duplicar targets')
+        setTimeout(() => setToastMessage(''), 2500)
+      },
+    }
+  )
+
+  const createTargetsNewAreas = async () => {
+    if (!selectedTemplateId) return
+    if (missingAreaScopes.length === 0) {
+      setToastMessage('No hay areas nuevas para crear targets.')
+      setTimeout(() => setToastMessage(''), 2500)
+      return
+    }
+    createTargetsForScopes.mutate(missingAreaScopes)
+  }
+
+  const deactivateInactiveAreaTargets = useMutation(
+    async () => {
+      const inactiveTargets =
+        targets?.filter((target) => {
+          if (!target.orgScopeId) return false
+          const scope = scopeById.get(target.orgScopeId)
+          return scope && (scope.active === 0 || scope.active === false) && target.enabled
+        }) || []
+      if (inactiveTargets.length === 0) return { updated: 0 }
+      await Promise.all(
+        inactiveTargets.map(async (target) => {
+          await api.put(`/integrations/targets/${target.id}`, {
+            templateId: target.templateId,
+            scopeType: target.scopeType,
+            scopeId: target.scopeId,
+            orgScopeId: target.orgScopeId,
+            params: target.params || {},
+            assignmentId: target.assignmentId || undefined,
+            enabled: false,
+          })
+        })
+      )
+      return { updated: inactiveTargets.length }
+    },
+    {
+      onSuccess: (summary: any) => {
+        queryClient.invalidateQueries(['integration-targets', selectedTemplateId])
+        const updated = summary?.updated || 0
+        setToastMessage(updated ? `Targets desactivados: ${updated}` : 'No hay targets para desactivar.')
+        setTimeout(() => setToastMessage(''), 2500)
       },
     }
   )
@@ -367,6 +1087,35 @@ export default function Configuracion() {
     }
   )
 
+  const saveCalendarProfile = useMutation(
+    async () => {
+      const payload = {
+        name: calendarForm.name.trim(),
+        description: calendarForm.description.trim() || undefined,
+        frequency: calendarForm.frequency,
+        active: calendarForm.active,
+      }
+      if (editingCalendar) {
+        await api.put(`/calendar-profiles/${editingCalendar.id}`, payload)
+      } else {
+        await api.post('/calendar-profiles', payload)
+      }
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('calendar-profiles')
+        setShowCalendarModal(false)
+        setEditingCalendar(null)
+        setCalendarForm({
+          name: '',
+          description: '',
+          frequency: 'monthly',
+          active: true,
+        })
+      },
+    }
+  )
+
   const saveScope = useMutation(
     async () => {
       let metadata: any = null
@@ -377,17 +1126,20 @@ export default function Configuracion() {
         name: scopeForm.name.trim(),
         type: scopeForm.type,
         parentId: scopeForm.parentId ? Number(scopeForm.parentId) : undefined,
+        calendarProfileId: scopeForm.calendarProfileId ? Number(scopeForm.calendarProfileId) : undefined,
         metadata,
         active: scopeForm.active,
       }
       if (editingScope) {
-        await api.put(`/org-scopes/${editingScope.id}`, payload)
+        const res = await api.put(`/org-scopes/${editingScope.id}`, payload)
+        return res.data
       } else {
-        await api.post('/org-scopes', payload)
+        const res = await api.post('/org-scopes', payload)
+        return res.data
       }
     },
     {
-      onSuccess: () => {
+      onSuccess: (data: any) => {
         queryClient.invalidateQueries('org-scopes')
         setShowScopeModal(false)
         setEditingScope(null)
@@ -395,9 +1147,13 @@ export default function Configuracion() {
           name: '',
           type: 'area',
           parentId: '',
+          calendarProfileId: '',
           metadataText: '',
           active: true,
         })
+        if (data?.warning) {
+          alert(data.warning)
+        }
       },
     }
   )
@@ -432,14 +1188,27 @@ export default function Configuracion() {
   const placeholderRegex = /\{[a-zA-Z0-9_]+\}/g
   const testsPlaceholders = templateForm.queryTestsTemplate.match(placeholderRegex) || []
   const storiesPlaceholders =
-    templateForm.metricType === 'ratio' ? templateForm.queryStoriesTemplate.match(placeholderRegex) || [] : []
+    templateForm.metricType === 'ratio' || templateForm.metricType === 'sla'
+      ? templateForm.queryStoriesTemplate.match(placeholderRegex) || []
+      : []
   const hasAnyPlaceholders = testsPlaceholders.length > 0 || storiesPlaceholders.length > 0
   const testsHasTime = testsPlaceholders.includes('{from}') || testsPlaceholders.includes('{to}')
   const storiesHasTime =
-    templateForm.metricType === 'ratio'
+    templateForm.metricType === 'ratio' || templateForm.metricType === 'sla'
       ? storiesPlaceholders.includes('{from}') || storiesPlaceholders.includes('{to}')
       : true
   const missingTimePlaceholders = !testsHasTime || !storiesHasTime
+
+  const containsLiteralIssueTypes = (text: string) => {
+    const literalRegex = /\b(Story|Bug|Test|Epic|Historia|HU|Feature|Task|Incident|Problem)\b/i
+    const statusRegex = /\bstatusCategory\s*=\s*Done\b/i
+    const issuetypeRegex = /\bissuetype\s*(=|IN)\s*(?!\{)/i
+    return literalRegex.test(text) || statusRegex.test(text) || issuetypeRegex.test(text)
+  }
+
+  const literalWarning =
+    (templateForm.queryTestsTemplate && containsLiteralIssueTypes(templateForm.queryTestsTemplate)) ||
+    (templateForm.queryStoriesTemplate && containsLiteralIssueTypes(templateForm.queryStoriesTemplate))
 
   const testTarget = useMutation(
     async (target: IntegrationTarget) => {
@@ -458,6 +1227,58 @@ export default function Configuracion() {
       },
       onError: (error: any) => {
         setTargetPreviewMessage(error?.response?.data?.error || error?.message || 'Error al probar target')
+      },
+    }
+  )
+
+  const archiveRunMutation = useMutation(
+    async (runId: number) => {
+      await api.patch(`/integrations/runs/${runId}/archive`)
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(['integration-template-runs', selectedTemplateId])
+      },
+    }
+  )
+
+  const deleteRunMutation = useMutation(
+    async (runId: number) => {
+      await api.delete(`/integrations/runs/${runId}`)
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(['integration-template-runs', selectedTemplateId])
+      },
+    }
+  )
+
+  const archiveErrorRuns = useMutation(
+    async () => {
+      if (!selectedTemplateId) return
+      await api.post('/integrations/runs/archive', {
+        templateId: Number(selectedTemplateId),
+        status: 'error',
+      })
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(['integration-template-runs', selectedTemplateId])
+      },
+    }
+  )
+
+  const deleteErrorRuns = useMutation(
+    async () => {
+      if (!selectedTemplateId) return
+      await api.post('/integrations/runs/delete', {
+        templateId: Number(selectedTemplateId),
+        status: 'error',
+      })
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(['integration-template-runs', selectedTemplateId])
       },
     }
   )
@@ -501,18 +1322,19 @@ export default function Configuracion() {
                 <button
                   className="btn-primary"
                   onClick={() => {
-                    setEditingTemplate(null)
-                    setTemplateForm({
-                      name: '',
-                      connector: 'jira',
-                      metricType: 'ratio',
-                      queryTestsTemplate: '',
-                      queryStoriesTemplate: '',
-                      formulaTemplate: 'tests / stories',
-                      schedule: '',
-                      authProfileId: '',
-                      enabled: true,
-                    })
+        setEditingTemplate(null)
+        setTemplateForm({
+          name: '',
+          connector: 'jira',
+          metricType: 'ratio',
+          queryTestsTemplate: '',
+          queryStoriesTemplate: '',
+          formulaTemplate: 'A / B',
+          schedule: '',
+          authProfileId: '',
+          enabled: true,
+        })
+                    setTemplateFormError('')
                     setShowTemplateModal(true)
                   }}
                 >
@@ -520,26 +1342,50 @@ export default function Configuracion() {
                 </button>
               )}
               {activeIntegrationTab === 'targets' && (
-                <button
-                  className="btn-primary"
-                  onClick={() => {
-                    if (!selectedTemplateId) return
-                    setEditingTarget(null)
-                    setTargetForm({
-                      templateId: String(selectedTemplateId),
-                      scopeType: 'area',
-                      scopeId: '',
-                      orgScopeId: '',
-                      paramsText: '',
-                      assignmentId: '',
-                      enabled: true,
-                    })
-                    setShowTargetModal(true)
-                  }}
-                  disabled={!selectedTemplateId}
-                >
-                  Nuevo target
-                </button>
+                <>
+                  <button
+                    className="btn-secondary"
+                    onClick={createTargetsAllAreas}
+                    disabled={!selectedTemplateId || createTargetsForScopes.isLoading}
+                  >
+                    Crear targets (todas las areas)
+                  </button>
+                  <button
+                    className="btn-secondary"
+                    onClick={createTargetsNewAreas}
+                    disabled={!selectedTemplateId || createTargetsForScopes.isLoading}
+                  >
+                    Crear para areas nuevas
+                  </button>
+                  <button
+                    className="btn-secondary"
+                    onClick={() => deactivateInactiveAreaTargets.mutate()}
+                    disabled={!selectedTemplateId || deactivateInactiveAreaTargets.isLoading}
+                  >
+                    Desactivar areas inactivas
+                  </button>
+                  <button
+                    className="btn-primary"
+                    onClick={() => {
+                      if (!selectedTemplateId) return
+                      setEditingTarget(null)
+                      setTargetForm({
+                        templateId: String(selectedTemplateId),
+                        scopeType: 'area',
+                        scopeId: '',
+                        orgScopeId: '',
+                        paramsText: '',
+                        assignmentId: '',
+                        enabled: true,
+                      })
+                      setTargetFormError('')
+                      setShowTargetModal(true)
+                    }}
+                    disabled={!selectedTemplateId}
+                  >
+                    Nuevo target
+                  </button>
+                </>
               )}
               {activeIntegrationTab === 'auth' && (
                 <button
@@ -564,6 +1410,34 @@ export default function Configuracion() {
                 >
                   Nuevo auth profile
                 </button>
+              )}
+              {activeIntegrationTab === 'runs' && (
+                <>
+                  <button
+                    className="btn-secondary"
+                    onClick={() => {
+                      if (!selectedTemplateId) return
+                      if (window.confirm('¿Archivar todos los runs con error de esta plantilla?')) {
+                        archiveErrorRuns.mutate()
+                      }
+                    }}
+                    disabled={!selectedTemplateId || archiveErrorRuns.isLoading}
+                  >
+                    Archivar errores
+                  </button>
+                  <button
+                    className="btn-danger"
+                    onClick={() => {
+                      if (!selectedTemplateId) return
+                      if (window.confirm('¿Eliminar todos los runs con error de esta plantilla?')) {
+                        deleteErrorRuns.mutate()
+                      }
+                    }}
+                    disabled={!selectedTemplateId || deleteErrorRuns.isLoading}
+                  >
+                    Eliminar errores
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -616,7 +1490,7 @@ export default function Configuracion() {
                   <tr key={template.id}>
                     <td>{template.name}</td>
                     <td>{template.connector}</td>
-                    <td>{template.metricType === 'count' ? 'Count' : 'Ratio'}</td>
+                    <td>{metricTypeLabel(template.metricType)}</td>
                     <td>{template.authProfileName || '-'}</td>
                     <td>{template.schedule || '-'}</td>
                     <td>
@@ -640,11 +1514,13 @@ export default function Configuracion() {
                             setTemplateForm({
                               name: template.name || '',
                               connector: template.connector || 'jira',
-                              metricType: template.metricType === 'count' ? 'count' : 'ratio',
+                              metricType:
+                                ((template as any).metricTypeUi as any) ||
+                                (template.metricType === 'count' ? 'count' : 'ratio'),
                               queryTestsTemplate: template.queryTestsTemplate || '',
                               queryStoriesTemplate: template.queryStoriesTemplate || '',
                               formulaTemplate:
-                                template.formulaTemplate || (template.metricType === 'count' ? 'tests' : 'tests / stories'),
+                                template.formulaTemplate || (template.metricType === 'count' ? 'COUNT' : 'A / B'),
                               schedule: template.schedule || '',
                               authProfileId: template.authProfileId ? String(template.authProfileId) : '',
                               enabled: Boolean(template.enabled),
@@ -714,6 +1590,11 @@ export default function Configuracion() {
                       {target.orgScopeName
                         ? `${target.orgScopeType || target.scopeType} · ${target.orgScopeName}`
                         : `${target.scopeType} · ${target.scopeId}`}
+                      {target.orgScopeId && scopeById.get(target.orgScopeId)?.active === 0 ? (
+                        <span className="status-pill review" style={{ marginLeft: 8 }}>
+                          Area inactiva
+                        </span>
+                      ) : null}
                     </td>
                     <td>{target.assignmentId || '-'}</td>
                     <td>
@@ -736,6 +1617,7 @@ export default function Configuracion() {
                               assignmentId: target.assignmentId ? String(target.assignmentId) : '',
                               enabled: Boolean(target.enabled),
                             })
+                            setTargetFormError('')
                             setShowTargetModal(true)
                           }}
                         >
@@ -747,6 +1629,17 @@ export default function Configuracion() {
                           disabled={!canRunIntegrations || runTarget.isLoading}
                         >
                           Ejecutar
+                        </button>
+                        <button
+                          className="btn-secondary"
+                          onClick={() => {
+                            if (window.confirm('¿Duplicar este target por cada user del params?')) {
+                              openTargetWizard(target)
+                            }
+                          }}
+                          disabled={duplicateTargetByUsers.isLoading}
+                        >
+                          Duplicar por users
                         </button>
                         <button
                           className="btn-secondary"
@@ -784,6 +1677,8 @@ export default function Configuracion() {
                   <th>Inicio</th>
                   <th>Usuario</th>
                   <th>Resultado</th>
+                  <th>Subperiodo</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -796,12 +1691,48 @@ export default function Configuracion() {
                     </td>
                     <td>{run.startedAt || '-'}</td>
                     <td>{run.triggeredByName || '-'}</td>
-                    <td>{run.outputs?.computed ?? '-'}</td>
+                    <td>
+                      {run.outputs?.skipped ? (
+                        <span className="status-pill review">Omitido</span>
+                      ) : (
+                        run.outputs?.computed ?? '-'
+                      )}
+                      {run.outputs?.skipReason ? (
+                        <div className="helper-text">{run.outputs.skipReason}</div>
+                      ) : null}
+                    </td>
+                    <td>{run.outputs?.subPeriodName || '-'}</td>
+                    <td>
+                      <div className="action-buttons">
+                        <button
+                          className="btn-secondary"
+                          onClick={() => {
+                            if (window.confirm('¿Archivar este run?')) {
+                              archiveRunMutation.mutate(run.id)
+                            }
+                          }}
+                          disabled={archiveRunMutation.isLoading}
+                        >
+                          Archivar
+                        </button>
+                        <button
+                          className="btn-danger"
+                          onClick={() => {
+                            if (window.confirm('¿Eliminar este run?')) {
+                              deleteRunMutation.mutate(run.id)
+                            }
+                          }}
+                          disabled={deleteRunMutation.isLoading}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
                 {(!templateRuns || templateRuns.length === 0) && (
                   <tr>
-                    <td colSpan={4} className="empty-row">
+                    <td colSpan={6} className="empty-row">
                       No hay ejecuciones registradas.
                     </td>
                   </tr>
@@ -873,6 +1804,92 @@ export default function Configuracion() {
         <div className="card">
           <div className="card-header">
             <div>
+              <h3>Calendarios de medición</h3>
+              <p className="muted">Define ciclos por scope (mensual, trimestral o custom).</p>
+            </div>
+            <button
+              className="btn-primary"
+              onClick={() => {
+                setEditingCalendar(null)
+                setCalendarForm({
+                  name: '',
+                  description: '',
+                  frequency: 'monthly',
+                  active: true,
+                })
+                setShowCalendarModal(true)
+              }}
+            >
+              Nuevo calendario
+            </button>
+          </div>
+          <table className="config-table">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Frecuencia</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {calendarProfiles?.map((profile) => (
+                <tr key={profile.id}>
+                  <td>{profile.name}</td>
+                  <td>{profile.frequency}</td>
+                  <td>
+                    <span className={`status-pill ${profile.active ? 'ok' : 'review'}`}>
+                      {profile.active ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="action-buttons">
+                      <button
+                        className="btn-secondary"
+                        onClick={() => {
+                          setEditingCalendar(profile)
+                          setCalendarForm({
+                            name: profile.name || '',
+                            description: profile.description || '',
+                            frequency: profile.frequency || 'monthly',
+                            active: profile.active !== false,
+                          })
+                          setShowCalendarModal(true)
+                        }}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        className="btn-secondary"
+                        onClick={() => {
+                          setCalendarForSubperiods(profile)
+                          setSelectedPeriodForCalendar('')
+                          setEditingCalendarSubperiod(undefined)
+                          setShowCalendarSubperiods(true)
+                        }}
+                      >
+                        Subperíodos
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {(!calendarProfiles || calendarProfiles.length === 0) && (
+                <tr>
+                  <td colSpan={4} className="empty-row">
+                    No hay calendarios configurados.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="config-section">
+        <div className="card">
+          <div className="card-header">
+            <div>
               <h3>Org Scopes</h3>
               <p className="muted">Jerarquía de áreas, equipos y personas con herencia.</p>
             </div>
@@ -884,6 +1901,7 @@ export default function Configuracion() {
                   name: '',
                   type: 'area',
                   parentId: '',
+                  calendarProfileId: '',
                   metadataText: '',
                   active: true,
                 })
@@ -919,15 +1937,16 @@ export default function Configuracion() {
                       <button
                         className="btn-secondary"
                         onClick={() => {
-                          setEditingScope(scope)
-                          setScopeForm({
-                            name: scope.name || '',
-                            type: scope.type || 'area',
-                            parentId: scope.parentId ? String(scope.parentId) : '',
-                            metadataText: scope.metadata ? JSON.stringify(scope.metadata, null, 2) : '',
-                            active: Boolean(scope.active),
-                          })
-                          setShowScopeModal(true)
+                        setEditingScope(scope)
+                        setScopeForm({
+                          name: scope.name || '',
+                          type: scope.type || 'area',
+                          parentId: scope.parentId ? String(scope.parentId) : '',
+                          calendarProfileId: scope.calendarProfileId ? String(scope.calendarProfileId) : '',
+                          metadataText: scope.metadata ? JSON.stringify(scope.metadata, null, 2) : '',
+                          active: Boolean(scope.active),
+                        })
+                        setShowScopeModal(true)
                         }}
                       >
                         Editar
@@ -948,135 +1967,6 @@ export default function Configuracion() {
         </div>
       </div>
 
-      <div className="config-grid">
-        <div className="card">
-          <h3>Colaboradores</h3>
-          <div className="list">
-            {collaborators?.map((col) => (
-              <button
-                key={col.id}
-                className={`list-item ${selectedCollaborator === col.id ? 'active' : ''}`}
-                onClick={() => setSelectedCollaborator(col.id)}
-              >
-                <div>
-                  <div className="item-title">{col.name}</div>
-                  <div className="item-sub">{col.area} · {col.role}</div>
-                </div>
-                {col.hasSuperpowers ? <span className="badge badge-super">Superpoderes</span> : null}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-header">
-            <h3>Permisos</h3>
-            {selectedCollaborator && (
-              <label className="toggle">
-                <input
-                  type="checkbox"
-                  checked={superpowers}
-                  onChange={(e) => {
-                    setSuperpowers(e.target.checked)
-                    saveSuperpowers.mutate(e.target.checked)
-                  }}
-                />
-                <span>Superpoderes</span>
-              </label>
-            )}
-          </div>
-
-          {selectedCollaborator ? (
-            <div className="perms-list">
-              {permissions?.map((perm) => (
-                <label key={perm.id} className="perm-item">
-                  <input
-                    type="checkbox"
-                    checked={selectedPerms.includes(perm.code)}
-                    onChange={(e) => {
-                      const checked = e.target.checked
-                      setSelectedPerms((prev) =>
-                        checked ? [...prev, perm.code] : prev.filter((p) => p !== perm.code)
-                      )
-                    }}
-                    disabled={superpowers}
-                  />
-                  <div>
-                    <div className="perm-code">{perm.code}</div>
-                    <div className="perm-desc">{perm.description || ''}</div>
-                  </div>
-                </label>
-              ))}
-
-              <div className="actions">
-                <button
-                  className="btn-primary"
-                  onClick={() => savePermissions.mutate()}
-                  disabled={savePermissions.isLoading || superpowers}
-                >
-                  Guardar permisos
-                </button>
-              </div>
-            </div>
-          ) : (
-            <p className="muted">Selecciona un colaborador para gestionar sus permisos.</p>
-          )}
-        </div>
-      </div>
-
-      <div className="config-section">
-        <div className="card">
-          <h3>Roles &amp; Acceso</h3>
-          <div className="roles-grid">
-            {roles?.map((role) => (
-              <div key={role.code} className="role-card">
-                <div className="role-card-header">
-                  <span className="role-name">{role.name}</span>
-                  <span className="role-count">{role.usersCount || 0} usuarios</span>
-                </div>
-                <div className="role-perms">
-                  {role.permissions?.map((perm: string) => (
-                    <span key={perm} className="perm-chip">
-                      {perm}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="card">
-          <h3>Usuarios y roles</h3>
-          <div className="roles-users-list">
-            {collaborators?.map((collab) => (
-              <div key={collab.id} className="role-user-row">
-                <div>
-                  <div className="item-title">{collab.name}</div>
-                  <div className="item-sub">{collab.area} · {collab.role}</div>
-                </div>
-                <select
-                  value=""
-                  onChange={(e) => {
-                    const roleCode = e.target.value
-                    if (roleCode) {
-                      assignRole.mutate({ collaboratorId: collab.id, roleCode })
-                      e.currentTarget.value = ''
-                    }
-                  }}
-                >
-                  <option value="">Asignar rol…</option>
-                  {roles?.map((role) => (
-                    <option key={role.code} value={role.code}>
-                      {role.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
 
       {showTemplateModal && (
         <div className="modal-overlay" onClick={() => setShowTemplateModal(false)}>
@@ -1104,26 +1994,66 @@ export default function Configuracion() {
                   >
                     <option value="jira">Jira</option>
                     <option value="xray">Xray</option>
+                    <option value="sheets">Google Sheets</option>
+                    <option value="manual">Manual / CSV</option>
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Tipo de metrica</label>
+                  <label>Tipo de métrica</label>
                   <select
                     value={templateForm.metricType}
                     onChange={(e) =>
                       setTemplateForm((prev) => {
-                        const nextMetricType = e.target.value === 'count' ? 'count' : 'ratio'
+                        const nextMetricType = e.target.value as
+                          | 'count'
+                          | 'ratio'
+                          | 'sla'
+                          | 'value'
+                          | 'value_agg'
+                          | 'manual'
                         return {
                           ...prev,
                           metricType: nextMetricType,
-                          formulaTemplate: nextMetricType === 'count' ? 'tests' : prev.formulaTemplate || 'tests / stories',
+                          formulaTemplate:
+                            nextMetricType === 'count'
+                              ? 'COUNT'
+                              : nextMetricType === 'ratio' || nextMetricType === 'sla'
+                              ? prev.formulaTemplate || 'A / B'
+                              : 'VALUE',
                         }
                       })
                     }
                   >
-                    <option value="ratio">Ratio (A / B)</option>
-                    <option value="count">Count (solo A)</option>
+                    <option value="count">COUNT — Conteo por filtro</option>
+                    <option value="ratio">RATIO A/B — Cumplimiento / Conversión</option>
+                    <option value="sla">SLA — Cumplimiento temporal</option>
+                    <option value="value">VALUE — Valor directo</option>
+                    <option value="value_agg">VALUE_AGG — Suma / Promedio</option>
+                    <option value="manual">MANUAL — Declarativo</option>
                   </select>
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Plantillas rápidas</label>
+                <div className="action-buttons">
+                  <button className="btn-secondary" onClick={() => applyTemplatePreset('count')}>
+                    COUNT
+                  </button>
+                  <button className="btn-secondary" onClick={() => applyTemplatePreset('ratio')}>
+                    RATIO
+                  </button>
+                  <button className="btn-secondary" onClick={() => applyTemplatePreset('sla')}>
+                    SLA
+                  </button>
+                  <button className="btn-secondary" onClick={() => applyTemplatePreset('sheets_value')}>
+                    Sheets VALUE
+                  </button>
+                  <button className="btn-secondary" onClick={() => applyTemplatePreset('sheets_agg')}>
+                    Sheets AGG
+                  </button>
+                  <button className="btn-secondary" onClick={() => applyTemplatePreset('manual')}>
+                    Manual / CSV
+                  </button>
                 </div>
               </div>
               <div className="form-group">
@@ -1131,38 +2061,86 @@ export default function Configuracion() {
                 <select
                   value={templateForm.authProfileId}
                   onChange={(e) => setTemplateForm((prev) => ({ ...prev, authProfileId: e.target.value }))}
+                  disabled={templateForm.connector === 'manual'}
                 >
                   <option value="">Selecciona un auth profile</option>
-                  {authProfiles?.map((profile) => (
+                  {authProfilesByConnector?.map((profile) => (
                     <option key={profile.id} value={profile.id}>
-                      {profile.name}
+                      {profile.name} · {profile.connector}
                     </option>
                   ))}
                 </select>
+                {authProfileHint ? <div className="helper-text">{authProfileHint}</div> : null}
+                {templateForm.connector !== 'manual' &&
+                  authProfilesByConnector &&
+                  authProfilesByConnector.length === 0 && (
+                    <div className="helper-text">No hay auth profiles para este conector.</div>
+                  )}
               </div>
-              <div className="form-group">
-                <label>JQL Tests (template)</label>
-                <textarea
-                  rows={3}
-                  value={templateForm.queryTestsTemplate}
-                  onChange={(e) => setTemplateForm((prev) => ({ ...prev, queryTestsTemplate: e.target.value }))}
-                />
-                <div className="helper-text">
-                  Ejemplo: project IN ({'{projects}'}) AND issuetype = {'{issueTypeTest}'} AND {'{testerField}'} IN ({'{users}'}) AND updated
-                  {' >= '} {'{from}'} AND updated {' < '} {'{to}'}
-                </div>
-              </div>
-              {templateForm.metricType === 'ratio' && (
+              {templateForm.metricType !== 'value' &&
+                templateForm.metricType !== 'value_agg' &&
+                templateForm.metricType !== 'manual' && (
+                  <>
+                    <div className="form-group">
+                      <label>
+                        {templateForm.connector === 'jira' || templateForm.connector === 'xray'
+                          ? 'Filtro A (template)'
+                          : 'Config A (template)'}
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={templateForm.queryTestsTemplate}
+                        onChange={(e) => setTemplateForm((prev) => ({ ...prev, queryTestsTemplate: e.target.value }))}
+                      />
+                      <div className="helper-text">
+                        {templateForm.connector === 'jira' || templateForm.connector === 'xray'
+                          ? templateForm.metricType === 'sla'
+                            ? `Ejemplo: {baseFilter} AND {endDate} >= {from} AND {endDate} < {to} AND {endDate} <= {limitDate}`
+                            : templateForm.metricType === 'ratio'
+                            ? `Ejemplo: {filterA} AND {dateFieldA} >= {from} AND {dateFieldA} < {to}`
+                            : `Ejemplo: {baseFilter} AND {dateField} >= {from} AND {dateField} < {to}`
+                          : 'Ejemplo: baseFilter={baseFilter} dateField={dateField} from={from} to={to}'}
+                      </div>
+                    </div>
+                    {(templateForm.metricType === 'ratio' || templateForm.metricType === 'sla') && (
+                      <div className="form-group">
+                        <label>
+                          {templateForm.connector === 'jira' || templateForm.connector === 'xray'
+                            ? 'Filtro B (template)'
+                            : 'Config B (template)'}
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={templateForm.queryStoriesTemplate}
+                          onChange={(e) =>
+                            setTemplateForm((prev) => ({ ...prev, queryStoriesTemplate: e.target.value }))
+                          }
+                        />
+                        <div className="helper-text">
+                          {templateForm.connector === 'jira' || templateForm.connector === 'xray'
+                            ? templateForm.metricType === 'sla'
+                              ? `Ejemplo: {baseFilter} AND {endDate} >= {from} AND {endDate} < {to}`
+                              : `Ejemplo: {filterB} AND {dateFieldB} >= {from} AND {dateFieldB} < {to}`
+                            : 'Ejemplo: usa el mismo config A o separa A/B si necesitas dos agregados.'}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              {(templateForm.metricType === 'value' ||
+                templateForm.metricType === 'value_agg' ||
+                templateForm.metricType === 'manual') && (
                 <div className="form-group">
-                  <label>JQL Historias (template)</label>
+                  <label>Config (template)</label>
                   <textarea
                     rows={3}
-                    value={templateForm.queryStoriesTemplate}
-                    onChange={(e) => setTemplateForm((prev) => ({ ...prev, queryStoriesTemplate: e.target.value }))}
+                    value={templateForm.queryTestsTemplate}
+                    onChange={(e) => setTemplateForm((prev) => ({ ...prev, queryTestsTemplate: e.target.value }))}
                   />
                   <div className="helper-text">
-                    Ejemplo: project IN ({'{projects}'}) AND issuetype IN ({'{issueTypeStory}'}) AND statusCategory = Done AND
-                    statusCategoryChangedDate {' >= '} {'{from}'} AND statusCategoryChangedDate {' < '} {'{to}'} AND {'{testerField}'} IN ({'{users}'})
+                    {templateForm.metricType === 'manual'
+                      ? 'Ejemplo: manual'
+                      : 'Ejemplo: sheetKey={sheetKey} tab={tab} periodColumn={periodColumn} areaColumn={areaColumn} kpiColumn={kpiColumn} valueColumn={valueColumn} aggregation={SUM|AVG}'}
                   </div>
                 </div>
               )}
@@ -1174,13 +2152,41 @@ export default function Configuracion() {
                     onChange={(e) => setTemplateForm((prev) => ({ ...prev, formulaTemplate: e.target.value }))}
                   />
                 </div>
-                <div className="form-group">
-                  <label>Frecuencia / Cron</label>
+              <div className="form-group">
+                <label>Frecuencia / Cron</label>
+                <div className="form-row">
                   <input
                     value={templateForm.schedule}
                     onChange={(e) => setTemplateForm((prev) => ({ ...prev, schedule: e.target.value }))}
                   />
+                  <button
+                    className="btn-secondary"
+                    type="button"
+                    onClick={() => setTemplateForm((prev) => ({ ...prev, schedule: '0 2 1 * *' }))}
+                  >
+                    Mensual (1° 02:00)
+                  </button>
                 </div>
+                <div className="action-buttons" style={{ marginTop: 6 }}>
+                  <button
+                    className="btn-secondary"
+                    type="button"
+                    onClick={() => setTemplateForm((prev) => ({ ...prev, schedule: '0 2 * * *' }))}
+                  >
+                    Diario (02:00)
+                  </button>
+                  <button
+                    className="btn-secondary"
+                    type="button"
+                    onClick={() => setTemplateForm((prev) => ({ ...prev, schedule: '0 2 * * 1' }))}
+                  >
+                    Semanal (Lun 02:00)
+                  </button>
+                </div>
+                <div className="helper-text">
+                  Cron sugerido para cierre mensual. Ej: 0 2 1 * *. {cronPreview ? `Próxima ejecución: ${cronPreview}` : ''}
+                </div>
+              </div>
               </div>
               <div className="form-group">
                 <label>Estado</label>
@@ -1192,14 +2198,28 @@ export default function Configuracion() {
                   <option value="0">Inactiva</option>
                 </select>
               </div>
-              {!hasAnyPlaceholders ? (
-                <div className="form-error">
-                  Esta plantilla parece especifica. Se recomienda usar placeholders (ej: {'{projects}'}, {'{users}'}, {'{from}'}, {'{to}'}).
+              {['count', 'ratio', 'sla'].includes(templateForm.metricType) &&
+              (templateForm.queryTestsTemplate.trim() || templateForm.queryStoriesTemplate.trim()) &&
+              !hasAnyPlaceholders ? (
+                <div className="form-warning">
+                  Sugerencia: usa placeholders (ej: {'{baseFilter}'}, {'{from}'}, {'{to}'}) para que la plantilla sea reutilizable.
                 </div>
               ) : null}
-              {missingTimePlaceholders ? (
-                <div className="form-error">Recomendacion: incluir {'{from}'} y {'{to}'} para filtrar por periodo.</div>
+              {['count', 'ratio', 'sla'].includes(templateForm.metricType) &&
+              (templateForm.queryTestsTemplate.trim() || templateForm.queryStoriesTemplate.trim()) &&
+              missingTimePlaceholders ? (
+                <div className="form-warning">
+                  Sugerencia: incluir {'{from}'} y {'{to}'} para filtrar por periodo.
+                </div>
               ) : null}
+              {['count', 'ratio', 'sla'].includes(templateForm.metricType) &&
+              (templateForm.queryTestsTemplate.trim() || templateForm.queryStoriesTemplate.trim()) &&
+              literalWarning ? (
+                <div className="form-warning">
+                  Sugerencia: evitá valores fijos (Story/Bug/Done). Ponelos en el Target con placeholders.
+                </div>
+              ) : null}
+              {templateFormError ? <div className="form-error">{templateFormError}</div> : null}
             </div>
             <div className="modal-actions">
               <button className="btn-secondary" onClick={() => setShowTemplateModal(false)}>
@@ -1307,12 +2327,43 @@ export default function Configuracion() {
               </div>
               <div className="form-group">
                 <label>Params (JSON)</label>
+                <div className="helper-text">Pega un JQL y convertilo a JSON para usarlo en params.</div>
+                <textarea
+                  rows={4}
+                  placeholder="Pegar JQL aqui..."
+                  value={rawJqlInput}
+                  onChange={(e) => setRawJqlInput(e.target.value)}
+                />
+                <div className="action-buttons" style={{ marginTop: 6 }}>
+                  <button className="btn-secondary" type="button" onClick={convertJqlToParams}>
+                    Convertir JQL → JSON
+                  </button>
+                  <button
+                    className="btn-secondary"
+                    type="button"
+                    onClick={() => {
+                      setRawJqlInput('')
+                    }}
+                  >
+                    Limpiar
+                  </button>
+                </div>
                 <textarea
                   rows={5}
                   value={targetForm.paramsText}
                   onChange={(e) => setTargetForm((prev) => ({ ...prev, paramsText: e.target.value }))}
                 />
               </div>
+              <div className="helper-text">
+                Periodo calculado: <strong>{targetPeriodPreview.period}</strong> · Rango: {targetPeriodPreview.from} →{' '}
+                {targetPeriodPreview.to}. El subperiodo destino se resuelve automaticamente al ejecutar.
+              </div>
+              {targetAssignmentBlocked ? (
+                <div className="form-error">
+                  Hay multiples users en params. Para asignacion individual, crea un target por persona o quita la asignacion.
+                </div>
+              ) : null}
+              {targetFormError ? <div className="form-error">{targetFormError}</div> : null}
               <div className="form-group">
                 <label>Estado</label>
                 <select
@@ -1331,9 +2382,116 @@ export default function Configuracion() {
               <button
                 className="btn-primary"
                 onClick={() => saveTarget.mutate()}
-                disabled={!targetForm.scopeId.trim() || saveTarget.isLoading}
+                disabled={!targetForm.scopeId.trim() || saveTarget.isLoading || targetAssignmentBlocked}
               >
                 {saveTarget.isLoading ? 'Guardando...' : 'Guardar target'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTargetWizard && wizardTarget && (
+        <div className="modal-overlay" onClick={() => setShowTargetWizard(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Duplicar target por users</h2>
+              <button className="close-button" onClick={() => setShowTargetWizard(false)}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="muted">
+                Template: {templates?.find((t) => t.id === wizardTarget.templateId)?.name || wizardTarget.templateId}
+              </div>
+              <div className="helper-text">
+                Selecciona el colaborador y, si corresponde, la asignacion destino. Se creara un target por cada user.
+              </div>
+              <table className="config-table">
+                <thead>
+                  <tr>
+                    <th>User Jira</th>
+                    <th>Colaborador</th>
+                    <th>Asignacion</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {wizardRows.map((row, index) => {
+                    const assignmentsForColab = row.collaboratorId
+                      ? assignmentsByCollaborator.get(Number(row.collaboratorId)) || []
+                      : []
+                    return (
+                      <tr key={row.userKey}>
+                        <td>{row.userKey}</td>
+                        <td>
+                          <select
+                            value={row.collaboratorId}
+                            onChange={(e) => {
+                              const value = e.target.value
+                              setWizardRows((prev) =>
+                                prev.map((item, idx) =>
+                                  idx === index
+                                    ? {
+                                        ...item,
+                                        collaboratorId: value,
+                                        assignmentId: '',
+                                      }
+                                    : item
+                                )
+                              )
+                            }}
+                          >
+                            <option value="">Selecciona colaborador</option>
+                            {collaborators?.map((col) => (
+                              <option key={col.id} value={col.id}>
+                                {col.name} · {col.area}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td>
+                          <select
+                            value={row.assignmentId}
+                            onChange={(e) => {
+                              const value = e.target.value
+                              setWizardRows((prev) =>
+                                prev.map((item, idx) =>
+                                  idx === index
+                                    ? {
+                                        ...item,
+                                        assignmentId: value,
+                                      }
+                                    : item
+                                )
+                              )
+                            }}
+                            disabled={!row.collaboratorId}
+                          >
+                            <option value="">Sin asignacion</option>
+                            {assignmentsForColab.map((assignment: any) => (
+                              <option key={assignment.id} value={assignment.id}>
+                                {assignment.kpiName || `KPI #${assignment.kpiId}`} ·{' '}
+                                {assignment.periodName || `Período #${assignment.periodId}`}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="modal-actions">
+              <button className="btn-secondary" onClick={() => setShowTargetWizard(false)}>
+                Cancelar
+              </button>
+              <button
+                className="btn-primary"
+                onClick={() => createTargetsFromWizard.mutate()}
+                disabled={createTargetsFromWizard.isLoading}
+              >
+                {createTargetsFromWizard.isLoading ? 'Creando...' : 'Crear targets'}
               </button>
             </div>
           </div>
@@ -1366,6 +2524,7 @@ export default function Configuracion() {
                   >
                     <option value="jira">Jira</option>
                     <option value="xray">Xray</option>
+                    <option value="sheets">Google Sheets</option>
                   </select>
                 </div>
               </div>
@@ -1376,6 +2535,11 @@ export default function Configuracion() {
                   onChange={(e) => setAuthForm((prev) => ({ ...prev, endpoint: e.target.value }))}
                   placeholder="https://umsa.atlassian.net"
                 />
+                {authForm.connector === 'sheets' ? (
+                  <div className="helper-text">Opcional. Ejemplo: https://sheets.googleapis.com</div>
+                ) : (
+                  <div className="helper-text">Ejemplo: https://tu-dominio.atlassian.net</div>
+                )}
               </div>
               <div className="form-group">
                 <label>Auth Type</label>
@@ -1477,6 +2641,230 @@ export default function Configuracion() {
         </div>
       )}
 
+      {showCalendarModal && (
+        <div className="modal-overlay" onClick={() => setShowCalendarModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{editingCalendar ? 'Editar calendario' : 'Nuevo calendario'}</h2>
+              <button className="close-button" onClick={() => setShowCalendarModal(false)}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Nombre</label>
+                  <input
+                    value={calendarForm.name}
+                    onChange={(e) => setCalendarForm((prev) => ({ ...prev, name: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Frecuencia</label>
+                  <select
+                    value={calendarForm.frequency}
+                    onChange={(e) =>
+                      setCalendarForm((prev) => ({ ...prev, frequency: e.target.value }))
+                    }
+                  >
+                    <option value="monthly">Mensual</option>
+                    <option value="quarterly">Trimestral</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Descripción</label>
+                <textarea
+                  rows={3}
+                  value={calendarForm.description}
+                  onChange={(e) => setCalendarForm((prev) => ({ ...prev, description: e.target.value }))}
+                />
+              </div>
+              <div className="form-group">
+                <label>Estado</label>
+                <select
+                  value={calendarForm.active ? '1' : '0'}
+                  onChange={(e) =>
+                    setCalendarForm((prev) => ({ ...prev, active: e.target.value === '1' }))
+                  }
+                >
+                  <option value="1">Activo</option>
+                  <option value="0">Inactivo</option>
+                </select>
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="btn-secondary" onClick={() => setShowCalendarModal(false)}>
+                Cancelar
+              </button>
+              <button
+                className="btn-primary"
+                onClick={() => saveCalendarProfile.mutate()}
+                disabled={!calendarForm.name.trim() || saveCalendarProfile.isLoading}
+              >
+                {saveCalendarProfile.isLoading ? 'Guardando...' : 'Guardar calendario'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCalendarSubperiods && calendarForSubperiods && (
+        <div
+          className="modal-overlay"
+          onClick={() => {
+            setShowCalendarSubperiods(false)
+            setEditingCalendarSubperiod(undefined)
+          }}
+        >
+          <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Subperíodos · {calendarForSubperiods.name}</h2>
+              <button
+                className="close-button"
+                onClick={() => {
+                  setShowCalendarSubperiods(false)
+                  setEditingCalendarSubperiod(undefined)
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Período</label>
+                  <select
+                    value={selectedPeriodForCalendar}
+                    onChange={(e) =>
+                      setSelectedPeriodForCalendar(e.target.value ? Number(e.target.value) : '')
+                    }
+                  >
+                    <option value="">Selecciona un período</option>
+                    {periods?.map((p: any) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Frecuencia</label>
+                  <div className="readonly-field">{calendarForSubperiods.frequency}</div>
+                </div>
+                <div className="form-group">
+                  <label>Estado</label>
+                  <div className="readonly-field">
+                    {calendarForSubperiods.active !== false ? 'Activo' : 'Inactivo'}
+                  </div>
+                </div>
+              </div>
+
+              {!selectedPeriodForCalendar && (
+                <div className="form-hint">Selecciona un período para ver los subperíodos.</div>
+              )}
+
+              {selectedPeriodForCalendar && (
+                <>
+                  <div className="modal-actions">
+                    <button
+                      className="btn-primary"
+                      onClick={() => setEditingCalendarSubperiod(null)}
+                    >
+                      Nuevo subperíodo
+                    </button>
+                  </div>
+                  <table className="config-table">
+                    <thead>
+                      <tr>
+                        <th>Nombre</th>
+                        <th>Inicio</th>
+                        <th>Fin</th>
+                        <th>Peso</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {calendarSubperiods?.map((sp: any) => (
+                        <tr key={sp.id}>
+                          <td>{sp.name}</td>
+                          <td>{sp.startDate}</td>
+                          <td>{sp.endDate}</td>
+                          <td>{sp.weight ? `${sp.weight}%` : '-'}</td>
+                          <td>
+                            <span className={`status-pill ${sp.status === 'closed' ? 'review' : 'ok'}`}>
+                              {sp.status === 'closed' ? 'Cerrado' : 'Abierto'}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="action-buttons">
+                              <button
+                                className="btn-secondary"
+                                disabled={sp.status === 'closed'}
+                                onClick={() => setEditingCalendarSubperiod(sp)}
+                              >
+                                Editar
+                              </button>
+                              <button
+                                className="btn-secondary"
+                                disabled={sp.status === 'closed'}
+                                onClick={() => closeCalendarSubperiod.mutate(sp)}
+                              >
+                                Cerrar
+                              </button>
+                              <button
+                                className="btn-danger"
+                                disabled={sp.status === 'closed'}
+                                onClick={() => deleteCalendarSubperiod.mutate(sp)}
+                              >
+                                Eliminar
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {(!calendarSubperiods || calendarSubperiods.length === 0) && (
+                        <tr>
+                          <td colSpan={6} className="empty-row">
+                            No hay subperíodos para este calendario y período.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCalendarSubperiods &&
+        calendarForSubperiods &&
+        selectedPeriodForCalendar &&
+        editingCalendarSubperiod !== undefined && (
+          <div className="modal-overlay" onClick={() => setEditingCalendarSubperiod(undefined)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <SubPeriodForm
+                periodId={Number(selectedPeriodForCalendar)}
+                calendarProfileId={calendarForSubperiods.id}
+                subPeriod={editingCalendarSubperiod || undefined}
+                onClose={() => setEditingCalendarSubperiod(undefined)}
+                onSuccess={() => {
+                  queryClient.invalidateQueries([
+                    'calendar-subperiods',
+                    selectedPeriodForCalendar,
+                    calendarForSubperiods.id,
+                  ])
+                  setEditingCalendarSubperiod(undefined)
+                }}
+              />
+            </div>
+          </div>
+        )}
+
       {showTargetPreview && (
         <div className="modal-overlay" onClick={() => setShowTargetPreview(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -1498,7 +2886,7 @@ export default function Configuracion() {
               {targetPreviewResult ? (
                 <div className="preview-box">
                   <div className="muted">
-                    Tests: {targetPreviewResult.testsTotal} · Stories: {targetPreviewResult.storiesTotal} · Valor:{' '}
+                    A: {targetPreviewResult.testsTotal} · B: {targetPreviewResult.storiesTotal} · Valor:{' '}
                     {targetPreviewResult.computed}
                   </div>
                   <div className="muted">
@@ -1508,11 +2896,11 @@ export default function Configuracion() {
                     <div className="form-error">{targetPreviewResult.warnings.join(' · ')}</div>
                   ) : null}
                   <div className="preview-jql">
-                    <strong>JQL Tests</strong>
+                    <strong>Filtro A</strong>
                     <pre>{targetPreviewResult.testsJql}</pre>
                   </div>
                   <div className="preview-jql">
-                    <strong>JQL Historias</strong>
+                    <strong>Filtro B</strong>
                     <pre>{targetPreviewResult.storiesJql}</pre>
                   </div>
                 </div>
@@ -1574,6 +2962,25 @@ export default function Configuracion() {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div className="form-group">
+                <label>Calendario</label>
+                <select
+                  value={scopeForm.calendarProfileId}
+                  onChange={(e) =>
+                    setScopeForm((prev) => ({ ...prev, calendarProfileId: e.target.value }))
+                  }
+                >
+                  <option value="">Default</option>
+                  {calendarProfiles?.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.name}
+                    </option>
+                  ))}
+                </select>
+                <small className="form-hint">
+                  Define el ciclo de medición que hereda este scope.
+                </small>
               </div>
               <div className="form-group">
                 <label>Metadata (JSON)</label>

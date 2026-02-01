@@ -5,7 +5,8 @@ import api from '../services/api'
 import './Curaduria.css'
 
 type CurationItem = {
-  id: number
+  id?: number | null
+  criteriaVersionId?: number | null
   assignmentId: number
   kpiName: string
   collaboratorName: string
@@ -14,7 +15,11 @@ type CurationItem = {
   dataSource?: string
   sourceConfig?: string
   criteriaText?: string
-  status: 'pending' | 'in_review' | 'approved' | 'rejected'
+  criteriaStatus?: 'pending' | 'in_review' | 'approved' | 'rejected'
+  assignmentCurationStatus?: 'pending' | 'in_review' | 'approved' | 'rejected'
+  assignmentDataSource?: string
+  assignmentSourceConfig?: string
+  kpiCriteria?: string
   comment?: string
   createdAt?: string
   createdByName?: string
@@ -25,7 +30,7 @@ export default function Curaduria() {
   const [periodFilter, setPeriodFilter] = useState<number | ''>('')
   const [kpiFilter, setKpiFilter] = useState<number | ''>('')
   const [collaboratorFilter, setCollaboratorFilter] = useState<number | ''>('')
-  const [areaFilter, setAreaFilter] = useState<number | ''>('')
+  const [scopeFilter, setScopeFilter] = useState<number | ''>('')
   const [showCriteriaModal, setShowCriteriaModal] = useState(false)
   const [criteriaAssignmentId, setCriteriaAssignmentId] = useState<number | ''>('')
   const [criteriaDataSource, setCriteriaDataSource] = useState('')
@@ -57,13 +62,13 @@ export default function Curaduria() {
     return response.data
   })
 
-  const { data: areas } = useQuery('areas', async () => {
-    const response = await api.get('/areas')
+  const { data: orgScopes } = useQuery('org-scopes', async () => {
+    const response = await api.get('/org-scopes')
     return response.data
   })
 
   const { data: items, isLoading } = useQuery<CurationItem[]>(
-    ['curation-items', statusFilter, periodFilter, kpiFilter, collaboratorFilter, areaFilter, assignmentId],
+    ['curation-items', statusFilter, periodFilter, kpiFilter, collaboratorFilter, scopeFilter, assignmentId],
     async () => {
       const response = await api.get('/curation/items', {
         params: {
@@ -71,7 +76,7 @@ export default function Curaduria() {
           periodId: periodFilter || undefined,
           kpiId: kpiFilter || undefined,
           collaboratorId: collaboratorFilter || undefined,
-          areaId: areaFilter || undefined,
+          orgScopeId: scopeFilter || undefined,
           assignmentId: assignmentId || undefined,
         },
       })
@@ -123,19 +128,63 @@ export default function Curaduria() {
     }
   )
 
+  const ensureCriteriaId = async (item: CurationItem): Promise<number | null> => {
+    const existingId = item.criteriaVersionId || item.id || null
+    if (existingId) return existingId
+
+    const dataSource =
+      item.assignmentDataSource ||
+      item.dataSource ||
+      (item.criteriaText || item.kpiCriteria ? 'Manual' : '')
+    const criteriaText = item.criteriaText || item.kpiCriteria || ''
+    const sourceConfig = item.assignmentSourceConfig || item.sourceConfig || ''
+
+    if (!criteriaText.trim()) {
+      setCriteriaAssignmentId(item.assignmentId)
+      setCriteriaDataSource(dataSource || '')
+      setCriteriaSourceConfig(sourceConfig || '')
+      setCriteriaText('')
+      setShowCriteriaModal(true)
+      return null
+    }
+
+    const response = await api.post(`/curation/assignments/${item.assignmentId}/criteria`, {
+      dataSource: dataSource || undefined,
+      sourceConfig: sourceConfig || undefined,
+      criteriaText,
+    })
+    return response.data?.id || null
+  }
+
+  const handleReview = async (
+    item: CurationItem,
+    action: 'approve' | 'reject' | 'request'
+  ) => {
+    const comment =
+      action === 'reject'
+        ? window.prompt('Comentario obligatorio para rechazo:')
+        : action === 'request'
+        ? window.prompt('Comentario para ajustes:')
+        : undefined
+
+    if (action === 'reject' && !comment) return
+
+    const criteriaId = await ensureCriteriaId(item)
+    if (!criteriaId) return
+    await reviewMutation.mutateAsync({ id: criteriaId, action, comment: comment || undefined })
+  }
+
   const handleReject = (item: CurationItem) => {
-    const comment = window.prompt('Comentario obligatorio para rechazo:')
-    if (!comment) return
-    reviewMutation.mutate({ id: item.id, action: 'reject', comment })
+    handleReview(item, 'reject')
   }
 
   const filteredItems = useMemo(() => items || [], [items])
 
-  const selectedAreaName = useMemo(() => {
-    if (!areaFilter || !areas) return ''
-    const areaMatch = areas.find((area: any) => area.id === areaFilter)
-    return areaMatch?.name || ''
-  }, [areaFilter, areas])
+  const selectedScopeName = useMemo(() => {
+    if (!scopeFilter || !orgScopes) return ''
+    const scopeMatch = orgScopes.find((scope: any) => scope.id === scopeFilter)
+    return scopeMatch?.name || ''
+  }, [scopeFilter, orgScopes])
 
   // Preseleccionar asignación si llega por query
   useEffect(() => {
@@ -146,29 +195,22 @@ export default function Curaduria() {
 
   const filteredCollaborators = useMemo(() => {
     if (!collaborators) return []
-    if (!selectedAreaName) return collaborators
-    return collaborators.filter((collab: any) => collab.area === selectedAreaName)
-  }, [collaborators, selectedAreaName])
+    if (!scopeFilter) return collaborators
+    return collaborators.filter((collab: any) => collab.orgScopeId === scopeFilter)
+  }, [collaborators, scopeFilter])
 
-  const filteredKpis = useMemo(() => {
-    if (!kpis) return []
-    if (!selectedAreaName) return kpis
-    return kpis.filter((kpi: any) => {
-      const areas = Array.isArray(kpi.areas) ? kpi.areas : []
-      return areas.includes(selectedAreaName)
-    })
-  }, [kpis, selectedAreaName])
+  const filteredKpis = useMemo(() => kpis || [], [kpis])
 
   const filteredAssignments = useMemo(() => {
     if (!assignments) return []
     return assignments.filter((assignment: any) => {
-      if (selectedAreaName && assignment.collaboratorArea !== selectedAreaName) return false
+      if (selectedScopeName && assignment.collaboratorArea !== selectedScopeName) return false
       if (periodFilter && assignment.periodId !== periodFilter) return false
       if (kpiFilter && assignment.kpiId !== kpiFilter) return false
       if (collaboratorFilter && assignment.collaboratorId !== collaboratorFilter) return false
       return true
     })
-  }, [assignments, selectedAreaName, periodFilter, kpiFilter, collaboratorFilter])
+  }, [assignments, selectedScopeName, periodFilter, kpiFilter, collaboratorFilter])
 
   const tabOptions = [
     { key: 'pending', label: 'Pendientes' },
@@ -179,21 +221,29 @@ export default function Curaduria() {
   ]
 
   const formatSource = (item: CurationItem) => {
-    if (!item.dataSource) return 'Sin fuente'
-    return item.sourceConfig ? `${item.dataSource} · ${item.sourceConfig}` : item.dataSource
+    const source = item.dataSource || item.assignmentDataSource
+    const config = item.sourceConfig || item.assignmentSourceConfig
+    if (!source) return 'Sin fuente'
+    return config ? `${source} · ${config}` : source
   }
 
   const formatMeta = (item: CurationItem) => {
-    const by = item.createdByName ? ` · ${item.createdByName}` : ''
+    const by = item.createdByName ? ' · Data Curator' : ''
     return item.createdAt ? `${item.createdAt}${by}` : '-'
   }
+
+  const resolveStatus = (item: CurationItem) =>
+    item.criteriaStatus || item.assignmentCurationStatus || 'pending'
+
+  const resolveCriteriaText = (item: CurationItem) =>
+    item.criteriaText || item.kpiCriteria || ''
 
   const exportCsv = () => {
     const headers = [
       'ID',
       'Asignacion',
       'Colaborador',
-      'Area',
+      'Scope',
       'KPI',
       'Periodo',
       'Fuente',
@@ -230,7 +280,7 @@ export default function Curaduria() {
     link.href = URL.createObjectURL(blob)
     const parts = [
       'curaduria',
-      selectedAreaName ? `area-${selectedAreaName}` : null,
+      selectedScopeName ? `scope-${selectedScopeName}` : null,
       periodFilter ? `periodo-${periodFilter}` : null,
       kpiFilter ? `kpi-${kpiFilter}` : null,
       collaboratorFilter ? `colab-${collaboratorFilter}` : null,
@@ -243,7 +293,7 @@ export default function Curaduria() {
 
   const exportExcel = () => {
     const rows = [
-      ['ID', 'Asignacion', 'Colaborador', 'Area', 'KPI', 'Periodo', 'Fuente', 'Criterio', 'Estado', 'Comentario', 'Creado'],
+      ['ID', 'Asignacion', 'Colaborador', 'Scope', 'KPI', 'Periodo', 'Fuente', 'Criterio', 'Estado', 'Comentario', 'Creado'],
       ...filteredItems.map((item) => [
         item.id,
         item.assignmentId,
@@ -291,7 +341,7 @@ export default function Curaduria() {
     link.href = URL.createObjectURL(blob)
     const parts = [
       'curaduria',
-      selectedAreaName ? `area-${selectedAreaName}` : null,
+      selectedScopeName ? `scope-${selectedScopeName}` : null,
       periodFilter ? `periodo-${periodFilter}` : null,
       kpiFilter ? `kpi-${kpiFilter}` : null,
       collaboratorFilter ? `colab-${collaboratorFilter}` : null,
@@ -388,19 +438,21 @@ export default function Curaduria() {
           </select>
         </div>
         <div className="filter-group">
-          <label htmlFor="area-filter">Área:</label>
+          <label htmlFor="scope-filter">Scope:</label>
           <select
-            id="area-filter"
-            value={areaFilter}
-            onChange={(e) => setAreaFilter(e.target.value ? Number(e.target.value) : '')}
+            id="scope-filter"
+            value={scopeFilter}
+            onChange={(e) => setScopeFilter(e.target.value ? Number(e.target.value) : '')}
             className="filter-select"
           >
-            <option value="">Todas</option>
-            {areas?.map((area: any) => (
-              <option key={area.id || area.name} value={area.id}>
-                {area.name}
-              </option>
-            ))}
+            <option value="">Todos</option>
+            {orgScopes
+              ?.filter((scope: any) => scope.type === 'area' && scope.active !== 0 && scope.active !== false)
+              .map((scope: any) => (
+                <option key={scope.id || scope.name} value={scope.id}>
+                  {scope.name}
+                </option>
+              ))}
           </select>
         </div>
         <div className="curaduria-hint">
@@ -428,61 +480,74 @@ export default function Curaduria() {
                 <td colSpan={8} className="empty-row">Cargando bandeja...</td>
               </tr>
             ) : (
-              filteredItems.map((item) => (
-                <tr key={item.id}>
-                  <td>{item.collaboratorName}</td>
-                  <td>{item.kpiName}</td>
-                  <td>{item.periodName}</td>
-                  <td title={item.sourceConfig || ''}>{formatSource(item)}</td>
-                  <td className="criteria-cell" title={item.criteriaText || ''}>
-                    {item.criteriaText || '-'}
-                  </td>
-                  <td>
-                    <span className={`status-pill ${item.status === 'approved' ? 'ok' : 'review'}`}>
-                      {item.status === 'pending'
-                        ? 'Pendiente'
-                        : item.status === 'in_review'
-                        ? 'En revision'
-                        : item.status === 'approved'
-                        ? 'Aprobado'
-                        : 'Rechazado'}
-                    </span>
-                    {item.comment ? <div className="comment">{item.comment}</div> : null}
-                  </td>
-                  <td>{formatMeta(item)}</td>
-                  <td>
-                    <div className="action-buttons">
-                      <button
-                        className="btn-approve-small"
-                        onClick={() => reviewMutation.mutate({ id: item.id, action: 'approve' })}
-                        disabled={item.status === 'approved'}
-                      >
-                        Aprobar
-                      </button>
-                      <button
-                        className="btn-reject-small"
-                        onClick={() => handleReject(item)}
-                        disabled={item.status === 'rejected'}
-                      >
-                        Rechazar
-                      </button>
-                      <button
-                        className="btn-secondary"
-                        onClick={() =>
-                          reviewMutation.mutate({
-                            id: item.id,
-                            action: 'request',
-                            comment: window.prompt('Comentario para ajustes:') || undefined,
-                          })
-                        }
-                        disabled={item.status === 'in_review'}
-                      >
-                        Pedir cambios
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+              filteredItems.map((item) => {
+                const status = resolveStatus(item)
+                const criteriaId = item.criteriaVersionId || item.id || null
+                const canReview = !!criteriaId
+                return (
+                  <tr key={criteriaId || `assignment-${item.assignmentId}`}>
+                    <td>{item.collaboratorName}</td>
+                    <td>{item.kpiName}</td>
+                    <td>{item.periodName}</td>
+                    <td title={item.sourceConfig || ''}>{formatSource(item)}</td>
+                    <td className="criteria-cell" title={resolveCriteriaText(item) || ''}>
+                      {resolveCriteriaText(item) || '-'}
+                    </td>
+                    <td>
+                      <span className={`status-pill ${status === 'approved' ? 'ok' : 'review'}`}>
+                        {status === 'pending'
+                          ? 'Pendiente'
+                          : status === 'in_review'
+                          ? 'En revision'
+                          : status === 'approved'
+                          ? 'Aprobado'
+                          : 'Rechazado'}
+                      </span>
+                      {item.comment ? <div className="comment">{item.comment}</div> : null}
+                    </td>
+                    <td>{formatMeta(item)}</td>
+                    <td>
+                      <div className="action-buttons">
+                        <button
+                          className="btn-approve-small"
+                          onClick={() => handleReview(item, 'approve')}
+                          disabled={status === 'approved'}
+                        >
+                          Aprobar
+                        </button>
+                        <button
+                          className="btn-reject-small"
+                          onClick={() => handleReview(item, 'reject')}
+                          disabled={status === 'rejected'}
+                        >
+                          Rechazar
+                        </button>
+                        <button
+                          className="btn-secondary"
+                          onClick={() => handleReview(item, 'request')}
+                          disabled={status === 'in_review'}
+                        >
+                          Pedir cambios
+                        </button>
+                        {!canReview && (
+                          <button
+                            className="btn-secondary"
+                            onClick={() => {
+                              setCriteriaAssignmentId(item.assignmentId)
+                              setCriteriaDataSource(item.assignmentDataSource || '')
+                              setCriteriaSourceConfig(item.assignmentSourceConfig || '')
+                              setCriteriaText(item.kpiCriteria || '')
+                              setShowCriteriaModal(true)
+                            }}
+                          >
+                            Crear criterio
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })
             )}
             {filteredItems.length === 0 && (
               <tr>

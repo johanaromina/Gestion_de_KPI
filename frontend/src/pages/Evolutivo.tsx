@@ -15,7 +15,7 @@ interface Collaborator {
 interface KPI {
   id: number
   name: string
-  type: 'growth' | 'reduction' | 'exact'
+  type: string
 }
 
 interface Period {
@@ -33,6 +33,7 @@ interface EvolutionPoint {
   collaboratorArea: string
   kpiName: string
   kpiType: string
+  kpiDirection?: 'growth' | 'reduction' | 'exact'
   periodName?: string
 }
 

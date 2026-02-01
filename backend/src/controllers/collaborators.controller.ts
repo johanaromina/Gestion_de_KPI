@@ -74,16 +74,30 @@ export const getCollaboratorById = async (req: Request, res: Response) => {
 
 export const createCollaborator = async (req: Request, res: Response) => {
   try {
-    const { name, position, area, managerId, role, email, mfaEnabled } = req.body
+    const { name, position, area, orgScopeId, managerId, role, email, mfaEnabled } = req.body
     const user = (req as AuthRequest).user
     const normalizedEmail = email ? String(email).trim().toLowerCase() : null
 
-    if (!name || !position || !area || !role) {
+    if (!name || !position || (!area && !orgScopeId) || !role) {
       return res.status(400).json({ error: 'Faltan campos requeridos' })
     }
 
+    let resolvedArea = area
+    let resolvedOrgScopeId = orgScopeId ? Number(orgScopeId) : null
+
+    if (resolvedOrgScopeId) {
+      const [scopeRows] = await pool.query<any[]>(
+        'SELECT id, name FROM org_scopes WHERE id = ?',
+        [resolvedOrgScopeId]
+      )
+      if (!scopeRows || scopeRows.length === 0) {
+        return res.status(400).json({ error: 'Scope no encontrado' })
+      }
+      resolvedArea = scopeRows[0].name
+    }
+
     if (
-      !canEditCollaborator(user, area) &&
+      !canEditCollaborator(user, resolvedArea) &&
       !['admin', 'director'].includes(user?.role || '')
     ) {
       return res.status(403).json({ error: 'Solo puedes crear colaboradores en tu area' })
@@ -100,9 +114,18 @@ export const createCollaborator = async (req: Request, res: Response) => {
     }
 
     const [result] = await pool.query(
-      `INSERT INTO collaborators (name, position, area, managerId, role, status, email, mfaEnabled) 
-       VALUES (?, ?, ?, ?, ?, 'active', ?, ?)`,
-      [name, position, area, managerId || null, role, normalizedEmail, mfaEnabled ? 1 : 0]
+      `INSERT INTO collaborators (name, position, area, orgScopeId, managerId, role, status, email, mfaEnabled) 
+       VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
+      [
+        name,
+        position,
+        resolvedArea,
+        resolvedOrgScopeId,
+        managerId || null,
+        role,
+        normalizedEmail,
+        mfaEnabled ? 1 : 0,
+      ]
     )
 
     const insertResult = result as any
@@ -116,7 +139,8 @@ export const createCollaborator = async (req: Request, res: Response) => {
       {
         name,
         position,
-        area,
+        area: resolvedArea,
+        orgScopeId: resolvedOrgScopeId,
         managerId: managerId || null,
         role,
         status: 'active',
@@ -135,7 +159,8 @@ export const createCollaborator = async (req: Request, res: Response) => {
       id: newId,
       name,
       position,
-      area,
+      area: resolvedArea,
+      orgScopeId: resolvedOrgScopeId,
       managerId: managerId || null,
       role,
       email: normalizedEmail,
@@ -150,7 +175,7 @@ export const createCollaborator = async (req: Request, res: Response) => {
 export const updateCollaborator = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const { name, position, area, managerId, role, email, mfaEnabled } = req.body
+    const { name, position, area, orgScopeId, managerId, role, email, mfaEnabled } = req.body
     const user = (req as AuthRequest).user
     console.log('updateCollaborator user:', user)
     const normalizedEmail = email ? String(email).trim().toLowerCase() : null
@@ -160,6 +185,20 @@ export const updateCollaborator = async (req: Request, res: Response) => {
       [id]
     )
     const oldValues = Array.isArray(oldRows) && oldRows.length > 0 ? oldRows[0] : null
+
+    let resolvedArea = area
+    let resolvedOrgScopeId = orgScopeId ? Number(orgScopeId) : oldValues?.orgScopeId || null
+
+    if (resolvedOrgScopeId) {
+      const [scopeRows] = await pool.query<any[]>(
+        'SELECT id, name FROM org_scopes WHERE id = ?',
+        [resolvedOrgScopeId]
+      )
+      if (!scopeRows || scopeRows.length === 0) {
+        return res.status(400).json({ error: 'Scope no encontrado' })
+      }
+      resolvedArea = scopeRows[0].name
+    }
 
     if (!canEditCollaborator(user, oldValues?.area, Number(id))) {
       return res.status(403).json({ error: 'No autorizado para editar fuera de tu area' })
@@ -177,9 +216,19 @@ export const updateCollaborator = async (req: Request, res: Response) => {
 
     await pool.query(
       `UPDATE collaborators 
-       SET name = ?, position = ?, area = ?, managerId = ?, role = ?, email = ?, mfaEnabled = ? 
+       SET name = ?, position = ?, area = ?, orgScopeId = ?, managerId = ?, role = ?, email = ?, mfaEnabled = ? 
        WHERE id = ?`,
-      [name, position, area, managerId || null, role, normalizedEmail, mfaEnabled ? 1 : 0, id]
+      [
+        name,
+        position,
+        resolvedArea,
+        resolvedOrgScopeId,
+        managerId || null,
+        role,
+        normalizedEmail,
+        mfaEnabled ? 1 : 0,
+        id,
+      ]
     )
 
     await logAudit(
@@ -190,7 +239,8 @@ export const updateCollaborator = async (req: Request, res: Response) => {
       {
         name,
         position,
-        area,
+        area: resolvedArea,
+        orgScopeId: resolvedOrgScopeId,
         managerId: managerId || null,
         role,
         email: normalizedEmail,

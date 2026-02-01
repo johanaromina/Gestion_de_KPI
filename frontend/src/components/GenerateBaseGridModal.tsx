@@ -15,13 +15,12 @@ export default function GenerateBaseGridModal({
   onSuccess,
 }: GenerateBaseGridModalProps) {
   const [formData, setFormData] = useState({
-    area: '',
+    scopeId: '',
     periodId: '',
     kpiIds: [] as number[],
     defaultTarget: '',
     defaultWeight: '',
     useAllKPIs: true,
-    showAllKpis: false,
     overrides: {} as Record<number, { target?: string; weight?: string }>,
   })
 
@@ -35,22 +34,16 @@ export default function GenerateBaseGridModal({
     return response.data
   })
 
-  // Obtener colaboradores para obtener áreas únicas
-  const { data: collaborators } = useQuery('collaborators', async () => {
-    const response = await api.get('/collaborators')
+  const { data: orgScopes } = useQuery('org-scopes', async () => {
+    const response = await api.get('/org-scopes')
     return response.data
   })
 
   // Obtener KPIs (filtrados por área, a menos que se pida mostrar todos)
   const { data: kpis } = useQuery<KPI[]>(
-    ['kpis', formData.area, formData.showAllKpis],
+    ['kpis'],
     async () => {
-      const response = await api.get('/kpis', {
-        params:
-          formData.area && !formData.showAllKpis
-            ? { area: formData.area }
-            : undefined,
-      })
+      const response = await api.get('/kpis')
       return response.data
     },
     { enabled: true }
@@ -82,16 +75,16 @@ export default function GenerateBaseGridModal({
     }
   )
 
-  // Obtener áreas únicas de colaboradores
-  const uniqueAreas = Array.from(
-    new Set(collaborators?.map((c: any) => c.area) || [])
-  ).sort() as string[]
+  const areaScopes =
+    orgScopes
+      ?.filter((scope: any) => scope.type === 'area' && scope.active !== 0 && scope.active !== false)
+      .sort((a: any, b: any) => String(a.name).localeCompare(String(b.name))) || []
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {}
 
-    if (!formData.area) {
-      newErrors.area = 'El área es requerida'
+    if (!formData.scopeId) {
+      newErrors.scopeId = 'El scope es requerido'
     }
 
     if (!formData.periodId) {
@@ -114,7 +107,7 @@ export default function GenerateBaseGridModal({
     }
 
     const submitData: any = {
-      area: formData.area,
+      orgScopeId: Number(formData.scopeId),
       periodId: parseInt(formData.periodId),
     }
 
@@ -181,27 +174,23 @@ export default function GenerateBaseGridModal({
 
         <form onSubmit={handleSubmit} className="generate-grid-form">
           <div className="form-group">
-            <label htmlFor="area">Área *</label>
+            <label htmlFor="scopeId">Scope *</label>
             <select
-              id="area"
-              value={formData.area}
-              onChange={(e) =>
-                setFormData({ ...formData, area: e.target.value })
-              }
-              className={errors.area ? 'error' : ''}
+              id="scopeId"
+              value={formData.scopeId}
+              onChange={(e) => setFormData({ ...formData, scopeId: e.target.value })}
+              className={errors.scopeId ? 'error' : ''}
             >
-              <option value="">Selecciona un área</option>
-              {uniqueAreas.map((area) => (
-                <option key={area} value={area}>
-                  {area}
+              <option value="">Selecciona un scope</option>
+              {areaScopes.map((scope: any) => (
+                <option key={scope.id} value={scope.id}>
+                  {scope.name}
                 </option>
               ))}
             </select>
-            {errors.area && (
-              <span className="error-message">{errors.area}</span>
-            )}
+            {errors.scopeId && <span className="error-message">{errors.scopeId}</span>}
             <small className="form-hint">
-              Se generarán parrillas para todos los colaboradores de esta área
+              Se generarán parrillas para todos los colaboradores de este scope
             </small>
           </div>
 
@@ -243,23 +232,9 @@ export default function GenerateBaseGridModal({
           </div>
 
           {!formData.useAllKPIs && (
-            <div className="form-group inline-group">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={formData.showAllKpis}
-                  onChange={(e) =>
-                    setFormData({ ...formData, showAllKpis: e.target.checked })
-                  }
-                />
-                <span style={{ marginLeft: '8px' }}>
-                  Mostrar KPIs de todas las áreas
-                </span>
-              </label>
-              <small className="form-hint">
-                Por defecto se listan los KPIs del área seleccionada.
-              </small>
-            </div>
+            <small className="form-hint">
+              Se listan los KPIs disponibles del sistema.
+            </small>
           )}
 
           {!formData.useAllKPIs && (

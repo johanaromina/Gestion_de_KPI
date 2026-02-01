@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { pool } from '../config/database'
 import { sendMail } from '../utils/mailer'
+import { getEffectivePermissions } from '../utils/permissions'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-change-in-production'
 const APP_BASE_URL = process.env.APP_BASE_URL || 'http://localhost:5173'
@@ -70,14 +71,7 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Credenciales invalidas' })
     }
 
-    const [permRows] = await pool.query<any[]>(
-      `SELECT p.code 
-       FROM permissions p 
-       JOIN collaborator_permissions cp ON cp.permissionId = p.id
-       WHERE cp.collaboratorId = ?`,
-      [collaborator.id]
-    )
-    const permissions: string[] = Array.isArray(permRows) ? permRows.map((p) => p.code) : []
+    const permissions = await getEffectivePermissions(collaborator.id)
 
     if (collaborator.mfaEnabled && collaborator.email) {
       const code = crypto.randomInt(100000, 999999).toString()
@@ -163,14 +157,7 @@ export const verifyMfa = async (req: Request, res: Response) => {
       [collaborator.id]
     )
 
-    const [permRows] = await pool.query<any[]>(
-      `SELECT p.code 
-       FROM permissions p 
-       JOIN collaborator_permissions cp ON cp.permissionId = p.id
-       WHERE cp.collaboratorId = ?`,
-      [collaborator.id]
-    )
-    const permissions: string[] = Array.isArray(permRows) ? permRows.map((p) => p.code) : []
+    const permissions = await getEffectivePermissions(collaborator.id)
 
     const expiresIn = rememberMe ? '30d' : '1d'
     const authToken = jwt.sign(buildTokenPayload(collaborator, permissions), JWT_SECRET, { expiresIn })
@@ -299,14 +286,7 @@ export const getCurrentUser = async (req: Request, res: Response) => {
 
     const collaborator = rows[0]
 
-    const [permRows] = await pool.query<any[]>(
-      `SELECT p.code 
-       FROM permissions p 
-       JOIN collaborator_permissions cp ON cp.permissionId = p.id
-       WHERE cp.collaboratorId = ?`,
-      [collaborator.id]
-    )
-    const permissions: string[] = Array.isArray(permRows) ? permRows.map((p) => p.code) : []
+    const permissions = await getEffectivePermissions(collaborator.id)
 
     res.json({
       ...buildTokenPayload(collaborator, permissions),

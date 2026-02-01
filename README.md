@@ -1,6 +1,6 @@
-# Sistema de Gestión de KPI
+# Sistema de Gestion de KPI
 
-Aplicación web para la gestión de objetivos y KPIs de colaboradores, reemplazando el sistema basado en Excel.
+Aplicacion web para la gestion de objetivos y KPIs de colaboradores, reemplazando el sistema basado en Excel.
 
 ## Estructura del Proyecto
 
@@ -30,7 +30,7 @@ Gestion_de_KPI/
 - JWT (autenticación)
 - bcryptjs (hash de contraseñas)
 
-## Instalación
+## Instalacion
 
 ### Frontend
 ```bash
@@ -53,13 +53,65 @@ npm run dev
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:5000
 
-## Próximos Pasos
+## Estado actual (funcionalidades principales)
 
-1. Configurar base de datos MySQL
-2. Implementar modelos de datos
-3. Crear endpoints de API
-4. Desarrollar componentes de UI
-5. Implementar autenticación y autorización
+- KPIs macro + asignaciones por colaborador y periodo (con subperiodos)
+- Tipos de KPI: manual / count / ratio / sla / value + direccion (growth/reduction/exact)
+- Curaduria versionada (fuente/criterio) por asignacion
+- Mediciones (manual/import/auto) con aprobacion
+- Modulo Curaduria (bandeja) e Input de datos (historial)
+- RBAC basico por permisos/roles
+- Integraciones escalables: auth profiles, templates, targets, runs
+- Org scopes jerarquicos para herencia de parametros (company > area > team > person)
+- Notificaciones por correo con control de spam (cooldown)
+
+## Base de datos (setup y migraciones utiles)
+
+Desde `backend/`:
+
+```bash
+# 1) Crear estructura base (si estas empezando de cero)
+npx tsx scripts/setup-database.ts
+
+# 2) Curaduria + mediciones
+npx tsx scripts/add-curation-measurements.ts
+
+# 3) Integraciones Fase 2 (templates/targets/org_scopes)
+npx tsx scripts/add-integrations-tables.ts
+npx tsx scripts/migrate-templates-to-targets.ts
+npx tsx scripts/seed-integrations-phase2.ts
+
+# 4) Notificaciones
+npx tsx scripts/add-notifications-table.ts
+
+# 5) KPI types + direction
+npx tsx scripts/add-kpi-type-direction.ts
+
+# 6) Org scopes (si ya tenes colaboradores cargados)
+npx tsx scripts/add-collaborators-orgscope.ts
+
+# 7) Plan mensual con override de peso (opcional)
+npx tsx scripts/add-collaborator-kpi-plan-override.ts
+```
+
+Notas:
+- Si ya tenias datos, podes correr igual los scripts: son idempotentes o tolerantes a cambios ya aplicados.
+- El manual operativo esta en `docs/manual-uso.md`.
+
+## Notificaciones por correo (recomendado en desarrollo)
+
+Para evitar spam durante pruebas, usa alguna de estas opciones en `backend/.env`:
+
+```env
+NOTIFY_ENABLED=false
+```
+
+o bien:
+
+```env
+NOTIFY_COOLDOWN_MIN=360
+NOTIFY_INTERVAL_MIN=30
+```
 
 ## Estructura de Carpetas Detallada
 
@@ -99,17 +151,13 @@ src/
 - `npm run build:frontend` - Construye el frontend para producción
 - `npm run build:backend` - Construye el backend para producción
 
-## Configuración Inicial
+## Configuracion Inicial
 
 1. **Backend**: Copiar `.env.example` a `.env` y configurar las credenciales de la base de datos
 2. **Frontend**: El archivo `.env` se puede crear si necesitas variables de entorno personalizadas
 3. **Base de datos**: Crear la base de datos MySQL según el nombre configurado en `.env`
+4. **Org Scopes**: Vincular colaboradores a scopes con `add-collaborators-orgscope.ts`
 
-## Estado del Proyecto
+## Estado del proyecto
 
-✅ Estructura de carpetas creada
-✅ Configuración de TypeScript
-✅ Dependencias instaladas
-✅ Archivos base creados
-⏳ Pendiente: Implementación de funcionalidades MVP
-
+El proyecto ya incluye modulos clave (curaduria, mediciones, RBAC e integraciones). El foco actual esta en pulir UX y consolidar flujos operativos.

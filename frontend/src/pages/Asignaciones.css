@@ -89,6 +89,36 @@
   font-weight: 500;
   color: #374151;
   font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: default;
+}
+
+.calendar-pill {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 6px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 11px;
+  font-weight: 600;
+  width: fit-content;
 }
 
 .filter-select {
@@ -130,10 +160,32 @@
   position: relative;
 }
 
+.table-container.compact {
+  overflow-x: hidden;
+}
+
 .data-table {
   width: 100%;
   border-collapse: collapse;
   min-width: 1200px;
+}
+
+.data-table.compact {
+  min-width: 0;
+}
+
+.data-table.compact th,
+.data-table.compact td {
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.data-table.compact .col-id,
+.data-table.compact .col-subperiod,
+.data-table.compact .col-peso,
+.data-table.compact .col-last,
+.data-table.compact .col-comments {
+  display: none;
 }
 
 .data-table thead {

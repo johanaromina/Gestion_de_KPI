@@ -7,6 +7,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import ProposeValueModal from '../components/ProposeValueModal'
 import ConsistencyAlerts from '../components/ConsistencyAlerts'
 import { useAuth } from '../hooks/useAuth'
+import { calculateVariationPercent, calculateWeightedImpact, resolveDirection } from '../utils/kpi'
 import './MiParrilla.css'
 
 interface CollaboratorKPI {
@@ -18,6 +19,7 @@ interface CollaboratorKPI {
   target: number
   actual?: number
   weight: number
+  subPeriodWeight?: number | null
   variation?: number
   weightedResult?: number
   status: 'draft' | 'proposed' | 'approved' | 'closed'
@@ -26,7 +28,8 @@ interface CollaboratorKPI {
   kpiDescription?: string
   kpiCriteria?: string
   criteriaText?: string
-  kpiType?: 'growth' | 'reduction' | 'exact'
+  kpiType?: string
+  kpiDirection?: 'growth' | 'reduction' | 'exact'
   periodName?: string
   periodStatus?: string
   curationStatus?: 'pending' | 'in_review' | 'approved' | 'rejected'
@@ -103,15 +106,26 @@ export default function MiParrilla() {
   const currentPeriodId = kpis?.[0]?.periodId
 
   // Calcular resultado global
-  const totalWeightedResult = kpis?.reduce((sum, kpi) => {
-    return sum + (kpi.weightedResult || 0)
-  }, 0) || 0
+  const summaryForGlobal = useMemo(() => {
+    if (!kpis || kpis.length === 0) return []
+    const hasSubPeriods = kpis.some((kpi) => kpi.subPeriodId !== null && kpi.subPeriodId !== undefined)
+    if (hasSubPeriods) {
+      return kpis.filter((kpi) => kpi.subPeriodId !== null && kpi.subPeriodId !== undefined)
+    }
+    const summary = kpis.filter((kpi) => kpi.subPeriodId === null || kpi.subPeriodId === undefined)
+    return summary.length > 0 ? summary : kpis
+  }, [kpis])
 
-  const totalWeight = kpis?.reduce((sum, kpi) => {
-    return sum + kpi.weight
-  }, 0) || 0
+  const totalWeightedImpact =
+    summaryForGlobal?.reduce((sum, kpi) => {
+      const direction = resolveDirection((kpi as any).assignmentDirection, kpi.kpiDirection, kpi.kpiType)
+      const variation =
+        kpi.variation ?? calculateVariationPercent(direction, kpi.target, kpi.actual ?? null)
+      const impact = calculateWeightedImpact(variation, kpi.weight, kpi.subPeriodWeight)
+      return sum + (impact || 0)
+    }, 0) || 0
 
-  const globalResult = totalWeight > 0 ? (totalWeightedResult / totalWeight) * 100 : 0
+  const globalResult = totalWeightedImpact
 
   // Datos para gráfico
   const chartData =
@@ -321,7 +335,16 @@ export default function MiParrilla() {
                 </tr>
               </thead>
               <tbody>
-                {kpis.map((kpi) => (
+                {kpis.map((kpi) => {
+                  const direction = resolveDirection(
+                    (kpi as any).assignmentDirection,
+                    kpi.kpiDirection,
+                    kpi.kpiType
+                  )
+                  const variation =
+                    kpi.variation ?? calculateVariationPercent(direction, kpi.target, kpi.actual ?? null)
+                  const weightedImpact = calculateWeightedImpact(variation, kpi.weight, kpi.subPeriodWeight)
+                  return (
                   <tr key={kpi.id}>
                     <td className="kpi-name">{kpi.kpiName || `KPI ${kpi.kpiId}`}</td>
                     <td className="kpi-description">
@@ -375,16 +398,16 @@ export default function MiParrilla() {
                       )}
                     </td>
                     <td className="kpi-variation">
-                      {kpi.variation !== null && kpi.variation !== undefined && !isNaN(Number(kpi.variation))
-                        ? `${Number(kpi.variation).toFixed(1)}%`
+                      {variation !== null && variation !== undefined && !isNaN(Number(variation))
+                        ? `${Number(variation).toFixed(1)}%`
                         : '-'}
                     </td>
                     <td className="kpi-weight">{kpi.weight}%</td>
                     <td className="kpi-weighted">
-                      {kpi.weightedResult !== null &&
-                      kpi.weightedResult !== undefined &&
-                      !isNaN(Number(kpi.weightedResult))
-                        ? `${Number(kpi.weightedResult).toFixed(1)}%`
+                      {weightedImpact !== null &&
+                      weightedImpact !== undefined &&
+                      !isNaN(Number(weightedImpact))
+                        ? `${Number(weightedImpact).toFixed(1)}%`
                         : '-'}
                     </td>
                     <td className="kpi-criteria">
@@ -449,7 +472,8 @@ export default function MiParrilla() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>

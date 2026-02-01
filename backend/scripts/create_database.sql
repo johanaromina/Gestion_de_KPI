@@ -5,12 +5,30 @@ CREATE DATABASE IF NOT EXISTS gestion_kpi CHARACTER SET utf8mb4 COLLATE utf8mb4_
 
 USE gestion_kpi;
 
+-- Tabla de Scopes Organizacionales
+CREATE TABLE IF NOT EXISTS org_scopes (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  type ENUM('company', 'area', 'team', 'person', 'product') NOT NULL DEFAULT 'area',
+  parentId INT NULL,
+  calendarProfileId INT NULL,
+  metadata TEXT NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (parentId) REFERENCES org_scopes(id) ON DELETE SET NULL,
+  FOREIGN KEY (calendarProfileId) REFERENCES calendar_profiles(id) ON DELETE SET NULL,
+  INDEX idx_scope_type (type),
+  INDEX idx_scope_parent (parentId)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Tabla de Colaboradores
 CREATE TABLE IF NOT EXISTS collaborators (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   position VARCHAR(255) NOT NULL,
   area VARCHAR(255) NOT NULL,
+  orgScopeId INT NULL,
   email VARCHAR(255) NULL,
   passwordHash VARCHAR(255) NULL,
   passwordResetTokenHash VARCHAR(64) NULL,
@@ -26,11 +44,13 @@ CREATE TABLE IF NOT EXISTS collaborators (
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (managerId) REFERENCES collaborators(id) ON DELETE SET NULL,
+  FOREIGN KEY (orgScopeId) REFERENCES org_scopes(id) ON DELETE SET NULL,
   UNIQUE KEY uniq_collaborators_email (email),
   INDEX idx_manager (managerId),
   INDEX idx_role (role),
   INDEX idx_status (status),
-  INDEX idx_area (area)
+  INDEX idx_area (area),
+  INDEX idx_collaborators_org_scope (orgScopeId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Eventos de colaborador (cambios de rol, desvinculaci¢n, reactivaci¢n)
@@ -62,10 +82,64 @@ CREATE TABLE IF NOT EXISTS periods (
   INDEX idx_dates (startDate, endDate)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Tabla de Subperíodos
-CREATE TABLE IF NOT EXISTS sub_periods (
+-- Resúmenes anuales por periodo y colaborador
+CREATE TABLE IF NOT EXISTS period_summaries (
   id INT AUTO_INCREMENT PRIMARY KEY,
   periodId INT NOT NULL,
+  collaboratorId INT NOT NULL,
+  totalWeight DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  totalWeightedResult DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  overallResult DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  status ENUM('open', 'closed') NOT NULL DEFAULT 'closed',
+  generatedBy INT NULL,
+  generatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_period_collaborator (periodId, collaboratorId),
+  INDEX idx_period_summary_period (periodId),
+  INDEX idx_period_summary_collaborator (collaboratorId),
+  FOREIGN KEY (periodId) REFERENCES periods(id) ON DELETE CASCADE,
+  FOREIGN KEY (collaboratorId) REFERENCES collaborators(id) ON DELETE CASCADE,
+  FOREIGN KEY (generatedBy) REFERENCES collaborators(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS period_summary_items (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  summaryId INT NOT NULL,
+  kpiId INT NOT NULL,
+  target DECIMAL(10,2) NULL,
+  actual DECIMAL(10,2) NULL,
+  variation DECIMAL(10,2) NULL,
+  weight DECIMAL(10,2) NULL,
+  weightedResult DECIMAL(10,2) NULL,
+  status ENUM('draft', 'proposed', 'approved', 'closed') NOT NULL DEFAULT 'draft',
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_summary_item_summary (summaryId),
+  INDEX idx_summary_item_kpi (kpiId),
+  UNIQUE KEY uniq_summary_kpi (summaryId, kpiId),
+  FOREIGN KEY (summaryId) REFERENCES period_summaries(id) ON DELETE CASCADE,
+  FOREIGN KEY (kpiId) REFERENCES kpis(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Calendarios de medición por scope
+CREATE TABLE IF NOT EXISTS calendar_profiles (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  description TEXT NULL,
+  frequency ENUM('monthly', 'quarterly', 'custom') NOT NULL DEFAULT 'monthly',
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_calendar_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO calendar_profiles (name, description, frequency, active)
+VALUES ('Default', 'Calendario por defecto', 'monthly', 1);
+
+-- Tabla de Subperíodos
+CREATE TABLE IF NOT EXISTS calendar_subperiods (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  periodId INT NOT NULL,
+  calendarProfileId INT NULL,
   name VARCHAR(255) NOT NULL,
   startDate DATE NOT NULL,
   endDate DATE NOT NULL,
@@ -74,6 +148,7 @@ CREATE TABLE IF NOT EXISTS sub_periods (
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (periodId) REFERENCES periods(id) ON DELETE CASCADE,
+  FOREIGN KEY (calendarProfileId) REFERENCES calendar_profiles(id) ON DELETE SET NULL,
   INDEX idx_period (periodId),
   INDEX idx_dates (startDate, endDate)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -83,7 +158,8 @@ CREATE TABLE IF NOT EXISTS kpis (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   description TEXT,
-  type ENUM('growth', 'reduction', 'exact') NOT NULL,
+  type ENUM('manual', 'count', 'ratio', 'sla', 'value') NOT NULL DEFAULT 'value',
+  direction ENUM('growth', 'reduction', 'exact') NOT NULL DEFAULT 'growth',
   criteria TEXT,
   formula TEXT NULL,
   defaultDataSource VARCHAR(100) NULL,
@@ -97,12 +173,28 @@ CREATE TABLE IF NOT EXISTS kpis (
   INDEX idx_macro (macroKPIId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Ponderación de KPI por Scope
+CREATE TABLE IF NOT EXISTS kpi_scope_weights (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  kpiId INT NOT NULL,
+  scopeId INT NOT NULL,
+  weight DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_kpi_scope_weight (kpiId, scopeId),
+  INDEX idx_kpi (kpiId),
+  INDEX idx_scope (scopeId),
+  FOREIGN KEY (kpiId) REFERENCES kpis(id) ON DELETE CASCADE,
+  FOREIGN KEY (scopeId) REFERENCES org_scopes(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Tabla de KPIs de Colaboradores (relación muchos a muchos con períodos)
 CREATE TABLE IF NOT EXISTS collaborator_kpis (
   id INT AUTO_INCREMENT PRIMARY KEY,
   collaboratorId INT NOT NULL,
   kpiId INT NOT NULL,
   periodId INT NOT NULL,
+  calendarProfileId INT NULL,
   subPeriodId INT NULL,
   target DECIMAL(10,2) NOT NULL,
   actual DECIMAL(10,2) NULL,
@@ -123,7 +215,8 @@ CREATE TABLE IF NOT EXISTS collaborator_kpis (
   FOREIGN KEY (collaboratorId) REFERENCES collaborators(id) ON DELETE CASCADE,
   FOREIGN KEY (kpiId) REFERENCES kpis(id) ON DELETE CASCADE,
   FOREIGN KEY (periodId) REFERENCES periods(id) ON DELETE CASCADE,
-  FOREIGN KEY (subPeriodId) REFERENCES sub_periods(id) ON DELETE SET NULL,
+  FOREIGN KEY (calendarProfileId) REFERENCES calendar_profiles(id) ON DELETE SET NULL,
+  FOREIGN KEY (subPeriodId) REFERENCES calendar_subperiods(id) ON DELETE SET NULL,
   FOREIGN KEY (curatorUserId) REFERENCES collaborators(id) ON DELETE SET NULL,
   INDEX idx_collaborator (collaboratorId),
   INDEX idx_period (periodId),
@@ -169,7 +262,7 @@ CREATE TABLE IF NOT EXISTS kpi_measurements (
   sourceRunId VARCHAR(255) NULL,
   FOREIGN KEY (assignmentId) REFERENCES collaborator_kpis(id) ON DELETE CASCADE,
   FOREIGN KEY (periodId) REFERENCES periods(id) ON DELETE SET NULL,
-  FOREIGN KEY (subPeriodId) REFERENCES sub_periods(id) ON DELETE SET NULL,
+  FOREIGN KEY (subPeriodId) REFERENCES calendar_subperiods(id) ON DELETE SET NULL,
   FOREIGN KEY (criteriaVersionId) REFERENCES kpi_criteria_versions(id) ON DELETE SET NULL,
   FOREIGN KEY (capturedBy) REFERENCES collaborators(id) ON DELETE SET NULL,
   INDEX idx_assignment (assignmentId),
@@ -212,6 +305,7 @@ CREATE TABLE IF NOT EXISTS notification_states (
   type VARCHAR(50) NOT NULL,
   entityKey VARCHAR(100) NOT NULL,
   stateHash VARCHAR(64) NOT NULL,
+  lastNotifiedAt DATETIME NULL,
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uniq_notification_state (type, entityKey)
@@ -263,7 +357,7 @@ CREATE TABLE IF NOT EXISTS integration_runs (
 CREATE TABLE IF NOT EXISTS auth_profiles (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  connector ENUM('jira', 'xray', 'azure_devops', 'github', 'servicenow', 'zendesk', 'other') NOT NULL DEFAULT 'jira',
+  connector ENUM('jira', 'xray', 'sheets', 'azure_devops', 'github', 'servicenow', 'zendesk', 'other') NOT NULL DEFAULT 'jira',
   endpoint TEXT NULL,
   authType ENUM('none', 'basic', 'bearer', 'apiKey') NOT NULL DEFAULT 'none',
   authConfig TEXT NULL,
@@ -275,8 +369,9 @@ CREATE TABLE IF NOT EXISTS auth_profiles (
 CREATE TABLE IF NOT EXISTS integration_templates (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  connector ENUM('jira', 'xray', 'azure_devops', 'github', 'servicenow', 'zendesk', 'other') NOT NULL DEFAULT 'jira',
+  connector ENUM('jira', 'xray', 'sheets', 'azure_devops', 'github', 'servicenow', 'zendesk', 'other') NOT NULL DEFAULT 'jira',
   metricType ENUM('count', 'ratio') NOT NULL DEFAULT 'ratio',
+  metricTypeUi VARCHAR(20) NULL,
   queryTestsTemplate TEXT NULL,
   queryStoriesTemplate TEXT NULL,
   formulaTemplate VARCHAR(255) NULL,
@@ -332,11 +427,13 @@ CREATE TABLE IF NOT EXISTS org_scopes (
   name VARCHAR(255) NOT NULL,
   type ENUM('company', 'area', 'team', 'person', 'product') NOT NULL DEFAULT 'area',
   parentId INT NULL,
+  calendarProfileId INT NULL,
   metadata TEXT NULL,
   active TINYINT(1) NOT NULL DEFAULT 1,
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (parentId) REFERENCES org_scopes(id) ON DELETE SET NULL,
+  FOREIGN KEY (calendarProfileId) REFERENCES calendar_profiles(id) ON DELETE SET NULL,
   INDEX idx_scope_type (type),
   INDEX idx_scope_parent (parentId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -356,12 +453,65 @@ CREATE TABLE IF NOT EXISTS permissions (
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS roles (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  code VARCHAR(50) NOT NULL UNIQUE,
+  name VARCHAR(100) NOT NULL,
+  description VARCHAR(255),
+  editable TINYINT(1) NOT NULL DEFAULT 1,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS role_permissions (
+  roleId INT NOT NULL,
+  permissionId INT NOT NULL,
+  PRIMARY KEY (roleId, permissionId),
+  CONSTRAINT fk_role_permission_role FOREIGN KEY (roleId) REFERENCES roles(id) ON DELETE CASCADE,
+  CONSTRAINT fk_role_permission_permission FOREIGN KEY (permissionId) REFERENCES permissions(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS collaborator_permissions (
   collaboratorId INT NOT NULL,
   permissionId INT NOT NULL,
   PRIMARY KEY (collaboratorId, permissionId),
   CONSTRAINT fk_cp_collaborator FOREIGN KEY (collaboratorId) REFERENCES collaborators(id) ON DELETE CASCADE,
   CONSTRAINT fk_cp_permission FOREIGN KEY (permissionId) REFERENCES permissions(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  entityType VARCHAR(64) NOT NULL,
+  entityId INT NOT NULL,
+  action VARCHAR(16) NOT NULL,
+  userId INT NULL,
+  userName VARCHAR(120) NULL,
+  oldValues JSON NULL,
+  newValues JSON NULL,
+  changes JSON NULL,
+  ipAddress VARCHAR(64) NULL,
+  userAgent VARCHAR(255) NULL,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_audit_entity (entityType, entityId),
+  INDEX idx_audit_user (userId),
+  INDEX idx_audit_created (createdAt),
+  FOREIGN KEY (userId) REFERENCES collaborators(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS collaborator_roles (
+  collaboratorId INT NOT NULL PRIMARY KEY,
+  roleId INT NOT NULL,
+  assignedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_cr_collaborator FOREIGN KEY (collaboratorId) REFERENCES collaborators(id) ON DELETE CASCADE,
+  CONSTRAINT fk_cr_role FOREIGN KEY (roleId) REFERENCES roles(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE IF NOT EXISTS org_scope_roles (
+  orgScopeId INT NOT NULL PRIMARY KEY,
+  roleId INT NOT NULL,
+  assignedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_osr_scope FOREIGN KEY (orgScopeId) REFERENCES org_scopes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_osr_role FOREIGN KEY (roleId) REFERENCES roles(id) ON DELETE RESTRICT
 );
 
 INSERT IGNORE INTO permissions (code, description) VALUES
@@ -387,4 +537,42 @@ INSERT IGNORE INTO permissions (code, description) VALUES
 ('measurement_import', 'Importar mediciones'),
 ('measurement_run_ingest', 'Ejecutar ingestas'),
 ('measurement_approve', 'Aprobar mediciones');
+
+INSERT IGNORE INTO roles (code, name, description, editable) VALUES
+('admin', 'Admin', 'Acceso total', 0),
+('data_curator', 'Data Curator', 'Aprueba criterios y datos', 0),
+('producer', 'Producer', 'Carga e ingesta de datos', 0),
+('viewer', 'Viewer', 'Solo lectura', 0),
+('leader', 'Leader/Manager', 'Aprueba y gestiona KPIs', 0);
+
+INSERT IGNORE INTO role_permissions (roleId, permissionId)
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.code IN (
+  'config.manage','config.view','kpi_read','kpi_create','kpi_update','kpi_delete','assignment_read','assignment_create',
+  'assignment_update','assignment_close','curation_read','curation_submit','curation_review','curation_edit',
+  'measurement_read','measurement_create_manual','measurement_import','measurement_run_ingest','measurement_approve',
+  'view_dashboard','view_reports','view_audit'
+) WHERE r.code = 'admin';
+
+INSERT IGNORE INTO role_permissions (roleId, permissionId)
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.code IN (
+  'config.manage','config.view','kpi_read','assignment_read','curation_read','curation_review','curation_edit',
+  'measurement_read','measurement_run_ingest','view_dashboard','view_reports','view_audit'
+) WHERE r.code = 'data_curator';
+
+INSERT IGNORE INTO role_permissions (roleId, permissionId)
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.code IN (
+  'kpi_read','assignment_read','curation_submit','measurement_read','measurement_create_manual','measurement_import',
+  'measurement_run_ingest','view_dashboard','view_reports'
+) WHERE r.code = 'producer';
+
+INSERT IGNORE INTO role_permissions (roleId, permissionId)
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.code IN (
+  'view_dashboard','view_reports','kpi_read','assignment_read','measurement_read'
+) WHERE r.code = 'viewer';
+
+INSERT IGNORE INTO role_permissions (roleId, permissionId)
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.code IN (
+  'config.manage','config.view','kpi_read','assignment_read','assignment_create','assignment_update','assignment_close',
+  'curation_submit','measurement_read','measurement_run_ingest','measurement_approve','view_dashboard','view_reports'
+) WHERE r.code = 'leader';
 

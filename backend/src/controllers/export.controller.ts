@@ -2,6 +2,23 @@ import { Request, Response } from 'express'
 import { pool } from '../config/database'
 import PDFDocument from 'pdfkit'
 import ExcelJS from 'exceljs'
+import { calculateVariation } from '../utils/kpi-formulas'
+import { KPIDirection, KPIType } from '../types'
+
+const resolveDirection = (direction?: string | null, type?: string | null): KPIDirection => {
+  if (direction === 'growth' || direction === 'reduction' || direction === 'exact') return direction
+  if (type === 'growth' || type === 'reduction' || type === 'exact') return type
+  if (type === 'sla') return 'reduction'
+  return 'growth'
+}
+
+const calculateWeightedImpact = (variation: number, weight: number, subPeriodWeight?: number | null) => {
+  const weightValue = Number(weight ?? 0)
+  const subWeightValue = Number(subPeriodWeight ?? 100)
+  const normalizedSubWeight = Number.isFinite(subWeightValue) && subWeightValue > 0 ? subWeightValue : 100
+  if (!Number.isFinite(weightValue) || weightValue <= 0) return 0
+  return (variation * (weightValue / 100)) * (normalizedSubWeight / 100)
+}
 
 /**
  * Exporta la parrilla de un colaborador en PDF
@@ -45,13 +62,16 @@ export const exportParrillaPDF = async (req: Request, res: Response) => {
         k.name as kpiName,
         k.description as kpiDescription,
         k.type as kpiType,
+        k.direction as kpiDirection,
         k.criteria as kpiCriteria,
         p.name as periodName,
         p.startDate as periodStartDate,
-        p.endDate as periodEndDate
+        p.endDate as periodEndDate,
+        sp.weight as subPeriodWeight
       FROM collaborator_kpis ck
       JOIN kpis k ON ck.kpiId = k.id
       JOIN periods p ON ck.periodId = p.id
+      LEFT JOIN calendar_subperiods sp ON ck.subPeriodId = sp.id
       WHERE ck.collaboratorId = ? AND ck.periodId = ?
       ORDER BY ck.createdAt ASC`,
       [collaboratorId, periodId]
@@ -120,6 +140,13 @@ export const exportParrillaPDF = async (req: Request, res: Response) => {
           currentY = 50
         }
 
+        const direction = resolveDirection(kpi.kpiDirection, kpi.kpiType as KPIType)
+        const variation =
+          kpi.variation !== null && kpi.variation !== undefined
+            ? Number(kpi.variation)
+            : calculateVariation(direction, Number(kpi.target ?? 0), Number(kpi.actual ?? 0))
+        const weightedImpact = calculateWeightedImpact(variation, kpi.weight, kpi.subPeriodWeight)
+
         doc.text(kpi.kpiName || '-', tableLeft, currentY, { width: colWidths[0] })
         doc.text(parseFloat(kpi.target).toFixed(2), tableLeft + colWidths[0], currentY)
         doc.text(
@@ -133,14 +160,12 @@ export const exportParrillaPDF = async (req: Request, res: Response) => {
           currentY
         )
         doc.text(
-          kpi.variation !== null ? `${parseFloat(kpi.variation).toFixed(2)}%` : '-',
+          Number.isFinite(variation) ? `${variation.toFixed(2)}%` : '-',
           tableLeft + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3],
           currentY
         )
         doc.text(
-          kpi.weightedResult !== null
-            ? parseFloat(kpi.weightedResult).toFixed(2)
-            : '-',
+          Number.isFinite(weightedImpact) ? weightedImpact.toFixed(2) : '-',
           tableLeft + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + colWidths[4],
           currentY
         )
@@ -160,11 +185,15 @@ export const exportParrillaPDF = async (req: Request, res: Response) => {
         (sum: number, kpi: any) => sum + parseFloat(kpi.weight || 0),
         0
       )
-      const totalWeightedResult = kpis.reduce(
-        (sum: number, kpi: any) =>
-          sum + (parseFloat(kpi.weightedResult || 0)),
-        0
-      )
+      const totalWeightedResult = kpis.reduce((sum: number, kpi: any) => {
+        const direction = resolveDirection(kpi.kpiDirection, kpi.kpiType as KPIType)
+        const variation =
+          kpi.variation !== null && kpi.variation !== undefined
+            ? Number(kpi.variation)
+            : calculateVariation(direction, Number(kpi.target ?? 0), Number(kpi.actual ?? 0))
+        const weightedImpact = calculateWeightedImpact(variation, kpi.weight, kpi.subPeriodWeight)
+        return sum + (Number.isFinite(weightedImpact) ? weightedImpact : 0)
+      }, 0)
 
       currentY += 10
       doc.font('Helvetica-Bold')
@@ -228,13 +257,16 @@ export const exportParrillaExcel = async (req: Request, res: Response) => {
         k.name as kpiName,
         k.description as kpiDescription,
         k.type as kpiType,
+        k.direction as kpiDirection,
         k.criteria as kpiCriteria,
         p.name as periodName,
         p.startDate as periodStartDate,
-        p.endDate as periodEndDate
+        p.endDate as periodEndDate,
+        sp.weight as subPeriodWeight
       FROM collaborator_kpis ck
       JOIN kpis k ON ck.kpiId = k.id
       JOIN periods p ON ck.periodId = p.id
+      LEFT JOIN calendar_subperiods sp ON ck.subPeriodId = sp.id
       WHERE ck.collaboratorId = ? AND ck.periodId = ?
       ORDER BY ck.createdAt ASC`,
       [collaboratorId, periodId]
@@ -309,6 +341,12 @@ export const exportParrillaExcel = async (req: Request, res: Response) => {
 
     // Datos
     kpis.forEach((kpi: any, index: number) => {
+      const direction = resolveDirection(kpi.kpiDirection, kpi.kpiType as KPIType)
+      const variation =
+        kpi.variation !== null && kpi.variation !== undefined
+          ? Number(kpi.variation)
+          : calculateVariation(direction, Number(kpi.target ?? 0), Number(kpi.actual ?? 0))
+      const weightedImpact = calculateWeightedImpact(variation, kpi.weight, kpi.subPeriodWeight)
       const row = headerRow + 1 + index
       worksheet.getCell(`A${row}`).value = kpi.kpiName || '-'
       worksheet.getCell(`B${row}`).value = parseFloat(kpi.target)
@@ -318,11 +356,9 @@ export const exportParrillaExcel = async (req: Request, res: Response) => {
       worksheet.getCell(`C${row}`).numFmt = '0.00'
       worksheet.getCell(`D${row}`).value = parseFloat(kpi.weight)
       worksheet.getCell(`D${row}`).numFmt = '0.00'
-      worksheet.getCell(`E${row}`).value =
-        kpi.variation !== null ? parseFloat(kpi.variation) : null
+      worksheet.getCell(`E${row}`).value = Number.isFinite(variation) ? variation : null
       worksheet.getCell(`E${row}`).numFmt = '0.00'
-      worksheet.getCell(`F${row}`).value =
-        kpi.weightedResult !== null ? parseFloat(kpi.weightedResult) : null
+      worksheet.getCell(`F${row}`).value = Number.isFinite(weightedImpact) ? weightedImpact : null
       worksheet.getCell(`F${row}`).numFmt = '0.00'
       worksheet.getCell(`G${row}`).value = kpi.status || '-'
       worksheet.getCell(`H${row}`).value = kpi.comments || '-'
@@ -347,10 +383,15 @@ export const exportParrillaExcel = async (req: Request, res: Response) => {
     worksheet.getCell(`D${totalRow + 1}`).numFmt = '0.00'
     worksheet.getCell(`D${totalRow + 1}`).font = { bold: true }
 
-    const totalWeightedResult = kpis.reduce(
-      (sum: number, kpi: any) => sum + (parseFloat(kpi.weightedResult || 0)),
-      0
-    )
+    const totalWeightedResult = kpis.reduce((sum: number, kpi: any) => {
+      const direction = resolveDirection(kpi.kpiDirection, kpi.kpiType as KPIType)
+      const variation =
+        kpi.variation !== null && kpi.variation !== undefined
+          ? Number(kpi.variation)
+          : calculateVariation(direction, Number(kpi.target ?? 0), Number(kpi.actual ?? 0))
+      const weightedImpact = calculateWeightedImpact(variation, kpi.weight, kpi.subPeriodWeight)
+      return sum + (Number.isFinite(weightedImpact) ? weightedImpact : 0)
+    }, 0)
     worksheet.getCell(`F${totalRow}`).value = 'Total Ponderado:'
     worksheet.getCell(`F${totalRow}`).font = { bold: true }
     worksheet.getCell(`F${totalRow + 1}`).value = totalWeightedResult

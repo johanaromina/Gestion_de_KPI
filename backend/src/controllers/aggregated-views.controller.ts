@@ -1,5 +1,7 @@
 import { Request, Response } from 'express'
 import { pool } from '../config/database'
+import { calculateVariation } from '../utils/kpi-formulas'
+import { KPIDirection, KPIType } from '../types'
 
 // Función auxiliar para calcular estadísticas
 function calculateStatistics(results: number[]): {
@@ -38,6 +40,58 @@ function calculateStatistics(results: number[]): {
   }
 }
 
+const resolveDirection = (direction?: string | null, type?: string | null): KPIDirection => {
+  if (direction === 'growth' || direction === 'reduction' || direction === 'exact') return direction
+  if (type === 'growth' || type === 'reduction' || type === 'exact') return type
+  if (type === 'sla') return 'reduction'
+  return 'growth'
+}
+
+const computeCollaboratorResult = async (collaboratorId: number, periodId: number) => {
+  const [rows] = await pool.query<any[]>(
+    `SELECT ck.target,
+            ck.actual,
+            ck.weight,
+            ck.variation,
+            ck.subPeriodId,
+            sp.weight as subPeriodWeight,
+            k.type as kpiType,
+            k.direction as kpiDirection
+     FROM collaborator_kpis ck
+     JOIN kpis k ON ck.kpiId = k.id
+     LEFT JOIN calendar_subperiods sp ON ck.subPeriodId = sp.id
+     WHERE ck.collaboratorId = ? AND ck.periodId = ?`,
+    [collaboratorId, periodId]
+  )
+
+  if (!Array.isArray(rows) || rows.length === 0) return null
+
+  const hasSubPeriods = rows.some((row) => row.subPeriodId !== null && row.subPeriodId !== undefined)
+  const rowsToUse = hasSubPeriods
+    ? rows.filter((row) => row.subPeriodId !== null && row.subPeriodId !== undefined)
+    : rows.filter((row) => row.subPeriodId === null || row.subPeriodId === undefined)
+
+  if (rowsToUse.length === 0) return null
+
+  let totalImpact = 0
+
+  for (const row of rowsToUse) {
+    const direction = resolveDirection(row.kpiDirection, row.kpiType as KPIType)
+    const variation =
+      row.variation !== null && row.variation !== undefined
+        ? Number(row.variation)
+        : calculateVariation(direction, Number(row.target ?? 0), Number(row.actual ?? 0))
+    if (!Number.isFinite(variation)) continue
+    const weight = Number(row.weight ?? 0)
+    const subWeight = Number(row.subPeriodWeight ?? 100)
+    if (!Number.isFinite(weight) || weight <= 0) continue
+    const normalizedSubWeight = Number.isFinite(subWeight) && subWeight > 0 ? subWeight : 100
+    totalImpact += (variation * (weight / 100)) * (normalizedSubWeight / 100)
+  }
+
+  return totalImpact
+}
+
 export const getAggregatedByDirection = async (req: Request, res: Response) => {
   try {
     const { periodId } = req.query
@@ -70,29 +124,8 @@ export const getAggregatedByDirection = async (req: Request, res: Response) => {
       const results: number[] = []
 
       for (const collab of collaborators || []) {
-        // Calcular resultado global del colaborador
-        const [kpis] = await pool.query<any[]>(
-          `SELECT 
-            SUM(weightedResult) as totalWeightedResult,
-            SUM(weight) as totalWeight
-           FROM collaborator_kpis
-           WHERE collaboratorId = ? AND periodId = ?`,
-          [collab.id, periodId]
-        )
-
-        if (
-          Array.isArray(kpis) &&
-          kpis.length > 0 &&
-          kpis[0].totalWeight > 0
-        ) {
-          const result =
-            (parseFloat(kpis[0].totalWeightedResult || 0) /
-              parseFloat(kpis[0].totalWeight)) *
-            100
-          if (!isNaN(result)) {
-            results.push(result)
-          }
-        }
+        const result = await computeCollaboratorResult(collab.id, Number(periodId))
+        if (result !== null && !isNaN(result)) results.push(result)
       }
 
       const stats = calculateStatistics(results)
@@ -147,49 +180,12 @@ export const getAggregatedByManagement = async (
 
       const results: number[] = []
 
-      // Incluir también el resultado del manager
-      const [managerKpis] = await pool.query<any[]>(
-        `SELECT 
-          SUM(weightedResult) as totalWeightedResult,
-          SUM(weight) as totalWeight
-         FROM collaborator_kpis
-         WHERE collaboratorId = ? AND periodId = ?`,
-        [manager.id, periodId]
-      )
-
-      if (
-        Array.isArray(managerKpis) &&
-        managerKpis.length > 0 &&
-        managerKpis[0].totalWeight > 0
-      ) {
-        const result =
-          (parseFloat(managerKpis[0].totalWeightedResult || 0) /
-            parseFloat(managerKpis[0].totalWeight)) *
-          100
-        if (!isNaN(result)) {
-          results.push(result)
-        }
-      }
+      const managerResult = await computeCollaboratorResult(manager.id, Number(periodId))
+      if (managerResult !== null && !isNaN(managerResult)) results.push(managerResult)
 
       for (const member of teamMembers || []) {
-        const [kpis] = await pool.query<any[]>(
-          `SELECT 
-            SUM(weightedResult) as totalWeightedResult,
-            SUM(weight) as totalWeight
-           FROM collaborator_kpis
-           WHERE collaboratorId = ? AND periodId = ?`,
-          [member.id, periodId]
-        )
-
-        if (Array.isArray(kpis) && kpis.length > 0 && kpis[0].totalWeight > 0) {
-          const result =
-            (parseFloat(kpis[0].totalWeightedResult || 0) /
-              parseFloat(kpis[0].totalWeight)) *
-            100
-          if (!isNaN(result)) {
-            results.push(result)
-          }
-        }
+        const memberResult = await computeCollaboratorResult(member.id, Number(periodId))
+        if (memberResult !== null && !isNaN(memberResult)) results.push(memberResult)
       }
 
       const stats = calculateStatistics(results)
@@ -249,49 +245,12 @@ export const getAggregatedByLeadership = async (
 
       const results: number[] = []
 
-      // Incluir también el resultado del líder
-      const [leaderKpis] = await pool.query<any[]>(
-        `SELECT 
-          SUM(weightedResult) as totalWeightedResult,
-          SUM(weight) as totalWeight
-         FROM collaborator_kpis
-         WHERE collaboratorId = ? AND periodId = ?`,
-        [leader.id, periodId]
-      )
-
-      if (
-        Array.isArray(leaderKpis) &&
-        leaderKpis.length > 0 &&
-        leaderKpis[0].totalWeight > 0
-      ) {
-        const result =
-          (parseFloat(leaderKpis[0].totalWeightedResult || 0) /
-            parseFloat(leaderKpis[0].totalWeight)) *
-          100
-        if (!isNaN(result)) {
-          results.push(result)
-        }
-      }
+      const leaderResult = await computeCollaboratorResult(leader.id, Number(periodId))
+      if (leaderResult !== null && !isNaN(leaderResult)) results.push(leaderResult)
 
       for (const member of teamMembers || []) {
-        const [kpis] = await pool.query<any[]>(
-          `SELECT 
-            SUM(weightedResult) as totalWeightedResult,
-            SUM(weight) as totalWeight
-           FROM collaborator_kpis
-           WHERE collaboratorId = ? AND periodId = ?`,
-          [member.id, periodId]
-        )
-
-        if (Array.isArray(kpis) && kpis.length > 0 && kpis[0].totalWeight > 0) {
-          const result =
-            (parseFloat(kpis[0].totalWeightedResult || 0) /
-              parseFloat(kpis[0].totalWeight)) *
-            100
-          if (!isNaN(result)) {
-            results.push(result)
-          }
-        }
+        const memberResult = await computeCollaboratorResult(member.id, Number(periodId))
+        if (memberResult !== null && !isNaN(memberResult)) results.push(memberResult)
       }
 
       const stats = calculateStatistics(results)
@@ -350,28 +309,8 @@ export const getAggregatedByArea = async (req: Request, res: Response) => {
       const results: number[] = []
 
       for (const collab of collaborators || []) {
-        const [kpis] = await pool.query<any[]>(
-          `SELECT 
-            SUM(weightedResult) as totalWeightedResult,
-            SUM(weight) as totalWeight
-           FROM collaborator_kpis
-           WHERE collaboratorId = ? AND periodId = ?`,
-          [collab.id, periodId]
-        )
-
-        if (
-          Array.isArray(kpis) &&
-          kpis.length > 0 &&
-          kpis[0].totalWeight > 0
-        ) {
-          const result =
-            (parseFloat(kpis[0].totalWeightedResult || 0) /
-              parseFloat(kpis[0].totalWeight)) *
-            100
-          if (!isNaN(result)) {
-            results.push(result)
-          }
-        }
+        const result = await computeCollaboratorResult(collab.id, Number(periodId))
+        if (result !== null && !isNaN(result)) results.push(result)
       }
 
       const stats = calculateStatistics(results)

@@ -8,6 +8,7 @@ import {
   getSubPeriodsByPeriod,
   closePeriod,
   reopenPeriod,
+  getPeriodSummary,
 } from '../controllers/periods.controller'
 import { authenticate, authorize } from '../middleware/auth.middleware'
 
@@ -15,6 +16,7 @@ const router = Router()
 
 router.get('/', getPeriods)
 router.get('/:id', getPeriodById)
+router.get('/:id/summary', getPeriodSummary)
 router.get('/:id/sub-periods', getSubPeriodsByPeriod)
 router.post('/', createPeriod)
 router.put('/:id', updatePeriod)

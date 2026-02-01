@@ -5,6 +5,8 @@ export interface Collaborator {
   name: string
   position: string
   area: string
+  orgScopeId?: number | null
+  calendarProfileId?: number | null
   email?: string | null
   mfaEnabled?: boolean
   managerId?: number
@@ -31,6 +33,7 @@ export interface Period {
 export interface SubPeriod {
   id: number
   periodId: number
+  calendarProfileId?: number | null
   name: string
   startDate: Date
   endDate: Date
@@ -40,13 +43,15 @@ export interface SubPeriod {
   updatedAt?: Date
 }
 
-export type KPIType = 'growth' | 'reduction' | 'exact'
+export type KPIType = 'manual' | 'count' | 'ratio' | 'sla' | 'value'
+export type KPIDirection = 'growth' | 'reduction' | 'exact'
 
 export interface KPI {
   id: number
   name: string
   description: string
   type: KPIType
+  direction?: KPIDirection
   criteria: string
   formula?: string
   defaultDataSource?: string | null
@@ -63,6 +68,7 @@ export interface CollaboratorKPI {
   collaboratorId: number
   kpiId: number
   periodId: number
+  calendarProfileId?: number | null
   subPeriodId?: number
   target: number
   actual?: number
@@ -120,7 +126,7 @@ export interface CollaboratorKPIPlan {
   periodId: number
   subPeriodId: number
   target: number
-  weight: number
+  weightOverride?: number | null
   source?: string | null
   createdAt?: Date
   updatedAt?: Date
@@ -137,6 +143,16 @@ export interface Area {
   id: number
   name: string
   parentId?: number | null
+  createdAt?: Date
+  updatedAt?: Date
+}
+
+export interface CalendarProfile {
+  id: number
+  name: string
+  description?: string | null
+  frequency: 'monthly' | 'quarterly' | 'custom'
+  active: boolean
   createdAt?: Date
   updatedAt?: Date
 }
