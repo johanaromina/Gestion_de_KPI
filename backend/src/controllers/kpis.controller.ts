@@ -60,7 +60,7 @@ export const getKPIs = async (req: Request, res: Response) => {
         `SELECT kpiId, periodId FROM kpi_periods WHERE kpiId IN (${ids.map(() => '?').join(',')})`,
         ids
       )
-      periodsMap = (periodRows || []).reduce((acc: Record<number, number[]>, row) => {
+      periodsMap = (periodRows || []).reduce((acc: Record<number, number[]>, row: any) => {
         if (!acc[row.kpiId]) acc[row.kpiId] = []
         acc[row.kpiId].push(Number(row.periodId))
         return acc
@@ -71,7 +71,7 @@ export const getKPIs = async (req: Request, res: Response) => {
         ids
       )
       weightsMap = (weightRows || []).reduce(
-        (acc: Record<number, Array<{ scopeId: number; weight: number }>>, row) => {
+        (acc: Record<number, Array<{ scopeId: number; weight: number }>>, row: any) => {
           if (!acc[row.kpiId]) acc[row.kpiId] = []
           acc[row.kpiId].push({ scopeId: Number(row.scopeId), weight: Number(row.weight) })
           return acc

@@ -13,7 +13,7 @@ async function addPeriodSummaries() {
     const sql = fs.readFileSync(scriptPath, 'utf8')
     console.log('🔧 Ejecutando script de resumen anual...')
     const statements = sql
-      .split(/;[\r\n]+/)
+      .split(/;\s*(?:\r?\n|$)/)
       .map((stmt) => stmt.trim())
       .filter((stmt) => stmt.length > 0)
 

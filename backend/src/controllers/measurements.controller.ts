@@ -1,57 +1,15 @@
 import { Request, Response } from 'express'
 import { pool } from '../config/database'
-import { calculateVariation, calculateWeightedResult } from '../utils/kpi-formulas'
-import { recalcSummaryAssignment } from './collaborator-kpis.controller'
 import { AuthRequest } from '../middleware/auth.middleware'
-
-export const applyMeasurementToAssignment = async (
-  assignmentId: number,
-  value: number,
-  mode: 'manual' | 'import' | 'auto',
-  measurementId: number,
-  criteriaVersionId?: number | null
-) => {
-  const [assignmentRows] = await pool.query<any[]>(
-    `SELECT ck.target, ck.weight, ck.kpiId, ck.periodId, ck.collaboratorId
-     FROM collaborator_kpis ck
-     WHERE ck.id = ?`,
-    [assignmentId]
-  )
-  if (!Array.isArray(assignmentRows) || assignmentRows.length === 0) {
-    return
-  }
-
-  const assignment = assignmentRows[0]
-  const [kpiRows] = await pool.query<any[]>(
-    `SELECT type, direction, formula FROM kpis WHERE id = ?`,
-    [assignment.kpiId]
-  )
-
-  const kpiDirection = kpiRows?.[0]?.direction || kpiRows?.[0]?.type || 'growth'
-  const customFormula = kpiRows?.[0]?.formula || undefined
-
-  const targetValue = Number(assignment.target ?? 0)
-  const weightValue = Number(assignment.weight ?? 0)
-  if (!targetValue || targetValue <= 0) {
-    return
-  }
-
-  const variation = calculateVariation(kpiDirection, targetValue, value, customFormula)
-  const weightedResult = calculateWeightedResult(variation, weightValue)
-
-  await pool.query(
-    `UPDATE collaborator_kpis
-     SET actual = ?, variation = ?, weightedResult = ?, inputMode = ?, lastMeasurementId = ?, activeCriteriaVersionId = COALESCE(activeCriteriaVersionId, ?)
-     WHERE id = ?`,
-    [value, variation, weightedResult, mode, measurementId, criteriaVersionId || null, assignmentId]
-  )
-
-  await recalcSummaryAssignment(assignment.collaboratorId, assignment.kpiId, assignment.periodId)
-}
+import {
+  applyMeasurementToCollaboratorAssignment,
+  applyMeasurementToScopeKpi,
+  ensureSingleMeasurementOwner,
+} from '../services/measurement-application.service'
 
 export const getMeasurements = async (req: Request, res: Response) => {
   try {
-    const { assignmentId, periodId, subPeriodId, status } = req.query
+    const { assignmentId, scopeKpiId, periodId, subPeriodId, status } = req.query
 
     let query = `SELECT m.*, c.name as capturedByName
                  FROM kpi_measurements m
@@ -62,6 +20,10 @@ export const getMeasurements = async (req: Request, res: Response) => {
     if (assignmentId) {
       query += ' AND m.assignmentId = ?'
       params.push(assignmentId)
+    }
+    if (scopeKpiId) {
+      query += ' AND m.scopeKpiId = ?'
+      params.push(scopeKpiId)
     }
     if (periodId) {
       query += ' AND m.periodId = ?'
@@ -90,6 +52,7 @@ export const createMeasurement = async (req: Request, res: Response) => {
   try {
     const {
       assignmentId,
+      scopeKpiId,
       periodId,
       subPeriodId,
       value,
@@ -101,14 +64,19 @@ export const createMeasurement = async (req: Request, res: Response) => {
       sourceRunId,
     } = req.body
 
-    if (!assignmentId || value === undefined) {
-      return res.status(400).json({ error: 'assignmentId y value son requeridos' })
+    try {
+      ensureSingleMeasurementOwner(assignmentId, scopeKpiId)
+    } catch (validationError: any) {
+      return res.status(400).json({ error: validationError?.message || 'Owner de medición inválido' })
+    }
+    if (value === undefined) {
+      return res.status(400).json({ error: 'value es requerido' })
     }
 
     const userId = (req as AuthRequest).user?.id || null
 
     let warning: string | null = null
-    if ((status || 'draft') === 'approved') {
+    if ((status || 'draft') === 'approved' && assignmentId) {
       const [assignmentRows] = await pool.query<any[]>(
         `SELECT curationStatus FROM collaborator_kpis WHERE id = ?`,
         [assignmentId]
@@ -146,11 +114,12 @@ export const createMeasurement = async (req: Request, res: Response) => {
     }
 
     const [result] = await pool.query(
-      `INSERT INTO kpi_measurements
-       (assignmentId, periodId, subPeriodId, value, mode, status, capturedBy, criteriaVersionId, reason, evidenceUrl, sourceRunId)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       `INSERT INTO kpi_measurements
+       (assignmentId, scopeKpiId, periodId, subPeriodId, value, mode, status, capturedBy, criteriaVersionId, reason, evidenceUrl, sourceRunId)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        assignmentId,
+        assignmentId || null,
+        scopeKpiId || null,
         periodId || null,
         subPeriodId || null,
         value,
@@ -167,8 +136,11 @@ export const createMeasurement = async (req: Request, res: Response) => {
     const insertResult = result as any
     const measurementId = insertResult.insertId
 
-    if ((status || 'draft') === 'approved') {
-      await applyMeasurementToAssignment(assignmentId, Number(value), mode || 'manual', measurementId, criteriaVersionId)
+    if ((status || 'draft') === 'approved' && assignmentId) {
+      await applyMeasurementToCollaboratorAssignment(assignmentId, Number(value), mode || 'manual', measurementId, criteriaVersionId)
+    }
+    if ((status || 'draft') === 'approved' && scopeKpiId) {
+      await applyMeasurementToScopeKpi(Number(scopeKpiId), Number(value), mode || 'manual', measurementId)
     }
 
     res.status(201).json({ id: measurementId, warning })
@@ -192,19 +164,21 @@ export const approveMeasurement = async (req: Request, res: Response) => {
 
     const measurement = rows[0]
 
-    const [assignmentRows] = await pool.query<any[]>(
-      `SELECT curationStatus FROM collaborator_kpis WHERE id = ?`,
-      [measurement.assignmentId]
-    )
     let warning: string | null = null
-    if (Array.isArray(assignmentRows) && assignmentRows.length > 0) {
-      const curationStatus = assignmentRows[0].curationStatus || 'pending'
-      if (curationStatus === 'in_review') {
-        warning = 'Curaduría en revisión: medición aprobada con warning'
-      } else if (curationStatus !== 'approved') {
-        return res.status(400).json({
-          error: 'No se puede aprobar una medición si la curaduría no está aprobada',
-        })
+    if (measurement.assignmentId) {
+      const [assignmentRows] = await pool.query<any[]>(
+        `SELECT curationStatus FROM collaborator_kpis WHERE id = ?`,
+        [measurement.assignmentId]
+      )
+      if (Array.isArray(assignmentRows) && assignmentRows.length > 0) {
+        const curationStatus = assignmentRows[0].curationStatus || 'pending'
+        if (curationStatus === 'in_review') {
+          warning = 'Curaduría en revisión: medición aprobada con warning'
+        } else if (curationStatus !== 'approved') {
+          return res.status(400).json({
+            error: 'No se puede aprobar una medición si la curaduría no está aprobada',
+          })
+        }
       }
     }
 
@@ -229,13 +203,23 @@ export const approveMeasurement = async (req: Request, res: Response) => {
     }
 
     await pool.query(`UPDATE kpi_measurements SET status = ? WHERE id = ?`, ['approved', id])
-    await applyMeasurementToAssignment(
-      measurement.assignmentId,
-      Number(measurement.value),
-      measurement.mode || 'manual',
-      measurement.id,
-      measurement.criteriaVersionId
-    )
+    if (measurement.assignmentId) {
+      await applyMeasurementToCollaboratorAssignment(
+        measurement.assignmentId,
+        Number(measurement.value),
+        measurement.mode || 'manual',
+        measurement.id,
+        measurement.criteriaVersionId
+      )
+    }
+    if (measurement.scopeKpiId) {
+      await applyMeasurementToScopeKpi(
+        measurement.scopeKpiId,
+        Number(measurement.value),
+        measurement.mode || 'manual',
+        measurement.id
+      )
+    }
 
     res.json({ message: 'Medición aprobada correctamente', warning })
   } catch (error: any) {

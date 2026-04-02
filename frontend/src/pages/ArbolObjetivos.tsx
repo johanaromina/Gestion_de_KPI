@@ -4,13 +4,66 @@ import { useMutation, useQuery, useQueryClient } from 'react-query'
 import api from '../services/api'
 import { ObjectiveTree } from '../types'
 import ObjectiveTreeForm from '../components/ObjectiveTreeForm'
+import ScopeKPIDetailModal from '../components/ScopeKPIDetailModal'
 import './ArbolObjetivos.css'
+
+type ObjectiveDrilldownScopeLink = {
+  id: number
+  childType: 'collaborator' | 'scope'
+  contributionWeight?: number | null
+  aggregationMethod: string
+  collaboratorName?: string | null
+  collaboratorKpiName?: string | null
+  collaboratorActual?: number | null
+  collaboratorTarget?: number | null
+  collaboratorWeightedResult?: number | null
+  collaboratorPeriodName?: string | null
+  collaboratorSubPeriodName?: string | null
+  childScopeKpiName?: string | null
+  childScopeOrgScopeName?: string | null
+  childScopeActual?: number | null
+  childScopeTarget?: number | null
+  childScopeWeightedResult?: number | null
+  childScopeStatus?: string | null
+  childScopePeriodName?: string | null
+  childScopeSubPeriodName?: string | null
+}
+
+type ObjectiveDrilldownScopeKpi = {
+  id: number
+  name: string
+  orgScopeName?: string | null
+  ownerLevel?: string | null
+  sourceMode?: string | null
+  status?: string | null
+  actual?: number | null
+  directActual?: number | null
+  aggregatedActual?: number | null
+  mixedConfig?: {
+    directWeight: number
+    aggregatedWeight: number
+    directLabel?: string | null
+    aggregatedLabel?: string | null
+  } | null
+  target?: number | null
+  variation?: number | null
+  weightedResult?: number | null
+  periodName?: string | null
+  subPeriodName?: string | null
+  links?: ObjectiveDrilldownScopeLink[]
+}
+
+type ObjectiveDrilldown = Omit<ObjectiveTree, 'scopeKpis'> & {
+  scopeKpis?: ObjectiveDrilldownScopeKpi[]
+}
 
 export default function ArbolObjetivos() {
   const [showForm, setShowForm] = useState(false)
   const [editingObjective, setEditingObjective] = useState<ObjectiveTree | undefined>(undefined)
   const [expandedObjectives, setExpandedObjectives] = useState<Set<number>>(new Set())
   const [expandedKpis, setExpandedKpis] = useState<Set<number>>(new Set())
+  const [drilldownObjectiveId, setDrilldownObjectiveId] = useState<number | null>(null)
+  const [detailScopeKpi, setDetailScopeKpi] = useState<ObjectiveDrilldownScopeKpi | null>(null)
 
   const queryClient = useQueryClient()
 
@@ -30,6 +83,17 @@ export default function ArbolObjetivos() {
       return res.data as any[]
     },
     { retry: false }
+  )
+  const { data: drilldownObjective, isLoading: isLoadingDrilldown } = useQuery<ObjectiveDrilldown>(
+    ['objective-tree-drilldown', drilldownObjectiveId],
+    async () => {
+      const response = await api.get(`/objective-trees/${drilldownObjectiveId}/drilldown`)
+      return response.data
+    },
+    {
+      enabled: !!drilldownObjectiveId,
+      retry: false,
+    }
   )
   const collaboratorNames = new Set((collaborators || []).map((c: any) => (c.name || '').trim().toLowerCase()))
 
@@ -178,6 +242,8 @@ export default function ArbolObjetivos() {
     const isKpiExpanded = expandedKpis.has(objective.id)
     const okr = isOKR(objective.name)
     const kpiCount = objective.kpis?.length || 0
+    const scopeKpiCount = objective.scopeKpis?.length || 0
+    const totalLinkedItems = kpiCount + scopeKpiCount
 
     return (
       <Fragment key={objective.id}>
@@ -202,8 +268,10 @@ export default function ArbolObjetivos() {
           </td>
           <td>
             <div className="kpis-cell">
-              <span>{kpiCount} KPIs</span>
-              {kpiCount > 0 && (
+              <span>
+                {kpiCount} KPIs · {scopeKpiCount} Scope KPIs
+              </span>
+              {totalLinkedItems > 0 && (
                 <button className="link-button" onClick={() => toggleKpiExpansion(objective.id)}>
                   {isKpiExpanded ? 'Ocultar' : 'Ver'}
                 </button>
@@ -214,6 +282,9 @@ export default function ArbolObjetivos() {
             <div className="action-buttons">
               <button className="btn-icon" title="Editar" onClick={() => handleEdit(objective)}>
                 ✎
+              </button>
+              <button className="btn-icon" title="Drill-down" onClick={() => setDrilldownObjectiveId(objective.id)}>
+                ⇲
               </button>
               <button
                 className="btn-icon"
@@ -226,13 +297,13 @@ export default function ArbolObjetivos() {
             </div>
           </td>
         </tr>
-        {isKpiExpanded && kpiCount > 0 && (
+        {isKpiExpanded && totalLinkedItems > 0 && (
           <tr className="kpi-row">
             <td />
             <td colSpan={4}>
               <div className="kpi-list">
                 {objective.kpis?.map((kpi) => (
-                  <div key={kpi.id} className="kpi-pill">
+                  <div key={`kpi-${kpi.id}`} className="kpi-pill">
                     <div className="kpi-title">{kpi.name}</div>
                     <div className="kpi-meta">
                       <span className="kpi-type">{kpi.type}</span>
@@ -241,6 +312,18 @@ export default function ArbolObjetivos() {
                           Área: {(kpi as any).area || ((kpi as any).areas || []).join(', ')}
                         </span>
                       )}
+                    </div>
+                  </div>
+                ))}
+                {objective.scopeKpis?.map((scopeKpi) => (
+                  <div key={`scope-kpi-${scopeKpi.id}`} className="kpi-pill">
+                    <div className="kpi-title">{scopeKpi.name}</div>
+                    <div className="kpi-meta">
+                      <span className="kpi-type">scope KPI</span>
+                      <span className="kpi-area">
+                        Scope: {scopeKpi.orgScopeName || `#${scopeKpi.orgScopeId}`}
+                      </span>
+                      {scopeKpi.periodName ? <span className="kpi-area">Periodo: {scopeKpi.periodName}</span> : null}
                     </div>
                   </div>
                 ))}
@@ -310,6 +393,191 @@ export default function ArbolObjetivos() {
           }}
         />
       )}
+
+      {drilldownObjectiveId && (
+        <div className="modal-overlay" onClick={() => setDrilldownObjectiveId(null)}>
+          <div className="modal-content objective-drilldown-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2>{drilldownObjective?.name || 'Drill-down objetivo'}</h2>
+                <p className="subtitle">
+                  {drilldownObjective?.level ? `Nivel ${drilldownObjective.level}` : 'Cargando relación estratégica...'}
+                </p>
+              </div>
+              <button className="close-button" onClick={() => setDrilldownObjectiveId(null)}>
+                ×
+              </button>
+            </div>
+
+            {isLoadingDrilldown ? (
+              <div className="loading">Cargando drill-down...</div>
+            ) : drilldownObjective ? (
+              <div className="objective-drilldown-content">
+                <div className="objective-drilldown-summary">
+                  <div className="objective-drilldown-stat">
+                    <span className="objective-drilldown-label">KPIs base</span>
+                    <strong>{drilldownObjective.kpis?.length || 0}</strong>
+                  </div>
+                  <div className="objective-drilldown-stat">
+                    <span className="objective-drilldown-label">Scope KPIs</span>
+                    <strong>{drilldownObjective.scopeKpis?.length || 0}</strong>
+                  </div>
+                </div>
+
+                {drilldownObjective.kpis?.length ? (
+                  <div className="objective-drilldown-section">
+                    <h3>KPIs base asociados</h3>
+                    <div className="kpi-list">
+                      {drilldownObjective.kpis.map((kpi) => (
+                        <div key={`drilldown-kpi-${kpi.id}`} className="kpi-pill">
+                          <div className="kpi-title">{kpi.name}</div>
+                          <div className="kpi-meta">
+                            <span className="kpi-type">{kpi.type}</span>
+                            {((kpi as any).area || (kpi as any).areas) && (
+                              <span className="kpi-area">
+                                Área: {(kpi as any).area || ((kpi as any).areas || []).join(', ')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="objective-drilldown-section">
+                  <h3>Scope KPIs vinculados</h3>
+                  {drilldownObjective.scopeKpis?.length ? (
+                    <div className="objective-scope-grid">
+                      {drilldownObjective.scopeKpis.map((scopeKpi: ObjectiveDrilldownScopeKpi) => (
+                        <div key={`drilldown-scope-${scopeKpi.id}`} className="objective-scope-card">
+                          <div className="objective-scope-header">
+                            <div>
+                              <h4>{scopeKpi.name}</h4>
+                              <p>
+                                {scopeKpi.orgScopeName || 'Scope'} · {scopeKpi.ownerLevel || 'owner'}
+                              </p>
+                            </div>
+                            <span className={`level-badge level-${scopeKpi.status === 'approved' ? 'management' : 'individual'}`}>
+                              {scopeKpi.status || 'draft'}
+                            </span>
+                          </div>
+
+                          <div className="objective-scope-metrics">
+                            <div>
+                              <span>Actual</span>
+                              <strong>{scopeKpi.actual ?? '-'}</strong>
+                            </div>
+                            <div>
+                              <span>Target</span>
+                              <strong>{scopeKpi.target ?? '-'}</strong>
+                            </div>
+                            <div>
+                              <span>Resultado</span>
+                              <strong>{scopeKpi.weightedResult ?? '-'}</strong>
+                            </div>
+                          </div>
+
+                          <div className="objective-scope-meta">
+                            <span>Source: {scopeKpi.sourceMode || '-'}</span>
+                            {scopeKpi.periodName ? <span>Período: {scopeKpi.periodName}</span> : null}
+                            {scopeKpi.subPeriodName ? <span>Subperíodo: {scopeKpi.subPeriodName}</span> : null}
+                          </div>
+                          {scopeKpi.sourceMode === 'mixed' ? (
+                            <div className="objective-scope-meta">
+                              <span>
+                                {scopeKpi.mixedConfig?.directLabel || 'Directo'}: {scopeKpi.directActual ?? '-'}
+                              </span>
+                              <span>
+                                {scopeKpi.mixedConfig?.aggregatedLabel || 'Agregado'}: {scopeKpi.aggregatedActual ?? '-'}
+                              </span>
+                              <span>
+                                Mix: {scopeKpi.mixedConfig?.directWeight ?? 50}/{scopeKpi.mixedConfig?.aggregatedWeight ?? 50}
+                              </span>
+                            </div>
+                          ) : null}
+
+                          <div className="objective-scope-links">
+                            <h5>Contribuciones</h5>
+                            <div className="objective-scope-actions">
+                              <button
+                                type="button"
+                                className="link-button"
+                                onClick={() => setDetailScopeKpi(scopeKpi)}
+                              >
+                                Ver detalle
+                              </button>
+                            </div>
+                            {scopeKpi.links?.length ? (
+                              <div className="objective-link-list">
+                                {scopeKpi.links.map((link: ObjectiveDrilldownScopeLink) => (
+                                  <div key={`drilldown-link-${link.id}`} className="objective-link-item">
+                                    <div className="objective-link-main">
+                                      <strong>
+                                        {link.childType === 'collaborator'
+                                          ? `${link.collaboratorName || 'Colaborador'} · ${link.collaboratorKpiName || 'KPI'}`
+                                          : `${link.childScopeKpiName || 'Scope KPI'} · ${link.childScopeOrgScopeName || 'Scope'}`}
+                                      </strong>
+                                      <span>
+                                        {link.aggregationMethod}
+                                        {link.contributionWeight != null ? ` · peso ${link.contributionWeight}` : ''}
+                                      </span>
+                                    </div>
+                                    <div className="objective-link-meta">
+                                      {link.childType === 'collaborator' ? (
+                                        <>
+                                          <span>Actual: {link.collaboratorActual ?? '-'}</span>
+                                          <span>Target: {link.collaboratorTarget ?? '-'}</span>
+                                          <span>Resultado: {link.collaboratorWeightedResult ?? '-'}</span>
+                                          {link.collaboratorSubPeriodName || link.collaboratorPeriodName ? (
+                                            <span>
+                                              {link.collaboratorSubPeriodName || link.collaboratorPeriodName}
+                                            </span>
+                                          ) : null}
+                                        </>
+                                      ) : (
+                                        <>
+                                          <span>Actual: {link.childScopeActual ?? '-'}</span>
+                                          <span>Target: {link.childScopeTarget ?? '-'}</span>
+                                          <span>Resultado: {link.childScopeWeightedResult ?? '-'}</span>
+                                          {link.childScopeSubPeriodName || link.childScopePeriodName ? (
+                                            <span>{link.childScopeSubPeriodName || link.childScopePeriodName}</span>
+                                          ) : null}
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="helper-text">Este Scope KPI todavía no tiene contribuciones configuradas.</div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="empty-state compact">
+                      <p>Este objetivo todavía no tiene Scope KPIs vinculados.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="empty-state compact">
+                <p>No se pudo cargar el drill-down del objetivo.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {detailScopeKpi ? (
+        <ScopeKPIDetailModal
+          scopeKpiId={detailScopeKpi.id}
+          initialScopeKpi={detailScopeKpi as any}
+          onClose={() => setDetailScopeKpi(null)}
+        />
+      ) : null}
     </div>
   )
 }

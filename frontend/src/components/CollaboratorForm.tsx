@@ -2,8 +2,17 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import api from '../services/api'
-import { OrgScope, Collaborator } from '../types'
+import { OrgScope, Collaborator, DataSourceMapping } from '../types'
 import './CollaboratorForm.css'
+import {
+  buildExternalKeysTextBySourceType,
+  DEFAULT_MAPPING_SOURCE_TYPE,
+  getMappingSourceTypeLabel,
+  getSourceTypesToSync,
+  MAPPING_SOURCE_TYPE_OPTIONS,
+  normalizeMappingSourceType,
+  parseExternalKeysText,
+} from '../utils/dataSourceMappings'
 
 interface CollaboratorFormProps {
   collaborator?: Collaborator
@@ -24,7 +33,11 @@ export default function CollaboratorForm({
     email: collaborator?.email || '',
     mfaEnabled: collaborator?.mfaEnabled || false,
     managerId: collaborator?.managerId || undefined,
-    role: collaborator?.role || 'collaborator',
+      role: collaborator?.role || 'collaborator',
+    })
+  const [mappingSourceType, setMappingSourceType] = useState(DEFAULT_MAPPING_SOURCE_TYPE)
+  const [externalKeysBySourceType, setExternalKeysBySourceType] = useState<Record<string, string>>({
+    [DEFAULT_MAPPING_SOURCE_TYPE]: '',
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -51,6 +64,21 @@ export default function CollaboratorForm({
     { retry: false }
   )
 
+  const { data: collaboratorMappings } = useQuery<DataSourceMapping[]>(
+    ['data-source-mappings-collaborator', collaborator?.id],
+    async () => {
+      if (!collaborator?.id) return []
+      const response = await api.get('/data-source-mappings', {
+        params: { entityType: 'collaborator', entityId: collaborator.id },
+      })
+      return response.data
+    },
+    {
+      enabled: !!collaborator?.id,
+      retry: false,
+    }
+  )
+
   const areaScopes = (orgScopes || []).filter((s) => s.type === 'area')
 
   useEffect(() => {
@@ -60,6 +88,45 @@ export default function CollaboratorForm({
       setFormData((prev) => ({ ...prev, orgScopeId: match.id }))
     }
   }, [areaScopes, formData.area, formData.orgScopeId])
+
+  useEffect(() => {
+    if (!collaborator?.id) {
+      setExternalKeysBySourceType({ [DEFAULT_MAPPING_SOURCE_TYPE]: '' })
+      setMappingSourceType(DEFAULT_MAPPING_SOURCE_TYPE)
+      return
+    }
+    setExternalKeysBySourceType(
+      buildExternalKeysTextBySourceType(collaboratorMappings, 'collaborator', collaborator.id)
+    )
+  }, [collaborator?.id, collaboratorMappings])
+
+  const updateExternalKeysForSourceType = (value: string) => {
+    const normalizedSourceType = normalizeMappingSourceType(mappingSourceType)
+    setExternalKeysBySourceType((prev) => ({
+      ...prev,
+      [normalizedSourceType]: value,
+    }))
+  }
+
+  const syncCollaboratorMappings = async (collaboratorId: number) => {
+    const sourceTypes = getSourceTypesToSync(
+      externalKeysBySourceType,
+      collaboratorMappings,
+      'collaborator',
+      collaboratorId
+    )
+
+    await Promise.all(
+      sourceTypes.map((sourceType) =>
+        api.post('/data-source-mappings/sync', {
+          sourceType,
+          entityType: 'collaborator',
+          entityId: collaboratorId,
+          externalKeys: parseExternalKeysText(externalKeysBySourceType[sourceType] || ''),
+        })
+      )
+    )
+  }
 
   const createAreaMutation = useMutation(
     async (name: string) => {
@@ -84,11 +151,16 @@ export default function CollaboratorForm({
   const createMutation = useMutation(
     async (data: Partial<Collaborator>) => {
       const response = await api.post('/collaborators', data)
+      const collaboratorId = Number(response.data?.id || 0)
+      if (collaboratorId) {
+        await syncCollaboratorMappings(collaboratorId)
+      }
       return response.data
     },
     {
       onSuccess: () => {
         queryClient.invalidateQueries('collaborators')
+        queryClient.invalidateQueries('data-source-mappings')
         onSuccess?.()
         onClose()
       },
@@ -98,11 +170,15 @@ export default function CollaboratorForm({
   const updateMutation = useMutation(
     async (data: Partial<Collaborator>) => {
       const response = await api.put(`/collaborators/${collaborator?.id}`, data)
+      if (collaborator?.id) {
+        await syncCollaboratorMappings(collaborator.id)
+      }
       return response.data
     },
     {
       onSuccess: () => {
         queryClient.invalidateQueries('collaborators')
+        queryClient.invalidateQueries('data-source-mappings')
         onSuccess?.()
         onClose()
       },
@@ -261,7 +337,7 @@ export default function CollaboratorForm({
                 onChange={(e) =>
                   setFormData({ ...formData, email: e.target.value })
                 }
-                placeholder="usuario@sidom.io"
+                placeholder="usuario@empresa.com"
                 className={errors.email ? 'error' : ''}
               />
               {errors.email && (
@@ -281,6 +357,37 @@ export default function CollaboratorForm({
                 />
                 <span>Activar verificacion por email</span>
               </div>
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="mappingSourceType">Source type</label>
+              <select
+                id="mappingSourceType"
+                value={mappingSourceType}
+                onChange={(e) => setMappingSourceType(normalizeMappingSourceType(e.target.value))}
+              >
+                {MAPPING_SOURCE_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label htmlFor="externalKeys">Claves externas</label>
+              <input
+                type="text"
+                id="externalKeys"
+                value={externalKeysBySourceType[mappingSourceType] || ''}
+                onChange={(e) => updateExternalKeysForSourceType(e.target.value)}
+                placeholder="johana, j.garcia, jgarcia@empresa.com"
+              />
+              <span className="helper-text">
+                Alias o claves externas separadas por coma para {getMappingSourceTypeLabel(mappingSourceType)}.
+                {' '}Global se usa como fallback si el conector no tiene mapping específico.
+              </span>
             </div>
           </div>
 

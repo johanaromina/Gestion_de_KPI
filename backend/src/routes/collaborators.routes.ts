@@ -8,6 +8,7 @@ import {
   deactivateCollaborator,
   changeCollaboratorRole,
   getCollaboratorEvents,
+  resendInvite,
 } from '../controllers/collaborators.controller'
 import { authenticate } from '../middleware/auth.middleware'
 
@@ -23,6 +24,7 @@ router.post('/', createCollaborator)
 router.put('/:id', updateCollaborator)
 router.post('/:id/deactivate', deactivateCollaborator)
 router.post('/:id/change-role', changeCollaboratorRole)
+router.post('/:id/resend-invite', resendInvite)
 router.delete('/:id', deleteCollaborator)
 
 export default router

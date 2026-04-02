@@ -470,27 +470,33 @@ export default function Seguridad() {
               <div className="form-group">
                 <label>Permisos</label>
                 <div className="perms-list">
-                  {permissions?.map((perm) => (
-                    <label key={perm.code} className="perm-item">
-                      <input
-                        type="checkbox"
-                        checked={roleForm.permissions.includes(perm.code)}
-                        onChange={(e) => {
-                          const checked = e.target.checked
-                          setRoleForm((prev) => ({
-                            ...prev,
-                            permissions: checked
-                              ? [...prev.permissions, perm.code]
-                              : prev.permissions.filter((p) => p !== perm.code),
-                          }))
-                        }}
-                      />
-                      <div>
-                        <div className="perm-code">{perm.code}</div>
-                        <div className="perm-desc">{perm.description || ''}</div>
-                      </div>
-                    </label>
-                  ))}
+                  {permissions && permissions.length > 0 ? (
+                    permissions.map((perm) => (
+                      <label key={perm.code} className="perm-item">
+                        <input
+                          type="checkbox"
+                          checked={roleForm.permissions.includes(perm.code)}
+                          onChange={(e) => {
+                            const checked = e.target.checked
+                            setRoleForm((prev) => ({
+                              ...prev,
+                              permissions: checked
+                                ? [...prev.permissions, perm.code]
+                                : prev.permissions.filter((p) => p !== perm.code),
+                            }))
+                          }}
+                        />
+                        <div>
+                          <div className="perm-code">{perm.code}</div>
+                          <div className="perm-desc">{perm.description || ''}</div>
+                        </div>
+                      </label>
+                    ))
+                  ) : (
+                    <div className="empty-hint">
+                      No hay permisos configurados. Inicializa los permisos en el backend y recarga.
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="actions">
@@ -517,24 +523,30 @@ export default function Seguridad() {
             </div>
             <div className="modal-body">
               <div className="perms-list">
-                {permissions?.map((perm) => (
-                  <label key={perm.code} className="perm-item">
-                    <input
-                      type="checkbox"
-                      checked={overridePermissions.includes(perm.code)}
-                      onChange={(e) => {
-                        const checked = e.target.checked
-                        setOverridePermissions((prev) =>
-                          checked ? [...prev, perm.code] : prev.filter((p) => p !== perm.code)
-                        )
-                      }}
-                    />
-                    <div>
-                      <div className="perm-code">{perm.code}</div>
-                      <div className="perm-desc">{perm.description || ''}</div>
-                    </div>
-                  </label>
-                ))}
+                {permissions && permissions.length > 0 ? (
+                  permissions.map((perm) => (
+                    <label key={perm.code} className="perm-item">
+                      <input
+                        type="checkbox"
+                        checked={overridePermissions.includes(perm.code)}
+                        onChange={(e) => {
+                          const checked = e.target.checked
+                          setOverridePermissions((prev) =>
+                            checked ? [...prev, perm.code] : prev.filter((p) => p !== perm.code)
+                          )
+                        }}
+                      />
+                      <div>
+                        <div className="perm-code">{perm.code}</div>
+                        <div className="perm-desc">{perm.description || ''}</div>
+                      </div>
+                    </label>
+                  ))
+                ) : (
+                  <div className="empty-hint">
+                    No hay permisos configurados. Inicializa los permisos en el backend y recarga.
+                  </div>
+                )}
               </div>
               <div className="actions">
                 <button className="btn-primary" onClick={() => updateUserOverrides.mutate()}>

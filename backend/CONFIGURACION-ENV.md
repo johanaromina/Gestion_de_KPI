@@ -27,9 +27,9 @@ APP_BASE_URL=http://localhost:5173
 # SMTP (envio de emails)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=tu_usuario@sidom.io
+SMTP_USER=tu_usuario@empresa.com
 SMTP_PASS=tu_app_password
-SMTP_FROM=KPI Manager <no-reply@sidom.io>
+SMTP_FROM=KPI Manager <no-reply@tuempresa.com>
 
 # MFA y reset (minutos)
 MFA_TTL_MIN=10

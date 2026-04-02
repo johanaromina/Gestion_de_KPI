@@ -276,6 +276,26 @@ export default function Periodos() {
       onSuccess: () => {
         queryClient.invalidateQueries('periods')
         queryClient.invalidateQueries('collaborator-kpis')
+        queryClient.invalidateQueries('period-summary-status')
+        queryClient.invalidateQueries('period-summary')
+      },
+    }
+  )
+
+  const recalcSummaryMutation = useMutation(
+    async (id: number) => {
+      await api.post(`/periods/${id}/close`, { sendEmail: false })
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('periods')
+        queryClient.invalidateQueries('collaborator-kpis')
+        queryClient.invalidateQueries('period-summary-status')
+        queryClient.invalidateQueries('period-summary')
+        alert('Resumen anual recalculado correctamente')
+      },
+      onError: (error: any) => {
+        alert(error.response?.data?.error || 'No se pudo recalcular el resumen anual')
       },
     }
   )
@@ -363,6 +383,16 @@ export default function Periodos() {
         'Enviar resumen anual por email a los colaboradores?'
       )
       closePeriodMutation.mutate({ id: period.id, sendEmail })
+    }
+  }
+
+  const handleRecalculateSummary = (period: Period) => {
+    if (
+      window.confirm(
+        `Recalcular resumen anual para "${period.name}"? Esto regenerará el resumen con los datos actuales.`
+      )
+    ) {
+      recalcSummaryMutation.mutate(period.id)
     }
   }
 
@@ -561,10 +591,25 @@ export default function Periodos() {
                           {period.status === 'closed' && (
                             <button
                               className="btn-text"
-                              onClick={() => navigate(`/historial?periodId=${period.id}`)}
+                              onClick={() =>
+                                navigate(
+                                  canConfig
+                                    ? `/historial/all?periodId=${period.id}`
+                                    : `/historial?periodId=${period.id}`
+                                )
+                              }
                               title="Ver resumen anual"
                             >
                               Ver resumen anual
+                            </button>
+                          )}
+                          {period.status === 'closed' && (
+                            <button
+                              className="btn-text"
+                              onClick={() => handleRecalculateSummary(period)}
+                              title="Recalcular resumen anual"
+                            >
+                              Recalcular resumen
                             </button>
                           )}
                           <button

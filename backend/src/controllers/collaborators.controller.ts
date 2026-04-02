@@ -1,9 +1,12 @@
 import { Request, Response } from 'express'
 import { RowDataPacket } from 'mysql2/promise'
+import crypto from 'crypto'
 import { pool } from '../config/database'
 import { Collaborator } from '../types'
 import { logAudit } from '../utils/audit'
 import { AuthRequest } from '../middleware/auth.middleware'
+import { appEnv } from '../config/env'
+import { sendMail } from '../utils/mailer'
 
 type CollaboratorRow = Collaborator & RowDataPacket
 
@@ -130,6 +133,31 @@ export const createCollaborator = async (req: Request, res: Response) => {
 
     const insertResult = result as any
     const newId = insertResult.insertId
+
+    if (normalizedEmail) {
+      try {
+        const rawToken = crypto.randomBytes(32).toString('hex')
+        const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex')
+        const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000) // 72 hours for invites
+        await pool.query(
+          'UPDATE collaborators SET passwordResetTokenHash = ?, passwordResetExpiresAt = ? WHERE id = ?',
+          [tokenHash, expiresAt, newId]
+        )
+        const inviteLink = `${appEnv.appBaseUrl}/reset-password?token=${rawToken}`
+        await sendMail({
+          to: normalizedEmail,
+          subject: 'Bienvenido/a a KPI Manager — Activá tu cuenta',
+          html: `<p>Hola ${name},</p>
+                 <p>Tu cuenta fue creada en KPI Manager. Hacé clic en el botón para establecer tu contraseña y comenzar.</p>
+                 <p><a href="${inviteLink}" style="background:#f97316;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold;">Activar mi cuenta</a></p>
+                 <p>Este enlace vence en 72 horas.</p>
+                 <p>Si no esperabas este mensaje, ignoralo.</p>`,
+          text: `Hola ${name}, activá tu cuenta en KPI Manager: ${inviteLink} (vence en 72 horas)`,
+        })
+      } catch (mailError: any) {
+        console.error('Error sending welcome invite email:', mailError)
+      }
+    }
 
     await logAudit(
       'collaborators',
@@ -437,5 +465,38 @@ export const getCollaboratorEvents = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Error fetching collaborator events:', error)
     res.status(500).json({ error: 'Error al obtener eventos del colaborador' })
+  }
+}
+
+export const resendInvite = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const [rows] = await pool.query<any[]>('SELECT * FROM collaborators WHERE id = ?', [Number(id)])
+    const collaborator = rows?.[0]
+    if (!collaborator) return res.status(404).json({ error: 'Colaborador no encontrado' })
+    if (!collaborator.email) return res.status(400).json({ error: 'El colaborador no tiene email configurado' })
+    if (collaborator.passwordHash) return res.status(400).json({ error: 'El colaborador ya tiene contraseña configurada' })
+
+    const rawToken = crypto.randomBytes(32).toString('hex')
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex')
+    const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000)
+    await pool.query(
+      'UPDATE collaborators SET passwordResetTokenHash = ?, passwordResetExpiresAt = ? WHERE id = ?',
+      [tokenHash, expiresAt, collaborator.id]
+    )
+    const inviteLink = `${appEnv.appBaseUrl}/reset-password?token=${rawToken}`
+    await sendMail({
+      to: collaborator.email,
+      subject: 'Recordatorio — Activá tu cuenta en KPI Manager',
+      html: `<p>Hola ${collaborator.name},</p>
+             <p>Te reenviamos el link para activar tu cuenta en KPI Manager.</p>
+             <p><a href="${inviteLink}" style="background:#f97316;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold;">Activar mi cuenta</a></p>
+             <p>Este enlace vence en 72 horas.</p>`,
+      text: `Activá tu cuenta: ${inviteLink}`,
+    })
+    res.json({ message: 'Invitación reenviada correctamente' })
+  } catch (error: any) {
+    console.error('Error in resendInvite:', error)
+    res.status(500).json({ error: 'Error al reenviar invitación' })
   }
 }

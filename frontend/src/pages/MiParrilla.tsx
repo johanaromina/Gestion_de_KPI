@@ -52,7 +52,9 @@ export default function MiParrilla() {
   const resolvedIdNumber = resolvedId ? parseInt(resolvedId, 10) : null
   const [editingKPIId, setEditingKPIId] = useState<number | null>(null)
   const [actualValue, setActualValue] = useState<string>('')
+  const [actualValueError, setActualValueError] = useState<string>('')
   const [proposingKPI, setProposingKPI] = useState<CollaboratorKPI | null>(null)
+  const [inlineAlert, setInlineAlert] = useState<{ type: 'info' | 'warning' | 'error'; message: string } | null>(null)
 
   const queryClient = useQueryClient()
 
@@ -90,12 +92,14 @@ export default function MiParrilla() {
         queryClient.invalidateQueries(['collaborator-kpis', resolvedId])
         setEditingKPIId(null)
         setActualValue('')
+        setActualValueError('')
+        setInlineAlert({ type: 'info', message: 'Valor actualizado correctamente.' })
       },
       onError: (error: any) => {
-        alert(
-          error.response?.data?.error ||
-            'Error al actualizar el valor. Verifica que el período no esté cerrado.'
-        )
+        setInlineAlert({
+          type: 'error',
+          message: error.response?.data?.error || 'Error al actualizar el valor. Verificá que el período no esté cerrado.',
+        })
       },
     }
   )
@@ -173,30 +177,28 @@ export default function MiParrilla() {
     return normalized === 'auto' ? 'Auto' : normalized === 'import' ? 'Import' : 'Manual'
   }
 
+  const getBlockReason = (kpi: CollaboratorKPI): string | null => {
+    if (kpi.status === 'closed') return 'KPI cerrado'
+    if (periodStatus === 'closed') return 'Período cerrado'
+    if (kpi.inputMode === 'auto') return 'Carga automática — usá Proponer para override'
+    if (kpi.curationStatus !== 'approved') return 'Criterio pendiente de aprobación'
+    if (isCollaborator) return 'Usá el botón Proponer para sugerir un valor'
+    return null
+  }
+
   const handleEditActual = (kpi: CollaboratorKPI) => {
-    // Verificar si está cerrado
-    if (kpi.status === 'closed' || periodStatus === 'closed') {
-      alert('No se puede editar el valor de una parrilla cerrada')
-      return
-    }
-    if (kpi.curationStatus !== 'approved') {
-      alert('El criterio no está aprobado. Solo se permite proponer valores.')
-      return
-    }
-    if (kpi.inputMode === 'auto') {
-      alert('Este KPI es automático. Proponé un override si corresponde.')
-      return
-    }
     setEditingKPIId(kpi.id)
     setActualValue(kpi.actual?.toString() || '')
+    setActualValueError('')
   }
 
   const handleSaveActual = (kpiId: number) => {
     const value = parseFloat(actualValue)
     if (isNaN(value)) {
-      alert('Por favor ingresa un valor numérico válido')
+      setActualValueError('Ingresá un valor numérico válido.')
       return
     }
+    setActualValueError('')
     updateActualMutation.mutate({ id: kpiId, actual: value })
   }
 
@@ -241,6 +243,12 @@ export default function MiParrilla() {
 
   return (
     <div className="mi-parrilla-page">
+      {inlineAlert && (
+        <div className={`parrilla-alert parrilla-alert-${inlineAlert.type}`}>
+          {inlineAlert.message}
+          <button onClick={() => setInlineAlert(null)} className="parrilla-alert-close">×</button>
+        </div>
+      )}
       <div className="parrilla-header">
         <div>
           <h1>Mi Parrilla de Objetivos</h1>
@@ -358,10 +366,13 @@ export default function MiParrilla() {
                             type="number"
                             step="any"
                             value={actualValue}
-                            onChange={(e) => setActualValue(e.target.value)}
-                            className="actual-input"
+                            onChange={(e) => { setActualValue(e.target.value); setActualValueError('') }}
+                            className={`actual-input${actualValueError ? ' actual-input-error' : ''}`}
                             autoFocus
                           />
+                          {actualValueError && (
+                            <span className="actual-value-error">{actualValueError}</span>
+                          )}
                           <div className="edit-actions">
                             <button
                               className="btn-save-small"
@@ -469,6 +480,14 @@ export default function MiParrilla() {
                             )}
                           </>
                         )}
+                        {!canEditInline(kpi) && !canProposeValue(kpi) && (() => {
+                          const reason = getBlockReason(kpi)
+                          return reason ? (
+                            <span className="block-reason" title={reason}>
+                              {reason}
+                            </span>
+                          ) : null
+                        })()}
                       </div>
                     </td>
                   </tr>

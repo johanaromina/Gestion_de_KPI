@@ -231,6 +231,39 @@
   align-self: center;
 }
 
+.cycle-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  flex-wrap: wrap;
+}
+
+.cycle-step {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cycle-step.done { color: #166534; }
+.cycle-step.partial { color: #92400e; }
+.cycle-step.pending { color: #9ca3af; }
+
+.cycle-dot {
+  font-size: 13px;
+}
+
+.cycle-arrow {
+  color: #d1d5db;
+  font-size: 14px;
+}
+
 .assignment-meta {
   margin-top: 10px;
   padding: 10px 12px;
@@ -243,12 +276,53 @@
   color: #374151;
 }
 
+.job-status {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff7ed;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: #7c2d12;
+}
+
+.job-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.job-meta {
+  font-size: 12px;
+  color: #9a3412;
+}
+
+.job-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.job-row.warning {
+  color: #b45309;
+  font-weight: 600;
+}
+
 .info-banner {
   margin-top: 10px;
   padding: 10px 12px;
   border-radius: 10px;
   font-size: 13px;
   font-weight: 600;
+}
+
+.info-banner.info {
+  background: #eff6ff;
+  border: 1px solid #3b82f6;
+  color: #1e40af;
 }
 
 .info-banner.warning {

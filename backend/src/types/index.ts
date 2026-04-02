@@ -63,6 +63,18 @@ export interface KPI {
   updatedAt?: Date
 }
 
+export type ScopeKPIOwnerLevel = 'team' | 'area' | 'business_unit' | 'company' | 'executive'
+export type ScopeKPISourceMode = 'direct' | 'aggregated' | 'mixed'
+export type ScopeKPIChildType = 'collaborator' | 'scope'
+export type ScopeKPIAggregationMethod =
+  | 'sum'
+  | 'avg'
+  | 'weighted_avg'
+  | 'ratio'
+  | 'formula'
+  | 'min'
+  | 'max'
+
 export interface CollaboratorKPI {
   id: number
   collaboratorId: number
@@ -105,7 +117,8 @@ export interface KPICriteriaVersion {
 
 export interface KPIMeasurement {
   id: number
-  assignmentId: number
+  assignmentId?: number | null
+  scopeKpiId?: number | null
   periodId?: number | null
   subPeriodId?: number | null
   value: number
@@ -117,6 +130,52 @@ export interface KPIMeasurement {
   reason?: string | null
   evidenceUrl?: string | null
   sourceRunId?: string | null
+}
+
+export interface ScopeKPI {
+  id: number
+  name: string
+  description?: string | null
+  kpiId: number
+  orgScopeId: number
+  periodId: number
+  subPeriodId?: number | null
+  ownerLevel: ScopeKPIOwnerLevel
+  sourceMode: ScopeKPISourceMode
+  target: number
+  actual?: number | null
+  directActual?: number | null
+  aggregatedActual?: number | null
+  mixedConfig?: {
+    directWeight: number
+    aggregatedWeight: number
+    directLabel?: string | null
+    aggregatedLabel?: string | null
+  } | null
+  weight: number
+  variation?: number | null
+  weightedResult?: number | null
+  status: 'draft' | 'proposed' | 'approved' | 'closed'
+  inputMode?: 'manual' | 'import' | 'auto'
+  curationStatus?: 'pending' | 'in_review' | 'approved' | 'rejected'
+  lastMeasurementId?: number | null
+  createdAt?: Date
+  updatedAt?: Date
+  objectiveIds?: number[]
+  objectiveNames?: string[]
+}
+
+export interface ScopeKPILink {
+  id: number
+  scopeKpiId: number
+  childType: ScopeKPIChildType
+  collaboratorAssignmentId?: number | null
+  childScopeKpiId?: number | null
+  contributionWeight?: number | null
+  aggregationMethod: ScopeKPIAggregationMethod
+  formulaConfig?: string | null
+  sortOrder?: number | null
+  createdAt?: Date
 }
 
 export interface CollaboratorKPIPlan {
@@ -137,6 +196,8 @@ export interface ObjectiveTree {
   level: 'company' | 'direction' | 'management' | 'leadership' | 'individual'
   name: string
   parentId?: number
+  kpis?: KPI[]
+  scopeKpis?: ScopeKPI[]
 }
 
 export interface Area {

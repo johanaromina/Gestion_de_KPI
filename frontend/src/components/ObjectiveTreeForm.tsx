@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import api from '../services/api'
-import { ObjectiveTree, KPI } from '../types'
+import { ObjectiveTree, KPI, ScopeKPI } from '../types'
 import './ObjectiveTreeForm.css'
 
 interface ObjectiveTreeFormProps {
@@ -26,6 +26,9 @@ export default function ObjectiveTreeForm({
   const [selectedKpiIds, setSelectedKpiIds] = useState<number[]>(
     objective?.kpis?.map((k) => k.id) || []
   )
+  const [selectedScopeKpiIds, setSelectedScopeKpiIds] = useState<number[]>(
+    objective?.scopeKpis?.map((scopeKpi) => scopeKpi.id) || []
+  )
 
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -48,6 +51,17 @@ export default function ObjectiveTreeForm({
     'kpis',
     async () => {
       const response = await api.get('/kpis')
+      return response.data
+    },
+    {
+      retry: false,
+    }
+  )
+
+  const { data: scopeKpis } = useQuery<ScopeKPI[]>(
+    'objective-tree-scope-kpis',
+    async () => {
+      const response = await api.get('/scope-kpis')
       return response.data
     },
     {
@@ -110,6 +124,7 @@ export default function ObjectiveTreeForm({
       level: formData.level,
       parentId: formData.parentId || null,
       kpiIds: selectedKpiIds,
+      scopeKpiIds: selectedScopeKpiIds,
     }
 
     if (objective?.id) {
@@ -124,6 +139,14 @@ export default function ObjectiveTreeForm({
       setSelectedKpiIds(selectedKpiIds.filter((id) => id !== kpiId))
     } else {
       setSelectedKpiIds([...selectedKpiIds, kpiId])
+    }
+  }
+
+  const handleScopeKpiToggle = (scopeKpiId: number) => {
+    if (selectedScopeKpiIds.includes(scopeKpiId)) {
+      setSelectedScopeKpiIds(selectedScopeKpiIds.filter((id) => id !== scopeKpiId))
+    } else {
+      setSelectedScopeKpiIds([...selectedScopeKpiIds, scopeKpiId])
     }
   }
 
@@ -257,6 +280,35 @@ export default function ObjectiveTreeForm({
             </div>
             <small className="form-hint">
               Selecciona los KPIs que están relacionados con este objetivo
+            </small>
+          </div>
+
+          <div className="form-group">
+            <label>Scope KPIs Asociados</label>
+            <div className="kpi-selection">
+              {scopeKpis && scopeKpis.length > 0 ? (
+                scopeKpis.map((scopeKpi) => (
+                  <label key={scopeKpi.id} className="kpi-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedScopeKpiIds.includes(scopeKpi.id)}
+                      onChange={() => handleScopeKpiToggle(scopeKpi.id)}
+                    />
+                    <span>
+                      {scopeKpi.name}
+                      <span className="macro-indicator">
+                        {' '}
+                        ({scopeKpi.orgScopeName || `Scope #${scopeKpi.orgScopeId}`})
+                      </span>
+                    </span>
+                  </label>
+                ))
+              ) : (
+                <p className="no-kpis">No hay Scope KPIs disponibles</p>
+              )}
+            </div>
+            <small className="form-hint">
+              Selecciona los Scope KPIs organizacionales que contribuyen a este objetivo
             </small>
           </div>
 

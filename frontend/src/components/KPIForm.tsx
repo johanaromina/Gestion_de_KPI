@@ -28,15 +28,6 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
 
   const queryClient = useQueryClient()
 
-  const { data: areas } = useQuery<string[]>(
-    ['areas-for-kpi-form'],
-    async () => {
-      const res = await api.get('/areas')
-      return (res.data || []).map((a: { name: string }) => a.name)
-    },
-    { retry: false }
-  )
-
   const { data: periods } = useQuery(
     ['periods-for-kpi-form'],
     async () => {
@@ -181,13 +172,6 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
   }
 
   const availableMacroKPIs = kpis?.filter((item) => item.id !== kpi?.id) || []
-
-  const toggleArea = (area: string, checked: boolean) => {
-    const current = new Set(formData.areas || [])
-    if (checked) current.add(area)
-    else current.delete(area)
-    setFormData({ ...formData, areas: Array.from(current) })
-  }
 
   const togglePeriod = (pid: number, checked: boolean) => {
     const current = new Set(formData.periodIds || [])

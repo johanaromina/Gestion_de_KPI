@@ -1,8 +1,9 @@
 import { useQuery } from 'react-query'
 import { useNavigate } from 'react-router-dom'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import api from '../services/api'
+import OnboardingWizard from '../components/OnboardingWizard'
 import { calculateVariationPercent, calculateWeightedImpact, resolveDirection } from '../utils/kpi'
 import {
   BarChart,
@@ -87,6 +88,13 @@ interface CollaboratorKPI {
 export default function Dashboard() {
   const navigate = useNavigate()
   const { user, isLoading: authLoading, isHR, isLeadership, isCollaborator, canConfig } = useAuth()
+  const [wizardDismissed, setWizardDismissed] = useState(
+    () => localStorage.getItem('onboarding-dismissed') === 'true'
+  )
+  const handleDismissWizard = () => {
+    localStorage.setItem('onboarding-dismissed', 'true')
+    setWizardDismissed(true)
+  }
   const formatNumber = (value: number, digits = 2) =>
     new Intl.NumberFormat('es-ES', { maximumFractionDigits: digits }).format(value)
   const formatPercent = (value: number, digits = 1) => `${formatNumber(value, digits)}%`
@@ -390,19 +398,43 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {canConfig && notificationSummary && (
-          <div className="notify-banner">
-            <div className="notify-main">
-              <h3>Alertas clave del sistema</h3>
-              <p>
-                KPIs sin carga: {notificationSummary.totals.missingActual} | KPIs en riesgo:{' '}
-                {notificationSummary.totals.atRisk} | Periodos por vencer:{' '}
-                {notificationSummary.totals.periodsExpiring}
-              </p>
+        {!wizardDismissed && stats && (
+          <OnboardingWizard stats={stats} onDismiss={handleDismissWizard} />
+        )}
+
+        {(stats || notificationSummary) && (
+          <div className="pending-actions-panel">
+            <h3>Acciones pendientes</h3>
+            <div className="pending-actions-list">
+              {(stats?.pendingAssignments ?? 0) > 0 ? (
+                <div className="pending-action-item warning">
+                  <span>{stats!.pendingAssignments} asignaciones sin completar en el período activo</span>
+                  <button className="pending-action-link" onClick={() => navigate('/asignaciones')}>Ver asignaciones →</button>
+                </div>
+              ) : stats ? (
+                <div className="pending-action-item success">
+                  <span>Todas las asignaciones del período activo están completas</span>
+                </div>
+              ) : null}
+              {(notificationSummary?.totals.missingActual ?? 0) > 0 && (
+                <div className="pending-action-item warning">
+                  <span>{notificationSummary!.totals.missingActual} colaboradores sin datos cargados</span>
+                  <button className="pending-action-link" onClick={() => navigate('/input-datos')}>Ir a Input →</button>
+                </div>
+              )}
+              {(notificationSummary?.totals.atRisk ?? 0) > 0 && (
+                <div className="pending-action-item error">
+                  <span>{notificationSummary!.totals.atRisk} KPIs en riesgo (cumplimiento &lt;80%)</span>
+                  <button className="pending-action-link" onClick={() => navigate('/asignaciones')}>Ver KPIs →</button>
+                </div>
+              )}
+              {(notificationSummary?.totals.periodsExpiring ?? 0) > 0 && (
+                <div className="pending-action-item info">
+                  <span>{notificationSummary!.totals.periodsExpiring} período(s) por vencer pronto</span>
+                  <button className="pending-action-link" onClick={() => navigate('/periodos')}>Ver períodos →</button>
+                </div>
+              )}
             </div>
-            <button className="btn-primary ghost" onClick={() => navigate('/asignaciones')}>
-              Ver asignaciones
-            </button>
           </div>
         )}
 
@@ -574,19 +606,39 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {canConfig && notificationSummary && (
-          <div className="notify-banner">
-            <div className="notify-main">
-              <h3>Alertas clave del sistema</h3>
-              <p>
-                KPIs sin carga: {notificationSummary.totals.missingActual} | KPIs en riesgo:{' '}
-                {notificationSummary.totals.atRisk} | Periodos por vencer:{' '}
-                {notificationSummary.totals.periodsExpiring}
-              </p>
+        {(teamStats || notificationSummary) && (
+          <div className="pending-actions-panel">
+            <h3>Acciones pendientes</h3>
+            <div className="pending-actions-list">
+              {(teamStats?.teamPendingKPIs ?? 0) > 0 ? (
+                <div className="pending-action-item warning">
+                  <span>{teamStats!.teamPendingKPIs} KPIs del equipo pendientes de completar</span>
+                  <button className="pending-action-link" onClick={() => navigate('/input-datos')}>Cargar datos →</button>
+                </div>
+              ) : teamStats ? (
+                <div className="pending-action-item success">
+                  <span>Tu equipo tiene todos los KPIs al día</span>
+                </div>
+              ) : null}
+              {(notificationSummary?.totals.missingActual ?? 0) > 0 && (
+                <div className="pending-action-item warning">
+                  <span>{notificationSummary!.totals.missingActual} colaboradores sin datos cargados</span>
+                  <button className="pending-action-link" onClick={() => navigate('/input-datos')}>Ir a Input →</button>
+                </div>
+              )}
+              {(notificationSummary?.totals.atRisk ?? 0) > 0 && (
+                <div className="pending-action-item error">
+                  <span>{notificationSummary!.totals.atRisk} KPIs en riesgo (cumplimiento &lt;80%)</span>
+                  <button className="pending-action-link" onClick={() => navigate('/asignaciones')}>Ver KPIs →</button>
+                </div>
+              )}
+              {(notificationSummary?.totals.periodsExpiring ?? 0) > 0 && (
+                <div className="pending-action-item info">
+                  <span>{notificationSummary!.totals.periodsExpiring} período(s) por vencer pronto</span>
+                  <button className="pending-action-link" onClick={() => navigate('/periodos')}>Ver períodos →</button>
+                </div>
+              )}
             </div>
-            <button className="btn-primary ghost" onClick={() => navigate('/asignaciones')}>
-              Ver asignaciones
-            </button>
           </div>
         )}
 
@@ -688,19 +740,32 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {canConfig && notificationSummary && (
-        <div className="notify-banner">
-          <div className="notify-main">
-            <h3>Alertas clave del sistema</h3>
-            <p>
-              KPIs sin carga: {notificationSummary.totals.missingActual} | KPIs en riesgo:{' '}
-              {notificationSummary.totals.atRisk} | Periodos por vencer:{' '}
-              {notificationSummary.totals.periodsExpiring}
-            </p>
+      {progressInsights && (
+        <div className="pending-actions-panel">
+          <h3>Acciones pendientes</h3>
+          <div className="pending-actions-list">
+            {progressInsights.withoutActual > 0 ? (
+              <div className="pending-action-item warning">
+                <span>{progressInsights.withoutActual} KPI{progressInsights.withoutActual > 1 ? 's' : ''} sin datos cargados este período</span>
+                <button className="pending-action-link" onClick={() => navigate('/input-datos')}>Cargar datos →</button>
+              </div>
+            ) : (
+              <div className="pending-action-item success">
+                <span>Todos tus KPIs tienen datos cargados</span>
+              </div>
+            )}
+            {progressInsights.atRisk > 0 && (
+              <div className="pending-action-item error">
+                <span>{progressInsights.atRisk} KPI{progressInsights.atRisk > 1 ? 's' : ''} en riesgo — cumplimiento por debajo del 80%</span>
+                <button className="pending-action-link" onClick={() => navigate('/mi-parrilla')}>Ver mi parrilla →</button>
+              </div>
+            )}
+            {progressInsights.onTrack === progressInsights.total && progressInsights.total > 0 && (
+              <div className="pending-action-item success">
+                <span>Todos tus KPIs están en camino (≥100% de cumplimiento)</span>
+              </div>
+            )}
           </div>
-          <button className="btn-primary ghost" onClick={() => navigate('/asignaciones')}>
-            Ver asignaciones
-          </button>
         </div>
       )}
 

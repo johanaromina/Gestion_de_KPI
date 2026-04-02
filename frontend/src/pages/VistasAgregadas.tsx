@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from 'react-query'
 import api from '../services/api'
+import { useAuth } from '../hooks/useAuth'
 import {
   BarChart,
   Bar,
@@ -36,6 +37,9 @@ interface AggregatedData {
 export default function VistasAgregadas() {
   const [viewType, setViewType] = useState<ViewType>('area')
   const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null)
+  const { user } = useAuth()
+  const canViewCompany = Boolean(user?.hasSuperpowers)
+  const teamArea = user?.area || ''
 
   // Obtener períodos
   const { data: periods } = useQuery('periods', async () => {
@@ -76,11 +80,19 @@ export default function VistasAgregadas() {
     return `±${stdDev.toFixed(2)}%`
   }
 
+  const filteredAggregated = useMemo(() => {
+    if (!aggregatedData?.aggregatedData) return []
+    if (!canViewCompany && teamArea) {
+      return aggregatedData.aggregatedData.filter((item) => item.area === teamArea)
+    }
+    return aggregatedData.aggregatedData
+  }, [aggregatedData, canViewCompany, teamArea])
+
   // Preparar datos para gráficos
   const getChartData = () => {
-    if (!aggregatedData?.aggregatedData) return []
+    if (!filteredAggregated.length) return []
 
-    return aggregatedData.aggregatedData.map((item) => {
+    return filteredAggregated.map((item) => {
       const label =
         item.area ||
         item.manager?.name ||
@@ -97,6 +109,12 @@ export default function VistasAgregadas() {
   }
 
   const chartData = getChartData()
+
+  useEffect(() => {
+    if (!canViewCompany && viewType !== 'area') {
+      setViewType('area')
+    }
+  }, [canViewCompany, viewType])
 
   return (
     <div className="vistas-agregadas-page">
@@ -138,30 +156,28 @@ export default function VistasAgregadas() {
           >
             Por Área
           </button>
-          <button
-            className={`view-type-btn ${
-              viewType === 'direction' ? 'active' : ''
-            }`}
-            onClick={() => setViewType('direction')}
-          >
-            Por Dirección
-          </button>
-          <button
-            className={`view-type-btn ${
-              viewType === 'management' ? 'active' : ''
-            }`}
-            onClick={() => setViewType('management')}
-          >
-            Por Gerencia
-          </button>
-          <button
-            className={`view-type-btn ${
-              viewType === 'leadership' ? 'active' : ''
-            }`}
-            onClick={() => setViewType('leadership')}
-          >
-            Por Jefatura
-          </button>
+          {canViewCompany && (
+            <>
+              <button
+                className={`view-type-btn ${viewType === 'direction' ? 'active' : ''}`}
+                onClick={() => setViewType('direction')}
+              >
+                Por Dirección
+              </button>
+              <button
+                className={`view-type-btn ${viewType === 'management' ? 'active' : ''}`}
+                onClick={() => setViewType('management')}
+              >
+                Por Gerencia
+              </button>
+              <button
+                className={`view-type-btn ${viewType === 'leadership' ? 'active' : ''}`}
+                onClick={() => setViewType('leadership')}
+              >
+                Por Jefatura
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -173,7 +189,7 @@ export default function VistasAgregadas() {
         </div>
       ) : isLoading ? (
         <div className="loading">Cargando datos agregados...</div>
-      ) : aggregatedData && aggregatedData.aggregatedData.length > 0 ? (
+      ) : filteredAggregated.length > 0 ? (
         <>
           {/* Gráfico de barras con promedio */}
           <div className="chart-section">
@@ -243,7 +259,7 @@ export default function VistasAgregadas() {
                   </tr>
                 </thead>
                 <tbody>
-                  {aggregatedData.aggregatedData.map((item, index) => {
+                  {filteredAggregated.map((item, index) => {
                     const label =
                       item.area ||
                       item.manager?.name ||

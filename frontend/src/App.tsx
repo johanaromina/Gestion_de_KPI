@@ -3,21 +3,27 @@ import { QueryClient, QueryClientProvider } from 'react-query'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
+import Register from './pages/Register'
+import SsoCallback from './pages/SsoCallback'
 import Dashboard from './pages/Dashboard'
+import TableroEjecutivo from './pages/TableroEjecutivo'
 import Colaboradores from './pages/Colaboradores'
 import Periodos from './pages/Periodos'
 import KPIs from './pages/KPIs'
 import Asignaciones from './pages/Asignaciones'
+import AsignacionesScope from './pages/AsignacionesScope'
 import InputDatos from './pages/InputDatos'
 import Curaduria from './pages/Curaduria'
 import ArbolObjetivos from './pages/ArbolObjetivos'
 import MiParrilla from './pages/MiParrilla'
-import HistorialIndividual from './pages/HistorialIndividual'
+import HistorialEvolutivo from './pages/HistorialEvolutivo'
+import Vistas from './pages/Vistas'
 import ConsolidadoColaborador from './pages/ConsolidadoColaborador'
 import VistasAgregadas from './pages/VistasAgregadas'
 import VistasReduccion from './pages/VistasReduccion'
 import Auditoria from './pages/Auditoria'
 import Configuracion from './pages/Configuracion'
+import DataSourceMappings from './pages/DataSourceMappings'
 import Seguridad from './pages/Seguridad'
 import ParrillaGeneral from './pages/ParrillaGeneral'
 import Evolutivo from './pages/Evolutivo'
@@ -54,12 +60,22 @@ function App() {
         <Layout>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/sso/callback" element={<SsoCallback />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/register" element={<Register />} />
             <Route
               path="/"
               element={
                 <RequireAuth>
                   <Dashboard />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/tablero-ejecutivo"
+              element={
+                <RequireAuth>
+                  <TableroEjecutivo />
                 </RequireAuth>
               }
             />
@@ -94,6 +110,18 @@ function App() {
                   <Asignaciones />
                 </RequireAuth>
               }
+            />
+            <Route
+              path="/asignaciones-scope"
+              element={
+                <RequireAuth>
+                  <AsignacionesScope />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/asignaciones-macro"
+              element={<Navigate to="/asignaciones-scope" replace />}
             />
             <Route
               path="/input-datos"
@@ -139,7 +167,15 @@ function App() {
               path="/historial/:collaboratorId?"
               element={
                 <RequireAuth>
-                  <HistorialIndividual />
+                  <HistorialEvolutivo />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/vistas"
+              element={
+                <RequireAuth>
+                  <Vistas />
                 </RequireAuth>
               }
             />
@@ -180,6 +216,14 @@ function App() {
               element={
                 <RequireAuth>
                   <Configuracion />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/mappings-externos"
+              element={
+                <RequireAuth>
+                  <DataSourceMappings />
                 </RequireAuth>
               }
             />

@@ -1,40 +1,8 @@
 import { pool } from '../config/database'
-import { decryptSecret } from './crypto'
-
-type AuthProfileRow = {
-  id: number
-  name: string
-  connector: string
-  endpoint?: string | null
-  authType?: string | null
-  authConfig?: string | null
-}
-
-type TemplateRow = {
-  id: number
-  name: string
-  connector: string
-  metricType?: 'count' | 'ratio' | null
-  metricTypeUi?: string | null
-  queryTestsTemplate?: string | null
-  queryStoriesTemplate?: string | null
-  formulaTemplate?: string | null
-  authProfileId?: number | null
-  schedule?: string | null
-  isSpecific?: number | null
-  enabled?: number | null
-}
-
-type TargetRow = {
-  id: number
-  templateId: number
-  scopeType: string
-  scopeId: string
-  params?: string | null
-  assignmentId?: number | null
-  orgScopeId?: number | null
-  enabled?: number | null
-}
+import { calculateVariation, calculateWeightedResult } from './kpi-formulas'
+import { applyMeasurementToScopeKPI } from '../services/scope-kpi.service'
+import { mergeParams, parseAuthConfig, parseJson, resolveConnectorAdapter, resolvePeriodParams } from '../integrations/adapters'
+import { AuthProfileRow, TargetRow, TemplateRow } from '../integrations/types'
 
 type RunContext = {
   templateId: number
@@ -50,21 +18,6 @@ const RETRY_DELAY_MS = parseInt(process.env.INTEGRATIONS_RETRY_MS || '60000', 10
 const CACHE_TTL_HOURS = parseInt(process.env.INTEGRATIONS_CACHE_HOURS || '12', 10)
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
-const parseJson = (value: any) => {
-  if (!value) return null
-  try {
-    return JSON.parse(value)
-  } catch {
-    return null
-  }
-}
-
-const parseAuthConfig = (value: any) => {
-  if (!value) return null
-  const decrypted = decryptSecret(String(value))
-  return parseJson(decrypted)
-}
 
 class RunQueue {
   private running = false
@@ -87,28 +40,6 @@ class RunQueue {
 }
 
 const runnerQueue = new RunQueue()
-
-const formatAuthHeaders = (authType: string | null | undefined, authConfig: any) => {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-  }
-  if (authType === 'basic') {
-    const user = authConfig?.username || ''
-    const pass = authConfig?.password || authConfig?.token || ''
-    const encoded = Buffer.from(`${user}:${pass}`).toString('base64')
-    headers.Authorization = `Basic ${encoded}`
-  } else if (authType === 'bearer') {
-    if (authConfig?.token) {
-      headers.Authorization = `Bearer ${authConfig.token}`
-    }
-  } else if (authType === 'apiKey') {
-    const headerName = authConfig?.header || 'X-API-KEY'
-    if (authConfig?.apiKey) {
-      headers[headerName] = authConfig.apiKey
-    }
-  }
-  return headers
-}
 
 const insertRun = async (templateId: number, targetId: number, payload: any) => {
   const [result] = await pool.query(
@@ -151,6 +82,20 @@ const hasMeasurementForSubPeriod = async (assignmentId: number, subPeriodId: num
   return Array.isArray(rows) && rows.length > 0
 }
 
+const hasActualValue = async (assignmentId: number) => {
+  const [rows] = await pool.query<any[]>(`SELECT actual FROM collaborator_kpis WHERE id = ? LIMIT 1`, [
+    assignmentId,
+  ])
+  if (!Array.isArray(rows) || rows.length === 0) return false
+  return rows[0].actual !== null && rows[0].actual !== undefined
+}
+
+const hasScopeActualValue = async (scopeKpiId: number) => {
+  const [rows] = await pool.query<any[]>(`SELECT actual FROM scope_kpis WHERE id = ? LIMIT 1`, [scopeKpiId])
+  if (!Array.isArray(rows) || rows.length === 0) return false
+  return rows[0].actual !== null && rows[0].actual !== undefined
+}
+
 const createMeasurementFromRun = async (
   assignmentId: number | null | undefined,
   value: number,
@@ -160,234 +105,177 @@ const createMeasurementFromRun = async (
   subPeriodId?: number | null
 ) => {
   if (!assignmentId) return
-  await pool.query(
+  const [assignmentRows] = await pool.query<any[]>(
+    `SELECT ck.target, ck.weight, ck.kpiId, ck.periodId, ck.curationStatus, ck.collaboratorId, ck.subPeriodId
+     FROM collaborator_kpis ck
+     WHERE ck.id = ?`,
+    [assignmentId]
+  )
+  if (!Array.isArray(assignmentRows) || assignmentRows.length === 0) {
+    return
+  }
+  const assignment = assignmentRows[0]
+  let curationStatus = assignment.curationStatus || 'pending'
+  if (curationStatus === 'pending' && assignment.subPeriodId) {
+    const [baseRows] = await pool.query<any[]>(
+      `SELECT curationStatus
+       FROM collaborator_kpis
+       WHERE collaboratorId = ? AND kpiId = ? AND periodId = ? AND subPeriodId IS NULL
+       LIMIT 1`,
+      [assignment.collaboratorId, assignment.kpiId, assignment.periodId]
+    )
+    if (Array.isArray(baseRows) && baseRows.length > 0 && baseRows[0].curationStatus) {
+      curationStatus = baseRows[0].curationStatus
+    }
+  }
+  const shouldApprove = curationStatus === 'approved' || curationStatus === 'in_review'
+  const measurementStatus = shouldApprove ? 'approved' : 'proposed'
+  const [result] = await pool.query(
     `INSERT INTO kpi_measurements
      (assignmentId, periodId, subPeriodId, value, mode, status, capturedBy, sourceRunId)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [assignmentId, periodId || null, subPeriodId || null, value, 'auto', 'proposed', triggeredBy || null, String(runId)]
+    [
+      assignmentId,
+      periodId || null,
+      subPeriodId || null,
+      value,
+      'auto',
+      measurementStatus,
+      triggeredBy || null,
+      String(runId),
+    ]
   )
-}
-
-const executeJiraQuery = async (endpoint: string, authType: string | null | undefined, authConfig: any, jql: string) => {
-  if (!endpoint || !jql) {
-    throw new Error('Falta endpoint o JQL en Jira')
-  }
-  const headers = {
-    ...formatAuthHeaders(authType, authConfig),
-    'Content-Type': 'application/json',
-  }
-  const baseUrl = endpoint.replace(/\/$/, '')
-  const url = `${baseUrl}/rest/api/3/search/approximate-count`
-  const response = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      jql,
-    }),
-  })
-  if (!response.ok) {
-    const text = await response.text()
-    throw new Error(`Jira error ${response.status}: ${text}`)
-  }
-  const data = await response.json()
-  const total = Number(data?.count ?? 0)
-  if (!Number.isFinite(total)) {
-    throw new Error('Respuesta de Jira inválida (count)')
-  }
-  return total
-}
-
-const formatValue = (value: any) => {
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => {
-        if (typeof item === 'number') return String(item)
-        const str = String(item)
-        if (str.startsWith('"') && str.endsWith('"')) return str
-        if (str.includes(' ')) return `"${str}"`
-        return str
-      })
-      .join(', ')
-  }
-  return String(value)
-}
-
-const renderTemplate = (template: string, params: Record<string, any>) => {
-  return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, key) => {
-    if (params[key] === undefined || params[key] === null) return ''
-    return formatValue(params[key])
-  })
-}
-
-const resolvePeriodParams = (params: Record<string, any>) => {
-  const period = params.period || 'previous_month'
-  const now = new Date()
-  const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  let from = startOfThisMonth
-  let to = startOfThisMonth
-  if (period === 'previous_month') {
-    from = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    to = startOfThisMonth
-  } else if (period === 'current_month') {
-    from = startOfThisMonth
-    to = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-  }
-  const toIso = to.toISOString().slice(0, 10)
-  const fromIso = from.toISOString().slice(0, 10)
-  return { from: fromIso, to: toIso }
-}
-
-const formatPeriodValue = (from: string, format: string) => {
-  if (!from) return ''
-  if (format === 'YYYY-MM-DD') return from
-  if (format === 'YYYY-MM') return from.slice(0, 7)
-  return from
-}
-
-const toNumber = (value: any) => {
-  if (value === null || value === undefined || value === '') return null
-  const num = Number(value)
-  return Number.isFinite(num) ? num : null
-}
-
-const findColumnIndex = (header: any[], column: any) => {
-  if (column === null || column === undefined || column === '') return null
-  if (typeof column === 'number') return column
-  const numeric = Number(column)
-  if (Number.isFinite(numeric) && String(column).trim() !== '') {
-    return numeric
-  }
-  const headerIndex = header.findIndex(
-    (cell) => String(cell).trim().toLowerCase() === String(column).trim().toLowerCase()
+  const insertResult = result as any
+  const measurementId = insertResult.insertId
+  if (!shouldApprove) return
+  const [kpiRows] = await pool.query<any[]>(
+    `SELECT type, direction, formula FROM kpis WHERE id = ?`,
+    [assignment.kpiId]
   )
-  return headerIndex >= 0 ? headerIndex : null
-}
-
-const matchValue = (value: any, expected: any) => {
-  if (expected === null || expected === undefined || expected === '') return true
-  return String(value).trim().toLowerCase() === String(expected).trim().toLowerCase()
-}
-
-const executeSheetsQuery = async (
-  endpoint: string | null | undefined,
-  authType: string | null | undefined,
-  authConfig: any,
-  params: Record<string, any>
-) => {
-  const sheetKey = params.sheetKey || params.spreadsheetId
-  const range = params.range || params.tab
-  if (!sheetKey || !range) {
-    throw new Error('Falta sheetKey o rango (tab/range) en params de Sheets')
-  }
-  const baseUrl = (endpoint || 'https://sheets.googleapis.com').replace(/\/$/, '')
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-  }
-  if (authType === 'bearer' && authConfig?.token) {
-    headers.Authorization = `Bearer ${authConfig.token}`
-  }
-  const queryParams = new URLSearchParams({
-    majorDimension: 'ROWS',
-    valueRenderOption: 'UNFORMATTED_VALUE',
-  })
-  if (authType === 'apiKey' && authConfig?.apiKey) {
-    queryParams.set('key', authConfig.apiKey)
-  }
-  const url = `${baseUrl}/v4/spreadsheets/${encodeURIComponent(sheetKey)}/values/${encodeURIComponent(
-    range
-  )}?${queryParams.toString()}`
-  const response = await fetch(url, { headers })
-  if (!response.ok) {
-    const text = await response.text()
-    throw new Error(`Sheets error ${response.status}: ${text}`)
-  }
-  const data = await response.json()
-  const values: any[] = Array.isArray(data?.values) ? data.values : []
-  if (values.length === 0) {
-    return { values: [], headers: [], rows: [] }
-  }
-  const headerRow = values[0]
-  const rows = values.slice(1)
-  return { values, headers: headerRow, rows }
-}
-
-const computeSheetsValue = (
-  template: TemplateRow,
-  params: Record<string, any>,
-  sheetData: { headers: any[]; rows: any[] }
-) => {
-  const headers = sheetData.headers || []
-  const rows = sheetData.rows || []
-  const periodFormat = params.periodFormat || 'YYYY-MM'
-  const periodValue =
-    params.periodValue ||
-    params.periodLabel ||
-    params.periodName ||
-    formatPeriodValue(params.from, periodFormat)
-  const areaValue = params.areaValue || params.area
-  const kpiValue = params.kpiValue || params.kpi
-  const periodColumn = params.periodColumn
-  const areaColumn = params.areaColumn
-  const kpiColumn = params.kpiColumn
-  const valueColumn = params.valueColumn || params.value
-
-  const periodIdx = findColumnIndex(headers, periodColumn)
-  const areaIdx = findColumnIndex(headers, areaColumn)
-  const kpiIdx = findColumnIndex(headers, kpiColumn)
-  const valueIdx = findColumnIndex(headers, valueColumn)
-
-  if (valueIdx === null || valueIdx === undefined) {
-    throw new Error('No se pudo resolver valueColumn en Sheets')
-  }
-
-  const matched = rows.filter((row) => {
-    const periodCell = periodIdx !== null ? row[periodIdx] : null
-    const areaCell = areaIdx !== null ? row[areaIdx] : null
-    const kpiCell = kpiIdx !== null ? row[kpiIdx] : null
-    return matchValue(periodCell, periodValue) && matchValue(areaCell, areaValue) && matchValue(kpiCell, kpiValue)
-  })
-
-  const values = matched.map((row) => toNumber(row[valueIdx])).filter((val) => val !== null) as number[]
-
-  const metricUi = template.metricTypeUi || ''
-  if (metricUi === 'value_agg') {
-    const agg = String(params.aggregation || 'SUM').toUpperCase()
-    if (values.length === 0) return { computed: 0, matchedRows: matched.length, values }
-    if (agg === 'AVG') {
-      const sum = values.reduce((acc, val) => acc + val, 0)
-      return { computed: sum / values.length, matchedRows: matched.length, values }
+  const kpiDirection = kpiRows?.[0]?.direction || kpiRows?.[0]?.type || 'growth'
+  const customFormula = kpiRows?.[0]?.formula || undefined
+  let targetValue = Number(assignment.target ?? 0)
+  const weightValue = Number(assignment.weight ?? 0)
+  if ((!targetValue || targetValue <= 0) && assignment.subPeriodId) {
+    const [planRows] = await pool.query<any[]>(
+      `SELECT target
+       FROM collaborator_kpi_plan
+       WHERE collaboratorId = ? AND kpiId = ? AND periodId = ? AND subPeriodId = ?
+       LIMIT 1`,
+      [assignment.collaboratorId, assignment.kpiId, assignment.periodId, assignment.subPeriodId]
+    )
+    const planTarget = Number(planRows?.[0]?.target ?? 0)
+    if (planTarget > 0) {
+      targetValue = planTarget
+      await pool.query(`UPDATE collaborator_kpis SET target = ? WHERE id = ?`, [
+        planTarget,
+        assignmentId,
+      ])
     }
-    if (agg === 'MAX') return { computed: Math.max(...values), matchedRows: matched.length, values }
-    if (agg === 'MIN') return { computed: Math.min(...values), matchedRows: matched.length, values }
-    const sum = values.reduce((acc, val) => acc + val, 0)
-    return { computed: sum, matchedRows: matched.length, values }
   }
-
-  const computed = values.length > 0 ? values[0] : 0
-  return { computed, matchedRows: matched.length, values }
+  if (!targetValue || targetValue <= 0) return
+  const variation = calculateVariation(kpiDirection, targetValue, value, customFormula)
+  const weightedResult = calculateWeightedResult(variation, weightValue)
+  await pool.query(
+    `UPDATE collaborator_kpis
+     SET actual = ?, variation = ?, weightedResult = ?, inputMode = ?, lastMeasurementId = ?
+     WHERE id = ?`,
+    [value, variation, weightedResult, 'auto', measurementId, assignmentId]
+  )
 }
 
-const resolveSubPeriodId = async (periodId: number | null, from: string, to: string) => {
-  if (!periodId || !from || !to) return null
+const createScopeMeasurementFromRun = async (
+  scopeKpiId: number | null | undefined,
+  value: number,
+  runId: number,
+  triggeredBy?: number | null,
+  periodId?: number | null,
+  subPeriodId?: number | null
+) => {
+  if (!scopeKpiId) return
+  const [result] = await pool.query(
+    `INSERT INTO kpi_measurements
+     (assignmentId, scopeKpiId, periodId, subPeriodId, value, mode, status, capturedBy, sourceRunId)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [null, scopeKpiId, periodId || null, subPeriodId || null, value, 'auto', 'approved', triggeredBy || null, String(runId)]
+  )
+  const measurementId = (result as any).insertId as number
+  await applyMeasurementToScopeKPI(scopeKpiId, value, 'auto', measurementId)
+}
+
+const resolveSubPeriodId = async (
+  calendarProfileId: number | null,
+  periodId: number | null,
+  from: string,
+  to: string
+) => {
+  if ((!calendarProfileId && !periodId) || !from || !to) return null
   const toDate = new Date(to)
   const endDate = new Date(toDate)
   endDate.setDate(endDate.getDate() - 1)
   const endIso = endDate.toISOString().slice(0, 10)
-  const [rows] = await pool.query<any[]>(
-    `SELECT id FROM calendar_subperiods
-     WHERE periodId = ? AND startDate = ? AND endDate = ?
-     LIMIT 1`,
-    [periodId, from, endIso]
-  )
+  let rows: any[] = []
+  if (calendarProfileId) {
+    const [byCalendar] = await pool.query<any[]>(
+      `SELECT id FROM calendar_subperiods
+       WHERE calendarProfileId = ? AND startDate = ? AND endDate = ?
+       LIMIT 1`,
+      [calendarProfileId, from, endIso]
+    )
+    rows = byCalendar
+  } else if (periodId) {
+    const [byPeriod] = await pool.query<any[]>(
+      `SELECT id FROM calendar_subperiods
+       WHERE periodId = ? AND startDate = ? AND endDate = ?
+       LIMIT 1`,
+      [periodId, from, endIso]
+    )
+    rows = byPeriod
+  }
   if (Array.isArray(rows) && rows.length > 0) {
     return rows[0].id
   }
-  const [fallback] = await pool.query<any[]>(
-    `SELECT id FROM calendar_subperiods
-     WHERE periodId = ? AND startDate <= ? AND endDate >= ?
-     LIMIT 1`,
-    [periodId, from, endIso]
-  )
+  if (calendarProfileId) {
+    const [byStartCalendar] = await pool.query<any[]>(
+      `SELECT id FROM calendar_subperiods
+       WHERE calendarProfileId = ? AND startDate = ?
+       LIMIT 1`,
+      [calendarProfileId, from]
+    )
+    if (Array.isArray(byStartCalendar) && byStartCalendar.length > 0) {
+      return byStartCalendar[0].id
+    }
+  }
+  if (periodId) {
+    const [byStartPeriod] = await pool.query<any[]>(
+      `SELECT id FROM calendar_subperiods
+       WHERE periodId = ? AND startDate = ?
+       LIMIT 1`,
+      [periodId, from]
+    )
+    if (Array.isArray(byStartPeriod) && byStartPeriod.length > 0) {
+      return byStartPeriod[0].id
+    }
+  }
+  let fallback: any[] = []
+  if (calendarProfileId) {
+    const [byCalendar] = await pool.query<any[]>(
+      `SELECT id FROM calendar_subperiods
+       WHERE calendarProfileId = ? AND startDate <= ? AND endDate >= ?
+       LIMIT 1`,
+      [calendarProfileId, from, endIso]
+    )
+    fallback = byCalendar
+  }
+  if ((Array.isArray(fallback) && fallback.length === 0) && periodId) {
+    const [byPeriod] = await pool.query<any[]>(
+      `SELECT id FROM calendar_subperiods
+       WHERE periodId = ? AND startDate <= ? AND endDate >= ?
+       LIMIT 1`,
+      [periodId, from, endIso]
+    )
+    fallback = byPeriod
+  }
   if (Array.isArray(fallback) && fallback.length > 0) {
     return fallback[0].id
   }
@@ -403,37 +291,105 @@ const resolveSubPeriodName = async (subPeriodId: number | null) => {
   return null
 }
 
-const mergeParams = (base: any, override: any): any => {
-  if (override === null || override === undefined) return base
-  if (Array.isArray(override)) {
-    return override
+const resolveMeasurementDestination = async (
+  target: TargetRow,
+  from: string,
+  to: string,
+  override?: {
+    assignmentId?: number | null
+    scopeKpiId?: number | null
   }
-  if (typeof override !== 'object') {
-    return override
+) => {
+  let periodId: number | null = null
+  let subPeriodId: number | null = null
+  let calendarProfileId: number | null = null
+  let collaboratorId: number | null = null
+  let kpiId: number | null = null
+  let effectiveAssignmentId: number | null =
+    override?.assignmentId !== undefined ? override.assignmentId || null : target.assignmentId || null
+  let effectiveScopeKpiId: number | null =
+    override?.scopeKpiId !== undefined ? override.scopeKpiId || null : target.scopeKpiId || target.macroKpiId || null
+
+  if (effectiveAssignmentId) {
+    const [assignmentRows] = await pool.query<any[]>(
+      `SELECT periodId, subPeriodId, calendarProfileId, collaboratorId, kpiId
+       FROM collaborator_kpis WHERE id = ? LIMIT 1`,
+      [effectiveAssignmentId]
+    )
+    if (!Array.isArray(assignmentRows) || assignmentRows.length === 0) {
+      throw new Error('Asignación destino no existe')
+    }
+    periodId = assignmentRows[0].periodId || null
+    subPeriodId = assignmentRows[0].subPeriodId || null
+    calendarProfileId = assignmentRows[0].calendarProfileId || null
+    collaboratorId = assignmentRows[0].collaboratorId || null
+    kpiId = assignmentRows[0].kpiId || null
   }
-  const result = { ...(base || {}) }
-  for (const key of Object.keys(override)) {
-    const baseValue = result[key]
-    const overrideValue = override[key]
-    if (Array.isArray(overrideValue)) {
-      result[key] = overrideValue
-    } else if (typeof overrideValue === 'object' && overrideValue !== null) {
-      result[key] = mergeParams(baseValue || {}, overrideValue)
-    } else {
-      result[key] = overrideValue
+  if (effectiveAssignmentId && (calendarProfileId || periodId)) {
+    const resolvedSubPeriodId = await resolveSubPeriodId(calendarProfileId, periodId, from, to)
+    if (resolvedSubPeriodId) {
+      if (collaboratorId && kpiId && periodId) {
+        const [assignmentMatch] = await pool.query<any[]>(
+          `SELECT id FROM collaborator_kpis
+           WHERE collaboratorId = ? AND kpiId = ? AND periodId = ? AND subPeriodId = ?
+           LIMIT 1`,
+          [collaboratorId, kpiId, periodId, resolvedSubPeriodId]
+        )
+        if (Array.isArray(assignmentMatch) && assignmentMatch.length > 0) {
+          effectiveAssignmentId = assignmentMatch[0].id
+          subPeriodId = resolvedSubPeriodId
+        } else {
+          effectiveAssignmentId = null
+          subPeriodId = resolvedSubPeriodId
+        }
+      } else {
+        subPeriodId = resolvedSubPeriodId
+      }
     }
   }
-  return result
+  if (effectiveScopeKpiId) {
+    const [scopeRows] = await pool.query<any[]>(
+      `SELECT periodId, subPeriodId FROM scope_kpis WHERE id = ? LIMIT 1`,
+      [effectiveScopeKpiId]
+    )
+    if (!Array.isArray(scopeRows) || scopeRows.length === 0) {
+      throw new Error('Scope KPI destino no existe')
+    }
+    periodId = scopeRows[0].periodId || periodId
+    subPeriodId = scopeRows[0].subPeriodId || subPeriodId
+  }
+  const subPeriodName = await resolveSubPeriodName(subPeriodId)
+  const shouldSkip = effectiveAssignmentId
+    ? (await hasMeasurementForSubPeriod(effectiveAssignmentId, subPeriodId)) || (await hasActualValue(effectiveAssignmentId))
+    : effectiveScopeKpiId
+      ? await hasScopeActualValue(effectiveScopeKpiId)
+      : false
+  const skipReason = !effectiveAssignmentId && !effectiveScopeKpiId
+    ? 'No hay destino para el subperiodo'
+    : shouldSkip
+      ? 'El destino ya tiene medicion cargada'
+      : null
+
+  return {
+    periodId,
+    subPeriodId,
+    subPeriodName,
+    effectiveAssignmentId,
+    effectiveScopeKpiId,
+    shouldSkip,
+    skipReason,
+  }
 }
 
 const loadScopeChain = async (scopeId: number) => {
   const chain: any[] = []
   let currentId: number | null = scopeId
   while (currentId) {
-    const [rows] = await pool.query<any[]>(
+    const result = await pool.query<any[]>(
       `SELECT id, name, type, parentId, metadata FROM org_scopes WHERE id = ?`,
       [currentId]
     )
+    const rows = result[0] as any[]
     if (!Array.isArray(rows) || rows.length === 0) break
     const scope = rows[0]
     chain.push({
@@ -443,27 +399,6 @@ const loadScopeChain = async (scopeId: number) => {
     currentId = scope.parentId || null
   }
   return chain.reverse()
-}
-
-const evaluateFormula = (formula: string, values: Record<string, number>) => {
-  const normalized = formula.trim().toLowerCase()
-  if (normalized === 'count' || normalized === 'tests' || normalized === 'a') {
-    return Number(values.tests)
-  }
-  if (normalized === 'stories' || normalized === 'b') {
-    return Number(values.stories)
-  }
-  const expression = normalized
-    .replace(/\btests\b/g, String(values.tests))
-    .replace(/\bstories\b/g, String(values.stories))
-    .replace(/\ba\b/g, String(values.tests))
-    .replace(/\bb\b/g, String(values.stories))
-  if (!/^[0-9+\-*/().\s]+$/.test(expression)) {
-    throw new Error('Fórmula inválida')
-  }
-  // eslint-disable-next-line no-new-func
-  const result = Function(`"use strict"; return (${expression});`)()
-  return Number(result)
 }
 
 const executeTemplateTarget = async (
@@ -500,7 +435,7 @@ const executeTemplateTarget = async (
   }
   mergedParams = mergeParams(mergedParams, baseParams)
   const { from, to } = resolvePeriodParams(mergedParams)
-  const params = { ...mergedParams, from, to }
+  const params: Record<string, any> = { ...mergedParams, from, to }
   const usersCount = Array.isArray(params.users) ? params.users.length : params.users ? 1 : 0
   if (target.assignmentId && usersCount > 1) {
     throw new Error(
@@ -521,87 +456,81 @@ const executeTemplateTarget = async (
 
   const authConfig = resolvedAuthProfile?.authConfig ? parseAuthConfig(resolvedAuthProfile.authConfig) : null
 
-  let testsTotal = 0
-  let storiesTotal = 0
-  let computed = 0
-  let formula = template.formulaTemplate || ''
-  let testsJql = ''
-  let storiesJql = ''
-  let sheetMeta: any = null
+  const adapter = resolveConnectorAdapter(connector, resolvedAuthProfile)
+  const connectorResult = await adapter.run({
+    template,
+    target,
+    authProfile: resolvedAuthProfile,
+    authConfig: authConfig || {},
+    params,
+  })
+  const computed = connectorResult.computed
+  const testsTotal = Number(connectorResult.outputs?.testsTotal ?? 0)
+  const storiesTotal = Number(connectorResult.outputs?.storiesTotal ?? 0)
+  const formula = connectorResult.outputs?.formula || template.formulaTemplate || ''
+  const testsJql = connectorResult.outputs?.testsJql || ''
+  const storiesJql = connectorResult.outputs?.storiesJql || ''
+  const sheetMeta = connectorResult.outputs?.sheetMeta || null
+  const sourceMeta = connectorResult.outputs?.sourceMeta || null
 
-  if (connector === 'sheets') {
-    const sheetData = await executeSheetsQuery(
-      resolvedAuthProfile?.endpoint || null,
-      resolvedAuthProfile?.authType || null,
-      authConfig || {},
-      params
-    )
-    const sheetResult = computeSheetsValue(template, params, sheetData)
-    computed = sheetResult.computed
-    sheetMeta = {
-      sheetKey: params.sheetKey || params.spreadsheetId,
-      tab: params.tab || params.range,
-      matchedRows: sheetResult.matchedRows,
-      values: sheetResult.values,
-      periodValue: params.periodValue || params.periodLabel || params.periodName || formatPeriodValue(params.from, params.periodFormat || 'YYYY-MM'),
+  if (connectorResult.measurements?.length) {
+    const mappedDestinations = []
+    for (const measurement of connectorResult.measurements) {
+      const destination = await resolveMeasurementDestination(target, from, to, {
+        assignmentId: measurement.assignmentId ?? null,
+        scopeKpiId: measurement.scopeKpiId ?? null,
+      })
+      mappedDestinations.push({
+        ...measurement,
+        ...destination,
+      })
     }
-    formula = template.formulaTemplate || (template.metricTypeUi === 'value_agg' ? 'AGG' : 'VALUE')
-  } else if (connector === 'jira' || connector === 'xray') {
-    const metricType: 'count' | 'ratio' = template.metricType === 'count' ? 'count' : 'ratio'
-    if (!template.queryTestsTemplate) {
-      throw new Error('La plantilla no tiene query de tests definida')
+    const insertResult = await insertRun(template.id, target.id, {
+      status: 'success',
+      triggeredBy: context.triggeredBy,
+      message: context.note || 'Ejecución manual',
+      outputs: {
+        metricType: template.metricType || 'count',
+        metricTypeUi: template.metricTypeUi || null,
+        testsTotal,
+        storiesTotal,
+        computed,
+        testsJql,
+        storiesJql,
+        formula,
+        sheetMeta,
+        sourceMeta,
+        mode: context.mode,
+        range: { from, to },
+        mappingMode: 'row_targets',
+        mappedRows: mappedDestinations.length,
+        appliedRows: mappedDestinations.filter((row) => !row.shouldSkip && (row.effectiveAssignmentId || row.effectiveScopeKpiId)).length,
+        skippedRows: mappedDestinations.filter((row) => row.shouldSkip).length,
+        unresolvedRows: mappedDestinations.filter((row) => !row.effectiveAssignmentId && !row.effectiveScopeKpiId).length,
+        mappingResultsPreview: mappedDestinations.slice(0, 10).map((row) => ({
+          externalKey: row.externalKey || null,
+          value: row.value,
+          assignmentId: row.effectiveAssignmentId || null,
+          scopeKpiId: row.effectiveScopeKpiId || null,
+          skipped: row.shouldSkip,
+          skipReason: row.skipReason || null,
+        })),
+      },
+    })
+    const runId = (insertResult as any).insertId
+    for (const row of mappedDestinations) {
+      if (row.shouldSkip) continue
+      if (row.effectiveAssignmentId) {
+        await createMeasurementFromRun(row.effectiveAssignmentId, row.value, runId, context.triggeredBy, row.periodId, row.subPeriodId)
+      } else if (row.effectiveScopeKpiId) {
+        await createScopeMeasurementFromRun(row.effectiveScopeKpiId, row.value, runId, context.triggeredBy, row.periodId, row.subPeriodId)
+      }
     }
-    if (metricType === 'ratio' && !template.queryStoriesTemplate) {
-      throw new Error('La plantilla ratio requiere query de historias')
-    }
-
-    testsJql = template.queryTestsTemplate ? renderTemplate(template.queryTestsTemplate, params) : ''
-    storiesJql =
-      metricType === 'ratio' && template.queryStoriesTemplate
-        ? renderTemplate(template.queryStoriesTemplate, params)
-        : ''
-
-    if (!resolvedAuthProfile?.endpoint) {
-      throw new Error('Falta endpoint en auth profile')
-    }
-
-    const auth = authConfig || {}
-    testsTotal = await executeJiraQuery(resolvedAuthProfile.endpoint, resolvedAuthProfile.authType, auth, testsJql)
-    storiesTotal =
-      metricType === 'ratio' && storiesJql
-        ? await executeJiraQuery(resolvedAuthProfile.endpoint, resolvedAuthProfile.authType, auth, storiesJql)
-        : 0
-    formula = template.formulaTemplate || (metricType === 'count' ? 'tests' : 'tests / stories')
-    computed =
-      metricType === 'ratio'
-        ? storiesTotal > 0
-          ? evaluateFormula(formula, { tests: testsTotal, stories: storiesTotal })
-          : 0
-        : evaluateFormula(formula, { tests: testsTotal, stories: storiesTotal })
-  } else {
-    throw new Error('Connector no soportado')
+    return { runId, computed, mappedRows: mappedDestinations.length }
   }
 
-  let periodId: number | null = null
-  let subPeriodId: number | null = null
-  if (target.assignmentId) {
-    const [assignmentRows] = await pool.query<any[]>(
-      `SELECT periodId, subPeriodId FROM collaborator_kpis WHERE id = ? LIMIT 1`,
-      [target.assignmentId]
-    )
-    if (Array.isArray(assignmentRows) && assignmentRows.length > 0) {
-      periodId = assignmentRows[0].periodId || null
-      subPeriodId = assignmentRows[0].subPeriodId || null
-    }
-  }
-  if (target.assignmentId && periodId && !subPeriodId) {
-    subPeriodId = await resolveSubPeriodId(periodId, from, to)
-  }
-  const subPeriodName = await resolveSubPeriodName(subPeriodId)
-  const shouldSkip = target.assignmentId
-    ? await hasMeasurementForSubPeriod(target.assignmentId, subPeriodId)
-    : false
-  const skipReason = shouldSkip ? 'Subperiodo ya tiene medicion propuesta/aprobada' : null
+  const { periodId, subPeriodId, subPeriodName, effectiveAssignmentId, effectiveScopeKpiId, shouldSkip, skipReason } =
+    await resolveMeasurementDestination(target, from, to)
 
   const insertResult = await insertRun(template.id, target.id, {
     status: 'success',
@@ -613,13 +542,15 @@ const executeTemplateTarget = async (
       testsTotal,
       storiesTotal,
       computed,
-      testsJql,
-      storiesJql,
-      formula,
-      sheetMeta,
-      mode: context.mode,
-      periodId,
+        testsJql,
+        storiesJql,
+        formula,
+        sheetMeta,
+        sourceMeta,
+        mode: context.mode,
+        periodId,
       subPeriodId,
+      scopeKpiId: effectiveScopeKpiId,
       subPeriodName,
       range: { from, to },
       skipped: shouldSkip,
@@ -628,8 +559,11 @@ const executeTemplateTarget = async (
   })
 
   const runId = (insertResult as any).insertId
-  if (!shouldSkip) {
-    await createMeasurementFromRun(target.assignmentId, computed, runId, context.triggeredBy, periodId, subPeriodId)
+  if (!shouldSkip && effectiveAssignmentId) {
+    await createMeasurementFromRun(effectiveAssignmentId, computed, runId, context.triggeredBy, periodId, subPeriodId)
+  }
+  if (!shouldSkip && effectiveScopeKpiId) {
+    await createScopeMeasurementFromRun(effectiveScopeKpiId, computed, runId, context.triggeredBy, periodId, subPeriodId)
   }
 
   return { runId, computed }

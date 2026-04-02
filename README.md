@@ -53,6 +53,19 @@ npm run dev
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:5000
 
+## Despliegue recomendado hoy
+
+Para comercializar la app en el estado actual, la estrategia recomendada es:
+
+- `single-tenant por cliente`
+- una app por empresa
+- una base MySQL por empresa
+
+Guia operativa:
+
+- [docs/DEPLOY-SINGLE-TENANT.md](/d:/proyectos laborales/Gestion_de_KPI/docs/DEPLOY-SINGLE-TENANT.md)
+- [docs/OPERACIONES-RAPIDAS.md](/d:/proyectos laborales/Gestion_de_KPI/docs/OPERACIONES-RAPIDAS.md)
+
 ## Estado actual (funcionalidades principales)
 
 - KPIs macro + asignaciones por colaborador y periodo (con subperiodos)

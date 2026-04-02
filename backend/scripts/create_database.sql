@@ -17,7 +17,6 @@ CREATE TABLE IF NOT EXISTS org_scopes (
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (parentId) REFERENCES org_scopes(id) ON DELETE SET NULL,
-  FOREIGN KEY (calendarProfileId) REFERENCES calendar_profiles(id) ON DELETE SET NULL,
   INDEX idx_scope_type (type),
   INDEX idx_scope_parent (parentId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -36,6 +35,9 @@ CREATE TABLE IF NOT EXISTS collaborators (
   mfaEnabled TINYINT(1) NOT NULL DEFAULT 0,
   mfaCodeHash VARCHAR(64) NULL,
   mfaCodeExpiresAt DATETIME NULL,
+  ssoProviderId INT NULL,
+  ssoSubject VARCHAR(255) NULL,
+  authSource ENUM('local', 'sso') NOT NULL DEFAULT 'local',
   managerId INT NULL,
   role ENUM('admin', 'director', 'manager', 'leader', 'collaborator') NOT NULL DEFAULT 'collaborator',
   status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
@@ -46,6 +48,8 @@ CREATE TABLE IF NOT EXISTS collaborators (
   FOREIGN KEY (managerId) REFERENCES collaborators(id) ON DELETE SET NULL,
   FOREIGN KEY (orgScopeId) REFERENCES org_scopes(id) ON DELETE SET NULL,
   UNIQUE KEY uniq_collaborators_email (email),
+  INDEX idx_collaborators_sso_provider (ssoProviderId),
+  INDEX idx_collaborators_sso_subject (ssoSubject),
   INDEX idx_manager (managerId),
   INDEX idx_role (role),
   INDEX idx_status (status),
@@ -82,6 +86,69 @@ CREATE TABLE IF NOT EXISTS periods (
   INDEX idx_dates (startDate, endDate)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS areas (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  parentId INT NULL,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_area_name (name),
+  FOREIGN KEY (parentId) REFERENCES areas(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sso_providers (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  slug VARCHAR(100) NOT NULL,
+  providerType ENUM('oidc') NOT NULL DEFAULT 'oidc',
+  issuer VARCHAR(255) NULL,
+  clientId VARCHAR(255) NOT NULL,
+  clientSecret TEXT NULL,
+  authorizationEndpoint VARCHAR(500) NOT NULL,
+  tokenEndpoint VARCHAR(500) NOT NULL,
+  userInfoEndpoint VARCHAR(500) NOT NULL,
+  scopes VARCHAR(500) NULL,
+  allowedDomains VARCHAR(500) NULL,
+  enabled TINYINT(1) NOT NULL DEFAULT 1,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_sso_provider_slug (slug)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS auth_handoff_codes (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  codeHash VARCHAR(64) NOT NULL,
+  collaboratorId INT NOT NULL,
+  ssoProviderId INT NULL,
+  expiresAt DATETIME NOT NULL,
+  consumedAt DATETIME NULL,
+  metadata TEXT NULL,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_auth_handoff_code_hash (codeHash),
+  INDEX idx_auth_handoff_collaborator (collaboratorId),
+  INDEX idx_auth_handoff_provider (ssoProviderId),
+  INDEX idx_auth_handoff_expires (expiresAt),
+  FOREIGN KEY (collaboratorId) REFERENCES collaborators(id) ON DELETE CASCADE,
+  FOREIGN KEY (ssoProviderId) REFERENCES sso_providers(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tabla de aliases / claves externas por fuente
+CREATE TABLE IF NOT EXISTS data_source_mappings (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  sourceType VARCHAR(50) NOT NULL DEFAULT 'global',
+  entityType ENUM('collaborator', 'org_scope') NOT NULL,
+  entityId INT NOT NULL,
+  externalKey VARCHAR(255) NOT NULL,
+  normalizedKey VARCHAR(255) NOT NULL,
+  externalLabel VARCHAR(255) NULL,
+  metadata TEXT NULL,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_data_source_mapping (sourceType, entityType, normalizedKey),
+  INDEX idx_data_source_mapping_entity (entityType, entityId),
+  INDEX idx_data_source_mapping_source (sourceType)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Resúmenes anuales por periodo y colaborador
 CREATE TABLE IF NOT EXISTS period_summaries (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -116,8 +183,7 @@ CREATE TABLE IF NOT EXISTS period_summary_items (
   INDEX idx_summary_item_summary (summaryId),
   INDEX idx_summary_item_kpi (kpiId),
   UNIQUE KEY uniq_summary_kpi (summaryId, kpiId),
-  FOREIGN KEY (summaryId) REFERENCES period_summaries(id) ON DELETE CASCADE,
-  FOREIGN KEY (kpiId) REFERENCES kpis(id) ON DELETE CASCADE
+  FOREIGN KEY (summaryId) REFERENCES period_summaries(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Calendarios de medición por scope
@@ -173,6 +239,26 @@ CREATE TABLE IF NOT EXISTS kpis (
   INDEX idx_macro (macroKPIId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS kpi_areas (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  kpiId INT NOT NULL,
+  area VARCHAR(255) NOT NULL,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_kpi_area (kpiId, area),
+  FOREIGN KEY (kpiId) REFERENCES kpis(id) ON DELETE CASCADE,
+  INDEX idx_area (area)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS kpi_periods (
+  kpiId INT NOT NULL,
+  periodId INT NOT NULL,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (kpiId, periodId),
+  FOREIGN KEY (kpiId) REFERENCES kpis(id) ON DELETE CASCADE,
+  FOREIGN KEY (periodId) REFERENCES periods(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Ponderación de KPI por Scope
 CREATE TABLE IF NOT EXISTS kpi_scope_weights (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -203,6 +289,7 @@ CREATE TABLE IF NOT EXISTS collaborator_kpis (
   weightedResult DECIMAL(10,2) NULL,
   status ENUM('draft', 'proposed', 'approved', 'closed') NOT NULL DEFAULT 'draft',
   comments TEXT,
+  planValue DECIMAL(12,2) NULL,
   curationStatus ENUM('pending', 'in_review', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
   dataSource VARCHAR(100) NULL,
   sourceConfig TEXT NULL,
@@ -248,7 +335,8 @@ CREATE TABLE IF NOT EXISTS kpi_criteria_versions (
 -- Mediciones por asignación (input)
 CREATE TABLE IF NOT EXISTS kpi_measurements (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  assignmentId INT NOT NULL,
+  assignmentId INT NULL,
+  scopeKpiId INT NULL,
   periodId INT NULL,
   subPeriodId INT NULL,
   value DECIMAL(10,2) NOT NULL,
@@ -266,7 +354,28 @@ CREATE TABLE IF NOT EXISTS kpi_measurements (
   FOREIGN KEY (criteriaVersionId) REFERENCES kpi_criteria_versions(id) ON DELETE SET NULL,
   FOREIGN KEY (capturedBy) REFERENCES collaborators(id) ON DELETE SET NULL,
   INDEX idx_assignment (assignmentId),
+  INDEX idx_scope_kpi (scopeKpiId),
   INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS collaborator_kpi_plan (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  collaboratorId INT NOT NULL,
+  kpiId INT NOT NULL,
+  periodId INT NOT NULL,
+  subPeriodId INT NOT NULL,
+  target DECIMAL(12,2) NOT NULL,
+  weightOverride DECIMAL(6,2) NULL DEFAULT NULL,
+  source VARCHAR(255) NULL,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_plan (collaboratorId, kpiId, periodId, subPeriodId),
+  FOREIGN KEY (collaboratorId) REFERENCES collaborators(id) ON DELETE CASCADE,
+  FOREIGN KEY (kpiId) REFERENCES kpis(id) ON DELETE CASCADE,
+  FOREIGN KEY (periodId) REFERENCES periods(id) ON DELETE CASCADE,
+  FOREIGN KEY (subPeriodId) REFERENCES calendar_subperiods(id) ON DELETE CASCADE,
+  INDEX idx_plan_collab (collaboratorId, periodId),
+  INDEX idx_plan_kpi (kpiId, periodId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 ALTER TABLE collaborator_kpis
@@ -286,6 +395,75 @@ CREATE TABLE IF NOT EXISTS objective_trees (
   INDEX idx_parent (parentId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS scope_kpis (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  description TEXT NULL,
+  kpiId INT NOT NULL,
+  orgScopeId INT NOT NULL,
+  periodId INT NOT NULL,
+  subPeriodId INT NULL,
+  ownerLevel ENUM('team', 'area', 'business_unit', 'company', 'executive') NOT NULL DEFAULT 'area',
+  sourceMode ENUM('direct', 'aggregated', 'mixed') NOT NULL DEFAULT 'direct',
+  target DECIMAL(12,2) NOT NULL DEFAULT 0,
+  actual DECIMAL(12,2) NULL,
+  directActual DECIMAL(12,2) NULL,
+  aggregatedActual DECIMAL(12,2) NULL,
+  mixedConfig TEXT NULL,
+  weight DECIMAL(8,2) NOT NULL DEFAULT 0,
+  variation DECIMAL(10,2) NULL,
+  weightedResult DECIMAL(10,2) NULL,
+  status ENUM('draft', 'proposed', 'approved', 'closed') NOT NULL DEFAULT 'draft',
+  inputMode ENUM('manual', 'import', 'auto') NOT NULL DEFAULT 'manual',
+  curationStatus ENUM('pending', 'in_review', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
+  lastMeasurementId INT NULL,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (kpiId) REFERENCES kpis(id) ON DELETE CASCADE,
+  FOREIGN KEY (periodId) REFERENCES periods(id) ON DELETE CASCADE,
+  FOREIGN KEY (subPeriodId) REFERENCES calendar_subperiods(id) ON DELETE SET NULL,
+  UNIQUE KEY uniq_scope_kpi (kpiId, orgScopeId, periodId, subPeriodId),
+  INDEX idx_scope_scope_period (orgScopeId, periodId),
+  INDEX idx_scope_period (periodId)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS scope_kpi_links (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  scopeKpiId INT NOT NULL,
+  childType ENUM('collaborator', 'scope') NOT NULL,
+  collaboratorAssignmentId INT NULL,
+  childScopeKpiId INT NULL,
+  contributionWeight DECIMAL(8,2) NULL,
+  aggregationMethod ENUM('sum', 'avg', 'weighted_avg') NOT NULL DEFAULT 'weighted_avg',
+  formulaConfig TEXT NULL,
+  sortOrder INT NOT NULL DEFAULT 0,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (scopeKpiId) REFERENCES scope_kpis(id) ON DELETE CASCADE,
+  FOREIGN KEY (collaboratorAssignmentId) REFERENCES collaborator_kpis(id) ON DELETE CASCADE,
+  FOREIGN KEY (childScopeKpiId) REFERENCES scope_kpis(id) ON DELETE CASCADE,
+  INDEX idx_scope_link_parent (scopeKpiId),
+  INDEX idx_scope_link_child_collab (collaboratorAssignmentId),
+  INDEX idx_scope_link_child_scope (childScopeKpiId)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS scope_kpi_aggregation_runs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  scopeKpiId INT NOT NULL,
+  periodId INT NOT NULL,
+  subPeriodId INT NULL,
+  status ENUM('success', 'error') NOT NULL DEFAULT 'success',
+  inputsSnapshot LONGTEXT NULL,
+  resultValue DECIMAL(12,2) NULL,
+  message TEXT NULL,
+  createdBy INT NULL,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (scopeKpiId) REFERENCES scope_kpis(id) ON DELETE CASCADE,
+  FOREIGN KEY (periodId) REFERENCES periods(id) ON DELETE CASCADE,
+  FOREIGN KEY (subPeriodId) REFERENCES calendar_subperiods(id) ON DELETE SET NULL,
+  FOREIGN KEY (createdBy) REFERENCES collaborators(id) ON DELETE SET NULL,
+  INDEX idx_scope_aggregation_parent (scopeKpiId, periodId)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Tabla de relación entre Árbol de Objetivos y KPIs
 CREATE TABLE IF NOT EXISTS objective_trees_kpis (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -297,6 +475,18 @@ CREATE TABLE IF NOT EXISTS objective_trees_kpis (
   UNIQUE KEY unique_objective_kpi (objectiveTreeId, kpiId),
   INDEX idx_objective (objectiveTreeId),
   INDEX idx_kpi (kpiId)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS objective_trees_scope_kpis (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  objectiveTreeId INT NOT NULL,
+  scopeKpiId INT NOT NULL,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (objectiveTreeId) REFERENCES objective_trees(id) ON DELETE CASCADE,
+  FOREIGN KEY (scopeKpiId) REFERENCES scope_kpis(id) ON DELETE CASCADE,
+  UNIQUE KEY unique_objective_scope_kpi (objectiveTreeId, scopeKpiId),
+  INDEX idx_objective_scope (objectiveTreeId),
+  INDEX idx_scope_kpi_objective (scopeKpiId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Tabla para estado de notificaciones
@@ -315,7 +505,7 @@ CREATE TABLE IF NOT EXISTS notification_states (
 CREATE TABLE IF NOT EXISTS integrations (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  type ENUM('jira', 'xray', 'db', 'excel', 'api', 'manual', 'other') NOT NULL DEFAULT 'api',
+  type ENUM('jira', 'xray', 'db', 'excel', 'api', 'manual', 'generic_api', 'looker', 'other') NOT NULL DEFAULT 'api',
   endpoint TEXT NULL,
   assignmentId INT NULL,
   jql TEXT NULL,
@@ -357,7 +547,7 @@ CREATE TABLE IF NOT EXISTS integration_runs (
 CREATE TABLE IF NOT EXISTS auth_profiles (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  connector ENUM('jira', 'xray', 'sheets', 'azure_devops', 'github', 'servicenow', 'zendesk', 'other') NOT NULL DEFAULT 'jira',
+  connector ENUM('jira', 'xray', 'sheets', 'azure_devops', 'github', 'servicenow', 'zendesk', 'generic_api', 'looker', 'other') NOT NULL DEFAULT 'jira',
   endpoint TEXT NULL,
   authType ENUM('none', 'basic', 'bearer', 'apiKey') NOT NULL DEFAULT 'none',
   authConfig TEXT NULL,
@@ -369,7 +559,7 @@ CREATE TABLE IF NOT EXISTS auth_profiles (
 CREATE TABLE IF NOT EXISTS integration_templates (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  connector ENUM('jira', 'xray', 'sheets', 'azure_devops', 'github', 'servicenow', 'zendesk', 'other') NOT NULL DEFAULT 'jira',
+  connector ENUM('jira', 'xray', 'sheets', 'azure_devops', 'github', 'servicenow', 'zendesk', 'generic_api', 'looker', 'other') NOT NULL DEFAULT 'jira',
   metricType ENUM('count', 'ratio') NOT NULL DEFAULT 'ratio',
   metricTypeUi VARCHAR(20) NULL,
   queryTestsTemplate TEXT NULL,
@@ -389,11 +579,12 @@ CREATE TABLE IF NOT EXISTS integration_templates (
 CREATE TABLE IF NOT EXISTS integration_targets (
   id INT AUTO_INCREMENT PRIMARY KEY,
   templateId INT NOT NULL,
-  scopeType ENUM('area', 'team', 'person', 'product') NOT NULL DEFAULT 'area',
+  scopeType ENUM('company', 'area', 'team', 'person', 'product') NOT NULL DEFAULT 'area',
   scopeId VARCHAR(255) NOT NULL,
   orgScopeId INT NULL,
   params TEXT NULL,
   assignmentId INT NULL,
+  scopeKpiId INT NULL,
   enabled TINYINT(1) NOT NULL DEFAULT 1,
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -414,6 +605,7 @@ CREATE TABLE IF NOT EXISTS integration_template_runs (
   message TEXT NULL,
   outputs TEXT NULL,
   error TEXT NULL,
+  archived TINYINT(1) NOT NULL DEFAULT 0,
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (templateId) REFERENCES integration_templates(id) ON DELETE CASCADE,
   FOREIGN KEY (targetId) REFERENCES integration_targets(id) ON DELETE CASCADE,
@@ -442,9 +634,29 @@ ALTER TABLE integration_targets
   ADD CONSTRAINT fk_target_org_scope
   FOREIGN KEY (orgScopeId) REFERENCES org_scopes(id) ON DELETE SET NULL;
 
+ALTER TABLE org_scopes
+  ADD CONSTRAINT fk_org_scopes_calendar_profile
+  FOREIGN KEY (calendarProfileId) REFERENCES calendar_profiles(id) ON DELETE SET NULL;
+
+ALTER TABLE scope_kpis
+  ADD CONSTRAINT fk_scope_kpis_org_scope
+  FOREIGN KEY (orgScopeId) REFERENCES org_scopes(id) ON DELETE CASCADE;
+
+ALTER TABLE period_summary_items
+  ADD CONSTRAINT fk_period_summary_items_kpi
+  FOREIGN KEY (kpiId) REFERENCES kpis(id) ON DELETE CASCADE;
+
+ALTER TABLE kpi_measurements
+  ADD CONSTRAINT fk_measurements_scope_kpi
+  FOREIGN KEY (scopeKpiId) REFERENCES scope_kpis(id) ON DELETE CASCADE;
+
+ALTER TABLE integration_targets
+  ADD CONSTRAINT fk_target_scope_kpi
+  FOREIGN KEY (scopeKpiId) REFERENCES scope_kpis(id) ON DELETE SET NULL;
+
 -- Permisos y superpoderes
 ALTER TABLE collaborators
-ADD COLUMN IF NOT EXISTS hasSuperpowers TINYINT(1) NOT NULL DEFAULT 0 AFTER role;
+ADD COLUMN hasSuperpowers TINYINT(1) NOT NULL DEFAULT 0 AFTER role;
 
 CREATE TABLE IF NOT EXISTS permissions (
   id INT AUTO_INCREMENT PRIMARY KEY,

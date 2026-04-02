@@ -1,8 +1,8 @@
 import express from 'express'
 import cors from 'cors'
-import dotenv from 'dotenv'
 import helmet from 'helmet'
 import { testConnection } from './config/database.js'
+import { appEnv } from './config/env.js'
 
 // Routes
 import authRoutes from './routes/auth.routes.js'
@@ -28,17 +28,31 @@ import integrationsRoutes from './routes/integrations.routes.js'
 import orgScopesRoutes from './routes/org-scopes.routes.js'
 import calendarProfilesRoutes from './routes/calendar-profiles.routes.js'
 import securityRoutes from './routes/security.routes.js'
+import scopeKpisRoutes from './routes/scope-kpis.routes.js'
+import dataSourceMappingsRoutes from './routes/data-source-mappings.routes.js'
 import { startIntegrationsScheduler } from './utils/integrations-scheduler'
 import { runNotifications } from './utils/notifications'
-
-dotenv.config()
 
 const app = express()
 const PORT = process.env.PORT || 5000
 
+const resolveCorsOrigin = (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {
+  if (!origin) return callback(null, true)
+  if (appEnv.corsAllowedOrigins.includes('*') || appEnv.corsAllowedOrigins.includes(origin)) {
+    return callback(null, true)
+  }
+  return callback(new Error('Origen no permitido por CORS'))
+}
+
 // Middleware
 app.use(helmet())
-app.use(cors())
+app.set('trust proxy', appEnv.trustProxy)
+app.use(
+  cors({
+    origin: resolveCorsOrigin,
+    credentials: true,
+  })
+)
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
@@ -49,6 +63,20 @@ app.get('/api/health', async (req, res) => {
     status: 'ok',
     message: 'Gestion KPI API is running',
     database: dbConnected ? 'connected' : 'disconnected',
+  })
+})
+
+app.get('/api/health/ready', async (req, res) => {
+  const dbConnected = await testConnection()
+  if (!dbConnected) {
+    return res.status(503).json({
+      status: 'error',
+      message: 'Database not ready',
+    })
+  }
+  return res.json({
+    status: 'ok',
+    message: 'Ready',
   })
 })
 
@@ -76,6 +104,9 @@ app.use('/api/integrations', integrationsRoutes)
 app.use('/api/org-scopes', orgScopesRoutes)
 app.use('/api/calendar-profiles', calendarProfilesRoutes)
 app.use('/api/security', securityRoutes)
+app.use('/api/scope-kpis', scopeKpisRoutes)
+app.use('/api/macro-kpis', scopeKpisRoutes)
+app.use('/api/data-source-mappings', dataSourceMappingsRoutes)
 
 // Start server
 app.listen(PORT, async () => {

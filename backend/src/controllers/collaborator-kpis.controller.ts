@@ -3,6 +3,8 @@ import { pool } from '../config/database'
 import { CollaboratorKPI, KPIDirection, KPIType } from '../types'
 import { calculateVariation, calculateWeightedResult } from '../utils/kpi-formulas'
 import { AuthRequest } from '../middleware/auth.middleware'
+import { closeKpiRecord, ensureAssignmentEditable, reopenKpiRecord } from '../services/kpi-assignment-shared.service'
+import { applyMeasurementToCollaboratorAssignment } from '../services/measurement-application.service'
 
 const canEditAssignment = async (user: AuthRequest['user'], collaboratorId: number) => {
   // Solo usuarios con permisos de configuración (o superpoderes) pueden modificar datos
@@ -416,7 +418,7 @@ export const createCollaboratorKPI = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Faltan campos requeridos' })
     }
 
-    const canEdit = await canEditAssignment((req as AuthRequest).user, collaboratorId)
+    const canEdit = await canEditAssignment((req as AuthRequest).user, Number(collaboratorId))
     if (!canEdit) {
       return res.status(403).json({ error: 'No autorizado para crear asignaciones fuera de tu área' })
     }
@@ -583,7 +585,7 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
       periodId = kpiInfo[0].periodId
     }
 
-    const canEdit = await canEditAssignment((req as AuthRequest).user, collaboratorId)
+    const canEdit = await canEditAssignment((req as AuthRequest).user, Number(collaboratorId || 0))
     if (!canEdit) {
       return res.status(403).json({ error: 'No autorizado para editar asignaciones fuera de tu área' })
     }
@@ -785,10 +787,14 @@ export const updateActualValue = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Asignación no encontrada' })
     }
 
-    if (ckRows[0].status === 'closed' || ckRows[0].periodStatus === 'closed') {
-      return res.status(403).json({
-        error: 'No se puede actualizar el valor de una asignación cerrada',
+    try {
+      ensureAssignmentEditable({
+        status: ckRows[0].status,
+        periodStatus: ckRows[0].periodStatus,
+        closedMessage: 'No se puede actualizar el valor de una asignación cerrada',
       })
+    } catch (error: any) {
+      return res.status(403).json({ error: error?.message || 'No se puede actualizar la asignación' })
     }
 
     const canEdit = await canEditAssignment((req as AuthRequest).user, ckRows[0].collaboratorId)
@@ -818,16 +824,6 @@ export const updateActualValue = async (req: Request, res: Response) => {
       })
     }
 
-    const variation = calculateVariation(resolveDirection(direction, type), currentTarget, actual)
-    const weightedResult = calculateWeightedResult(variation, currentWeight)
-
-    await pool.query(
-      `UPDATE collaborator_kpis 
-       SET actual = ?, variation = ?, weightedResult = ? 
-       WHERE id = ?`,
-      [actual, variation, weightedResult, id]
-    )
-
     const userId = (req as AuthRequest).user?.id || null
     const [measurementResult] = await pool.query<any>(
       `INSERT INTO kpi_measurements
@@ -845,7 +841,7 @@ export const updateActualValue = async (req: Request, res: Response) => {
     )
     const measurementId = (measurementResult as any)?.insertId
     if (measurementId) {
-      await pool.query(`UPDATE collaborator_kpis SET lastMeasurementId = ? WHERE id = ?`, [measurementId, id])
+      await applyMeasurementToCollaboratorAssignment(Number(id), Number(actual), ckRows[0].inputMode || 'manual', measurementId, ckRows[0].activeCriteriaVersionId || null)
     }
 
     await recalcSummaryAssignment(ckRows[0].collaboratorId, kpiId, periodId)
@@ -853,8 +849,8 @@ export const updateActualValue = async (req: Request, res: Response) => {
     res.json({
       message: 'Valor actualizado correctamente',
       actual,
-      variation,
-      weightedResult,
+      variation: calculateVariation(resolveDirection(direction, type), currentTarget, actual),
+      weightedResult: calculateWeightedResult(calculateVariation(resolveDirection(direction, type), currentTarget, actual), currentWeight),
     })
   } catch (error: any) {
     console.error('Error updating actual value:', error)
@@ -881,7 +877,7 @@ export const closeCollaboratorKPI = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'La asignación ya está cerrada' })
     }
 
-    await pool.query('UPDATE collaborator_kpis SET status = ? WHERE id = ?', ['closed', id])
+    await closeKpiRecord('collaborator_kpis', Number(id))
 
     res.json({ message: 'Asignación cerrada correctamente' })
   } catch (error: any) {
@@ -911,7 +907,7 @@ export const reopenCollaboratorKPI = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'La asignación no está cerrada' })
     }
 
-    await pool.query('UPDATE collaborator_kpis SET status = ? WHERE id = ?', ['approved', id])
+    await reopenKpiRecord('collaborator_kpis', Number(id), 'approved')
 
     res.json({ message: 'Asignación reabierta correctamente' })
   } catch (error: any) {
@@ -1587,34 +1583,47 @@ export const upsertMonthlyPlan = async (req: Request, res: Response) => {
              WHERE id = ?`,
             [target, existingAssignments[0].id]
           )
-        } else {
-          const [baseRows] = await conn.query<any[]>(
-            `SELECT weight FROM collaborator_kpis 
-             WHERE collaboratorId = ? AND kpiId = ? AND periodId = ? AND subPeriodId IS NULL
-             LIMIT 1`,
-            [collaboratorId, kpiId, periodId]
-          )
-          const baseWeight = baseRows?.[0]?.weight ?? 0
-          const resolvedCalendarProfileId = await resolveCalendarProfileId({
-            collaboratorId: Number(collaboratorId),
-            subPeriodId: item.subPeriodId,
-          })
-          await conn.query(
-            `INSERT INTO collaborator_kpis 
-               (collaboratorId, kpiId, periodId, calendarProfileId, subPeriodId, target, weight, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-              collaboratorId,
-              kpiId,
-              periodId,
-              resolvedCalendarProfileId,
-              item.subPeriodId,
-              target,
-              baseWeight,
-              'draft',
-            ]
-          )
-        }
+          } else {
+            const [baseRows] = await conn.query<any[]>(
+              `SELECT weight, curationStatus, dataSource, sourceConfig, curatorUserId, inputMode, activeCriteriaVersionId
+               FROM collaborator_kpis 
+               WHERE collaboratorId = ? AND kpiId = ? AND periodId = ? AND subPeriodId IS NULL
+               LIMIT 1`,
+              [collaboratorId, kpiId, periodId]
+            )
+            const baseWeight = baseRows?.[0]?.weight ?? 0
+            const baseCurationStatus = baseRows?.[0]?.curationStatus || 'pending'
+            const baseDataSource = baseRows?.[0]?.dataSource ?? null
+            const baseSourceConfig = baseRows?.[0]?.sourceConfig ?? null
+            const baseCuratorUserId = baseRows?.[0]?.curatorUserId ?? null
+            const baseInputMode = baseRows?.[0]?.inputMode ?? null
+            const baseActiveCriteriaVersionId = baseRows?.[0]?.activeCriteriaVersionId ?? null
+            const resolvedCalendarProfileId = await resolveCalendarProfileId({
+              collaboratorId: Number(collaboratorId),
+              subPeriodId: item.subPeriodId,
+            })
+            await conn.query(
+              `INSERT INTO collaborator_kpis 
+                 (collaboratorId, kpiId, periodId, calendarProfileId, subPeriodId, target, weight, status, curationStatus, dataSource, sourceConfig, curatorUserId, inputMode, activeCriteriaVersionId)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [
+                collaboratorId,
+                kpiId,
+                periodId,
+                resolvedCalendarProfileId,
+                item.subPeriodId,
+                target,
+                baseWeight,
+                'draft',
+                baseCurationStatus,
+                baseDataSource,
+                baseSourceConfig,
+                baseCuratorUserId,
+                baseInputMode,
+                baseActiveCriteriaVersionId,
+              ]
+            )
+          }
       }
 
       await conn.commit()

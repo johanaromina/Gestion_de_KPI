@@ -5,7 +5,29 @@
 ### 1. `create_database.sql`
 Script SQL que crea:
 - La base de datos `gestion_kpi`
-- Todas las tablas necesarias (collaborators, periods, sub_periods, kpis, collaborator_kpis, objective_trees)
+- Todas las tablas necesarias del schema actual
+- Incluye `calendar_profiles`, `calendar_subperiods`, `scope_kpis`, `scope_kpi_links`, `scope_kpi_aggregation_runs`, `data_source_mappings` e integraciones modernas
+
+### Ruta recomendada hoy
+
+Para una instalacion nueva:
+
+1. Ejecutar `create_database.sql`
+2. Ejecutar `seed-demo-examples.ts` si queres datos de ejemplo
+
+Para una base existente que necesita alinearse al dominio actual:
+
+1. Ejecutar `add-scope-kpis.sql`
+
+### Scripts legacy / de compatibilidad
+
+- `add-macro-kpis.sql`
+  - Deprecated.
+  - `macro_kpis` fue reemplazado por `scope_kpis`.
+- `add-company-scope-to-integration-targets.sql`
+  - Cambio puntual ya absorbido por `add-scope-kpis.sql`.
+- `add-data-source-mappings.sql`
+  - Cambio puntual ya absorbido por `add-scope-kpis.sql`.
 
 ### 2. `setup-database.ts`
 Script TypeScript que ejecuta automáticamente los scripts SQL anteriores.
@@ -157,5 +179,5 @@ O desde PowerShell:
 Get-Content scripts/create_database.sql | mysql -u root -p
 ```
 
-**Nota:** Los datos deben ser insertados manualmente a través de la aplicación. No se incluyen scripts de seed con datos de ejemplo.
+**Nota:** Tambien existe `seed-demo-examples.ts` para regenerar un dataset demo end-to-end preservando el usuario admin que elijas dejar en la base.
 

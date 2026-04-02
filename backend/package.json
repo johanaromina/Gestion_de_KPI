@@ -1,7 +1,6 @@
 {
   "name": "gestion-kpi-backend",
   "version": "1.0.0",
-  "type": "module",
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -21,8 +20,11 @@
     "add:evolution": "tsx scripts/add-evolution-table.ts",
     "import:evolution": "tsx scripts/import-evolution-from-excel.ts",
     "add:auth-columns": "tsx scripts/add-auth-columns.ts",
+    "bootstrap:admin": "tsx scripts/bootstrap-client-admin.ts",
     "add:notifications-table": "tsx scripts/add-notifications-table.ts",
-    "add:subperiod-status": "tsx scripts/add-subperiod-status.ts"
+    "add:subperiod-status": "tsx scripts/add-subperiod-status.ts",
+    "test:critical-flow": "tsx scripts/smoke-critical-flow.ts",
+    "test:sheets": "node --import tsx --test tests/integrations/sheets.test.ts"
   },
   "dependencies": {
     "@types/pdfkit": "^0.17.4",

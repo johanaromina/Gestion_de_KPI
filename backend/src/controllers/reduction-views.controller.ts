@@ -96,9 +96,9 @@ export const getReductionKPIs = async (req: Request, res: Response) => {
           periodStartDate: string
           periodEndDate: string
           target: number
-          actual?: number
-          variation?: number
-          weightedResult?: number
+          actual?: number | null
+          variation?: number | null
+          weightedResult?: number | null
           status: string
         }>
       }

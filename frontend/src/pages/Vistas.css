@@ -1,0 +1,33 @@
+.vistas-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.header-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 8px;
+}
+
+.tab-button {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.tab-button.active {
+  background: #111827;
+  color: #fff;
+  border-color: #111827;
+}
+
+.tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}

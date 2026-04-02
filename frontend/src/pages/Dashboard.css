@@ -113,6 +113,79 @@
   color: #9ca3af;
 }
 
+.pending-actions-panel {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.pending-actions-panel h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 12px;
+}
+
+.pending-actions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pending-action-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  gap: 12px;
+}
+
+.pending-action-item.warning {
+  background: #fffbeb;
+  border: 1px solid #f59e0b;
+  color: #92400e;
+}
+
+.pending-action-item.error {
+  background: #fef2f2;
+  border: 1px solid #ef4444;
+  color: #b91c1c;
+}
+
+.pending-action-item.info {
+  background: #eff6ff;
+  border: 1px solid #3b82f6;
+  color: #1e40af;
+}
+
+.pending-action-item.success {
+  background: #f0fdf4;
+  border: 1px solid #22c55e;
+  color: #166534;
+}
+
+.pending-action-item span {
+  flex: 1;
+}
+
+.pending-action-link {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-decoration: underline;
+  color: inherit;
+  padding: 0;
+}
+
 .dashboard-section {
   margin-bottom: 32px;
 }

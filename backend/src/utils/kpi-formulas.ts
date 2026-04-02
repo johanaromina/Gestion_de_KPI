@@ -184,8 +184,8 @@ export function validateFormula(formula: string): {
  * @param type Tipo de KPI
  * @returns Fórmula por defecto
  */
-export function getDefaultFormula(type: KPIType): string {
-  switch (type) {
+export function getDefaultFormula(type: KPIType | KPIDirection | string): string {
+  switch (resolveDirection(type)) {
     case 'growth':
       return '(actual / target) * 100'
     case 'reduction':

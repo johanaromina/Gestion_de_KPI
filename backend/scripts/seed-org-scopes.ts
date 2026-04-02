@@ -11,7 +11,7 @@ const dbConfig = {
   database: process.env.DB_NAME || 'gestion_kpi',
 }
 
-const companyName = 'SIDOM'
+const companyName = 'Mi Empresa'
 const areaNames = [
   'Producto',
   'Ingenieria',

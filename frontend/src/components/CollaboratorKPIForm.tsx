@@ -151,7 +151,7 @@ export default function CollaboratorKPIForm({
       return
     }
     if (!collaboratorArea) return
-    const scopeMatch = areaScopes.find((scope) => scope.name === collaboratorArea)
+    const scopeMatch = areaScopes.find((scope: any) => scope.name === collaboratorArea)
     if (scopeMatch) {
       setSelectedScopeId(scopeMatch.id)
     }
@@ -314,8 +314,8 @@ export default function CollaboratorKPIForm({
         periodId: assignment.periodId,
         calendarProfileId: (assignment as any).calendarProfileId ?? formData.calendarProfileId ?? null,
         subPeriodId: data.subPeriodId,
-        target: assignment.target ?? 0,
-        weight: assignment.weight ?? 0,
+        target: data.target ?? assignment.target ?? 0,
+        weight: data.weight ?? assignment.weight ?? 0,
         status: data.status,
         comments: data.comments,
         actual: data.actual,
@@ -617,7 +617,7 @@ export default function CollaboratorKPIForm({
                 disabled={!!assignment?.id || isReadOnlyCollaborator}
               >
                 <option value="">Seleccione un scope</option>
-                {areaScopes.map((scope) => (
+                {areaScopes.map((scope: any) => (
                   <option key={scope.id} value={scope.id}>
                     {scope.label}
                   </option>
@@ -642,7 +642,7 @@ export default function CollaboratorKPIForm({
                     if (nextCollaborator?.orgScopeId) {
                       setSelectedScopeId(nextCollaborator.orgScopeId)
                     } else if (nextCollaborator?.area) {
-                      const scopeMatch = areaScopes.find((scope) => scope.name === nextCollaborator.area)
+                      const scopeMatch = areaScopes.find((scope: any) => scope.name === nextCollaborator.area)
                       if (scopeMatch) {
                         setSelectedScopeId(scopeMatch.id)
                       }

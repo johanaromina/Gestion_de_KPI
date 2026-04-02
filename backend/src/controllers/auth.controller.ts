@@ -3,15 +3,12 @@ import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { pool } from '../config/database'
+import { appEnv } from '../config/env'
 import { sendMail } from '../utils/mailer'
 import { getEffectivePermissions } from '../utils/permissions'
+import { buildTokenPayload, issueAuthToken } from '../services/auth-session.service'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-change-in-production'
-const APP_BASE_URL = process.env.APP_BASE_URL || 'http://localhost:5173'
-const MFA_TTL_MIN = parseInt(process.env.MFA_TTL_MIN || '10')
-const RESET_TTL_MIN = parseInt(process.env.RESET_TTL_MIN || '60')
-
-if (!process.env.JWT_SECRET) {
+if (!appEnv.isProduction && !process.env.JWT_SECRET) {
   console.warn('??  ADVERTENCIA: JWT_SECRET no esta configurado. Usando clave por defecto (solo para desarrollo).')
   console.warn('??  En produccion, configura JWT_SECRET en el archivo .env')
 }
@@ -21,20 +18,11 @@ interface User {
   email: string
   name: string
   role: string
+  area?: string
   collaboratorId?: number
   hasSuperpowers?: boolean
   permissions?: string[]
 }
-
-const buildTokenPayload = (collaborator: any, permissions: string[]) => ({
-  id: collaborator.id,
-  name: collaborator.name,
-  role: collaborator.role,
-  area: collaborator.area,
-  collaboratorId: collaborator.id,
-  hasSuperpowers: collaborator.hasSuperpowers === 1 || collaborator.hasSuperpowers === true,
-  permissions,
-})
 
 export const login = async (req: Request, res: Response) => {
   try {
@@ -76,7 +64,7 @@ export const login = async (req: Request, res: Response) => {
     if (collaborator.mfaEnabled && collaborator.email) {
       const code = crypto.randomInt(100000, 999999).toString()
       const codeHash = crypto.createHash('sha256').update(code).digest('hex')
-      const expiresAt = new Date(Date.now() + MFA_TTL_MIN * 60 * 1000)
+      const expiresAt = new Date(Date.now() + appEnv.mfaTtlMin * 60 * 1000)
 
       await pool.query(
         'UPDATE collaborators SET mfaCodeHash = ?, mfaCodeExpiresAt = ? WHERE id = ?',
@@ -86,21 +74,20 @@ export const login = async (req: Request, res: Response) => {
       await sendMail({
         to: collaborator.email,
         subject: 'Codigo de acceso - KPI Manager',
-        html: `<p>Tu codigo de verificacion es:</p><h2>${code}</h2><p>Vence en ${MFA_TTL_MIN} minutos.</p>`,
-        text: `Tu codigo de verificacion es: ${code}. Vence en ${MFA_TTL_MIN} minutos.`,
+        html: `<p>Tu codigo de verificacion es:</p><h2>${code}</h2><p>Vence en ${appEnv.mfaTtlMin} minutos.</p>`,
+        text: `Tu codigo de verificacion es: ${code}. Vence en ${appEnv.mfaTtlMin} minutos.`,
       })
 
       const mfaToken = jwt.sign(
         { id: collaborator.id, purpose: 'mfa' },
-        JWT_SECRET,
-        { expiresIn: `${MFA_TTL_MIN}m` }
+        appEnv.jwtSecret,
+        { expiresIn: `${appEnv.mfaTtlMin}m` }
       )
 
       return res.json({ mfaRequired: true, mfaToken })
     }
 
-    const expiresIn = rememberMe ? '30d' : '1d'
-    const token = jwt.sign(buildTokenPayload(collaborator, permissions), JWT_SECRET, { expiresIn })
+    const token = issueAuthToken(collaborator, permissions, rememberMe)
 
     return res.json({
       token,
@@ -121,7 +108,7 @@ export const verifyMfa = async (req: Request, res: Response) => {
 
     let decoded: any
     try {
-      decoded = jwt.verify(token, JWT_SECRET) as any
+      decoded = jwt.verify(token, appEnv.jwtSecret) as any
     } catch {
       return res.status(401).json({ error: 'Token invalido' })
     }
@@ -159,8 +146,7 @@ export const verifyMfa = async (req: Request, res: Response) => {
 
     const permissions = await getEffectivePermissions(collaborator.id)
 
-    const expiresIn = rememberMe ? '30d' : '1d'
-    const authToken = jwt.sign(buildTokenPayload(collaborator, permissions), JWT_SECRET, { expiresIn })
+    const authToken = issueAuthToken(collaborator, permissions, rememberMe)
 
     return res.json({
       token: authToken,
@@ -195,22 +181,22 @@ export const requestPasswordReset = async (req: Request, res: Response) => {
     console.log('[auth] reset request: sending to', collaborator.email)
     const rawToken = crypto.randomBytes(32).toString('hex')
     const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex')
-    const expiresAt = new Date(Date.now() + RESET_TTL_MIN * 60 * 1000)
+    const expiresAt = new Date(Date.now() + appEnv.resetTtlMin * 60 * 1000)
 
     await pool.query(
       'UPDATE collaborators SET passwordResetTokenHash = ?, passwordResetExpiresAt = ? WHERE id = ?',
       [tokenHash, expiresAt, collaborator.id]
     )
 
-    const resetLink = `${APP_BASE_URL}/reset-password?token=${rawToken}`
+    const resetLink = `${appEnv.appBaseUrl}/reset-password?token=${rawToken}`
 
     await sendMail({
       to: collaborator.email,
       subject: 'Recuperacion de contrasena - KPI Manager',
       html: `<p>Recibimos una solicitud para restablecer tu contrasena.</p>
              <p><a href="${resetLink}">Restablecer contrasena</a></p>
-             <p>Este enlace vence en ${RESET_TTL_MIN} minutos.</p>`,
-      text: `Restablece tu contrasena: ${resetLink} (vence en ${RESET_TTL_MIN} minutos).`,
+             <p>Este enlace vence en ${appEnv.resetTtlMin} minutos.</p>`,
+        text: `Restablece tu contrasena: ${resetLink} (vence en ${appEnv.resetTtlMin} minutos).`,
     })
 
     console.log('[auth] reset request: email sent', collaborator.email)
@@ -264,10 +250,82 @@ export const resetPassword = async (req: Request, res: Response) => {
 
 export const register = async (req: Request, res: Response) => {
   try {
-    res.status(501).json({ error: 'Registro no implementado en MVP' })
+    const { companyName, adminName, email, password } = req.body
+    const normalizedEmail = email ? String(email).trim().toLowerCase() : ''
+
+    if (!companyName || !adminName || !normalizedEmail || !password) {
+      return res.status(400).json({ error: 'Todos los campos son requeridos' })
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(normalizedEmail)) {
+      return res.status(400).json({ error: 'Email inválido' })
+    }
+
+    if (String(password).length < 8) {
+      return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' })
+    }
+
+    const [existing] = await pool.query<any[]>(
+      'SELECT id FROM collaborators WHERE email = ?',
+      [normalizedEmail]
+    )
+    if (Array.isArray(existing) && existing.length > 0) {
+      return res.status(400).json({ error: 'Ya existe una cuenta con ese email' })
+    }
+
+    const [companyResult] = await pool.query<any>(
+      `INSERT INTO org_scopes (name, type, parentId, metadata, active) VALUES (?, 'company', NULL, ?, 1)`,
+      [String(companyName).trim(), JSON.stringify({ code: 'COMPANY', aliases: ['company'] })]
+    )
+    const companyScopeId = Number(companyResult.insertId)
+
+    await pool.query(
+      `INSERT INTO org_scopes (name, type, parentId, metadata, active) VALUES ('General', 'area', ?, NULL, 1)`,
+      [companyScopeId]
+    )
+
+    const passwordHash = await bcrypt.hash(String(password), 10)
+    const [adminResult] = await pool.query<any>(
+      `INSERT INTO collaborators (name, position, area, orgScopeId, managerId, role, status, email, passwordHash, mfaEnabled, hasSuperpowers)
+       VALUES (?, 'Administrador', ?, ?, NULL, 'admin', 'active', ?, ?, 0, 1)`,
+      [String(adminName).trim(), String(companyName).trim(), companyScopeId, normalizedEmail, passwordHash]
+    )
+    const adminId = Number(adminResult.insertId)
+
+    const permissions = await getEffectivePermissions(adminId)
+    const [adminRows] = await pool.query<any[]>('SELECT * FROM collaborators WHERE id = ?', [adminId])
+    const adminCollaborator = adminRows[0]
+    const token = issueAuthToken(buildTokenPayload(adminCollaborator, permissions), true)
+
+    try {
+      await sendMail({
+        to: normalizedEmail,
+        subject: '¡Bienvenido/a a KPI Manager!',
+        html: `<p>Hola ${String(adminName).trim()},</p>
+               <p>Tu empresa <strong>${String(companyName).trim()}</strong> fue registrada exitosamente en KPI Manager.</p>
+               <p>Ya podés ingresar con tu email y contraseña.</p>
+               <p><a href="${appEnv.appBaseUrl}/login" style="background:#f97316;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold;">Ingresar ahora</a></p>
+               <p>Te recomendamos comenzar configurando tu estructura organizacional y los KPIs de tu equipo.</p>`,
+        text: `Bienvenido/a a KPI Manager. Tu empresa ${String(companyName).trim()} fue registrada. Ingresá en: ${appEnv.appBaseUrl}/login`,
+      })
+    } catch (mailErr) {
+      console.error('[register] Error enviando email de bienvenida:', mailErr)
+    }
+
+    return res.status(201).json({
+      token,
+      user: {
+        id: adminId,
+        name: String(adminName).trim(),
+        email: normalizedEmail,
+        role: 'admin',
+        companyName: String(companyName).trim(),
+      },
+    })
   } catch (error: any) {
     console.error('Error in register:', error)
-    res.status(500).json({ error: 'Error al registrar' })
+    res.status(500).json({ error: 'Error al registrar la empresa' })
   }
 }
 

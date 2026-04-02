@@ -36,7 +36,7 @@ export default function ProposeValueModal({
   const queryClient = useQueryClient()
 
   const proposeMutation = useMutation(
-    async (data: { actual?: number; comments?: string }) => {
+    async (data: { actual?: number; comments?: string; reason?: string; evidenceUrl?: string }) => {
       const response = await api.post(
         `/collaborator-kpis/${assignment.id}/propose`,
         data

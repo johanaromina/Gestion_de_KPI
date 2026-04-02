@@ -97,11 +97,13 @@ export default function HistorialIndividual() {
   const { collaboratorId } = useParams<{ collaboratorId: string }>()
   const [searchParams] = useSearchParams()
   const { user } = useAuth()
+  const isGlobalView = collaboratorId === 'all' || collaboratorId === 'global'
   const resolvedId = useMemo(() => {
+    if (isGlobalView) return ''
     if (collaboratorId) return collaboratorId
     if (user?.collaboratorId) return String(user.collaboratorId)
     return ''
-  }, [collaboratorId, user?.collaboratorId])
+  }, [collaboratorId, isGlobalView, user?.collaboratorId])
 
   const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null)
   const [selectedSubPeriodId, setSelectedSubPeriodId] = useState<number | null>(null)
@@ -121,7 +123,7 @@ export default function HistorialIndividual() {
       const response = await api.get(`/collaborators/${resolvedId}`)
       return response.data
     },
-    { enabled: !!resolvedId }
+    { enabled: !!resolvedId && !isGlobalView }
   )
 
   const { data: events } = useQuery<CollaboratorEvent[]>(
@@ -130,7 +132,7 @@ export default function HistorialIndividual() {
       const response = await api.get(`/collaborators/${resolvedId}/events`)
       return response.data
     },
-    { enabled: !!resolvedId }
+    { enabled: !!resolvedId && !isGlobalView }
   )
 
   const { data: periods } = useQuery<Period[]>('periods', async () => {
@@ -170,7 +172,7 @@ export default function HistorialIndividual() {
       return response.data
     },
     {
-      enabled: !!resolvedId,
+      enabled: !!resolvedId && !isGlobalView,
     }
   )
 
@@ -273,8 +275,8 @@ export default function HistorialIndividual() {
     <div className="historial-individual-page">
       <div className="historial-header">
         <div>
-          <h1>Historico Individual</h1>
-          {collaborator && (
+          <h1>{isGlobalView ? 'Historico - Resumen anual' : 'Historico Individual'}</h1>
+          {!isGlobalView && collaborator && (
             <div className="collaborator-info">
               <p className="collaborator-name">{collaborator.name}</p>
               <p className="collaborator-details">
@@ -294,7 +296,7 @@ export default function HistorialIndividual() {
         </div>
       </div>
 
-      {events && events.length > 0 && (
+      {!isGlobalView && events && events.length > 0 && (
         <div className="event-timeline">
           <h3>Eventos del colaborador</h3>
           <ul>
@@ -371,9 +373,64 @@ export default function HistorialIndividual() {
         </div>
       )}
 
-      {selectedPeriodId && loadingKPIs && <div className="loading">Cargando resultados...</div>}
+      {selectedPeriodId && loadingKPIs && !isGlobalView && (
+        <div className="loading">Cargando resultados...</div>
+      )}
 
-      {selectedPeriodId && !loadingKPIs && filteredKPIs && filteredKPIs.length > 0 && (
+      {isGlobalView && selectedPeriodId && (
+        <>
+          {periodSummary && periodSummary.summaries?.length > 0 ? (
+            <div className="annual-summary-card">
+              <div className="summary-header">
+                <h2>Resumen anual por colaborador</h2>
+              </div>
+              <div className="summary-table-container">
+                <table className="summary-table">
+                  <thead>
+                    <tr>
+                      <th>Colaborador</th>
+                      <th>Peso total</th>
+                      <th>Resultado ponderado</th>
+                      <th>Resultado final</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {periodSummary.summaries.map((summary) => (
+                      <tr key={summary.id}>
+                        <td>{summary.collaboratorName}</td>
+                        <td>{summary.totalWeight?.toFixed(1)}%</td>
+                        <td>{summary.totalWeightedResult?.toFixed(1)}</td>
+                        <td>{summary.overallResult?.toFixed(1)}%</td>
+                        <td>
+                          <button
+                            className="btn-text"
+                            onClick={() =>
+                              window.location.assign(
+                                `/historial/${summary.collaboratorId}?periodId=${selectedPeriodId}`
+                              )
+                            }
+                          >
+                            Ver detalle
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="empty-state">
+              <div className="empty-icon">:/</div>
+              <h3>Sin resumen anual</h3>
+              <p>Cierra el periodo para generar el resumen anual.</p>
+            </div>
+          )}
+        </>
+      )}
+
+      {!isGlobalView && selectedPeriodId && !loadingKPIs && filteredKPIs && filteredKPIs.length > 0 && (
         <>
           {summaryForCollaborator && (
             <div className="annual-summary-card">

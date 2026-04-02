@@ -14,10 +14,16 @@ export default function Colaboradores() {
   const [filterArea, setFilterArea] = useState('')
   const [filterRole, setFilterRole] = useState('')
   const [showInactive, setShowInactive] = useState(false)
+  const [resendingId, setResendingId] = useState<number | null>(null)
+  const [inviteAlert, setInviteAlert] = useState<{ id: number; message: string; type: 'success' | 'error' } | null>(null)
 
   const queryClient = useQueryClient()
-  const { user, isAdmin, isDirector, isManager, isLeader } = useAuth()
-
+  const auth = useAuth()
+  const user = auth?.user
+  const isAdmin = Boolean(auth?.isAdmin)
+  const isDirector = Boolean(auth?.isDirector)
+  const isManager = Boolean(auth?.isManager)
+  const isLeader = Boolean(auth?.isLeader)
   const { data: orgScopes } = useQuery<OrgScope[]>(
     'org-scopes',
     async () => {
@@ -27,7 +33,9 @@ export default function Colaboradores() {
     { retry: false }
   )
 
-  const areaScopes = (orgScopes || []).filter((scope) => scope.type === 'area')
+  const areaScopes = Array.isArray(orgScopes)
+    ? orgScopes.filter((scope) => scope.type === 'area')
+    : []
 
   const { data: collaborators, isLoading } = useQuery<Collaborator[]>(
     ['collaborators', showInactive],
@@ -74,21 +82,6 @@ export default function Colaboradores() {
     }
   )
 
-  const createAreaMutation = useMutation(
-    async (name: string) => {
-      const response = await api.post('/org-scopes', { name, type: 'area' })
-      return response.data as { id: number }
-    },
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('org-scopes')
-      },
-      onError: (error: any) => {
-        alert(error.response?.data?.error || 'Error al crear área')
-      },
-    }
-  )
-
   const handleCreate = () => {
     setEditingCollaborator(undefined)
     setShowForm(true)
@@ -116,6 +109,23 @@ export default function Colaboradores() {
     deactivateMutation.mutate({ id, reason: reason || undefined })
   }
 
+  const handleResendInvite = async (id: number) => {
+    setResendingId(id)
+    try {
+      await api.post(`/collaborators/${id}/resend-invite`)
+      setInviteAlert({ id, message: 'Invitación reenviada correctamente', type: 'success' })
+    } catch (error: any) {
+      setInviteAlert({
+        id,
+        message: error.response?.data?.error || 'Error al reenviar invitación',
+        type: 'error',
+      })
+    } finally {
+      setResendingId(null)
+      setTimeout(() => setInviteAlert(null), 4000)
+    }
+  }
+
   const getManagerName = (managerId?: number): string => {
     if (!managerId) return '-'
     const manager = collaborators?.find((c) => c.id === managerId)
@@ -123,10 +133,11 @@ export default function Colaboradores() {
   }
 
   const filteredCollaborators = collaborators?.filter((collaborator) => {
+    const safeName = (collaborator.name || '').toLowerCase()
+    const safePosition = (collaborator.position || '').toLowerCase()
+    const safeSearch = searchTerm.toLowerCase()
     const matchesSearch =
-      !searchTerm ||
-      collaborator.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      collaborator.position.toLowerCase().includes(searchTerm.toLowerCase())
+      !searchTerm || safeName.includes(safeSearch) || safePosition.includes(safeSearch)
 
     const matchesArea = !filterArea || collaborator.area === filterArea
     const matchesRole = !filterRole || collaborator.role === filterRole
@@ -136,14 +147,35 @@ export default function Colaboradores() {
 
   return (
     <div className="colaboradores-page">
+      {inviteAlert && (
+        <div
+          className={`invite-alert invite-alert-${inviteAlert.type}`}
+          style={{
+            padding: '10px 16px',
+            marginBottom: '12px',
+            borderRadius: '6px',
+            fontWeight: 500,
+            background: inviteAlert.type === 'success' ? '#d1fae5' : '#fee2e2',
+            color: inviteAlert.type === 'success' ? '#065f46' : '#991b1b',
+            border: `1px solid ${inviteAlert.type === 'success' ? '#6ee7b7' : '#fca5a5'}`,
+          }}
+        >
+          {inviteAlert.message}
+        </div>
+      )}
       <div className="page-header">
         <div>
           <h1>Colaboradores</h1>
           <p className="subtitle">Gestiona los colaboradores del sistema</p>
         </div>
-        <button className="btn-primary" onClick={handleCreate}>
-          + Agregar Colaborador
-        </button>
+        <div className="header-actions">
+          <a className="btn-secondary" href="/configuracion" target="_blank" rel="noreferrer">
+            Gestionar Áreas
+          </a>
+          <button className="btn-primary" onClick={handleCreate}>
+            + Agregar Colaborador
+          </button>
+        </div>
       </div>
 
       <div className="filters-section">
@@ -291,6 +323,16 @@ export default function Colaboradores() {
                         >
                           Eliminar
                         </button>
+                        {collaborator.email && (
+                          <button
+                            className="btn-icon"
+                            title="Reenviar invitación"
+                            onClick={() => handleResendInvite(collaborator.id)}
+                            disabled={resendingId === collaborator.id}
+                          >
+                            {resendingId === collaborator.id ? 'Enviando...' : 'Reenviar invitación'}
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -326,33 +368,7 @@ export default function Colaboradores() {
         )}
       </div>
 
-      <div className="areas-panel">
-        <div className="areas-header">
-          <h3>Áreas</h3>
-          <button
-            className="btn-primary"
-            onClick={() => {
-              const name = window.prompt('Nombre del área')
-              if (name && name.trim()) {
-                createAreaMutation.mutate(name.trim())
-              }
-            }}
-          >
-            + Nueva área
-          </button>
-        </div>
-        {areaScopes && areaScopes.length > 0 ? (
-          <ul className="areas-list">
-            {areaScopes.map((area) => (
-              <li key={area.id}>
-                <span>{area.name}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="empty-areas">Aún no hay áreas creadas.</p>
-        )}
-      </div>
+      {/* Áreas se gestionan en Configuración → Org Scopes */}
 
       {showForm && (
         <CollaboratorForm

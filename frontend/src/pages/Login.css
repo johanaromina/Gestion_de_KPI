@@ -422,6 +422,64 @@
   text-align: center;
 }
 
+.sso-section {
+  display: grid;
+  gap: 12px;
+}
+
+.sso-divider {
+  position: relative;
+  text-align: center;
+  color: #64748b;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.sso-divider::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 1px solid #e2e8f0;
+  z-index: 0;
+}
+
+.sso-divider span {
+  position: relative;
+  z-index: 1;
+  display: inline-block;
+  background: #fff;
+  padding: 0 12px;
+}
+
+.sso-provider-list {
+  display: grid;
+  gap: 10px;
+}
+
+.login-page .sso-provider-btn {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
+}
+
+.login-page .sso-provider-btn:hover {
+  background: #f8fafc;
+}
+
+.login-shell.compact {
+  width: min(520px, 100%);
+  grid-template-columns: 1fr;
+}
+
+.login-panel.only-panel .login-card {
+  transform: none;
+  min-height: auto;
+}
+
 .reset-modal {
   position: fixed;
   inset: 0;

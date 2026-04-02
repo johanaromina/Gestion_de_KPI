@@ -1,6 +1,7 @@
 import crypto from 'crypto'
+import { appEnv } from '../config/env'
 
-const RAW_KEY = process.env.AUTH_ENCRYPTION_KEY || process.env.JWT_SECRET || ''
+const RAW_KEY = appEnv.authEncryptionKey
 
 const getKey = () => {
   if (!RAW_KEY) {

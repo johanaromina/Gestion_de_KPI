@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useQueryClient } from 'react-query'
 import { useAuth } from '../hooks/useAuth'
 import './Layout.css'
@@ -13,9 +13,12 @@ export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user, canConfig, isCollaborator } = useAuth()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const isActive = (path: string) =>
     path === '/' ? location.pathname === '/' : location.pathname.startsWith(path)
+
+  const handleNavClick = () => setSidebarOpen(false)
 
   const handleLogout = () => {
     localStorage.removeItem('token')
@@ -27,14 +30,18 @@ export default function Layout({ children }: LayoutProps) {
     if (isCollaborator) {
       const blocked = [
         '/colaboradores',
+        '/tablero-ejecutivo',
         '/periodos',
         '/kpis',
         '/asignaciones',
+        '/asignaciones-scope',
+        '/asignaciones-macro',
         '/input-datos',
         '/curaduria',
         '/arbol-objetivos',
         '/parrilla-general',
         '/configuracion',
+        '/mappings-externos',
         '/seguridad',
         '/consolidado',
         '/auditoria',
@@ -52,12 +59,31 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div className="layout">
-      <aside className="sidebar">
+      <button
+        className="sidebar-hamburger"
+        onClick={() => setSidebarOpen(true)}
+        aria-label="Abrir menú"
+      >
+        ☰
+      </button>
+
+      {sidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      <aside className={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
         <div className="sidebar-header">
           <h1>KPI Manager</h1>
+          <button
+            className="sidebar-close"
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Cerrar menú"
+          >
+            ✕
+          </button>
         </div>
         <nav className="sidebar-nav">
-          <Link to="/" className={`nav-item ${isActive('/') ? 'active' : ''}`}>
+          <Link to="/" className={`nav-item ${isActive('/') ? 'active' : ''}`} onClick={handleNavClick}>
             <span className="nav-icon" aria-hidden="true">
               &gt;
             </span>
@@ -65,157 +91,89 @@ export default function Layout({ children }: LayoutProps) {
           </Link>
 
           {!isCollaborator && (
+            <Link
+              to="/tablero-ejecutivo"
+              className={`nav-item ${isActive('/tablero-ejecutivo') ? 'active' : ''}`}
+              onClick={handleNavClick}
+            >
+              <span className="nav-icon" aria-hidden="true">
+                &gt;
+              </span>
+              Tablero Ejecutivo
+            </Link>
+          )}
+
+          {!isCollaborator && (
             <>
-              <Link
-                to="/colaboradores"
-                className={`nav-item ${isActive('/colaboradores') ? 'active' : ''}`}
-              >
-                <span className="nav-icon" aria-hidden="true">
-                  &gt;
-                </span>
+              <Link to="/colaboradores" className={`nav-item ${isActive('/colaboradores') ? 'active' : ''}`} onClick={handleNavClick}>
+                <span className="nav-icon" aria-hidden="true">&gt;</span>
                 Colaboradores
               </Link>
-              <Link
-                to="/periodos"
-                className={`nav-item ${isActive('/periodos') ? 'active' : ''}`}
-              >
-                <span className="nav-icon" aria-hidden="true">
-                  &gt;
-                </span>
+              <Link to="/periodos" className={`nav-item ${isActive('/periodos') ? 'active' : ''}`} onClick={handleNavClick}>
+                <span className="nav-icon" aria-hidden="true">&gt;</span>
                 Periodos
               </Link>
-              <Link to="/kpis" className={`nav-item ${isActive('/kpis') ? 'active' : ''}`}>
-                <span className="nav-icon" aria-hidden="true">
-                  &gt;
-                </span>
+              <Link to="/kpis" className={`nav-item ${isActive('/kpis') ? 'active' : ''}`} onClick={handleNavClick}>
+                <span className="nav-icon" aria-hidden="true">&gt;</span>
                 KPIs
               </Link>
-              <Link
-                to="/asignaciones"
-                className={`nav-item ${isActive('/asignaciones') ? 'active' : ''}`}
-              >
-                <span className="nav-icon" aria-hidden="true">
-                  &gt;
-                </span>
+              <Link to="/asignaciones" className={`nav-item ${isActive('/asignaciones') ? 'active' : ''}`} onClick={handleNavClick}>
+                <span className="nav-icon" aria-hidden="true">&gt;</span>
                 Asignaciones
               </Link>
-              <Link
-                to="/input-datos"
-                className={`nav-item ${isActive('/input-datos') ? 'active' : ''}`}
-              >
-                <span className="nav-icon" aria-hidden="true">
-                  &gt;
-                </span>
+              <Link to="/asignaciones-scope" className={`nav-item ${isActive('/asignaciones-scope') ? 'active' : ''}`} onClick={handleNavClick}>
+                <span className="nav-icon" aria-hidden="true">&gt;</span>
+                KPIs Grupales
+              </Link>
+              <Link to="/input-datos" className={`nav-item ${isActive('/input-datos') ? 'active' : ''}`} onClick={handleNavClick}>
+                <span className="nav-icon" aria-hidden="true">&gt;</span>
                 Input de datos
               </Link>
-              <Link
-                to="/curaduria"
-                className={`nav-item ${isActive('/curaduria') ? 'active' : ''}`}
-              >
-                <span className="nav-icon" aria-hidden="true">
-                  &gt;
-                </span>
+              <Link to="/curaduria" className={`nav-item ${isActive('/curaduria') ? 'active' : ''}`} onClick={handleNavClick}>
+                <span className="nav-icon" aria-hidden="true">&gt;</span>
                 Curaduria
               </Link>
-              <Link
-                to="/arbol-objetivos"
-                className={`nav-item ${isActive('/arbol-objetivos') ? 'active' : ''}`}
-              >
-                <span className="nav-icon" aria-hidden="true">
-                  &gt;
-                </span>
+              <Link to="/arbol-objetivos" className={`nav-item ${isActive('/arbol-objetivos') ? 'active' : ''}`} onClick={handleNavClick}>
+                <span className="nav-icon" aria-hidden="true">&gt;</span>
                 Arbol de Objetivos
               </Link>
             </>
           )}
 
-          <Link to="/mi-parrilla" className={`nav-item ${isActive('/mi-parrilla') ? 'active' : ''}`}>
-            <span className="nav-icon" aria-hidden="true">
-              &gt;
-            </span>
+          <Link to="/mi-parrilla" className={`nav-item ${isActive('/mi-parrilla') ? 'active' : ''}`} onClick={handleNavClick}>
+            <span className="nav-icon" aria-hidden="true">&gt;</span>
             Mi Parrilla
           </Link>
 
           {!isCollaborator && (
             <>
-              <Link
-                to="/historial"
-                className={`nav-item ${isActive('/historial') ? 'active' : ''}`}
-              >
-                <span className="nav-icon" aria-hidden="true">
-                  &gt;
-                </span>
+              <Link to="/historial" className={`nav-item ${isActive('/historial') ? 'active' : ''}`} onClick={handleNavClick}>
+                <span className="nav-icon" aria-hidden="true">&gt;</span>
                 Historico
               </Link>
-              <Link
-                to="/evolutivo"
-                className={`nav-item ${isActive('/evolutivo') ? 'active' : ''}`}
-              >
-                <span className="nav-icon" aria-hidden="true">
-                  &gt;
-                </span>
-                Evolutivo
+              <Link to="/vistas" className={`nav-item ${isActive('/vistas') ? 'active' : ''}`} onClick={handleNavClick}>
+                <span className="nav-icon" aria-hidden="true">&gt;</span>
+                Vistas
               </Link>
-              <Link
-                to="/vistas-agregadas"
-                className={`nav-item ${isActive('/vistas-agregadas') ? 'active' : ''}`}
-              >
-                <span className="nav-icon" aria-hidden="true">
-                  &gt;
-                </span>
-                Vistas Agregadas
-              </Link>
-              <Link
-                to="/vistas-reduccion"
-                className={`nav-item ${isActive('/vistas-reduccion') ? 'active' : ''}`}
-              >
-                <span className="nav-icon" aria-hidden="true">
-                  &gt;
-                </span>
-                Vistas de Reduccion
-              </Link>
-              <Link
-                to="/auditoria"
-                className={`nav-item ${isActive('/auditoria') ? 'active' : ''}`}
-              >
-                <span className="nav-icon" aria-hidden="true">
-                  &gt;
-                </span>
+              <Link to="/auditoria" className={`nav-item ${isActive('/auditoria') ? 'active' : ''}`} onClick={handleNavClick}>
+                <span className="nav-icon" aria-hidden="true">&gt;</span>
                 Auditoria
               </Link>
             </>
           )}
 
-          {user?.hasSuperpowers && !isCollaborator && (
-            <Link
-              to="/parrilla-general"
-              className={`nav-item ${isActive('/parrilla-general') ? 'active' : ''}`}
-            >
-              <span className="nav-icon" aria-hidden="true">
-                &gt;
-              </span>
-              Parrilla General
-            </Link>
-          )}
-
           {canConfig && !isCollaborator && (
             <>
-              <Link
-                to="/configuracion"
-                className={`nav-item ${isActive('/configuracion') ? 'active' : ''}`}
-              >
-                <span className="nav-icon" aria-hidden="true">
-                  &gt;
-                </span>
+              <Link to="/configuracion" className={`nav-item ${isActive('/configuracion') ? 'active' : ''}`} onClick={handleNavClick}>
+                <span className="nav-icon" aria-hidden="true">&gt;</span>
                 Configuracion
               </Link>
-              <Link
-                to="/seguridad"
-                className={`nav-item ${isActive('/seguridad') ? 'active' : ''}`}
-              >
-                <span className="nav-icon" aria-hidden="true">
-                  &gt;
-                </span>
+              <Link to="/mappings-externos" className={`nav-item ${isActive('/mappings-externos') ? 'active' : ''}`} onClick={handleNavClick}>
+                <span className="nav-icon" aria-hidden="true">&gt;</span>
+                Mappings externos
+              </Link>
+              <Link to="/seguridad" className={`nav-item ${isActive('/seguridad') ? 'active' : ''}`} onClick={handleNavClick}>
+                <span className="nav-icon" aria-hidden="true">&gt;</span>
                 Seguridad
               </Link>
             </>

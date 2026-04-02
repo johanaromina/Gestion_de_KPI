@@ -1,0 +1,236 @@
+.onboarding-wizard {
+  background: #fff;
+  border: 2px solid #f97316;
+  border-radius: 14px;
+  margin-bottom: 28px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(249, 115, 22, 0.12);
+}
+
+.onboarding-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  cursor: pointer;
+  background: #fff7ed;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.onboarding-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.onboarding-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #9a3412;
+}
+
+.onboarding-progress-label {
+  font-size: 13px;
+  color: #c2410c;
+  font-weight: 500;
+}
+
+.onboarding-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.onboarding-progress-bar {
+  width: 120px;
+  height: 6px;
+  background: #fed7aa;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.onboarding-progress-fill {
+  height: 100%;
+  background: #f97316;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.onboarding-toggle {
+  font-size: 12px;
+  color: #9a3412;
+}
+
+.onboarding-dismiss {
+  background: none;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.onboarding-dismiss:hover {
+  background: #fff7ed;
+}
+
+.onboarding-steps {
+  padding: 0 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.onboarding-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.onboarding-step:last-child {
+  border-bottom: none;
+}
+
+.onboarding-step-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 2px;
+  background: #f97316;
+  color: #fff;
+}
+
+.onboarding-step.done .onboarding-step-icon {
+  background: #22c55e;
+  color: #fff;
+}
+
+.onboarding-step.blocked .onboarding-step-icon {
+  background: #e5e7eb;
+  color: #9ca3af;
+}
+
+.onboarding-step-body {
+  flex: 1;
+}
+
+.onboarding-step-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 3px;
+}
+
+.onboarding-step.done .onboarding-step-title {
+  color: #6b7280;
+  text-decoration: line-through;
+}
+
+.onboarding-step.blocked .onboarding-step-title {
+  color: #9ca3af;
+}
+
+.onboarding-step-desc {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.onboarding-step.blocked .onboarding-step-desc {
+  color: #d1d5db;
+}
+
+.onboarding-step-blocked {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.onboarding-step-action {
+  background: #f97316;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: center;
+  transition: background 0.15s;
+}
+
+.onboarding-step-action:hover {
+  background: #ea580c;
+}
+
+.onboarding-step-done-label {
+  font-size: 12px;
+  color: #22c55e;
+  font-weight: 600;
+  white-space: nowrap;
+  align-self: center;
+  flex-shrink: 0;
+}
+
+/* Estado: sistema completamente configurado */
+.onboarding-done {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f0fdf4;
+  border: 1px solid #22c55e;
+  border-radius: 12px;
+  padding: 12px 18px;
+  margin-bottom: 24px;
+  font-size: 14px;
+  color: #166534;
+}
+
+.onboarding-done-icon {
+  font-size: 18px;
+  font-weight: 700;
+  color: #22c55e;
+}
+
+.onboarding-done .onboarding-dismiss {
+  margin-left: auto;
+  border-color: #86efac;
+  color: #166534;
+}
+
+@media (max-width: 640px) {
+  .onboarding-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .onboarding-progress-bar {
+    width: 100%;
+  }
+
+  .onboarding-step {
+    flex-wrap: wrap;
+  }
+
+  .onboarding-step-action {
+    width: 100%;
+    text-align: center;
+    margin-top: 8px;
+  }
+}

@@ -8,7 +8,7 @@ type IntegrationSchedule = {
   enabled: number
 }
 
-const tasks = new Map<number, { schedule: string; task: cron.ScheduledTask }>()
+const tasks = new Map<number, { schedule: string; task: { stop: () => void } }>()
 
 const refreshSchedules = async () => {
   let rows: IntegrationSchedule[] = []

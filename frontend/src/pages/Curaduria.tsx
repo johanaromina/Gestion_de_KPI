@@ -21,6 +21,7 @@ type CurationItem = {
   assignmentSourceConfig?: string
   kpiCriteria?: string
   comment?: string
+  status?: 'pending' | 'in_review' | 'approved' | 'rejected'
   createdAt?: string
   createdByName?: string
 }
@@ -38,6 +39,8 @@ export default function Curaduria() {
   const [criteriaText, setCriteriaText] = useState('')
   const [criteriaEvidenceUrl, setCriteriaEvidenceUrl] = useState('')
   const [criteriaError, setCriteriaError] = useState('')
+  const [reviewModal, setReviewModal] = useState<{ item: CurationItem; action: 'reject' | 'request' } | null>(null)
+  const [reviewComment, setReviewComment] = useState('')
   const [searchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const assignmentId = searchParams.get('assignmentId')
@@ -160,22 +163,25 @@ export default function Curaduria() {
     item: CurationItem,
     action: 'approve' | 'reject' | 'request'
   ) => {
-    const comment =
-      action === 'reject'
-        ? window.prompt('Comentario obligatorio para rechazo:')
-        : action === 'request'
-        ? window.prompt('Comentario para ajustes:')
-        : undefined
-
-    if (action === 'reject' && !comment) return
-
+    if (action === 'reject' || action === 'request') {
+      setReviewComment('')
+      setReviewModal({ item, action })
+      return
+    }
     const criteriaId = await ensureCriteriaId(item)
     if (!criteriaId) return
-    await reviewMutation.mutateAsync({ id: criteriaId, action, comment: comment || undefined })
+    await reviewMutation.mutateAsync({ id: criteriaId, action, comment: undefined })
   }
 
-  const handleReject = (item: CurationItem) => {
-    handleReview(item, 'reject')
+  const handleReviewConfirm = async () => {
+    if (!reviewModal) return
+    const { item, action } = reviewModal
+    if (action === 'reject' && !reviewComment.trim()) return
+    const criteriaId = await ensureCriteriaId(item)
+    if (!criteriaId) return
+    await reviewMutation.mutateAsync({ id: criteriaId, action, comment: reviewComment.trim() || undefined })
+    setReviewModal(null)
+    setReviewComment('')
   }
 
   const filteredItems = useMemo(() => items || [], [items])
@@ -261,7 +267,7 @@ export default function Curaduria() {
       item.periodName,
       formatSource(item),
       item.criteriaText || '',
-      item.status,
+      resolveStatus(item),
       item.comment || '',
       formatMeta(item),
     ])
@@ -303,7 +309,7 @@ export default function Curaduria() {
         item.periodName,
         formatSource(item),
         item.criteriaText || '',
-        item.status,
+        resolveStatus(item),
         item.comment || '',
         formatMeta(item),
       ]),
@@ -357,7 +363,7 @@ export default function Curaduria() {
       <div className="page-header">
         <div>
           <h1>Curaduria</h1>
-          <p className="subtitle">Inbox para aprobar fuentes, criterios y datos.</p>
+          <p className="subtitle">Validá de dónde viene cada dato y cómo se calcula. Un KPI solo aparece en los dashboards cuando su criterio está aprobado.</p>
         </div>
         <div className="header-actions">
           <button className="btn-secondary" onClick={exportCsv}>Exportar CSV</button>
@@ -598,18 +604,20 @@ export default function Curaduria() {
                       setCriteriaDataSource(e.target.value)
                       setCriteriaError('')
                     }}
-                    placeholder="Jira, DB, Manual, etc."
+                    placeholder="Jira, Google Sheet, DB, Manual, API..."
                   />
+                  <small className="form-hint">De dónde proviene el dato: sistema, herramienta o proceso que lo genera.</small>
                 </div>
                 <div className="form-group">
-                  <label htmlFor="criteria-config">Query / Endpoint</label>
+                  <label htmlFor="criteria-config">Query / Endpoint (opcional)</label>
                   <input
                     id="criteria-config"
                     type="text"
                     value={criteriaSourceConfig}
                     onChange={(e) => setCriteriaSourceConfig(e.target.value)}
-                    placeholder="JQL / SQL / URL"
+                    placeholder="JQL, SQL, URL o nombre de pestaña"
                   />
+                  <small className="form-hint">Consulta o referencia exacta para obtener el dato (ej: filtro de Jira, nombre de hoja).</small>
                 </div>
               </div>
               <div className="form-group">
@@ -622,8 +630,9 @@ export default function Curaduria() {
                     setCriteriaError('')
                   }}
                   rows={4}
-                  placeholder="Describe el criterio de cálculo"
+                  placeholder="Ej: Suma de tickets cerrados con prioridad Alta en el período, excluyendo los cancelados."
                 />
+                <small className="form-hint">Explicá cómo se calcula el valor del KPI. Este texto queda registrado para auditoría y debe ser suficientemente claro para que otra persona pueda replicarlo.</small>
               </div>
               <div className="form-group">
                 <label htmlFor="criteria-evidence">Evidencia (opcional)</label>
@@ -652,6 +661,71 @@ export default function Curaduria() {
                 }
               >
                 {createCriteria.isLoading ? 'Enviando...' : 'Enviar a curaduría'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reviewModal && (
+        <div className="modal-overlay" onClick={() => setReviewModal(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>
+                {reviewModal.action === 'reject' ? 'Rechazar criterio' : 'Pedir cambios'}
+              </h2>
+              <button className="close-button" onClick={() => setReviewModal(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="review-modal-context">
+                <span className="review-modal-kpi">{reviewModal.item.kpiName}</span>
+                <span className="review-modal-sep">·</span>
+                <span>{reviewModal.item.collaboratorName}</span>
+                <span className="review-modal-sep">·</span>
+                <span>{reviewModal.item.periodName}</span>
+              </div>
+              <div className="form-group" style={{ marginTop: 12 }}>
+                <label htmlFor="review-comment">
+                  {reviewModal.action === 'reject'
+                    ? 'Motivo del rechazo (obligatorio)'
+                    : 'Comentario para el ajuste (opcional)'}
+                </label>
+                <textarea
+                  id="review-comment"
+                  rows={3}
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  placeholder={
+                    reviewModal.action === 'reject'
+                      ? 'Ej: La fuente indicada no corresponde al sistema acordado.'
+                      : 'Ej: Falta especificar el rango de fechas del cálculo.'
+                  }
+                  autoFocus
+                />
+                {reviewModal.action === 'reject' && !reviewComment.trim() && (
+                  <small className="form-hint" style={{ color: '#b91c1c' }}>
+                    Requerido: explicá el motivo para que el responsable pueda corregirlo.
+                  </small>
+                )}
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="btn-secondary" onClick={() => setReviewModal(null)}>
+                Cancelar
+              </button>
+              <button
+                className={reviewModal.action === 'reject' ? 'btn-reject-small' : 'btn-secondary'}
+                onClick={handleReviewConfirm}
+                disabled={
+                  (reviewModal.action === 'reject' && !reviewComment.trim()) ||
+                  reviewMutation.isLoading
+                }
+              >
+                {reviewMutation.isLoading
+                  ? 'Enviando...'
+                  : reviewModal.action === 'reject'
+                  ? 'Confirmar rechazo'
+                  : 'Enviar solicitud de cambios'}
               </button>
             </div>
           </div>

@@ -44,10 +44,10 @@ router.delete('/runs/:id', requirePermission('config.manage'), deleteRun)
 router.post('/runs/archive', requirePermission('config.manage'), archiveRuns)
 router.post('/runs/delete', requirePermission('config.manage'), deleteRuns)
 router.post('/templates/test', requirePermission('config.manage'), testTemplate)
-router.get('/cron/next', requirePermission('config.manage'), getNextCronRun)
+router.get('/cron/next', requirePermission('config.view', 'config.manage', 'measurement_read'), getNextCronRun)
 
 // Targets
-router.get('/targets', requirePermission('config.view', 'config.manage'), listTargets)
+router.get('/targets', requirePermission('config.view', 'config.manage', 'measurement_read'), listTargets)
 router.post('/targets', requirePermission('config.manage'), createTarget)
 router.put('/targets/:id', requirePermission('config.manage'), updateTarget)
 router.post('/targets/:id/run', requirePermission('measurement_run_ingest', 'config.manage'), runTarget)

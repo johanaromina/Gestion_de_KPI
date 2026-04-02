@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from 'react-query'
 import api from '../services/api'
+import { useAuth } from '../hooks/useAuth'
 import {
   LineChart,
   Line,
@@ -74,6 +75,9 @@ export default function VistasReduccion() {
   const [selectedArea, setSelectedArea] = useState<string>('')
   const [selectedKPI, setSelectedKPI] = useState<number | null>(null)
   const [viewMode, setViewMode] = useState<'overview' | 'evolution'>('overview')
+  const { user } = useAuth()
+  const canViewCompany = Boolean(user?.hasSuperpowers)
+  const teamArea = user?.area || ''
 
   // Obtener períodos
   const { data: periods } = useQuery('periods', async () => {
@@ -90,6 +94,12 @@ export default function VistasReduccion() {
   const areas = Array.from(
     new Set(collaborators?.map((c: any) => c.area).filter(Boolean) || [])
   ) as string[]
+
+  useEffect(() => {
+    if (!canViewCompany && teamArea) {
+      setSelectedArea(teamArea)
+    }
+  }, [canViewCompany, teamArea])
 
   // Obtener KPIs de reducción
   const { data: reductionKPIs, isLoading: isLoadingKPIs } = useQuery<
@@ -197,9 +207,10 @@ export default function VistasReduccion() {
             id="area-filter"
             value={selectedArea}
             onChange={(e) => setSelectedArea(e.target.value)}
+            disabled={!canViewCompany && !!teamArea}
           >
-            <option value="">Todas las áreas</option>
-            {areas.map((area) => (
+            {!(!canViewCompany && teamArea) && <option value="">Todas las áreas</option>}
+            {(canViewCompany ? areas : teamArea ? [teamArea] : areas).map((area) => (
               <option key={area} value={area}>
                 {area}
               </option>

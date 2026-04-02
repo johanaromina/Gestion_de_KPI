@@ -15,6 +15,7 @@ const dbConfig = {
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
 }
+const targetDatabase = process.env.DB_NAME || 'gestion_kpi'
 
 async function setupDatabase() {
   let connection: mysql.Connection | null = null
@@ -55,13 +56,21 @@ async function setupDatabase() {
     // Leer y ejecutar script de creación
     const createScriptPath = join(__dirname, 'create_database.sql')
     const createScript = readFileSync(createScriptPath, 'utf-8')
+      .replace(
+        /CREATE DATABASE IF NOT EXISTS gestion_kpi CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;/,
+        `CREATE DATABASE IF NOT EXISTS \`${targetDatabase}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
+      )
+      .replace(
+        /USE gestion_kpi;/,
+        `USE \`${targetDatabase}\`;`
+      )
 
     console.log('📝 Ejecutando script de creación de base de datos...')
     await connection.query(createScript)
     console.log('✅ Base de datos y tablas creadas exitosamente')
 
     console.log('\n🎉 ¡Base de datos configurada correctamente!')
-    console.log('💡 Nota: Los datos deben ser insertados manualmente a través de la aplicación.')
+    console.log('💡 Si queres datos demo, ejecuta luego: npx tsx scripts/seed-demo-examples.ts')
   } catch (error: any) {
     console.error('❌ Error al configurar la base de datos:', error.message)
     if (error.code === 'ER_ACCESS_DENIED_ERROR') {

@@ -4,6 +4,7 @@ import { pool } from '../config/database'
 import { AuthRequest } from '../middleware/auth.middleware'
 import { runTemplateQueued } from '../utils/integrations-runner'
 import { decryptSecret, encryptSecret } from '../utils/crypto'
+import { resolveConnectorAdapter } from '../integrations/adapters'
 
 type IntegrationRow = {
   id: number
@@ -39,22 +40,13 @@ type TemplateRow = {
   name: string
   connector: string
   metricType?: 'count' | 'ratio' | null
+  metricTypeUi?: string | null
   queryTestsTemplate?: string | null
   queryStoriesTemplate?: string | null
   formulaTemplate?: string | null
   schedule?: string | null
   authProfileId?: number | null
   isSpecific?: number | null
-  enabled?: number | null
-}
-
-type TargetRow = {
-  id: number
-  templateId: number
-  scopeType: string
-  scopeId: string
-  params?: string | null
-  assignmentId?: number | null
   enabled?: number | null
 }
 
@@ -164,6 +156,49 @@ const computeIsSpecific = (metricType: 'count' | 'ratio', testsTemplate?: string
   return testsPlaceholders.length === 0 && storiesPlaceholders.length === 0
 }
 
+const normalizePlaceholder = (value: string) => value.replace(/[{}]/g, '')
+
+const hasConfiguredValue = (value: any) => {
+  if (Array.isArray(value)) return value.length > 0
+  if (typeof value === 'string') return value.trim().length > 0
+  return value !== undefined && value !== null
+}
+
+const validateTargetTemplateParams = async (templateId: number, rawParams: any) => {
+  const [templateRows] = await pool.query<any[]>(
+    `SELECT id, connector, metricType, metricTypeUi, queryTestsTemplate, queryStoriesTemplate
+     FROM integration_templates
+     WHERE id = ?
+     LIMIT 1`,
+    [templateId]
+  )
+  if (!Array.isArray(templateRows) || templateRows.length === 0) {
+    throw new Error('Plantilla no encontrada')
+  }
+
+  const template = templateRows[0] as TemplateRow
+  const placeholders = [
+    ...getPlaceholders(template.queryTestsTemplate),
+    ...getPlaceholders(template.queryStoriesTemplate),
+  ]
+  const requiredKeys = Array.from(new Set(placeholders.map(normalizePlaceholder))).filter(
+    (key) => !['from', 'to'].includes(key)
+  )
+
+  const requiresStructuredParams =
+    ['jira', 'xray', 'sheets', 'generic_api', 'looker'].includes(String(template.connector || '')) &&
+    requiredKeys.length > 0
+
+  if (!requiresStructuredParams) return
+
+  const params = rawParams && typeof rawParams === 'object' ? rawParams : {}
+  const missingKeys = requiredKeys.filter((key) => !hasConfiguredValue(params[key]))
+
+  if (missingKeys.length > 0) {
+    throw new Error(`Faltan params requeridos para la plantilla: ${missingKeys.join(', ')}`)
+  }
+}
+
 const resolvePeriodParams = (params: Record<string, any>) => {
   const period = params.period || 'previous_month'
   const now = new Date()
@@ -238,10 +273,11 @@ const loadScopeChain = async (scopeId: number) => {
   const chain: any[] = []
   let currentId: number | null = scopeId
   while (currentId) {
-    const [rows] = await pool.query<any[]>(
+    const result = await pool.query<any[]>(
       `SELECT id, name, type, parentId, metadata FROM org_scopes WHERE id = ?`,
       [currentId]
     )
+    const rows = result[0] as any[]
     if (!Array.isArray(rows) || rows.length === 0) break
     const scope = rows[0]
     chain.push({
@@ -441,17 +477,30 @@ export const updateTemplate = async (req: Request, res: Response) => {
 
 export const listTargets = async (req: Request, res: Response) => {
   try {
-    const { templateId } = req.query
+    const { templateId, assignmentId } = req.query
+    const scopeKpiId = req.query.scopeKpiId || req.query.macroKpiId
     const params: any[] = []
     let query = `SELECT t.*, ck.collaboratorId, ck.kpiId, ck.periodId,
-                        os.name as orgScopeName, os.type as orgScopeType
+                        sk.name as scopeKpiName, sk.orgScopeId as scopeOrgScopeId, sk.periodId as scopePeriodId,
+                        os.name as orgScopeName, os.type as orgScopeType,
+                        tpl.name as templateName, tpl.schedule as templateSchedule
                  FROM integration_targets t
-                 LEFT JOIN collaborator_kpis ck ON ck.id = t.assignmentId
-                 LEFT JOIN org_scopes os ON os.id = t.orgScopeId
-                 WHERE 1=1`
+                  LEFT JOIN integration_templates tpl ON tpl.id = t.templateId
+                  LEFT JOIN collaborator_kpis ck ON ck.id = t.assignmentId
+                  LEFT JOIN scope_kpis sk ON sk.id = t.scopeKpiId
+                  LEFT JOIN org_scopes os ON os.id = t.orgScopeId
+                  WHERE 1=1`
     if (templateId) {
       query += ' AND t.templateId = ?'
       params.push(templateId)
+    }
+    if (assignmentId) {
+      query += ' AND t.assignmentId = ?'
+      params.push(assignmentId)
+    }
+    if (scopeKpiId) {
+      query += ' AND t.scopeKpiId = ?'
+      params.push(scopeKpiId)
     }
     query += ' ORDER BY t.createdAt DESC'
     const [rows] = await pool.query(query, params)
@@ -470,9 +519,13 @@ export const listTargets = async (req: Request, res: Response) => {
 
 export const createTarget = async (req: Request, res: Response) => {
   try {
-    const { templateId, scopeType, scopeId, orgScopeId, params, assignmentId, enabled } = req.body
+    const { templateId, scopeType, scopeId, orgScopeId, params, assignmentId, scopeKpiId, macroKpiId, enabled } = req.body
+    const resolvedScopeKpiId = scopeKpiId || macroKpiId || null
     if (!templateId || (!scopeId && !orgScopeId)) {
       return res.status(400).json({ error: 'templateId y scopeId/orgScopeId son requeridos' })
+    }
+    if (assignmentId && resolvedScopeKpiId) {
+      return res.status(400).json({ error: 'Un target solo puede apuntar a assignmentId o scopeKpiId' })
     }
     const usersCount = getUsersCount(params)
     if (assignmentId && usersCount > 1) {
@@ -480,10 +533,11 @@ export const createTarget = async (req: Request, res: Response) => {
         error: 'Target con multiples users no puede asignarse a un KPI individual. Usa un target por persona o quita la asignacion.',
       })
     }
+    await validateTargetTemplateParams(Number(templateId), params)
     const [result] = await pool.query(
       `INSERT INTO integration_targets
-       (templateId, scopeType, scopeId, orgScopeId, params, assignmentId, enabled)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       (templateId, scopeType, scopeId, orgScopeId, params, assignmentId, scopeKpiId, enabled)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         templateId,
         scopeType || 'area',
@@ -491,6 +545,7 @@ export const createTarget = async (req: Request, res: Response) => {
         orgScopeId || null,
         params ? JSON.stringify(params) : null,
         assignmentId || null,
+        resolvedScopeKpiId,
         enabled ? 1 : 0,
       ]
     )
@@ -498,24 +553,29 @@ export const createTarget = async (req: Request, res: Response) => {
     res.status(201).json({ id: insertResult.insertId })
   } catch (error: any) {
     console.error('Error creating target:', error)
-    res.status(500).json({ error: 'Error al crear target' })
+    res.status(400).json({ error: error?.message || 'Error al crear target' })
   }
 }
 
 export const updateTarget = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const { templateId, scopeType, scopeId, orgScopeId, params, assignmentId, enabled } = req.body
+    const { templateId, scopeType, scopeId, orgScopeId, params, assignmentId, scopeKpiId, macroKpiId, enabled } = req.body
+    const resolvedScopeKpiId = scopeKpiId || macroKpiId || null
+    if (assignmentId && resolvedScopeKpiId) {
+      return res.status(400).json({ error: 'Un target solo puede apuntar a assignmentId o scopeKpiId' })
+    }
     const usersCount = getUsersCount(params)
     if (assignmentId && usersCount > 1) {
       return res.status(400).json({
         error: 'Target con multiples users no puede asignarse a un KPI individual. Usa un target por persona o quita la asignacion.',
       })
     }
+    await validateTargetTemplateParams(Number(templateId), params)
     await pool.query(
       `UPDATE integration_targets
-       SET templateId = ?, scopeType = ?, scopeId = ?, orgScopeId = ?, params = ?, assignmentId = ?, enabled = ?
-       WHERE id = ?`,
+       SET templateId = ?, scopeType = ?, scopeId = ?, orgScopeId = ?, params = ?, assignmentId = ?, scopeKpiId = ?, enabled = ?
+        WHERE id = ?`,
       [
         templateId,
         scopeType || 'area',
@@ -523,6 +583,7 @@ export const updateTarget = async (req: Request, res: Response) => {
         orgScopeId || null,
         params ? JSON.stringify(params) : null,
         assignmentId || null,
+        resolvedScopeKpiId,
         enabled ? 1 : 0,
         id,
       ]
@@ -530,7 +591,7 @@ export const updateTarget = async (req: Request, res: Response) => {
     res.json({ message: 'Target actualizado' })
   } catch (error: any) {
     console.error('Error updating target:', error)
-    res.status(500).json({ error: 'Error al actualizar target' })
+    res.status(400).json({ error: error?.message || 'Error al actualizar target' })
   }
 }
 
@@ -686,6 +747,7 @@ export const runTarget = async (req: Request, res: Response) => {
 export const testTemplate = async (req: Request, res: Response) => {
   try {
     const {
+      connector,
       endpoint,
       authType,
       authConfig,
@@ -706,6 +768,8 @@ export const testTemplate = async (req: Request, res: Response) => {
     let resolvedStoriesTemplate = queryStoriesTemplate
     let resolvedFormula = formulaTemplate
     let resolvedMetricType: 'count' | 'ratio' = metricType === 'count' ? 'count' : 'ratio'
+    let resolvedMetricTypeUi = metricType || null
+    let resolvedConnector = connector || 'jira'
 
     if (templateId) {
       const [templateRows] = await pool.query<any[]>(`SELECT * FROM integration_templates WHERE id = ?`, [templateId])
@@ -713,7 +777,9 @@ export const testTemplate = async (req: Request, res: Response) => {
         return res.status(404).json({ error: 'Plantilla no encontrada' })
       }
       const template = templateRows[0]
+      resolvedConnector = template.connector || resolvedConnector
       resolvedMetricType = template.metricType === 'count' ? 'count' : 'ratio'
+      resolvedMetricTypeUi = template.metricTypeUi || resolvedMetricTypeUi
       resolvedTestsTemplate = template.queryTestsTemplate
       resolvedStoriesTemplate = template.queryStoriesTemplate
       resolvedFormula = template.formulaTemplate
@@ -728,7 +794,8 @@ export const testTemplate = async (req: Request, res: Response) => {
       }
     }
 
-    if (!resolvedEndpoint || !resolvedTestsTemplate) {
+    const requiresEndpoint = resolvedConnector !== 'sheets'
+    if ((requiresEndpoint && !resolvedEndpoint) || !resolvedTestsTemplate) {
       return res.status(400).json({ error: 'endpoint y queryTestsTemplate son requeridos' })
     }
     if (resolvedMetricType === 'ratio' && !resolvedStoriesTemplate) {
@@ -769,6 +836,49 @@ export const testTemplate = async (req: Request, res: Response) => {
 
     const { from, to } = resolvePeriodParams(baseParams)
     const renderParams = { ...baseParams, from, to }
+
+    if (resolvedConnector === 'generic_api' || resolvedConnector === 'sheets' || resolvedConnector === 'looker') {
+      const adapter = resolveConnectorAdapter(resolvedConnector)
+      const result = await adapter.run({
+        template: {
+          id: Number(templateId || 0),
+          name: 'preview',
+          connector: resolvedConnector,
+          metricType: resolvedMetricType,
+          metricTypeUi: resolvedMetricTypeUi,
+          queryTestsTemplate: resolvedTestsTemplate,
+          queryStoriesTemplate: resolvedStoriesTemplate,
+          formulaTemplate: resolvedFormula,
+          authProfileId: null,
+        },
+        target: {
+          id: Number(targetId || 0),
+          templateId: Number(templateId || 0),
+          scopeType: 'preview',
+          scopeId: 'preview',
+        },
+        authProfile: {
+          id: 0,
+          name: 'preview',
+          connector: resolvedConnector,
+          endpoint: resolvedEndpoint,
+          authType: resolvedAuthType,
+          authConfig: null,
+        },
+        authConfig: resolvedAuthConfig || {},
+        params: renderParams,
+      })
+
+      return res.json({
+        connector: resolvedConnector,
+        computed: result.computed,
+        from,
+        to,
+        warnings: [],
+        ...result.outputs,
+      })
+    }
+
     const testsJql = renderTemplate(resolvedTestsTemplate, renderParams)
     const storiesJql = resolvedMetricType === 'ratio' && resolvedStoriesTemplate
       ? renderTemplate(resolvedStoriesTemplate, renderParams)
@@ -782,7 +892,6 @@ export const testTemplate = async (req: Request, res: Response) => {
     }
 
     const testsTotal = await jiraSearch(resolvedEndpoint, resolvedAuthType, resolvedAuthConfig || {}, testsJql)
-    let storiesJson: any = null
     let storiesTotal = 0
     if (resolvedMetricType === 'ratio' && storiesJql) {
       storiesTotal = await jiraSearch(resolvedEndpoint, resolvedAuthType, resolvedAuthConfig || {}, storiesJql)

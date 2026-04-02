@@ -5,6 +5,8 @@ import crypto from 'crypto'
 const NOTIFY_WINDOW_DAYS = parseInt(process.env.NOTIFY_WINDOW_DAYS || '7')
 const NOTIFY_ENABLED = (process.env.NOTIFY_ENABLED || 'true').toLowerCase() === 'true'
 const NOTIFY_COOLDOWN_MIN = parseInt(process.env.NOTIFY_COOLDOWN_MIN || '180')
+const NOTIFY_DIGEST_MIN = parseInt(process.env.NOTIFY_DIGEST_MIN || '1440')
+const NOTIFY_GLOBAL_COOLDOWN_MIN = parseInt(process.env.NOTIFY_GLOBAL_COOLDOWN_MIN || '720')
 
 interface NotificationSummary {
   missingActual: { collaboratorId: number; collaboratorName: string; count: number }[]
@@ -109,7 +111,7 @@ async function getRecipients() {
        )`
   )
 
-  return (rows || []).filter((r) => r.email)
+  return (rows || []).filter((r: any) => r.email)
 }
 
 async function upsertState(type: string, entityKey: string, stateHash: string, notified: boolean) {
@@ -144,7 +146,7 @@ async function deleteMissingStates(type: string, activeKeys: Set<string>) {
     `SELECT entityKey FROM notification_states WHERE type = ?`,
     [type]
   )
-  const stale = (rows || []).filter((r) => !activeKeys.has(r.entityKey))
+  const stale = (rows || []).filter((r: any) => !activeKeys.has(r.entityKey))
   for (const row of stale) {
     await pool.query('DELETE FROM notification_states WHERE type = ? AND entityKey = ?', [
       type,
@@ -153,8 +155,24 @@ async function deleteMissingStates(type: string, activeKeys: Set<string>) {
   }
 }
 
+async function ensureNotificationStatesTable() {
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS notification_states (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      type VARCHAR(50) NOT NULL,
+      entityKey VARCHAR(120) NOT NULL,
+      stateHash VARCHAR(64) NOT NULL,
+      lastNotifiedAt DATETIME NULL,
+      updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_notification_state (type, entityKey)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`
+  )
+}
+
 export async function runNotifications() {
   if (!NOTIFY_ENABLED) return
+
+  await ensureNotificationStatesTable()
 
   const summary = await buildNotificationSummary()
   const recipients = await getRecipients()
@@ -226,6 +244,32 @@ export async function runNotifications() {
     return
   }
 
+  const globalState = await getStateMap('global')
+  const globalKey = 'global'
+  const globalPrev = globalState.get(globalKey)
+  const globalCooldownMs = NOTIFY_GLOBAL_COOLDOWN_MIN * 60 * 1000
+  const globalTooSoon =
+    globalPrev?.lastNotifiedAt
+      ? now - globalPrev.lastNotifiedAt.getTime() < globalCooldownMs
+      : false
+  if (globalTooSoon) {
+    await upsertState('global', globalKey, hashValue(newEvents.join('|')), false)
+    return
+  }
+
+  const digestState = await getStateMap('digest')
+  const digestKey = 'global'
+  const digestPrev = digestState.get(digestKey)
+  const digestCooldownMs = NOTIFY_DIGEST_MIN * 60 * 1000
+  const digestTooSoon =
+    digestPrev?.lastNotifiedAt
+      ? now - digestPrev.lastNotifiedAt.getTime() < digestCooldownMs
+      : false
+  if (digestTooSoon) {
+    await upsertState('digest', digestKey, hashValue(newEvents.join('|')), false)
+    return
+  }
+
   const html = `
     <h2>Alertas nuevas detectadas</h2>
     <ul>
@@ -242,4 +286,7 @@ export async function runNotifications() {
       text: newEvents.join('\n'),
     })
   }
+
+  await upsertState('digest', digestKey, hashValue(newEvents.join('|')), true)
+  await upsertState('global', globalKey, hashValue(newEvents.join('|')), true)
 }

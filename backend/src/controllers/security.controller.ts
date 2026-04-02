@@ -37,7 +37,7 @@ const fetchRolePermissions = async (roleIds: number[]) => {
     roleIds
   )
   const map = new Map<number, string[]>()
-  rows?.forEach((row) => {
+  rows?.forEach((row: any) => {
     if (!map.has(row.roleId)) map.set(row.roleId, [])
     map.get(row.roleId)!.push(row.code)
   })
@@ -54,7 +54,7 @@ export const listRoles = async (req: Request, res: Response) => {
        GROUP BY r.id
        ORDER BY r.name ASC`
     )
-    const roleIds = Array.isArray(roles) ? roles.map((r) => r.id) : []
+    const roleIds = Array.isArray(roles) ? roles.map((r: any) => r.id) : []
     const permsByRole = await fetchRolePermissions(roleIds)
     res.json(
       (roles || []).map((role) => ({
@@ -95,7 +95,7 @@ export const createRole = async (req: Request, res: Response) => {
         `SELECT id FROM permissions WHERE code IN (${permissions.map(() => '?').join(',')})`,
         permissions
       )
-      const values = (permRows || []).map((p) => [roleId, p.id])
+      const values = (permRows || []).map((p: any) => [roleId, p.id])
       if (values.length > 0) {
         await pool.query('INSERT INTO role_permissions (roleId, permissionId) VALUES ?', [values])
       }
@@ -152,7 +152,7 @@ export const updateRole = async (req: Request, res: Response) => {
         `SELECT id FROM permissions WHERE code IN (${permissions.map(() => '?').join(',')})`,
         permissions
       )
-      const values = (permRows || []).map((p) => [roleId, p.id])
+      const values = (permRows || []).map((p: any) => [roleId, p.id])
       if (values.length > 0) {
         await pool.query('INSERT INTO role_permissions (roleId, permissionId) VALUES ?', [values])
       }
@@ -165,7 +165,7 @@ export const updateRole = async (req: Request, res: Response) => {
       {
         name: rows[0].name,
         description: rows[0].description,
-        permissions: (beforePerms || []).map((p) => p.code),
+        permissions: (beforePerms || []).map((p: any) => p.code),
       },
       {
         name: name || null,
@@ -399,7 +399,7 @@ export const listUserOverrides = async (req: Request, res: Response) => {
        WHERE cp.collaboratorId = ?`,
       [collaboratorId]
     )
-    res.json({ collaboratorId: Number(collaboratorId), permissions: rows?.map((r) => r.code) || [] })
+    res.json({ collaboratorId: Number(collaboratorId), permissions: rows?.map((r: any) => r.code) || [] })
   } catch (error) {
     console.error('Error listing user overrides:', error)
     res.status(500).json({ error: 'Error al obtener permisos del usuario' })
@@ -426,7 +426,7 @@ export const updateUserOverrides = async (req: Request, res: Response) => {
       permissions
     )
     await pool.query('DELETE FROM collaborator_permissions WHERE collaboratorId = ?', [collaboratorId])
-    const values = (permRows || []).map((p) => [collaboratorId, p.id])
+    const values = (permRows || []).map((p: any) => [collaboratorId, p.id])
     if (values.length > 0) {
       await pool.query('INSERT INTO collaborator_permissions (collaboratorId, permissionId) VALUES ?', [values])
     }
@@ -434,7 +434,7 @@ export const updateUserOverrides = async (req: Request, res: Response) => {
       'collaborator_permissions',
       Number(collaboratorId),
       'UPDATE',
-      { permissions: (beforeRows || []).map((p) => p.code) },
+      { permissions: (beforeRows || []).map((p: any) => p.code) },
       { permissions },
       getAuditMeta(req)
     )
@@ -461,7 +461,7 @@ export const resetUserOverrides = async (req: Request, res: Response) => {
       'collaborator_permissions',
       Number(collaboratorId),
       'UPDATE',
-      { permissions: (beforeRows || []).map((p) => p.code) },
+      { permissions: (beforeRows || []).map((p: any) => p.code) },
       { permissions: [] },
       getAuditMeta(req)
     )

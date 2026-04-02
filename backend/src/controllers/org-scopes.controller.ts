@@ -100,3 +100,58 @@ export const updateOrgScope = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Error al actualizar scope' })
   }
 }
+
+export const deleteOrgScope = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+
+    const [childRows] = await pool.query<any[]>(
+      'SELECT COUNT(*) as count FROM org_scopes WHERE parentId = ?',
+      [id]
+    )
+    if (Number(childRows?.[0]?.count || 0) > 0) {
+      return res.status(400).json({
+        error: 'No se puede eliminar: el scope tiene hijos. Mueve o elimina los hijos primero.',
+      })
+    }
+
+    const [collabRows] = await pool.query<any[]>(
+      'SELECT COUNT(*) as count FROM collaborators WHERE orgScopeId = ?',
+      [id]
+    )
+    if (Number(collabRows?.[0]?.count || 0) > 0) {
+      return res.status(400).json({
+        error: 'No se puede eliminar: hay colaboradores asignados a este scope.',
+      })
+    }
+
+    const [assignRows] = await pool.query<any[]>(
+      `SELECT COUNT(*) as count
+       FROM collaborator_kpis ck
+       JOIN collaborators c ON c.id = ck.collaboratorId
+       WHERE c.orgScopeId = ?`,
+      [id]
+    )
+    if (Number(assignRows?.[0]?.count || 0) > 0) {
+      return res.status(400).json({
+        error: 'No se puede eliminar: hay asignaciones activas vinculadas a este scope.',
+      })
+    }
+
+    const [targetRows] = await pool.query<any[]>(
+      'SELECT COUNT(*) as count FROM integration_targets WHERE orgScopeId = ?',
+      [id]
+    )
+    if (Number(targetRows?.[0]?.count || 0) > 0) {
+      return res.status(400).json({
+        error: 'No se puede eliminar: hay integraciones/targets asociados a este scope.',
+      })
+    }
+
+    await pool.query('DELETE FROM org_scopes WHERE id = ?', [id])
+    res.json({ message: 'Scope eliminado' })
+  } catch (error: any) {
+    console.error('Error deleting org scope:', error)
+    res.status(500).json({ error: 'Error al eliminar scope' })
+  }
+}

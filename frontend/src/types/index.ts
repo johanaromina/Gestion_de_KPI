@@ -27,11 +27,24 @@ export interface Area {
 export interface OrgScope {
   id: number
   name: string
-  type: 'company' | 'area' | 'team' | 'person'
+  type: 'company' | 'area' | 'team' | 'person' | 'business_unit' | 'product'
   parentId?: number | null
   calendarProfileId?: number | null
   active?: boolean
   metadata?: any
+}
+
+export interface DataSourceMapping {
+  id: number
+  sourceType: string
+  entityType: 'collaborator' | 'org_scope'
+  entityId: number
+  externalKey: string
+  normalizedKey?: string
+  externalLabel?: string | null
+  metadata?: any
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface Period {
@@ -102,7 +115,67 @@ export interface CollaboratorKPI {
   kpiType?: string
   kpiDirection?: KPIDirection
   assignmentDirection?: KPIDirection
+  collaboratorName?: string
+  kpiName?: string
+  periodName?: string
+  periodStatus?: 'open' | 'in_review' | 'closed'
+  subPeriodName?: string
 }
+
+export interface ScopeKPI {
+  id: number
+  name: string
+  description?: string | null
+  kpiId: number
+  orgScopeId: number
+  periodId: number
+  subPeriodId?: number | null
+  ownerLevel: 'team' | 'area' | 'business_unit' | 'company' | 'executive'
+  sourceMode: 'direct' | 'aggregated' | 'mixed'
+  target: number
+  actual?: number | null
+  directActual?: number | null
+  aggregatedActual?: number | null
+  mixedConfig?: {
+    directWeight: number
+    aggregatedWeight: number
+    directLabel?: string | null
+    aggregatedLabel?: string | null
+  } | null
+  weight: number
+  variation?: number | null
+  weightedResult?: number | null
+  status: 'draft' | 'proposed' | 'approved' | 'closed'
+  curationStatus?: 'pending' | 'in_review' | 'approved' | 'rejected'
+  inputMode?: 'manual' | 'import' | 'auto'
+  orgScopeName?: string
+  orgScopeType?: string
+  kpiName?: string
+  periodName?: string
+  periodStatus?: 'open' | 'in_review' | 'closed'
+  subPeriodName?: string
+  objectiveIds?: number[]
+  objectiveNames?: string[]
+  objectives?: ObjectiveTree[]
+}
+
+export interface ScopeKPILink {
+  id: number
+  scopeKpiId: number
+  childType: 'collaborator' | 'scope'
+  collaboratorAssignmentId?: number | null
+  childScopeKpiId?: number | null
+  contributionWeight?: number | null
+  aggregationMethod: 'sum' | 'avg' | 'weighted_avg'
+  formulaConfig?: any
+  sortOrder?: number | null
+  collaboratorName?: string
+  collaboratorKpiName?: string
+  childScopeKpiName?: string
+}
+
+export type MacroKPI = ScopeKPI
+export type MacroKPILink = ScopeKPILink
 
 export interface ObjectiveTree {
   id: number
@@ -110,6 +183,7 @@ export interface ObjectiveTree {
   name: string
   parentId?: number
   kpis: KPI[]
+  scopeKpis?: ScopeKPI[]
 }
 
 export interface CalendarProfile {

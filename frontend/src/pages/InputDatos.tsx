@@ -16,6 +16,30 @@ type Measurement = {
   evidenceUrl?: string
 }
 
+type IntegrationTarget = {
+  id: number
+  templateId: number
+  assignmentId?: number | null
+  enabled?: number | null
+  templateName?: string | null
+  templateSchedule?: string | null
+}
+
+type IntegrationRun = {
+  id: number
+  status: string
+  startedAt?: string
+  finishedAt?: string
+  outputs?: any
+}
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString()
+}
+
 export default function InputDatos() {
   const [showOnlyPending, setShowOnlyPending] = useState(false)
   const [searchParams] = useSearchParams()
@@ -32,6 +56,7 @@ export default function InputDatos() {
   const [newEvidence, setNewEvidence] = useState('')
   const [uploading, setUploading] = useState(false)
   const [uploadMessage, setUploadMessage] = useState('')
+  const [inlineAlert, setInlineAlert] = useState<{ type: 'info' | 'warning' | 'error'; message: string } | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const navigate = useNavigate()
 
@@ -204,6 +229,49 @@ export default function InputDatos() {
     return assignmentsWithScope.find((assignment: any) => assignment.id === selectedAssignmentId) || null
   }, [assignmentsWithScope, selectedAssignmentId])
 
+  const { data: integrationTargets } = useQuery<IntegrationTarget[]>(
+    ['integration-targets', selectedAssignmentId],
+    async () => {
+      const response = await api.get('/integrations/targets', {
+        params: { assignmentId: selectedAssignmentId },
+      })
+      return response.data
+    },
+    { enabled: !!selectedAssignmentId }
+  )
+
+  const selectedIntegrationTarget = useMemo(() => {
+    if (!integrationTargets || integrationTargets.length === 0) return null
+    return integrationTargets.find((target) => target.enabled) || integrationTargets[0]
+  }, [integrationTargets])
+
+  const { data: integrationRuns } = useQuery<IntegrationRun[]>(
+    ['integration-runs', selectedIntegrationTarget?.id],
+    async () => {
+      const response = await api.get('/integrations/runs', {
+        params: {
+          templateId: selectedIntegrationTarget?.templateId,
+          targetId: selectedIntegrationTarget?.id,
+        },
+      })
+      return response.data
+    },
+    { enabled: !!selectedIntegrationTarget?.id }
+  )
+
+  const latestIntegrationRun = integrationRuns?.[0] || null
+
+  const { data: nextCronRun } = useQuery<{ nextRun?: string | null }>(
+    ['integration-next-run', selectedIntegrationTarget?.templateSchedule],
+    async () => {
+      const response = await api.get('/integrations/cron/next', {
+        params: { expression: selectedIntegrationTarget?.templateSchedule },
+      })
+      return response.data
+    },
+    { enabled: !!selectedIntegrationTarget?.templateSchedule }
+  )
+
   const selectedCalendarProfile = useMemo(() => {
     if (!calendarProfiles || !selectedAssignmentData?.calendarProfileId) return null
     return (
@@ -251,9 +319,38 @@ export default function InputDatos() {
         setNewValue('')
         setNewReason('')
         setNewEvidence('')
+        setShowMeasurementModal(false)
         if (data?.warning) {
-          alert(data.warning)
+          setInlineAlert({ type: 'warning', message: data.warning })
+        } else {
+          setInlineAlert({ type: 'info', message: 'Medición cargada correctamente.' })
         }
+      },
+    }
+  )
+
+  const runJobNow = useMutation(
+    async () => {
+      if (!selectedIntegrationTarget?.id) {
+        throw new Error('No hay target activo para ejecutar')
+      }
+      const response = await api.post(`/integrations/targets/${selectedIntegrationTarget.id}/run`)
+      return response.data
+    },
+    {
+      onSuccess: (data: any) => {
+        queryClient.invalidateQueries(['integration-runs', selectedIntegrationTarget?.id])
+        queryClient.invalidateQueries(['measurements', selectedAssignmentId])
+        if (data?.result?.skipped) {
+          setInlineAlert({ type: 'warning', message: data?.result?.reason || 'Ejecución omitida: ya existe una medición para este período.' })
+          return
+        }
+        if (data?.result?.runId) {
+          setInlineAlert({ type: 'info', message: 'Job ejecutado correctamente. Revisá el historial de mediciones.' })
+        }
+      },
+      onError: (error: any) => {
+        setInlineAlert({ type: 'error', message: error.response?.data?.error || 'Error al ejecutar job' })
       },
     }
   )
@@ -267,7 +364,7 @@ export default function InputDatos() {
       onSuccess: (data: any) => {
         queryClient.invalidateQueries(['measurements', selectedAssignmentId])
         if (data?.warning) {
-          alert(data.warning)
+          setInlineAlert({ type: 'warning', message: data.warning })
         }
       },
     }
@@ -435,7 +532,7 @@ export default function InputDatos() {
 
   const handleAutoFetch = async () => {
     if (!selectedAssignmentId) {
-      alert('Selecciona una asignación primero')
+      setInlineAlert({ type: 'warning', message: 'Seleccioná una asignación primero para ejecutar el fetch.' })
       return
     }
     const value = window.prompt('Valor obtenido automáticamente:')
@@ -447,10 +544,22 @@ export default function InputDatos() {
       status: 'proposed',
     })
     queryClient.invalidateQueries(['measurements', selectedAssignmentId])
+    setInlineAlert({ type: 'info', message: 'Valor cargado automáticamente como propuesto.' })
   }
 
   return (
     <div className="input-page">
+      {inlineAlert && (
+        <div className={`info-banner ${inlineAlert.type === 'error' ? 'error' : inlineAlert.type === 'warning' ? 'warning' : 'info'}`} style={{ marginBottom: 16 }}>
+          {inlineAlert.message}
+          <button
+            onClick={() => setInlineAlert(null)}
+            style={{ marginLeft: 12, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 14 }}
+          >
+            ×
+          </button>
+        </div>
+      )}
       <div className="page-header">
         <div>
           <h1>Input de datos</h1>
@@ -464,7 +573,7 @@ export default function InputDatos() {
             className="btn-primary"
             onClick={() => {
               if (!selectedAssignmentId) {
-                alert('Selecciona una asignación primero')
+                setInlineAlert({ type: 'warning', message: 'Seleccioná una asignación primero para cargar datos.' })
                 return
               }
               setShowMeasurementModal(true)
@@ -480,16 +589,30 @@ export default function InputDatos() {
           <h3>Ingesta automatica</h3>
           <p className="muted">Jobs activos y salud de integraciones.</p>
           <div className="auto-list muted">
-            Integraciones disponibles. La ultima corrida se mostrara aqui cuando esten activas.
+            {selectedIntegrationTarget
+              ? `Integración activa: ${selectedIntegrationTarget.templateName || 'Target #'+selectedIntegrationTarget.id}`
+              : 'Sin integraciones activas para la asignación seleccionada.'}
           </div>
           <div className="card-actions">
             <button
               className="btn-secondary"
-              onClick={() => alert('No hay integraciones activas configuradas.')}
+              onClick={() => {
+                if (!selectedIntegrationTarget?.id) {
+                  setInlineAlert({ type: 'warning', message: 'No hay integraciones activas para esta asignación. Configuralo en Integraciones > Targets.' })
+                  return
+                }
+                runJobNow.mutate()
+              }}
+              disabled={!selectedIntegrationTarget?.id || runJobNow.isLoading}
             >
-              Ejecutar jobs ahora
+              {runJobNow.isLoading ? 'Ejecutando...' : 'Ejecutar jobs ahora'}
             </button>
           </div>
+          {!selectedIntegrationTarget && selectedAssignmentId && (
+            <div className="form-hint">
+              No hay target vinculado a esta asignación. Configuralo en Integraciones &gt; Targets.
+            </div>
+          )}
         </div>
 
         <div className="card">
@@ -506,13 +629,13 @@ export default function InputDatos() {
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="scope-select">Scope</label>
+              <label htmlFor="scope-select">Área</label>
               <select
                 id="scope-select"
                 value={selectedScopeId}
                 onChange={(e) => setSelectedScopeId(e.target.value ? Number(e.target.value) : '')}
               >
-                <option value="">Todos los scopes</option>
+                <option value="">Todas las áreas</option>
                 {scopeOptions.map((scope: any) => (
                   <option key={scope.id} value={scope.id}>
                     {scope.name}
@@ -576,6 +699,29 @@ export default function InputDatos() {
             <div className="form-hint">No hay asignaciones para esos filtros.</div>
           ) : null}
           {selectedAssignmentData && (
+            <div className="cycle-indicator">
+              <div className={`cycle-step done`}>
+                <span className="cycle-dot">✓</span>
+                <span>Asignación</span>
+              </div>
+              <div className="cycle-arrow">→</div>
+              <div className={`cycle-step ${isCurationApproved ? 'done' : canApproveWithWarning ? 'partial' : 'pending'}`}>
+                <span className="cycle-dot">{isCurationApproved ? '✓' : canApproveWithWarning ? '~' : '○'}</span>
+                <span>Criterio</span>
+              </div>
+              <div className="cycle-arrow">→</div>
+              <div className={`cycle-step ${(measurements?.length ?? 0) > 0 ? 'done' : 'pending'}`}>
+                <span className="cycle-dot">{(measurements?.length ?? 0) > 0 ? '✓' : '○'}</span>
+                <span>Medición</span>
+              </div>
+              <div className="cycle-arrow">→</div>
+              <div className={`cycle-step ${measurements?.some(m => m.status === 'approved') ? 'done' : 'pending'}`}>
+                <span className="cycle-dot">{measurements?.some(m => m.status === 'approved') ? '✓' : '○'}</span>
+                <span>Aprobación</span>
+              </div>
+            </div>
+          )}
+          {selectedAssignmentData && (
             <div className="assignment-meta">
               <div>
                 <span className="meta-label">Fuente:</span>{' '}
@@ -619,14 +765,59 @@ export default function InputDatos() {
               )}
             </div>
           )}
+          {selectedIntegrationTarget && (
+            <div className="job-status">
+              <div className="job-header">
+                <strong>Estado del job</strong>
+                <span className="job-meta">
+                  {selectedIntegrationTarget.templateName || 'Integración'} ·{' '}
+                  {selectedIntegrationTarget.templateSchedule || 'Sin cron'}
+                </span>
+              </div>
+              <div className="job-row">
+                <span className="meta-label">Última ejecución:</span>{' '}
+                <span className="meta-value">{formatDateTime(latestIntegrationRun?.startedAt)}</span>
+                <span className={`status-pill ${latestIntegrationRun?.status === 'success' ? 'ok' : 'review'}`}>
+                  {latestIntegrationRun?.status || '-'}
+                </span>
+              </div>
+              <div className="job-row">
+                <span className="meta-label">Próximo run:</span>{' '}
+                <span className="meta-value">{formatDateTime(nextCronRun?.nextRun)}</span>
+              </div>
+              <div className="job-row">
+                <span className="meta-label">Subperíodo destino:</span>{' '}
+                <span className="meta-value">
+                  {latestIntegrationRun?.outputs?.subPeriodName ||
+                    availableSubPeriods.find((sp: any) => sp.id === selectedSubPeriodId)?.name ||
+                    'Sin subperíodo'}
+                </span>
+              </div>
+              {latestIntegrationRun?.outputs?.skipped && (
+                <div className="job-row warning">
+                  <span className="meta-label">Omitido:</span>{' '}
+                  <span className="meta-value">
+                    {latestIntegrationRun?.outputs?.skipReason || 'El job ya tenía medición.'}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
           {approvalWarning && (
             <div className="info-banner warning">
               {approvalWarning}
             </div>
           )}
           {!canApproveMeasurement && approvalBlockedReason && (
-            <div className="info-banner error">
-              {approvalBlockedReason}
+            <div className="info-banner error" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>⚠️ {approvalBlockedReason}. Las mediciones no se pueden aprobar hasta que la curaduría esté aprobada.</span>
+              <button
+                className="btn-secondary"
+                style={{ marginLeft: 12, padding: '4px 12px', fontSize: 12, whiteSpace: 'nowrap' }}
+                onClick={() => navigate('/curaduria')}
+              >
+                Ir a Curaduría →
+              </button>
             </div>
           )}
           <table className="input-table">
@@ -722,7 +913,7 @@ export default function InputDatos() {
               className="btn-primary"
               onClick={() => {
                 if (!selectedAssignmentId) {
-                  alert('Selecciona una asignación primero')
+                  setInlineAlert({ type: 'warning', message: 'Seleccioná una asignación primero para cargar datos.' })
                   return
                 }
                 setShowMeasurementModal(true)
@@ -803,9 +994,9 @@ export default function InputDatos() {
                     value={newMode}
                     onChange={(e) => setNewMode(e.target.value as any)}
                   >
-                    <option value="manual">Manual</option>
-                    <option value="import">Import</option>
-                    <option value="auto">Auto</option>
+                    <option value="manual">Manual — ingreso directo por el usuario</option>
+                    <option value="import">Import — carga desde archivo CSV</option>
+                    <option value="auto">Auto — obtenido por integración externa</option>
                   </select>
                 </div>
                 <div className="form-group">

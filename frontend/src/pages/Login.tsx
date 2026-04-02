@@ -1,8 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
+import { persistSsoRememberMe, storeAuthToken } from '../utils/authStorage'
 import './Login.css'
+
+type SsoProvider = {
+  id: number
+  name: string
+  slug: string
+  providerType: string
+}
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -18,14 +26,22 @@ export default function Login() {
   const [resetOpen, setResetOpen] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
   const [resetStatus, setResetStatus] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle')
+  const [ssoProviders, setSsoProviders] = useState<SsoProvider[]>([])
+  const [ssoLoading, setSsoLoading] = useState(false)
   const navigate = useNavigate()
 
-  const storeToken = (token: string) => {
-    localStorage.removeItem('token')
-    sessionStorage.removeItem('token')
-    const storage = rememberMe ? localStorage : sessionStorage
-    storage.setItem('token', token)
-  }
+  useEffect(() => {
+    const loadProviders = async () => {
+      try {
+        const response = await api.get('/auth/sso/providers')
+        setSsoProviders(Array.isArray(response.data) ? response.data : [])
+      } catch {
+        setSsoProviders([])
+      }
+    }
+
+    void loadProviders()
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -47,7 +63,7 @@ export default function Login() {
       }
 
       const { token } = response.data
-      storeToken(token)
+      storeAuthToken(token, rememberMe)
       navigate('/')
     } catch (err: any) {
       setError(err.response?.data?.error || 'Error al iniciar sesion')
@@ -67,7 +83,7 @@ export default function Login() {
         rememberMe,
       })
       const { token } = response.data
-      storeToken(token)
+      storeAuthToken(token, rememberMe)
       navigate('/')
     } catch (err: any) {
       setError(err.response?.data?.error || 'Error al verificar codigo')
@@ -86,6 +102,23 @@ export default function Login() {
       setResetStatus('sent')
     } catch {
       setResetStatus('error')
+    }
+  }
+
+  const handleSsoStart = async (provider: SsoProvider) => {
+    setError(null)
+    setSsoLoading(true)
+    try {
+      persistSsoRememberMe(rememberMe)
+      const response = await api.post(`/auth/sso/${provider.slug || provider.id}/start`)
+      const redirectUrl = response.data?.redirectUrl
+      if (!redirectUrl) {
+        throw new Error('No se pudo obtener la URL de autenticacion corporativa')
+      }
+      window.location.assign(redirectUrl)
+    } catch (err: any) {
+      setError(err.response?.data?.error || err.message || 'No se pudo iniciar el acceso corporativo')
+      setSsoLoading(false)
     }
   }
 
@@ -140,6 +173,7 @@ export default function Login() {
               </p>
             </div>
             {!mfaRequired ? (
+              <>
               <form onSubmit={handleLogin} className="login-form">
                 <div className="field">
                   <label htmlFor="email">Email</label>
@@ -148,7 +182,7 @@ export default function Login() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="usuario@sidom.io"
+                    placeholder="usuario@empresa.com"
                     autoComplete="username"
                   />
                 </div>
@@ -215,10 +249,38 @@ export default function Login() {
                   {loading ? 'Ingresando...' : 'Ingresar'}
                 </button>
 
+                {ssoProviders.length ? (
+                  <div className="sso-section">
+                    <div className="sso-divider">
+                      <span>o continua con tu identidad corporativa</span>
+                    </div>
+                    <div className="sso-provider-list">
+                      {ssoProviders.map((provider) => (
+                        <button
+                          type="button"
+                          key={`sso-provider-${provider.id}`}
+                          className="btn-secondary sso-provider-btn"
+                          disabled={loading || ssoLoading}
+                          onClick={() => handleSsoStart(provider)}
+                        >
+                          {ssoLoading ? 'Conectando...' : `Ingresar con ${provider.name}`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="login-help">
                   <span>Necesitas ayuda? Contacta a RRHH para recuperar tu ID.</span>
                 </div>
               </form>
+              <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '14px', color: '#94a3b8' }}>
+                ¿No tenés cuenta?{' '}
+                <a href="/register" style={{ color: '#f97316', fontWeight: 600, textDecoration: 'none' }}>
+                  Registrá tu empresa →
+                </a>
+              </div>
+              </>
             ) : (
               <form onSubmit={handleVerifyMfa} className="login-form">
                 <div className="field">
@@ -257,7 +319,7 @@ export default function Login() {
                   type="email"
                   value={resetEmail}
                   onChange={(e) => setResetEmail(e.target.value)}
-                  placeholder="usuario@sidom.io"
+                  placeholder="usuario@empresa.com"
                   required
                 />
               </div>

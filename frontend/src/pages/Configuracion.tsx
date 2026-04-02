@@ -4,14 +4,31 @@ import api from '../services/api'
 import { useAuth } from '../hooks/useAuth'
 import SubPeriodForm from '../components/SubPeriodForm'
 import './Configuracion.css'
-
-type Permission = { id: number; code: string; description?: string }
+import { PreviewSourceMeta } from './configuracion/PreviewSourceMeta'
+import {
+  buildTemplatePreset,
+  getAuthProfileHint,
+  metricTypeLabel,
+  metricTypeToBackend,
+  type TemplateFormState,
+  type TemplatePreset,
+} from './configuracion/templateHelpers'
+import {
+  buildExternalKeysTextBySourceType,
+  DEFAULT_MAPPING_SOURCE_TYPE,
+  getMappingSourceTypeLabel,
+  getSourceTypesToSync,
+  MAPPING_SOURCE_TYPE_OPTIONS,
+  normalizeMappingSourceType,
+  parseExternalKeysText,
+} from '../utils/dataSourceMappings'
 
 type Collaborator = {
   id: number
   name: string
   area: string
   role: string
+  email?: string | null
   hasSuperpowers?: boolean
   orgScopeId?: number | null
 }
@@ -48,10 +65,71 @@ type IntegrationTarget = {
   scopeId: string
   params?: any
   assignmentId?: number | null
+  scopeKpiId?: number | null
+  scopeKpiName?: string | null
+  scopeOrgScopeId?: number | null
+  scopePeriodId?: number | null
   enabled?: number
   orgScopeId?: number | null
   orgScopeName?: string
   orgScopeType?: string
+}
+
+type TargetMappingRow = {
+  externalKey: string
+  ownerType: 'assignment' | 'scopeKpi'
+  assignmentId: string
+  scopeKpiId: string
+}
+
+type PendingExplicitMappingRow = {
+  externalKey: string
+  ownerType: 'assignment' | 'scopeKpi'
+  entityId: string
+}
+
+type DataSourceMapping = {
+  id: number
+  sourceType: string
+  entityType: 'collaborator' | 'org_scope'
+  entityId: number
+  externalKey: string
+  normalizedKey?: string
+  externalLabel?: string | null
+  metadata?: any
+}
+
+const normalizeExternalMatchKey = (value: any) =>
+  String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+
+const pushMatchToken = (set: Set<string>, value: any) => {
+  const normalized = normalizeExternalMatchKey(value)
+  if (normalized) {
+    set.add(normalized)
+  }
+}
+
+const extractMetadataMatchTokens = (metadata: any, parentKey = ''): string[] => {
+  if (metadata === null || metadata === undefined) return []
+  if (typeof metadata === 'string' || typeof metadata === 'number') {
+    if (/(alias|code|key|slug|email|name)/i.test(parentKey)) {
+      return [String(metadata)]
+    }
+    return []
+  }
+  if (Array.isArray(metadata)) {
+    return metadata.flatMap((item) => extractMetadataMatchTokens(item, parentKey))
+  }
+  if (typeof metadata === 'object') {
+    return Object.entries(metadata).flatMap(([key, value]) => extractMetadataMatchTokens(value, key))
+  }
+  return []
 }
 
 type TemplateRun = {
@@ -79,9 +157,6 @@ type CalendarProfile = {
 export default function Configuracion() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
-  const [selectedCollaborator, setSelectedCollaborator] = useState<number | null>(null)
-  const [selectedPerms, setSelectedPerms] = useState<string[]>([])
-  const [superpowers, setSuperpowers] = useState(false)
   const [activeIntegrationTab, setActiveIntegrationTab] = useState<'templates' | 'targets' | 'runs' | 'auth'>(
     'templates'
   )
@@ -110,13 +185,15 @@ export default function Configuracion() {
   const [targetPreviewTarget, setTargetPreviewTarget] = useState<IntegrationTarget | null>(null)
   const [targetPreviewResult, setTargetPreviewResult] = useState<any>(null)
   const [targetPreviewMessage, setTargetPreviewMessage] = useState('')
+  const [targetDraftPreviewResult, setTargetDraftPreviewResult] = useState<any>(null)
+  const [targetDraftPreviewMessage, setTargetDraftPreviewMessage] = useState('')
   const [toastMessage, setToastMessage] = useState('')
   const [templateFormError, setTemplateFormError] = useState('')
   const [cronPreview, setCronPreview] = useState('')
-  const [templateForm, setTemplateForm] = useState({
+  const [templateForm, setTemplateForm] = useState<TemplateFormState>({
     name: '',
     connector: 'jira',
-    metricType: 'ratio' as 'count' | 'ratio' | 'sla' | 'value' | 'value_agg' | 'manual',
+    metricType: 'ratio',
     queryTestsTemplate: '',
     queryStoriesTemplate: '',
     formulaTemplate: 'A / B',
@@ -124,119 +201,8 @@ export default function Configuracion() {
     authProfileId: '',
     enabled: true,
   })
-  const metricTypeToBackend = (metricType: string) => {
-    if (metricType === 'ratio' || metricType === 'sla') return 'ratio'
-    return 'count'
-  }
-
-  const metricTypeLabel = (metricType?: string) => {
-    switch (metricType) {
-      case 'count':
-        return 'COUNT'
-      case 'ratio':
-        return 'RATIO'
-      case 'sla':
-        return 'SLA'
-      case 'value':
-        return 'VALUE'
-      case 'value_agg':
-        return 'VALUE_AGG'
-      case 'manual':
-        return 'MANUAL'
-      default:
-        return metricType === 'count' ? 'COUNT' : 'RATIO'
-    }
-  }
-
-  const applyTemplatePreset = (preset: 'count' | 'ratio' | 'sla' | 'sheets_value' | 'sheets_agg' | 'manual') => {
-    if (preset === 'count') {
-      setTemplateForm({
-        name: 'Jira – COUNT (Generic)',
-        connector: 'jira',
-        metricType: 'count',
-        queryTestsTemplate:
-          'project IN ({projects})\nAND issuetype IN ({issueTypesA})\nAND {dateFieldA} >= {from}\nAND {dateFieldA} < {to}\n{extraJqlA}',
-        queryStoriesTemplate: '',
-        formulaTemplate: 'A',
-        schedule: '',
-        authProfileId: templateForm.authProfileId,
-        enabled: true,
-      })
-      return
-    }
-    if (preset === 'ratio') {
-      setTemplateForm({
-        name: 'Jira – RATIO A/B (Generic)',
-        connector: 'jira',
-        metricType: 'ratio',
-        queryTestsTemplate:
-          'project IN ({projects})\nAND issuetype IN ({issueTypesA})\nAND {dateFieldA} >= {from}\nAND {dateFieldA} < {to}\n{extraJqlA}',
-        queryStoriesTemplate:
-          'project IN ({projects})\nAND issuetype IN ({issueTypesB})\nAND {dateFieldB} >= {from}\nAND {dateFieldB} < {to}\n{extraJqlB}',
-        formulaTemplate: 'A / B',
-        schedule: '',
-        authProfileId: templateForm.authProfileId,
-        enabled: true,
-      })
-      return
-    }
-    if (preset === 'sla') {
-      setTemplateForm({
-        name: 'Jira – SLA (On-time / Total)',
-        connector: 'jira',
-        metricType: 'sla',
-        queryTestsTemplate:
-          'project IN ({projects})\nAND issuetype IN ({issueTypesA})\nAND statusCategory = Done\nAND {dateFieldEnd} >= {from}\nAND {dateFieldEnd} < {to}\nAND {dateFieldEnd} <= {dateFieldLimit}\n{extraJqlA}',
-        queryStoriesTemplate:
-          'project IN ({projects})\nAND issuetype IN ({issueTypesB})\nAND statusCategory = Done\nAND {dateFieldEnd} >= {from}\nAND {dateFieldEnd} < {to}\n{extraJqlB}',
-        formulaTemplate: 'A / B',
-        schedule: '',
-        authProfileId: templateForm.authProfileId,
-        enabled: true,
-      })
-      return
-    }
-    if (preset === 'sheets_value') {
-      setTemplateForm({
-        name: 'Sheets – VALUE (Direct)',
-        connector: 'sheets',
-        metricType: 'value',
-        queryTestsTemplate:
-          'sheetKey={sheetKey}\n tab={tab}\n periodColumn={periodColumn}\n areaColumn={areaColumn}\n kpiColumn={kpiColumn}\n valueColumn={valueColumn}',
-        queryStoriesTemplate: '',
-        formulaTemplate: 'VALUE',
-        schedule: '',
-        authProfileId: templateForm.authProfileId,
-        enabled: true,
-      })
-      return
-    }
-    if (preset === 'sheets_agg') {
-      setTemplateForm({
-        name: 'Sheets – AGG (SUM/AVG)',
-        connector: 'sheets',
-        metricType: 'value_agg',
-        queryTestsTemplate:
-          'sheetKey={sheetKey}\n tab={tab}\n aggregation={SUM|AVG}\n periodColumn={periodColumn}\n areaColumn={areaColumn}\n kpiColumn={kpiColumn}\n valueColumn={valueColumn}',
-        queryStoriesTemplate: '',
-        formulaTemplate: 'AGG',
-        schedule: '',
-        authProfileId: templateForm.authProfileId,
-        enabled: true,
-      })
-      return
-    }
-    setTemplateForm({
-      name: 'Manual / CSV – Measurement',
-      connector: 'manual',
-      metricType: 'manual',
-      queryTestsTemplate: 'manual',
-      queryStoriesTemplate: '',
-      formulaTemplate: 'VALUE',
-      schedule: '',
-      authProfileId: '',
-      enabled: true,
-    })
+  const applyTemplatePreset = (preset: TemplatePreset) => {
+    setTemplateForm(buildTemplatePreset(preset, templateForm.authProfileId))
   }
   const [targetForm, setTargetForm] = useState({
     templateId: '',
@@ -245,6 +211,7 @@ export default function Configuracion() {
     orgScopeId: '',
     paramsText: '',
     assignmentId: '',
+    scopeKpiId: '',
     enabled: true,
   })
   const [authForm, setAuthForm] = useState({
@@ -258,6 +225,8 @@ export default function Configuracion() {
       token: '',
       apiKey: '',
       header: '',
+      clientId: '',
+      clientSecret: '',
     },
   })
   const [calendarForm, setCalendarForm] = useState({
@@ -274,20 +243,19 @@ export default function Configuracion() {
     metadataText: '',
     active: true,
   })
+  const [scopeMappingSourceType, setScopeMappingSourceType] = useState(DEFAULT_MAPPING_SOURCE_TYPE)
+  const [scopeExternalKeysBySourceType, setScopeExternalKeysBySourceType] = useState<Record<string, string>>({
+    [DEFAULT_MAPPING_SOURCE_TYPE]: '',
+  })
   const [targetFormError, setTargetFormError] = useState('')
-
-  const { data: permissions } = useQuery<Permission[]>('config-permissions', async () => {
-    const res = await api.get('/config/permissions')
-    return res.data
-  })
-
-  const { data: roles } = useQuery<any[]>('config-roles', async () => {
-    const res = await api.get('/config/roles')
-    return res.data
-  })
 
   const { data: collaborators } = useQuery<Collaborator[]>('config-collaborators', async () => {
     const res = await api.get('/collaborators')
+    return res.data
+  })
+
+  const { data: dataSourceMappings } = useQuery<DataSourceMapping[]>('data-source-mappings', async () => {
+    const res = await api.get('/data-source-mappings')
     return res.data
   })
 
@@ -301,6 +269,11 @@ export default function Configuracion() {
     return res.data
   })
 
+  const { data: scopeKpis } = useQuery<any[]>('config-scope-kpis', async () => {
+    const res = await api.get('/scope-kpis')
+    return res.data
+  })
+
   const { data: orgScopes } = useQuery<any[]>('org-scopes', async () => {
     const res = await api.get('/org-scopes')
     return res.data
@@ -310,6 +283,19 @@ export default function Configuracion() {
     const res = await api.get('/calendar-profiles')
     return res.data
   })
+
+  const getEntityExternalKeysBySourceType = (
+    entityType: 'collaborator' | 'org_scope',
+    entityId?: number | null
+  ) => buildExternalKeysTextBySourceType(dataSourceMappings, entityType, entityId)
+
+  const updateScopeExternalKeysForSourceType = (value: string) => {
+    const sourceType = normalizeMappingSourceType(scopeMappingSourceType)
+    setScopeExternalKeysBySourceType((prev) => ({
+      ...prev,
+      [sourceType]: value,
+    }))
+  }
 
   const { data: calendarSubperiods } = useQuery<any[]>(
     ['calendar-subperiods', selectedPeriodForCalendar, calendarForSubperiods?.id],
@@ -348,16 +334,6 @@ export default function Configuracion() {
         }
       },
     }
-  )
-
-  const { data: collaboratorPerms, refetch: refetchPerms } = useQuery(
-    ['config-collaborator-perms', selectedCollaborator],
-    async () => {
-      if (!selectedCollaborator) return null
-      const res = await api.get(`/config/collaborators/${selectedCollaborator}/permissions`)
-      return res.data
-    },
-    { enabled: !!selectedCollaborator }
   )
 
   const { data: authProfiles } = useQuery<AuthProfile[]>('auth-profiles', async () => {
@@ -413,6 +389,12 @@ export default function Configuracion() {
     return map
   }, [orgScopes])
 
+  const collaboratorById = useMemo(() => {
+    const map = new Map<number, Collaborator>()
+    collaborators?.forEach((collaborator) => map.set(Number(collaborator.id), collaborator))
+    return map
+  }, [collaborators])
+
   const assignmentsByCollaborator = useMemo(() => {
     const map = new Map<number, any[]>()
     assignments?.forEach((assignment) => {
@@ -445,7 +427,7 @@ export default function Configuracion() {
         map.set(key, new Set())
       }
       const set = map.get(key)!
-      users.forEach((user) => {
+      users.forEach((user: any) => {
         if (user) {
           set.add(String(user))
         }
@@ -469,17 +451,14 @@ export default function Configuracion() {
   }, [activeAreaScopes, existingTargetScopeKeys])
 
   const authProfileHint = useMemo(() => {
-    if (templateForm.connector === 'jira' || templateForm.connector === 'xray') {
-      return 'Jira/Xray: usa email + API token (Basic) o Bearer token.'
-    }
-    if (templateForm.connector === 'sheets') {
-      return 'Google Sheets: usa OAuth/Service Account (Bearer). Si la planilla es publica, podes dejar sin auth.'
-    }
-    if (templateForm.connector === 'manual') {
-      return 'Manual/CSV no requiere auth profile.'
-    }
-    return ''
+    return getAuthProfileHint(templateForm.connector)
   }, [templateForm.connector])
+
+  const selectedTargetTemplate = useMemo(() => {
+    const templateId = Number(targetForm.templateId || selectedTemplateId || 0)
+    if (!templateId) return null
+    return templates?.find((template) => Number(template.id) === templateId) || null
+  }, [templates, targetForm.templateId, selectedTemplateId])
 
   const convertJqlToParams = () => {
     const jql = rawJqlInput.trim()
@@ -495,6 +474,8 @@ export default function Configuracion() {
     let testerField = ''
     let extraJql = ''
     let period = 'previous_month'
+    let customFrom: string | null = null
+    let customTo: string | null = null
 
     const projectMatch = normalized.match(/project\s+in\s*\(([^)]+)\)/i)
     if (projectMatch?.[1]) {
@@ -555,6 +536,8 @@ export default function Configuracion() {
     if (dateRangeMatch?.[2] && dateRangeMatch?.[3]) {
       const fromDate = new Date(dateRangeMatch[2])
       const toDate = new Date(dateRangeMatch[3])
+      customFrom = dateRangeMatch[2]
+      customTo = dateRangeMatch[3]
       const now = new Date()
       const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1)
       const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
@@ -574,7 +557,7 @@ export default function Configuracion() {
       }
     }
 
-    const params = {
+    const params: Record<string, any> = {
       baseFilter: baseFilter || 'project IN (...)',
       issueTypes: issueTypes.length ? issueTypes : ['Historia'],
       dateField: dateField || 'statusCategoryChangedDate',
@@ -582,6 +565,10 @@ export default function Configuracion() {
       users: users.length ? users : ['userId'],
       extraJqlA: extraJql || undefined,
       period,
+    }
+    if (period === 'custom' && customFrom && customTo) {
+      params.from = customFrom
+      params.to = customTo
     }
 
     setTargetForm((prev) => ({
@@ -614,6 +601,335 @@ export default function Configuracion() {
       return null
     }
   }, [targetForm.paramsText])
+  const targetParamsInvalidJson = Boolean(targetForm.paramsText.trim()) && !parsedTargetParams
+
+  const supportsTargetMappingEditor =
+    selectedTargetTemplate?.connector === 'looker' || selectedTargetTemplate?.connector === 'generic_api'
+
+  const extractTargetMappingRows = (params: any): TargetMappingRow[] => {
+    const targetMap =
+      params?.targetMap && typeof params.targetMap === 'object' && !Array.isArray(params.targetMap)
+        ? params.targetMap
+        : {}
+    const defaultOwnerType = String(params?.mappingOwnerType || 'assignment') === 'scopeKpi' ? 'scopeKpi' : 'assignment'
+    return Object.entries(targetMap).map(([externalKey, targetConfig]) => {
+      const assignmentId =
+        targetConfig && typeof targetConfig === 'object'
+          ? (targetConfig as any).assignmentId ?? (targetConfig as any).collaboratorAssignmentId ?? ''
+          : defaultOwnerType === 'assignment'
+          ? targetConfig
+          : ''
+      const scopeKpiId =
+        targetConfig && typeof targetConfig === 'object'
+          ? (targetConfig as any).scopeKpiId ?? (targetConfig as any).macroKpiId ?? ''
+          : defaultOwnerType === 'scopeKpi'
+          ? targetConfig
+          : ''
+
+      return {
+        externalKey,
+        ownerType: scopeKpiId ? 'scopeKpi' : 'assignment',
+        assignmentId: assignmentId ? String(assignmentId) : '',
+        scopeKpiId: scopeKpiId ? String(scopeKpiId) : '',
+      }
+    })
+  }
+
+  const initialTargetMappingDraft = useMemo(() => {
+    const params = parsedTargetParams && typeof parsedTargetParams === 'object' ? parsedTargetParams : {}
+    return {
+      mappingResultPath: String(params.mappingResultPath || params.resultPath || params.dataPath || ''),
+      mappingKeyPath: String(params.mappingKeyPath || params.keyPath || params.mappingKey || ''),
+      mappingValuePath: String(params.mappingValuePath || params.valuePath || params.metricPath || ''),
+      rows: extractTargetMappingRows(params),
+    }
+  }, [parsedTargetParams])
+
+  const [targetMappingDraft, setTargetMappingDraft] = useState<{
+    mappingResultPath: string
+    mappingKeyPath: string
+    mappingValuePath: string
+    rows: TargetMappingRow[]
+  }>({
+    mappingResultPath: '',
+    mappingKeyPath: '',
+    mappingValuePath: '',
+    rows: [],
+  })
+  const [pendingExplicitMappings, setPendingExplicitMappings] = useState<Record<string, PendingExplicitMappingRow>>({})
+
+  useEffect(() => {
+    if (!showTargetModal || !supportsTargetMappingEditor || targetParamsInvalidJson) return
+    setTargetMappingDraft(initialTargetMappingDraft)
+  }, [showTargetModal, editingTarget?.id, supportsTargetMappingEditor])
+
+  useEffect(() => {
+    setTargetDraftPreviewResult(null)
+    setTargetDraftPreviewMessage('')
+  }, [showTargetModal, editingTarget?.id])
+
+  useEffect(() => {
+    if (!editingScope?.id || !showScopeModal) return
+    setScopeExternalKeysBySourceType(getEntityExternalKeysBySourceType('org_scope', editingScope.id))
+    setScopeMappingSourceType(DEFAULT_MAPPING_SOURCE_TYPE)
+  }, [editingScope?.id, showScopeModal, dataSourceMappings])
+
+  const targetHasRowMapping = targetMappingDraft.rows.some((row) =>
+    row.ownerType === 'scopeKpi' ? Boolean(row.scopeKpiId) : Boolean(row.assignmentId)
+  )
+
+  const setTargetParamsObject = (updater: (current: Record<string, any>) => Record<string, any>) => {
+    let current: Record<string, any> = {}
+    if (targetForm.paramsText.trim()) {
+      try {
+        const parsed = JSON.parse(targetForm.paramsText)
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          current = parsed
+        }
+      } catch {
+        setTargetFormError('El JSON de params no es válido. Corregilo antes de usar el editor de mapping.')
+        return false
+      }
+    }
+
+    const next = updater({ ...current })
+    setTargetForm((prev) => ({
+      ...prev,
+      paramsText: JSON.stringify(next, null, 2),
+    }))
+    setTargetFormError('')
+    return true
+  }
+
+  const persistTargetMappingDraft = (draft: {
+    mappingResultPath: string
+    mappingKeyPath: string
+    mappingValuePath: string
+    rows: TargetMappingRow[]
+  }) => {
+    setTargetMappingDraft(draft)
+    setTargetParamsObject((current) => {
+      const nextRows = draft.rows.filter((row) => row.externalKey.trim())
+      const targetMap = nextRows.reduce<Record<string, any>>((acc, row) => {
+        const externalKey = row.externalKey.trim()
+        if (row.ownerType === 'scopeKpi') {
+          if (row.scopeKpiId) {
+            acc[externalKey] = { scopeKpiId: Number(row.scopeKpiId) }
+          }
+          return acc
+        }
+        if (row.assignmentId) {
+          acc[externalKey] = { assignmentId: Number(row.assignmentId) }
+        }
+        return acc
+      }, {})
+
+      if (Object.keys(targetMap).length > 0) {
+        current.targetMap = targetMap
+        const ownerTypes = new Set(
+          nextRows
+            .filter((row) => (row.ownerType === 'scopeKpi' ? row.scopeKpiId : row.assignmentId))
+            .map((row) => row.ownerType)
+        )
+        if (ownerTypes.size === 1) {
+          current.mappingOwnerType = Array.from(ownerTypes)[0]
+        } else {
+          delete current.mappingOwnerType
+        }
+      } else {
+        delete current.targetMap
+        delete current.mappingOwnerType
+      }
+
+      if (draft.mappingResultPath.trim()) {
+        current.mappingResultPath = draft.mappingResultPath.trim()
+      } else {
+        delete current.mappingResultPath
+      }
+      if (draft.mappingKeyPath.trim()) {
+        current.mappingKeyPath = draft.mappingKeyPath.trim()
+      } else {
+        delete current.mappingKeyPath
+      }
+      if (draft.mappingValuePath.trim()) {
+        current.mappingValuePath = draft.mappingValuePath.trim()
+      } else {
+        delete current.mappingValuePath
+      }
+
+      return current
+    })
+  }
+
+  const updateTargetMappingField = (
+    field: 'mappingResultPath' | 'mappingKeyPath' | 'mappingValuePath',
+    value: string
+  ) => {
+    persistTargetMappingDraft({
+      ...targetMappingDraft,
+      [field]: value,
+    })
+  }
+
+  const addTargetMappingRow = () => {
+    persistTargetMappingDraft({
+      ...targetMappingDraft,
+      rows: [
+        ...targetMappingDraft.rows,
+        {
+          externalKey: `key_${targetMappingDraft.rows.length + 1}`,
+          ownerType: 'assignment',
+          assignmentId: '',
+          scopeKpiId: '',
+        },
+      ],
+    })
+  }
+
+  const updateTargetMappingRow = (index: number, patch: Partial<TargetMappingRow>) => {
+    const rows = targetMappingDraft.rows.map((row, rowIndex) => {
+      if (rowIndex !== index) return row
+      const nextRow: TargetMappingRow = {
+        ...row,
+        ...patch,
+      }
+      if (patch.ownerType === 'assignment') {
+        nextRow.scopeKpiId = ''
+      }
+      if (patch.ownerType === 'scopeKpi') {
+        nextRow.assignmentId = ''
+      }
+      return nextRow
+    })
+    persistTargetMappingDraft({
+      ...targetMappingDraft,
+      rows,
+    })
+  }
+
+  const removeTargetMappingRow = (index: number) => {
+    persistTargetMappingDraft({
+      ...targetMappingDraft,
+      rows: targetMappingDraft.rows.filter((_, rowIndex) => rowIndex !== index),
+    })
+  }
+
+  const importPreviewRowsToMapping = (previewResult: any, mode: 'all' | 'unmapped' = 'all') => {
+    const previewRows = Array.isArray(previewResult?.sourceMeta?.previewRows) ? previewResult.sourceMeta.previewRows : []
+    if (!previewRows.length) {
+      setTargetDraftPreviewMessage('El preview no devolvió filas útiles para armar el mapping.')
+      return
+    }
+
+    const unmappedKeySet = new Set(
+      (Array.isArray(previewResult?.sourceMeta?.unmappedKeys) ? previewResult.sourceMeta.unmappedKeys : []).map((value: any) =>
+        String(value || '').trim().toLowerCase()
+      )
+    )
+    const rowsToImport =
+      mode === 'unmapped' && unmappedKeySet.size > 0
+        ? previewRows.filter((row: any) => unmappedKeySet.has(String(row?.externalKey || '').trim().toLowerCase()))
+        : previewRows
+
+    if (!rowsToImport.length) {
+      setTargetDraftPreviewMessage('El preview no tiene claves faltantes para agregar al editor.')
+      return
+    }
+
+    const existingByKey = new Map(
+      targetMappingDraft.rows.map((row) => [row.externalKey.trim().toLowerCase(), row] as const)
+    )
+    const currentOwnerType =
+      targetMappingDraft.rows.find((row) => row.ownerType === 'scopeKpi' && row.scopeKpiId)?.ownerType ||
+      targetMappingDraft.rows.find((row) => row.ownerType === 'assignment' && row.assignmentId)?.ownerType ||
+      (String((parsedTargetParams as any)?.mappingOwnerType || '') === 'scopeKpi' ? 'scopeKpi' : 'assignment')
+
+    const importedRows: TargetMappingRow[] = rowsToImport.map((row: any) => {
+      const externalKey = String(row?.externalKey || '').trim()
+      const existing = existingByKey.get(externalKey.toLowerCase())
+      if (existing) {
+        return {
+          ...existing,
+          externalKey,
+        }
+      }
+
+      const autoAssignment =
+        currentOwnerType === 'assignment'
+          ? assignmentAutoMatchMap.get(normalizeExternalMatchKey(externalKey)) || null
+          : null
+      const autoScopeKpi =
+        currentOwnerType === 'scopeKpi'
+          ? scopeKpiAutoMatchMap.get(normalizeExternalMatchKey(externalKey)) || null
+          : null
+
+      return {
+        externalKey,
+        ownerType: currentOwnerType,
+        assignmentId: autoAssignment ? String(autoAssignment.id) : '',
+        scopeKpiId: autoScopeKpi ? String(autoScopeKpi.id) : '',
+      }
+    })
+    const nextRows = [...targetMappingDraft.rows]
+
+    importedRows.forEach((row) => {
+      const normalizedKey = row.externalKey.trim().toLowerCase()
+      const index = nextRows.findIndex((current) => current.externalKey.trim().toLowerCase() === normalizedKey)
+      if (index >= 0) {
+        nextRows[index] = row
+      } else {
+        nextRows.push(row)
+      }
+    })
+
+    setTargetForm((prev) => ({
+      ...prev,
+      assignmentId: '',
+      scopeKpiId: '',
+    }))
+    persistTargetMappingDraft({
+      mappingResultPath:
+        targetMappingDraft.mappingResultPath || String(previewResult?.sourceMeta?.mappingResultPath || ''),
+      mappingKeyPath: targetMappingDraft.mappingKeyPath || String(previewResult?.sourceMeta?.mappingKeyPath || ''),
+      mappingValuePath:
+        targetMappingDraft.mappingValuePath || String(previewResult?.sourceMeta?.mappingValuePath || ''),
+      rows: nextRows,
+    })
+    setTargetDraftPreviewMessage('')
+    setToastMessage(
+      mode === 'unmapped' ? `Claves faltantes agregadas al editor: ${nextRows.length}` : `Filas cargadas desde preview: ${nextRows.length}`
+    )
+    setTimeout(() => setToastMessage(''), 2500)
+  }
+
+  const extractTemplateParamKeys = (template?: IntegrationTemplate | null) => {
+    if (!template) return []
+    const regex = /\{([a-zA-Z0-9_]+)\}/g
+    const combined = `${template.queryTestsTemplate || ''}\n${template.queryStoriesTemplate || ''}`
+    const matches = Array.from(combined.matchAll(regex)).map((match) => match[1])
+    return Array.from(new Set(matches)).filter((key) => !['from', 'to'].includes(key))
+  }
+
+  const targetRequiredParamKeys = useMemo(
+    () => extractTemplateParamKeys(selectedTargetTemplate),
+    [selectedTargetTemplate]
+  )
+
+  const targetMissingParamKeys = useMemo(() => {
+    if (!targetRequiredParamKeys.length) return []
+    const params = parsedTargetParams && typeof parsedTargetParams === 'object' ? parsedTargetParams : {}
+    return targetRequiredParamKeys.filter((key) => {
+      const value = (params as any)[key]
+      if (Array.isArray(value)) return value.length === 0
+      if (typeof value === 'string') return value.trim().length === 0
+      return value === undefined || value === null
+    })
+  }, [parsedTargetParams, targetRequiredParamKeys])
+
+  const targetRequiresStructuredParams =
+    Boolean(selectedTargetTemplate) &&
+    ['jira', 'xray', 'sheets', 'generic_api', 'looker'].includes(String(selectedTargetTemplate?.connector || '')) &&
+    targetRequiredParamKeys.length > 0
 
   const targetUsersCount = useMemo(() => {
     if (!parsedTargetParams) return 0
@@ -624,6 +940,21 @@ export default function Configuracion() {
   }, [parsedTargetParams])
 
   const targetAssignmentBlocked = Boolean(targetForm.assignmentId) && targetUsersCount > 1
+  const targetDirectDestinationBlockedByMapping =
+    targetHasRowMapping && Boolean(targetForm.assignmentId || targetForm.scopeKpiId)
+  const targetUnresolvedMappingRows = useMemo(
+    () =>
+      targetMappingDraft.rows.filter((row) =>
+        row.ownerType === 'scopeKpi' ? !row.scopeKpiId : !row.assignmentId
+      ),
+    [targetMappingDraft.rows]
+  )
+  const targetExplicitMappingSourceType = useMemo(
+    () => normalizeMappingSourceType(selectedTargetTemplate?.connector || DEFAULT_MAPPING_SOURCE_TYPE),
+    [selectedTargetTemplate?.connector]
+  )
+  const explicitRowKey = (row: Pick<TargetMappingRow, 'externalKey' | 'ownerType'>) =>
+    `${row.ownerType}:${normalizeExternalMatchKey(row.externalKey)}`
 
   const targetPeriodPreview = useMemo(() => {
     const period = (parsedTargetParams as any)?.period || 'previous_month'
@@ -631,7 +962,21 @@ export default function Configuracion() {
     const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     let from = startOfThisMonth
     let to = startOfThisMonth
-    if (period === 'previous_month') {
+    if (period === 'custom') {
+      const customFrom = (parsedTargetParams as any)?.from
+      const customTo = (parsedTargetParams as any)?.to
+      if (customFrom && customTo) {
+        const fromDate = new Date(customFrom)
+        const toDate = new Date(customTo)
+        if (!Number.isNaN(fromDate.getTime()) && !Number.isNaN(toDate.getTime())) {
+          from = fromDate
+          to = toDate
+        }
+      } else {
+        from = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+        to = startOfThisMonth
+      }
+    } else if (period === 'previous_month') {
       from = new Date(now.getFullYear(), now.getMonth() - 1, 1)
       to = startOfThisMonth
     } else if (period === 'current_month') {
@@ -645,6 +990,200 @@ export default function Configuracion() {
     }
   }, [parsedTargetParams])
 
+  const assignmentGroupsForTarget = useMemo(() => {
+    if (!assignments) return []
+    const groups = new Map<string, any>()
+    assignments.forEach((assignment: any) => {
+      const key = `${assignment.collaboratorId}-${assignment.kpiId}-${assignment.periodId}`
+      const current = groups.get(key)
+      if (!current) {
+        groups.set(key, assignment)
+        return
+      }
+      const currentIsBase = current.subPeriodId == null
+      const nextIsBase = assignment.subPeriodId == null
+      if (nextIsBase && !currentIsBase) {
+        groups.set(key, assignment)
+      }
+    })
+    return Array.from(groups.values())
+  }, [assignments])
+  const assignmentGroupById = useMemo(() => {
+    const map = new Map<number, any>()
+    assignmentGroupsForTarget.forEach((assignment: any) => {
+      map.set(Number(assignment.id), assignment)
+    })
+    return map
+  }, [assignmentGroupsForTarget])
+  const scopeKpiById = useMemo(() => {
+    const map = new Map<number, any>()
+    ;(scopeKpis || []).forEach((scopeKpi: any) => {
+      map.set(Number(scopeKpi.id), scopeKpi)
+    })
+    return map
+  }, [scopeKpis])
+
+  const assignmentAutoMatchMap = useMemo(() => {
+    const map = new Map<string, any>()
+    const normalizedConnector = String(selectedTargetTemplate?.connector || '').trim().toLowerCase()
+    const collaboratorAssignmentById = new Map<number, any>()
+    assignmentGroupsForTarget.forEach((assignment: any) => {
+      if (!collaboratorAssignmentById.has(Number(assignment.collaboratorId))) {
+        collaboratorAssignmentById.set(Number(assignment.collaboratorId), assignment)
+      }
+    })
+
+    ;(dataSourceMappings || [])
+      .filter((mapping) => {
+        if (mapping.entityType !== 'collaborator') return false
+        const sourceType = String(mapping.sourceType || 'global').trim().toLowerCase()
+        return sourceType === 'global' || (normalizedConnector && sourceType === normalizedConnector)
+      })
+      .forEach((mapping) => {
+        const assignment = collaboratorAssignmentById.get(Number(mapping.entityId))
+        if (!assignment) return
+        const token = normalizeExternalMatchKey(mapping.externalKey)
+        if (token && !map.has(token)) {
+          map.set(token, assignment)
+        }
+      })
+
+    assignmentGroupsForTarget.forEach((assignment: any) => {
+      const collaborator = collaboratorById.get(Number(assignment.collaboratorId))
+      const tokens = new Set<string>()
+      pushMatchToken(tokens, assignment.collaboratorName)
+      pushMatchToken(tokens, collaborator?.name)
+      pushMatchToken(tokens, collaborator?.email)
+      if (collaborator?.email?.includes('@')) {
+        pushMatchToken(tokens, collaborator.email.split('@')[0])
+      }
+      tokens.forEach((token) => {
+        if (!map.has(token)) {
+          map.set(token, assignment)
+        }
+      })
+    })
+    return map
+  }, [assignmentGroupsForTarget, collaboratorById, dataSourceMappings, selectedTargetTemplate?.connector])
+
+  const scopeKpiAutoMatchMap = useMemo(() => {
+    const map = new Map<string, any>()
+    const normalizedConnector = String(selectedTargetTemplate?.connector || '').trim().toLowerCase()
+    const scopeKpiByOrgScopeId = new Map<number, any>()
+    ;(scopeKpis || []).forEach((scopeKpi: any) => {
+      const orgScopeId = Number(scopeKpi.orgScopeId || 0)
+      if (!orgScopeId || scopeKpiByOrgScopeId.has(orgScopeId)) return
+      scopeKpiByOrgScopeId.set(orgScopeId, scopeKpi)
+    })
+
+    ;(dataSourceMappings || [])
+      .filter((mapping) => {
+        if (mapping.entityType !== 'org_scope') return false
+        const sourceType = String(mapping.sourceType || 'global').trim().toLowerCase()
+        return sourceType === 'global' || (normalizedConnector && sourceType === normalizedConnector)
+      })
+      .forEach((mapping) => {
+        const scopeKpi = scopeKpiByOrgScopeId.get(Number(mapping.entityId))
+        if (!scopeKpi) return
+        const token = normalizeExternalMatchKey(mapping.externalKey)
+        if (token && !map.has(token)) {
+          map.set(token, scopeKpi)
+        }
+      })
+
+    ;(scopeKpis || []).forEach((scopeKpi: any) => {
+      const tokens = new Set<string>()
+      const scope = scopeKpi?.orgScopeId ? scopeById.get(Number(scopeKpi.orgScopeId)) : null
+      pushMatchToken(tokens, scopeKpi.name)
+      pushMatchToken(tokens, scopeKpi.orgScopeName)
+      pushMatchToken(tokens, `${scopeKpi.name || ''} ${scopeKpi.orgScopeName || ''}`)
+      extractMetadataMatchTokens(scope?.metadata).forEach((token) => pushMatchToken(tokens, token))
+      tokens.forEach((token) => {
+        if (!map.has(token)) {
+          map.set(token, scopeKpi)
+        }
+      })
+    })
+    return map
+  }, [scopeKpis, scopeById, dataSourceMappings, selectedTargetTemplate?.connector])
+  const pendingExplicitMappingSelectionsCount = useMemo(
+    () =>
+      targetUnresolvedMappingRows.filter((row) => Boolean(pendingExplicitMappings[explicitRowKey(row)]?.entityId)).length,
+    [pendingExplicitMappings, targetUnresolvedMappingRows]
+  )
+
+  useEffect(() => {
+    if (!showTargetModal) {
+      setPendingExplicitMappings({})
+      return
+    }
+
+    const validKeys = new Set(targetUnresolvedMappingRows.map((row) => explicitRowKey(row)))
+    setPendingExplicitMappings((prev) =>
+      Object.fromEntries(Object.entries(prev).filter(([key]) => validKeys.has(key)))
+    )
+  }, [showTargetModal, targetUnresolvedMappingRows])
+
+  const assignmentForTarget = useMemo(() => {
+    if (!targetForm.assignmentId) return null
+    return assignments?.find((assignment) => String(assignment.id) === String(targetForm.assignmentId)) || null
+  }, [assignments, targetForm.assignmentId])
+
+  const scopeKpiForTarget = useMemo(() => {
+    if (!targetForm.scopeKpiId) return null
+    return scopeKpis?.find((scopeKpi) => String(scopeKpi.id) === String(targetForm.scopeKpiId)) || null
+  }, [scopeKpis, targetForm.scopeKpiId])
+
+  const scopeForTarget = useMemo(() => {
+    if (!targetForm.orgScopeId) return null
+    return orgScopes?.find((scope) => String(scope.id) === String(targetForm.orgScopeId)) || null
+  }, [orgScopes, targetForm.orgScopeId])
+
+  const targetResolvedScopeName =
+    targetForm.scopeId?.trim() || scopeForTarget?.name || scopeKpiForTarget?.orgScopeName || ''
+
+  const targetCalendarProfileId =
+    assignmentForTarget?.calendarProfileId ||
+    scopeForTarget?.calendarProfileId ||
+    (scopeKpiForTarget?.orgScopeId
+      ? orgScopes?.find((scope) => Number(scope.id) === Number(scopeKpiForTarget.orgScopeId))?.calendarProfileId
+      : null) ||
+    null
+  const activePeriodId = useMemo(() => {
+    if (!periods || periods.length === 0) return null
+    const active = periods.find((period: any) =>
+      String(period.status || '').toLowerCase() === 'open' ||
+      String(period.status || '').toLowerCase() === 'active'
+    )
+    return active?.id || periods[0]?.id || null
+  }, [periods])
+
+  const targetPeriodId = assignmentForTarget?.periodId || scopeKpiForTarget?.periodId || activePeriodId
+
+  const { data: targetCalendarSubperiods } = useQuery<any[]>(
+    ['target-calendar-subperiods', targetPeriodId, targetCalendarProfileId],
+    async () => {
+      if (!targetPeriodId || !targetCalendarProfileId) return []
+      const res = await api.get(`/periods/${targetPeriodId}/sub-periods`, {
+        params: { calendarProfileId: targetCalendarProfileId },
+      })
+      return res.data
+    },
+    { enabled: !!targetPeriodId && !!targetCalendarProfileId }
+  )
+
+  const targetResolvedSubperiod = useMemo(() => {
+    if (!targetCalendarSubperiods || !targetCalendarSubperiods.length) return null
+    const fromDate = new Date(targetPeriodPreview.from)
+    return (
+      targetCalendarSubperiods.find((sp: any) => {
+        const start = new Date(sp.startDate)
+        const end = new Date(sp.endDate)
+        return fromDate >= start && fromDate < end
+      }) || null
+    )
+  }, [targetCalendarSubperiods, targetPeriodPreview.from])
+
   useEffect(() => {
     if (!templateForm.authProfileId) return
     const exists = authProfilesByConnector.some(
@@ -654,61 +1193,6 @@ export default function Configuracion() {
       setTemplateForm((prev) => ({ ...prev, authProfileId: '' }))
     }
   }, [authProfilesByConnector, templateForm.authProfileId])
-
-  useEffect(() => {
-    if (collaboratorPerms?.permissions) {
-      setSelectedPerms(collaboratorPerms.permissions)
-    } else {
-      setSelectedPerms([])
-    }
-    if (selectedCollaborator && collaborators) {
-      const col = collaborators.find((c) => c.id === selectedCollaborator)
-      setSuperpowers(col?.hasSuperpowers || false)
-    } else {
-      setSuperpowers(false)
-    }
-  }, [collaboratorPerms, selectedCollaborator, collaborators])
-
-  const savePermissions = useMutation(
-    async () => {
-      if (!selectedCollaborator) return
-      await api.put(`/config/collaborators/${selectedCollaborator}/permissions`, {
-        permissions: selectedPerms,
-      })
-    },
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(['config-collaborator-perms', selectedCollaborator])
-      },
-    }
-  )
-
-  const saveSuperpowers = useMutation(
-    async (value: boolean) => {
-      if (!selectedCollaborator) return
-      await api.patch(`/config/collaborators/${selectedCollaborator}/superpowers`, {
-        hasSuperpowers: value,
-      })
-    },
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('config-collaborators')
-        refetchPerms()
-      },
-    }
-  )
-
-  const assignRole = useMutation(
-    async ({ collaboratorId, roleCode }: { collaboratorId: number; roleCode: string }) => {
-      await api.post(`/config/collaborators/${collaboratorId}/role`, { roleCode })
-    },
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('config-roles')
-        queryClient.invalidateQueries('config-collaborator-perms')
-      },
-    }
-  )
 
   const saveTemplate = useMutation(
     async () => {
@@ -769,19 +1253,36 @@ export default function Configuracion() {
         : parsedParams?.users
         ? 1
         : 0
+      if (targetRequiresStructuredParams && targetMissingParamKeys.length > 0) {
+        throw new Error(`Faltan params requeridos: ${targetMissingParamKeys.join(', ')}`)
+      }
+      if (targetParamsInvalidJson) {
+        throw new Error('El JSON de params no es válido')
+      }
       if (targetForm.assignmentId && usersCount > 1) {
         throw new Error(
           'Target con multiples users no puede asignarse a un KPI individual. Usa un target por persona o quita la asignacion.'
         )
       }
+      if (parsedParams?.targetMap && (targetForm.assignmentId || targetForm.scopeKpiId)) {
+        throw new Error('Un target con mapping por filas no puede apuntar también a una asignación o Scope KPI directo')
+      }
+      if (targetForm.assignmentId && targetForm.scopeKpiId) {
+        throw new Error('Un target solo puede apuntar a asignación o Scope KPI')
+      }
       const selectedScope = orgScopes?.find((scope) => scope.id === Number(targetForm.orgScopeId))
+      const selectedScopeKpi = scopeKpis?.find((scopeKpi) => scopeKpi.id === Number(targetForm.scopeKpiId))
+      const resolvedScope = selectedScope || (selectedScopeKpi?.orgScopeId
+        ? orgScopes?.find((scope) => scope.id === Number(selectedScopeKpi.orgScopeId))
+        : null)
       const payload = {
         templateId: Number(targetForm.templateId || selectedTemplateId),
-        scopeType: selectedScope?.type || targetForm.scopeType,
-        scopeId: targetForm.scopeId || selectedScope?.name || '',
-        orgScopeId: targetForm.orgScopeId ? Number(targetForm.orgScopeId) : undefined,
+        scopeType: resolvedScope?.type || targetForm.scopeType,
+        scopeId: targetForm.scopeId || resolvedScope?.name || '',
+        orgScopeId: resolvedScope?.id || (targetForm.orgScopeId ? Number(targetForm.orgScopeId) : undefined),
         params: parsedParams,
         assignmentId: targetForm.assignmentId ? Number(targetForm.assignmentId) : undefined,
+        scopeKpiId: targetForm.scopeKpiId ? Number(targetForm.scopeKpiId) : undefined,
         enabled: targetForm.enabled,
       }
       if (editingTarget) {
@@ -803,11 +1304,151 @@ export default function Configuracion() {
           orgScopeId: '',
           paramsText: '',
           assignmentId: '',
+          scopeKpiId: '',
           enabled: true,
         })
       },
       onError: (error: any) => {
         setTargetFormError(error?.message || 'Error al guardar target')
+      },
+    }
+  )
+  const saveExplicitTargetMappings = useMutation(
+    async () => {
+      const rowsToPersist = targetUnresolvedMappingRows
+        .map((row) => ({
+          row,
+          selection: pendingExplicitMappings[explicitRowKey(row)],
+        }))
+        .filter((item) => item.selection?.entityId)
+
+      if (rowsToPersist.length === 0) {
+        throw new Error('Seleccioná al menos un destino para crear mappings explícitos')
+      }
+
+      const grouped = new Map<
+        string,
+        {
+          sourceType: string
+          entityType: 'collaborator' | 'org_scope'
+          entityId: number
+          mappings: Map<string, { externalKey: string }>
+        }
+      >()
+      const resolvedRows = new Map<
+        string,
+        {
+          assignmentId?: string
+          scopeKpiId?: string
+        }
+      >()
+
+      rowsToPersist.forEach(({ row, selection }) => {
+        const selectedId = Number(selection.entityId)
+        if (row.ownerType === 'assignment') {
+          const assignment = assignmentGroupById.get(selectedId)
+          if (!assignment) {
+            throw new Error(`La asignación seleccionada ya no está disponible para ${row.externalKey}`)
+          }
+          const collaboratorId = Number(assignment.collaboratorId || 0)
+          if (!collaboratorId) {
+            throw new Error(`No se pudo resolver el colaborador base para ${row.externalKey}`)
+          }
+          const groupKey = `${targetExplicitMappingSourceType}:collaborator:${collaboratorId}`
+          if (!grouped.has(groupKey)) {
+            const existingMappings = (dataSourceMappings || []).filter(
+              (mapping) =>
+                normalizeMappingSourceType(mapping.sourceType) === targetExplicitMappingSourceType &&
+                mapping.entityType === 'collaborator' &&
+                Number(mapping.entityId) === collaboratorId
+            )
+            grouped.set(groupKey, {
+              sourceType: targetExplicitMappingSourceType,
+              entityType: 'collaborator',
+              entityId: collaboratorId,
+              mappings: new Map(
+                existingMappings.map((mapping) => [normalizeExternalMatchKey(mapping.externalKey), { externalKey: mapping.externalKey }])
+              ),
+            })
+          }
+          grouped.get(groupKey)!.mappings.set(normalizeExternalMatchKey(row.externalKey), {
+            externalKey: row.externalKey.trim(),
+          })
+          resolvedRows.set(explicitRowKey(row), { assignmentId: String(assignment.id) })
+          return
+        }
+
+        const scopeKpi = scopeKpiById.get(selectedId)
+        if (!scopeKpi) {
+          throw new Error(`El Scope KPI seleccionado ya no está disponible para ${row.externalKey}`)
+        }
+        const orgScopeId = Number(scopeKpi.orgScopeId || 0)
+        if (!orgScopeId) {
+          throw new Error(`No se pudo resolver el scope base para ${row.externalKey}`)
+        }
+        const groupKey = `${targetExplicitMappingSourceType}:org_scope:${orgScopeId}`
+        if (!grouped.has(groupKey)) {
+          const existingMappings = (dataSourceMappings || []).filter(
+            (mapping) =>
+              normalizeMappingSourceType(mapping.sourceType) === targetExplicitMappingSourceType &&
+              mapping.entityType === 'org_scope' &&
+              Number(mapping.entityId) === orgScopeId
+          )
+          grouped.set(groupKey, {
+            sourceType: targetExplicitMappingSourceType,
+            entityType: 'org_scope',
+            entityId: orgScopeId,
+            mappings: new Map(
+              existingMappings.map((mapping) => [normalizeExternalMatchKey(mapping.externalKey), { externalKey: mapping.externalKey }])
+            ),
+          })
+        }
+        grouped.get(groupKey)!.mappings.set(normalizeExternalMatchKey(row.externalKey), {
+          externalKey: row.externalKey.trim(),
+        })
+        resolvedRows.set(explicitRowKey(row), { scopeKpiId: String(scopeKpi.id) })
+      })
+
+      const items = Array.from(grouped.values()).map((group) => ({
+        sourceType: group.sourceType,
+        entityType: group.entityType,
+        entityId: group.entityId,
+        mappings: Array.from(group.mappings.values()),
+      }))
+
+      await api.post('/data-source-mappings/bulk-sync', { items })
+
+      return {
+        resolvedRows,
+        rowCount: rowsToPersist.length,
+      }
+    },
+    {
+      onSuccess: (result) => {
+        queryClient.invalidateQueries('data-source-mappings')
+        persistTargetMappingDraft({
+          ...targetMappingDraft,
+          rows: targetMappingDraft.rows.map((row) => {
+            const resolved = result.resolvedRows.get(explicitRowKey(row))
+            if (!resolved) return row
+            return {
+              ...row,
+              assignmentId: resolved.assignmentId || '',
+              scopeKpiId: resolved.scopeKpiId || '',
+            }
+          }),
+        })
+        setPendingExplicitMappings((prev) =>
+          Object.fromEntries(
+            Object.entries(prev).filter(([key]) => !result.resolvedRows.has(key))
+          )
+        )
+        setTargetFormError('')
+        setToastMessage(`Mappings explícitos guardados y filas resueltas: ${result.rowCount}`)
+        setTimeout(() => setToastMessage(''), 2500)
+      },
+      onError: (error: any) => {
+        setTargetFormError(error?.response?.data?.error || error?.message || 'Error al guardar mappings explícitos')
       },
     }
   )
@@ -875,6 +1516,7 @@ export default function Configuracion() {
             orgScopeId: target.orgScopeId,
             params: target.params || {},
             assignmentId: target.assignmentId || undefined,
+            scopeKpiId: target.scopeKpiId || undefined,
             enabled: true,
           })
         })
@@ -1034,6 +1676,7 @@ export default function Configuracion() {
             orgScopeId: target.orgScopeId,
             params: target.params || {},
             assignmentId: target.assignmentId || undefined,
+            scopeKpiId: target.scopeKpiId || undefined,
             enabled: false,
           })
         })
@@ -1081,6 +1724,8 @@ export default function Configuracion() {
             token: '',
             apiKey: '',
             header: '',
+            clientId: '',
+            clientSecret: '',
           },
         })
       },
@@ -1130,17 +1775,57 @@ export default function Configuracion() {
         metadata,
         active: scopeForm.active,
       }
+      let scopeId = editingScope?.id ? Number(editingScope.id) : null
       if (editingScope) {
         const res = await api.put(`/org-scopes/${editingScope.id}`, payload)
+        scopeId = Number(editingScope.id)
+        if (scopeId) {
+          const sourceTypes = getSourceTypesToSync(
+            scopeExternalKeysBySourceType,
+            dataSourceMappings,
+            'org_scope',
+            scopeId
+          )
+          await Promise.all(
+            sourceTypes.map((sourceType) =>
+              api.post('/data-source-mappings/sync', {
+                sourceType,
+                entityType: 'org_scope',
+                entityId: scopeId,
+                externalKeys: parseExternalKeysText(scopeExternalKeysBySourceType[sourceType] || ''),
+              })
+            )
+          )
+        }
         return res.data
       } else {
         const res = await api.post('/org-scopes', payload)
+        scopeId = Number(res.data?.id || 0)
+        if (scopeId) {
+          const sourceTypes = getSourceTypesToSync(
+            scopeExternalKeysBySourceType,
+            undefined,
+            'org_scope',
+            scopeId
+          )
+          await Promise.all(
+            sourceTypes.map((sourceType) =>
+              api.post('/data-source-mappings/sync', {
+                sourceType,
+                entityType: 'org_scope',
+                entityId: scopeId,
+                externalKeys: parseExternalKeysText(scopeExternalKeysBySourceType[sourceType] || ''),
+              })
+            )
+          )
+        }
         return res.data
       }
     },
     {
       onSuccess: (data: any) => {
         queryClient.invalidateQueries('org-scopes')
+        queryClient.invalidateQueries('data-source-mappings')
         setShowScopeModal(false)
         setEditingScope(null)
         setScopeForm({
@@ -1151,9 +1836,26 @@ export default function Configuracion() {
           metadataText: '',
           active: true,
         })
+        setScopeExternalKeysBySourceType({ [DEFAULT_MAPPING_SOURCE_TYPE]: '' })
+        setScopeMappingSourceType(DEFAULT_MAPPING_SOURCE_TYPE)
         if (data?.warning) {
           alert(data.warning)
         }
+      },
+    }
+  )
+
+  const deleteScope = useMutation(
+    async (scope: any) => {
+      await api.delete(`/org-scopes/${scope.id}`)
+      return scope
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('org-scopes')
+      },
+      onError: (error: any) => {
+        alert(error.response?.data?.error || 'Error al eliminar la unidad organizacional')
       },
     }
   )
@@ -1186,10 +1888,10 @@ export default function Configuracion() {
   )
 
   const placeholderRegex = /\{[a-zA-Z0-9_]+\}/g
-  const testsPlaceholders = templateForm.queryTestsTemplate.match(placeholderRegex) || []
+  const testsPlaceholders: string[] = templateForm.queryTestsTemplate.match(placeholderRegex) || []
   const storiesPlaceholders =
     templateForm.metricType === 'ratio' || templateForm.metricType === 'sla'
-      ? templateForm.queryStoriesTemplate.match(placeholderRegex) || []
+      ? ((templateForm.queryStoriesTemplate.match(placeholderRegex) || []) as string[])
       : []
   const hasAnyPlaceholders = testsPlaceholders.length > 0 || storiesPlaceholders.length > 0
   const testsHasTime = testsPlaceholders.includes('{from}') || testsPlaceholders.includes('{to}')
@@ -1227,6 +1929,39 @@ export default function Configuracion() {
       },
       onError: (error: any) => {
         setTargetPreviewMessage(error?.response?.data?.error || error?.message || 'Error al probar target')
+      },
+    }
+  )
+
+  const previewTargetDraft = useMutation(
+    async () => {
+      if (targetParamsInvalidJson) {
+        throw new Error('El JSON de params no es válido')
+      }
+      let parsedParams: any = {}
+      if (targetForm.paramsText.trim()) {
+        parsedParams = JSON.parse(targetForm.paramsText)
+      }
+      const templateId = Number(targetForm.templateId || selectedTemplateId)
+      if (!templateId) {
+        throw new Error('Selecciona una plantilla para probar el target')
+      }
+      const payload = {
+        templateId,
+        targetId: editingTarget?.id || undefined,
+        params: parsedParams,
+        includeRaw: false,
+      }
+      const res = await api.post('/integrations/templates/test', payload)
+      return res.data
+    },
+    {
+      onSuccess: (data) => {
+        setTargetDraftPreviewResult(data)
+        setTargetDraftPreviewMessage('')
+      },
+      onError: (error: any) => {
+        setTargetDraftPreviewMessage(error?.response?.data?.error || error?.message || 'Error al probar params')
       },
     }
   )
@@ -1376,6 +2111,7 @@ export default function Configuracion() {
                         orgScopeId: '',
                         paramsText: '',
                         assignmentId: '',
+                        scopeKpiId: '',
                         enabled: true,
                       })
                       setTargetFormError('')
@@ -1403,6 +2139,8 @@ export default function Configuracion() {
                         token: '',
                         apiKey: '',
                         header: '',
+                        clientId: '',
+                        clientSecret: '',
                       },
                     })
                     setShowAuthModal(true)
@@ -1577,8 +2315,8 @@ export default function Configuracion() {
             <table className="config-table">
               <thead>
                 <tr>
-                  <th>Scope</th>
-                  <th>Asignación</th>
+                  <th>Área / Equipo</th>
+                  <th>Destino</th>
                   <th>Enabled</th>
                   <th>Acciones</th>
                 </tr>
@@ -1596,7 +2334,15 @@ export default function Configuracion() {
                         </span>
                       ) : null}
                     </td>
-                    <td>{target.assignmentId || '-'}</td>
+                    <td>
+                      {target.assignmentId
+                        ? `Asignación #${target.assignmentId}`
+                        : target.scopeKpiId
+                        ? `${target.scopeKpiName || `Scope KPI #${target.scopeKpiId}`}`
+                        : target.params?.targetMap
+                        ? `Mapping por filas (${Object.keys(target.params.targetMap || {}).length})`
+                        : '-'}
+                    </td>
                     <td>
                       <span className={`status-pill ${target.enabled ? 'ok' : 'review'}`}>
                         {target.enabled ? 'Activa' : 'Inactiva'}
@@ -1615,6 +2361,7 @@ export default function Configuracion() {
                               orgScopeId: target.orgScopeId ? String(target.orgScopeId) : '',
                               paramsText: target.params ? JSON.stringify(target.params, null, 2) : '',
                               assignmentId: target.assignmentId ? String(target.assignmentId) : '',
+                              scopeKpiId: target.scopeKpiId ? String(target.scopeKpiId) : '',
                               enabled: Boolean(target.enabled),
                             })
                             setTargetFormError('')
@@ -1770,12 +2517,15 @@ export default function Configuracion() {
                               connector: profile.connector || 'jira',
                               endpoint: profile.endpoint || '',
                               authType: profile.authType || 'none',
-                              authConfig: profile.authConfig || {
+                              authConfig: {
                                 username: '',
                                 password: '',
                                 token: '',
                                 apiKey: '',
                                 header: '',
+                                clientId: '',
+                                clientSecret: '',
+                                ...(profile.authConfig || {}),
                               },
                             })
                             setShowAuthModal(true)
@@ -1805,7 +2555,7 @@ export default function Configuracion() {
           <div className="card-header">
             <div>
               <h3>Calendarios de medición</h3>
-              <p className="muted">Define ciclos por scope (mensual, trimestral o custom).</p>
+              <p className="muted">Define ciclos de medición por área o equipo (mensual, trimestral o custom).</p>
             </div>
             <button
               className="btn-primary"
@@ -1890,25 +2640,27 @@ export default function Configuracion() {
         <div className="card">
           <div className="card-header">
             <div>
-              <h3>Org Scopes</h3>
-              <p className="muted">Jerarquía de áreas, equipos y personas con herencia.</p>
+              <h3>Estructura Organizacional</h3>
+              <p className="muted">Jerarquía de áreas, equipos y personas con herencia de calendarios.</p>
             </div>
             <button
               className="btn-primary"
               onClick={() => {
                 setEditingScope(null)
-                setScopeForm({
-                  name: '',
-                  type: 'area',
-                  parentId: '',
-                  calendarProfileId: '',
-                  metadataText: '',
-                  active: true,
-                })
-                setShowScopeModal(true)
-              }}
+                  setScopeForm({
+                    name: '',
+                    type: 'area',
+                    parentId: '',
+                    calendarProfileId: '',
+                    metadataText: '',
+                    active: true,
+                  })
+                  setScopeExternalKeysBySourceType({ [DEFAULT_MAPPING_SOURCE_TYPE]: '' })
+                  setScopeMappingSourceType(DEFAULT_MAPPING_SOURCE_TYPE)
+                  setShowScopeModal(true)
+                }}
             >
-              Nuevo scope
+              Nueva unidad
             </button>
           </div>
           <table className="config-table">
@@ -1946,10 +2698,27 @@ export default function Configuracion() {
                           metadataText: scope.metadata ? JSON.stringify(scope.metadata, null, 2) : '',
                           active: Boolean(scope.active),
                         })
+                        setScopeExternalKeysBySourceType(getEntityExternalKeysBySourceType('org_scope', scope.id))
+                        setScopeMappingSourceType(DEFAULT_MAPPING_SOURCE_TYPE)
                         setShowScopeModal(true)
-                        }}
+                      }}
                       >
                         Editar
+                      </button>
+                      <button
+                        className="btn-secondary danger"
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              `¿Eliminar la unidad "${scope.name}"? Esta acción no se puede deshacer.`
+                            )
+                          ) {
+                            deleteScope.mutate(scope)
+                          }
+                        }}
+                        disabled={deleteScope.isLoading}
+                      >
+                        Eliminar
                       </button>
                     </div>
                   </td>
@@ -1958,7 +2727,7 @@ export default function Configuracion() {
               {(!orgScopes || orgScopes.length === 0) && (
                 <tr>
                   <td colSpan={5} className="empty-row">
-                    No hay scopes configurados.
+                    No hay unidades organizacionales configuradas.
                   </td>
                 </tr>
               )}
@@ -1995,6 +2764,8 @@ export default function Configuracion() {
                     <option value="jira">Jira</option>
                     <option value="xray">Xray</option>
                     <option value="sheets">Google Sheets</option>
+                    <option value="looker">Looker</option>
+                    <option value="generic_api">Generic API</option>
                     <option value="manual">Manual / CSV</option>
                   </select>
                 </div>
@@ -2051,6 +2822,24 @@ export default function Configuracion() {
                   <button className="btn-secondary" onClick={() => applyTemplatePreset('sheets_agg')}>
                     Sheets AGG
                   </button>
+                  <button className="btn-secondary" onClick={() => applyTemplatePreset('sheets_grid')}>
+                    Sheets GRID
+                  </button>
+                  <button className="btn-secondary" onClick={() => applyTemplatePreset('sheets_grid_agg')}>
+                    Sheets GRID AGG
+                  </button>
+                  <button className="btn-secondary" onClick={() => applyTemplatePreset('api_value')}>
+                    API VALUE
+                  </button>
+                  <button className="btn-secondary" onClick={() => applyTemplatePreset('api_agg')}>
+                    API AGG
+                  </button>
+                  <button className="btn-secondary" onClick={() => applyTemplatePreset('looker_value')}>
+                    Looker VALUE
+                  </button>
+                  <button className="btn-secondary" onClick={() => applyTemplatePreset('looker_agg')}>
+                    Looker AGG
+                  </button>
                   <button className="btn-secondary" onClick={() => applyTemplatePreset('manual')}>
                     Manual / CSV
                   </button>
@@ -2085,6 +2874,10 @@ export default function Configuracion() {
                       <label>
                         {templateForm.connector === 'jira' || templateForm.connector === 'xray'
                           ? 'Filtro A (template)'
+                          : templateForm.connector === 'generic_api'
+                          ? 'Config request (template)'
+                          : templateForm.connector === 'looker'
+                          ? 'Config Looker (template)'
                           : 'Config A (template)'}
                       </label>
                       <textarea
@@ -2092,23 +2885,31 @@ export default function Configuracion() {
                         value={templateForm.queryTestsTemplate}
                         onChange={(e) => setTemplateForm((prev) => ({ ...prev, queryTestsTemplate: e.target.value }))}
                       />
-                      <div className="helper-text">
-                        {templateForm.connector === 'jira' || templateForm.connector === 'xray'
-                          ? templateForm.metricType === 'sla'
-                            ? `Ejemplo: {baseFilter} AND {endDate} >= {from} AND {endDate} < {to} AND {endDate} <= {limitDate}`
-                            : templateForm.metricType === 'ratio'
-                            ? `Ejemplo: {filterA} AND {dateFieldA} >= {from} AND {dateFieldA} < {to}`
-                            : `Ejemplo: {baseFilter} AND {dateField} >= {from} AND {dateField} < {to}`
-                          : 'Ejemplo: baseFilter={baseFilter} dateField={dateField} from={from} to={to}'}
+                        <div className="helper-text">
+                          {templateForm.connector === 'jira' || templateForm.connector === 'xray'
+                            ? templateForm.metricType === 'sla'
+                              ? `Ejemplo: {baseFilter} AND {endDate} >= {from} AND {endDate} < {to} AND {endDate} <= {limitDate}`
+                              : templateForm.metricType === 'ratio'
+                              ? `Ejemplo: {filterA} AND {dateFieldA} >= {from} AND {dateFieldA} < {to}`
+                              : `Ejemplo: {baseFilter} AND {dateField} >= {from} AND {dateField} < {to}`
+                            : templateForm.connector === 'generic_api'
+                            ? 'Ejemplo: path={path} method={method} resultPath={resultPath} valuePath={valuePath} aggregation={aggregation}'
+                            : templateForm.connector === 'looker'
+                            ? 'Ejemplo: resourceType={query|look|dashboard|dashboard_element|inline_query} resourceId={resourceId} dashboardElementId={dashboardElementId} resultFormat={resultFormat} resultPath={resultPath} valuePath={valuePath}'
+                            : 'Ejemplo: baseFilter={baseFilter} dateField={dateField} from={from} to={to}'}
+                        </div>
                       </div>
-                    </div>
                     {(templateForm.metricType === 'ratio' || templateForm.metricType === 'sla') && (
                       <div className="form-group">
-                        <label>
-                          {templateForm.connector === 'jira' || templateForm.connector === 'xray'
-                            ? 'Filtro B (template)'
-                            : 'Config B (template)'}
-                        </label>
+                          <label>
+                            {templateForm.connector === 'jira' || templateForm.connector === 'xray'
+                              ? 'Filtro B (template)'
+                              : templateForm.connector === 'generic_api'
+                              ? 'Config B (template)'
+                              : templateForm.connector === 'looker'
+                              ? 'Config B (template)'
+                              : 'Config B (template)'}
+                          </label>
                         <textarea
                           rows={3}
                           value={templateForm.queryStoriesTemplate}
@@ -2121,6 +2922,10 @@ export default function Configuracion() {
                             ? templateForm.metricType === 'sla'
                               ? `Ejemplo: {baseFilter} AND {endDate} >= {from} AND {endDate} < {to}`
                               : `Ejemplo: {filterB} AND {dateFieldB} >= {from} AND {dateFieldB} < {to}`
+                            : templateForm.connector === 'generic_api'
+                            ? 'Opcional. Solo si queres documentar otro bloque de placeholders.'
+                            : templateForm.connector === 'looker'
+                            ? 'Opcional. Para inline_query usá queryBody. Para dashboard podés usar dashboardElementId, dashboardElementTitle o dashboardElementIndex.'
                             : 'Ejemplo: usa el mismo config A o separa A/B si necesitas dos agregados.'}
                         </div>
                       </div>
@@ -2140,7 +2945,11 @@ export default function Configuracion() {
                   <div className="helper-text">
                     {templateForm.metricType === 'manual'
                       ? 'Ejemplo: manual'
-                      : 'Ejemplo: sheetKey={sheetKey} tab={tab} periodColumn={periodColumn} areaColumn={areaColumn} kpiColumn={kpiColumn} valueColumn={valueColumn} aggregation={SUM|AVG}'}
+                      : templateForm.connector === 'generic_api'
+                      ? 'Ejemplo: path={path} method={method} query={query} resultPath={resultPath} valuePath={valuePath} aggregation={aggregation}'
+                      : templateForm.connector === 'looker'
+                      ? 'Ejemplo: resourceType={query|look|dashboard|dashboard_element|inline_query} resourceId={resourceId} dashboardElementId={dashboardElementId} dashboardElementTitle={dashboardElementTitle} resultFormat={resultFormat} resultPath={resultPath} valuePath={valuePath}'
+                      : 'Ejemplo: sheetKey={sheetKey} range={range} areaColumn={areaColumn} collaboratorColumn={collaboratorColumn} kpiColumn={kpiColumn}. En params: collaboratorValue + valueColumn o valueColumnFromPeriod=true + valueColumnPeriodFormat=YYYYMM'}
                   </div>
                 </div>
               )}
@@ -2262,12 +3071,13 @@ export default function Configuracion() {
                     ))}
                   </select>
                 </div>
-                <div className="form-group">
-                  <label>Scope</label>
+              <div className="form-group">
+                  <label>Tipo de unidad</label>
                   <select
                     value={targetForm.scopeType}
                     onChange={(e) => setTargetForm((prev) => ({ ...prev, scopeType: e.target.value }))}
                   >
+                    <option value="company">Empresa</option>
                     <option value="area">Área</option>
                     <option value="team">Equipo</option>
                     <option value="person">Persona</option>
@@ -2277,7 +3087,7 @@ export default function Configuracion() {
               </div>
               <div className="form-row">
                 <div className="form-group">
-                  <label>Org Scope</label>
+                  <label>Unidad organizacional</label>
                   <select
                     value={targetForm.orgScopeId}
                     onChange={(e) => {
@@ -2288,10 +3098,16 @@ export default function Configuracion() {
                         orgScopeId: value,
                         scopeType: scope?.type || prev.scopeType,
                         scopeId: scope?.name || prev.scopeId,
+                        scopeKpiId:
+                          prev.scopeKpiId &&
+                          scopeKpis?.find((scopeKpi) => Number(scopeKpi.id) === Number(prev.scopeKpiId))
+                            ?.orgScopeId !== Number(value)
+                            ? ''
+                            : prev.scopeKpiId,
                       }))
                     }}
                   >
-                    <option value="">Selecciona un scope</option>
+                    <option value="">Seleccioná un área o equipo</option>
                     {orgScopes?.map((scope) => (
                       <option key={scope.id} value={scope.id}>
                         {scope.type} · {scope.name}
@@ -2300,7 +3116,7 @@ export default function Configuracion() {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Scope ID</label>
+                  <label>ID externo</label>
                   <input
                     value={targetForm.scopeId}
                     onChange={(e) => setTargetForm((prev) => ({ ...prev, scopeId: e.target.value }))}
@@ -2309,13 +3125,19 @@ export default function Configuracion() {
               </div>
               <div className="form-row">
                 <div className="form-group">
-                  <label>Asignación destino</label>
+                  <label>Asignación destino (solo si es individual)</label>
                   <select
                     value={targetForm.assignmentId}
-                    onChange={(e) => setTargetForm((prev) => ({ ...prev, assignmentId: e.target.value }))}
+                    onChange={(e) =>
+                      setTargetForm((prev) => ({
+                        ...prev,
+                        assignmentId: e.target.value,
+                        scopeKpiId: e.target.value ? '' : prev.scopeKpiId,
+                      }))
+                    }
                   >
                     <option value="">Selecciona una asignación</option>
-                    {assignments?.map((assignment: any) => (
+                    {assignmentGroupsForTarget.map((assignment: any) => (
                       <option key={assignment.id} value={assignment.id}>
                         {assignment.collaboratorName || `Colaborador #${assignment.collaboratorId}`} ·{' '}
                         {assignment.kpiName || `KPI #${assignment.kpiId}`} ·{' '}
@@ -2323,11 +3145,55 @@ export default function Configuracion() {
                       </option>
                     ))}
                   </select>
+                  <div className="helper-text">
+                    Seleccioná una asignación base solo si el target debe escribir sobre un KPI colaborador.
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>KPI Grupal destino</label>
+                  <select
+                    value={targetForm.scopeKpiId}
+                    onChange={(e) =>
+                      setTargetForm((prev) => {
+                        const selectedScopeKpi = scopeKpis?.find(
+                          (scopeKpi) => Number(scopeKpi.id) === Number(e.target.value)
+                        )
+                        const selectedScope = selectedScopeKpi?.orgScopeId
+                          ? orgScopes?.find((scope) => Number(scope.id) === Number(selectedScopeKpi.orgScopeId))
+                          : null
+                        return {
+                          ...prev,
+                          scopeKpiId: e.target.value,
+                          assignmentId: e.target.value ? '' : prev.assignmentId,
+                          orgScopeId: e.target.value
+                            ? String(selectedScopeKpi?.orgScopeId || prev.orgScopeId)
+                            : prev.orgScopeId,
+                          scopeType: selectedScope?.type || prev.scopeType,
+                          scopeId: selectedScope?.name || prev.scopeId,
+                        }
+                      })
+                    }
+                  >
+                    <option value="">Seleccioná un KPI Grupal</option>
+                    {(scopeKpis || [])
+                      .filter((scopeKpi: any) =>
+                        targetForm.orgScopeId ? Number(scopeKpi.orgScopeId) === Number(targetForm.orgScopeId) : true
+                      )
+                      .map((scopeKpi: any) => (
+                        <option key={scopeKpi.id} value={scopeKpi.id}>
+                          {scopeKpi.name} · {scopeKpi.orgScopeName || `Scope #${scopeKpi.orgScopeId}`} ·{' '}
+                          {scopeKpi.periodName || `Período #${scopeKpi.periodId}`}
+                        </option>
+                      ))}
+                  </select>
+                  <div className="helper-text">
+                    Seleccioná esto si el target debe escribir sobre un KPI organizacional. Solo uno de los dos destinos puede estar informado.
+                  </div>
                 </div>
               </div>
               <div className="form-group">
-                <label>Params (JSON)</label>
-                <div className="helper-text">Pega un JQL y convertilo a JSON para usarlo en params.</div>
+                <label>JQL raw (opcional)</label>
+                <div className="helper-text">Usalo solo como ayuda para convertir un JQL en params JSON.</div>
                 <textarea
                   rows={4}
                   placeholder="Pegar JQL aqui..."
@@ -2348,19 +3214,405 @@ export default function Configuracion() {
                     Limpiar
                   </button>
                 </div>
+                <label style={{ marginTop: 12, display: 'block' }}>Params JSON (guardado real del target)</label>
+                <div className="helper-text">
+                  Este contenido es el que se persiste y usa el runner al ejecutar el target.
+                </div>
                 <textarea
                   rows={5}
                   value={targetForm.paramsText}
                   onChange={(e) => setTargetForm((prev) => ({ ...prev, paramsText: e.target.value }))}
                 />
+                {selectedTargetTemplate?.connector === 'sheets' ? (
+                  <div className="helper-text">
+                    Para hojas por lider: usa <code>range</code> con A1 notation (ej: <code>'Alexis Cantenys'!A3:Z</code>),
+                    {' '}<code>collaboratorValue</code> para elegir la fila correcta y, si los meses son columnas,
+                    {' '}<code>valueColumnFromPeriod=true</code> + <code>valueColumnPeriodFormat=YYYYMM</code>.
+                  </div>
+                ) : null}
               </div>
+              {targetRequiresStructuredParams && targetRequiredParamKeys.length > 0 ? (
+                <div className="helper-text">
+                  Params requeridos por la plantilla: <strong>{targetRequiredParamKeys.join(', ')}</strong>
+                </div>
+              ) : null}
+              {selectedTargetTemplate?.connector === 'looker' || selectedTargetTemplate?.connector === 'generic_api' ? (
+                <div className="helper-text">
+                  Para actualizar multiples destinos desde una sola corrida, podés usar
+                  {' '}<code>targetMap</code>, <code>mappingKeyPath</code>, <code>mappingValuePath</code> y
+                  {' '}<code>mappingOwnerType</code> (<code>assignment</code> o <code>scopeKpi</code>).
+                  {selectedTargetTemplate?.connector === 'looker'
+                    ? ' Looker también soporta resourceType dashboard y dashboard_element.'
+                    : ''}
+                </div>
+              ) : null}
+              {supportsTargetMappingEditor ? (
+                <div className="form-group" style={{ marginTop: 14 }}>
+                  <label>Editor de mapping por filas</label>
+                  <div className="helper-text">
+                    Armá el <code>targetMap</code> desde UI. Si usás este editor, quitá el destino directo del target.
+                    Cuando importás desde preview, el sistema intenta autocompletar coincidencias por nombre.
+                  </div>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Mapping result path</label>
+                      <input
+                        placeholder="data.rows"
+                        value={targetMappingDraft.mappingResultPath}
+                        onChange={(e) => updateTargetMappingField('mappingResultPath', e.target.value)}
+                        disabled={targetParamsInvalidJson}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Mapping key path</label>
+                      <input
+                        placeholder="qa o area"
+                        value={targetMappingDraft.mappingKeyPath}
+                        onChange={(e) => updateTargetMappingField('mappingKeyPath', e.target.value)}
+                        disabled={targetParamsInvalidJson}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Mapping value path</label>
+                      <input
+                        placeholder="stories_delivered o revenue"
+                        value={targetMappingDraft.mappingValuePath}
+                        onChange={(e) => updateTargetMappingField('mappingValuePath', e.target.value)}
+                        disabled={targetParamsInvalidJson}
+                      />
+                    </div>
+                  </div>
+                  <div className="action-buttons" style={{ marginTop: 6 }}>
+                    <button
+                      className="btn-secondary"
+                      type="button"
+                      onClick={addTargetMappingRow}
+                      disabled={targetParamsInvalidJson}
+                    >
+                      Agregar fila de mapping
+                    </button>
+                  </div>
+                  {targetMappingDraft.rows.length > 0 ? (
+                    <table className="config-table" style={{ marginTop: 10 }}>
+                      <thead>
+                        <tr>
+                          <th>Clave externa</th>
+                          <th>Destino</th>
+                          <th>Asignación</th>
+                          <th>KPI Grupal</th>
+                          <th>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {targetMappingDraft.rows.map((row, index) => (
+                          <tr key={`${row.externalKey || 'row'}-${index}`}>
+                            <td>
+                              <input
+                                value={row.externalKey}
+                                placeholder="Johana / Revenue / CS"
+                                onChange={(e) =>
+                                  updateTargetMappingRow(index, {
+                                    externalKey: e.target.value,
+                                  })
+                                }
+                                disabled={targetParamsInvalidJson}
+                              />
+                            </td>
+                            <td>
+                              <select
+                                value={row.ownerType}
+                                onChange={(e) =>
+                                  updateTargetMappingRow(index, {
+                                    ownerType: e.target.value === 'scopeKpi' ? 'scopeKpi' : 'assignment',
+                                  })
+                                }
+                                disabled={targetParamsInvalidJson}
+                              >
+                                <option value="assignment">Asignación</option>
+                                <option value="scopeKpi">KPI Grupal</option>
+                              </select>
+                            </td>
+                            <td>
+                              <select
+                                value={row.assignmentId}
+                                onChange={(e) =>
+                                  updateTargetMappingRow(index, {
+                                    assignmentId: e.target.value,
+                                  })
+                                }
+                                disabled={row.ownerType !== 'assignment' || targetParamsInvalidJson}
+                              >
+                                <option value="">Selecciona una asignación</option>
+                                {assignmentGroupsForTarget.map((assignment: any) => (
+                                  <option key={assignment.id} value={assignment.id}>
+                                    {assignment.collaboratorName || `Colaborador #${assignment.collaboratorId}`} ·{' '}
+                                    {assignment.kpiName || `KPI #${assignment.kpiId}`} ·{' '}
+                                    {assignment.periodName || `Período #${assignment.periodId}`}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td>
+                              <select
+                                value={row.scopeKpiId}
+                                onChange={(e) =>
+                                  updateTargetMappingRow(index, {
+                                    scopeKpiId: e.target.value,
+                                  })
+                                }
+                                disabled={row.ownerType !== 'scopeKpi' || targetParamsInvalidJson}
+                              >
+                                <option value="">Seleccioná un KPI Grupal</option>
+                                {(scopeKpis || []).map((scopeKpi: any) => (
+                                  <option key={scopeKpi.id} value={scopeKpi.id}>
+                                    {scopeKpi.name} · {scopeKpi.orgScopeName || `Scope #${scopeKpi.orgScopeId}`} ·{' '}
+                                    {scopeKpi.periodName || `Período #${scopeKpi.periodId}`}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td>
+                              <button
+                                className="btn-secondary"
+                                type="button"
+                                onClick={() => removeTargetMappingRow(index)}
+                                disabled={targetParamsInvalidJson}
+                              >
+                                Eliminar
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="helper-text" style={{ marginTop: 10 }}>
+                      Sin filas configuradas. Agregá una fila para mapear claves externas a asignaciones o Scope KPIs.
+                    </div>
+                  )}
+                  {targetUnresolvedMappingRows.length > 0 ? (
+                    <>
+                      <div className="form-warning" style={{ marginTop: 10 }}>
+                        Hay <strong>{targetUnresolvedMappingRows.length}</strong> filas del <code>targetMap</code> sin destino
+                        asignado. Completalas o eliminá las que no quieras usar.
+                      </div>
+                      <div className="preview-box" style={{ marginTop: 10 }}>
+                        <div className="muted">
+                          Podés crear mappings explícitos de <code>data_source_mappings</code> para{' '}
+                          <strong>{getMappingSourceTypeLabel(targetExplicitMappingSourceType)}</strong> sin salir del modal.
+                          Eso guarda la clave externa para futuros previews y además resuelve estas filas ahora.
+                        </div>
+                        <table className="config-table" style={{ marginTop: 10 }}>
+                          <thead>
+                            <tr>
+                              <th>Clave externa</th>
+                              <th>Destino a persistir</th>
+                              <th>Se guarda sobre</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {targetUnresolvedMappingRows.map((row) => {
+                              const rowKey = explicitRowKey(row)
+                              const pending = pendingExplicitMappings[rowKey]
+                              return (
+                                <tr key={`pending-mapping-${rowKey}`}>
+                                  <td>
+                                    <strong>{row.externalKey || 'Sin clave'}</strong>
+                                    <div className="helper-text">
+                                      {row.ownerType === 'assignment'
+                                        ? 'La clave se guardará contra el colaborador base de la asignación elegida.'
+                                        : 'La clave se guardará contra el org scope base del Scope KPI elegido.'}
+                                    </div>
+                                  </td>
+                                  <td>
+                                    {row.ownerType === 'assignment' ? (
+                                      <select
+                                        value={pending?.entityId || ''}
+                                        onChange={(e) =>
+                                          setPendingExplicitMappings((prev) => ({
+                                            ...prev,
+                                            [rowKey]: {
+                                              externalKey: row.externalKey,
+                                              ownerType: row.ownerType,
+                                              entityId: e.target.value,
+                                            },
+                                          }))
+                                        }
+                                        disabled={targetParamsInvalidJson || saveExplicitTargetMappings.isLoading}
+                                      >
+                                        <option value="">Selecciona una asignación</option>
+                                        {assignmentGroupsForTarget.map((assignment: any) => (
+                                          <option key={`pending-assignment-${assignment.id}`} value={assignment.id}>
+                                            {assignment.collaboratorName || `Colaborador #${assignment.collaboratorId}`} ·{' '}
+                                            {assignment.kpiName || `KPI #${assignment.kpiId}`} ·{' '}
+                                            {assignment.periodName || `Período #${assignment.periodId}`}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    ) : (
+                                      <select
+                                        value={pending?.entityId || ''}
+                                        onChange={(e) =>
+                                          setPendingExplicitMappings((prev) => ({
+                                            ...prev,
+                                            [rowKey]: {
+                                              externalKey: row.externalKey,
+                                              ownerType: row.ownerType,
+                                              entityId: e.target.value,
+                                            },
+                                          }))
+                                        }
+                                        disabled={targetParamsInvalidJson || saveExplicitTargetMappings.isLoading}
+                                      >
+                                        <option value="">Seleccioná un KPI Grupal</option>
+                                        {(scopeKpis || []).map((scopeKpi: any) => (
+                                          <option key={`pending-scope-${scopeKpi.id}`} value={scopeKpi.id}>
+                                            {scopeKpi.name} · {scopeKpi.orgScopeName || `Scope #${scopeKpi.orgScopeId}`} ·{' '}
+                                            {scopeKpi.periodName || `Período #${scopeKpi.periodId}`}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    )}
+                                  </td>
+                                  <td>
+                                    {pending?.entityId ? (
+                                      <span className="status-pill ok">
+                                        {row.ownerType === 'assignment'
+                                          ? collaboratorById.get(
+                                              Number(assignmentGroupById.get(Number(pending.entityId))?.collaboratorId || 0)
+                                            )?.name || 'Colaborador'
+                                          : scopeById.get(
+                                              Number(scopeKpiById.get(Number(pending.entityId))?.orgScopeId || 0)
+                                            )?.name || 'Org scope'}
+                                      </span>
+                                    ) : (
+                                      <span className="muted">Pendiente</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                        <div className="action-buttons" style={{ marginTop: 10 }}>
+                          <button
+                            className="btn-secondary"
+                            type="button"
+                            onClick={() => saveExplicitTargetMappings.mutate()}
+                            disabled={
+                              targetParamsInvalidJson ||
+                              saveExplicitTargetMappings.isLoading ||
+                              pendingExplicitMappingSelectionsCount === 0
+                            }
+                          >
+                            {saveExplicitTargetMappings.isLoading
+                              ? 'Guardando mappings...'
+                              : `Guardar mappings explícitos y resolver (${pendingExplicitMappingSelectionsCount})`}
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
+              {supportsTargetMappingEditor ? (
+                <div className="form-group" style={{ marginTop: 12 }}>
+                  <div className="action-buttons">
+                    <button
+                      className="btn-secondary"
+                      type="button"
+                      onClick={() => previewTargetDraft.mutate()}
+                      disabled={previewTargetDraft.isLoading || targetParamsInvalidJson}
+                    >
+                      {previewTargetDraft.isLoading ? 'Probando...' : 'Probar params'}
+                    </button>
+                    {Array.isArray(targetDraftPreviewResult?.sourceMeta?.previewRows) &&
+                    targetDraftPreviewResult.sourceMeta.previewRows.length > 0 ? (
+                      <button
+                        className="btn-secondary"
+                        type="button"
+                        onClick={() => importPreviewRowsToMapping(targetDraftPreviewResult)}
+                      >
+                        Cargar claves desde preview
+                      </button>
+                    ) : null}
+                    {Array.isArray(targetDraftPreviewResult?.sourceMeta?.unmappedKeys) &&
+                    targetDraftPreviewResult.sourceMeta.unmappedKeys.length > 0 ? (
+                      <button
+                        className="btn-secondary"
+                        type="button"
+                        onClick={() => importPreviewRowsToMapping(targetDraftPreviewResult, 'unmapped')}
+                      >
+                        Agregar solo faltantes
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="helper-text">
+                    El preview usa la plantilla seleccionada y los params actuales del modal, sin necesidad de guardar el
+                    target antes.
+                  </div>
+                  {targetDraftPreviewMessage ? <div className="form-error">{targetDraftPreviewMessage}</div> : null}
+                  {targetDraftPreviewResult ? (
+                    <div className="preview-box" style={{ marginTop: 10 }}>
+                      <div className="muted">
+                        {targetDraftPreviewResult.sourceMeta
+                          ? `Valor preview: ${targetDraftPreviewResult.computed}`
+                          : `A: ${targetDraftPreviewResult.testsTotal} · B: ${targetDraftPreviewResult.storiesTotal} · Valor: ${targetDraftPreviewResult.computed}`}
+                      </div>
+                      <div className="muted">
+                        Rango: {targetDraftPreviewResult.from} → {targetDraftPreviewResult.to}
+                      </div>
+                      <PreviewSourceMeta sourceMeta={targetDraftPreviewResult.sourceMeta} />
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="helper-text">
                 Periodo calculado: <strong>{targetPeriodPreview.period}</strong> · Rango: {targetPeriodPreview.from} →{' '}
-                {targetPeriodPreview.to}. El subperiodo destino se resuelve automaticamente al ejecutar.
+                {targetPeriodPreview.to}.
               </div>
+              <div className="form-hint">
+                {targetResolvedSubperiod ? (
+                  <>
+                    Subperíodo destino: <strong>{targetResolvedSubperiod.name}</strong> ·{' '}
+                    {targetResolvedSubperiod.startDate} → {targetResolvedSubperiod.endDate}
+                  </>
+                ) : (
+                  <>Subperíodo destino: se resolverá al ejecutar (no hay calendario asociado o subperíodos).</>
+                )}
+              </div>
+              {assignmentForTarget?.subPeriodId && (
+                <div className="form-warning">
+                  Esta asignación pertenece a un subperíodo específico. Para que el mes se resuelva automáticamente,
+                  seleccioná la asignación base (sin subperíodo).
+                </div>
+              )}
+              {scopeKpiForTarget?.subPeriodId && (
+                <div className="form-warning">
+                  Este Scope KPI pertenece a un subperíodo específico. Si querés resolución mensual automática,
+                  usá un Scope KPI base sin subperíodo.
+                </div>
+              )}
               {targetAssignmentBlocked ? (
                 <div className="form-error">
                   Hay multiples users en params. Para asignacion individual, crea un target por persona o quita la asignacion.
+                </div>
+              ) : null}
+              {targetParamsInvalidJson ? (
+                <div className="form-error">El JSON de params no es válido.</div>
+              ) : null}
+              {targetRequiresStructuredParams && targetMissingParamKeys.length > 0 ? (
+                <div className="form-error">
+                  Faltan params requeridos para la plantilla: {targetMissingParamKeys.join(', ')}
+                </div>
+              ) : null}
+              {targetForm.assignmentId && targetForm.scopeKpiId ? (
+                <div className="form-error">El target no puede apuntar a asignación y KPI Grupal al mismo tiempo.</div>
+              ) : null}
+              {targetDirectDestinationBlockedByMapping ? (
+                <div className="form-error">
+                  Si configurás mapping por filas, quitá el destino directo del target. Cada fila debe resolver su propia
+                  asignación o Scope KPI.
                 </div>
               ) : null}
               {targetFormError ? <div className="form-error">{targetFormError}</div> : null}
@@ -2382,7 +3634,15 @@ export default function Configuracion() {
               <button
                 className="btn-primary"
                 onClick={() => saveTarget.mutate()}
-                disabled={!targetForm.scopeId.trim() || saveTarget.isLoading || targetAssignmentBlocked}
+                disabled={
+                  !targetResolvedScopeName ||
+                  saveTarget.isLoading ||
+                  targetAssignmentBlocked ||
+                  targetDirectDestinationBlockedByMapping ||
+                  Boolean(targetForm.assignmentId && targetForm.scopeKpiId) ||
+                  targetParamsInvalidJson ||
+                  (targetRequiresStructuredParams && targetMissingParamKeys.length > 0)
+                }
               >
                 {saveTarget.isLoading ? 'Guardando...' : 'Guardar target'}
               </button>
@@ -2525,6 +3785,8 @@ export default function Configuracion() {
                     <option value="jira">Jira</option>
                     <option value="xray">Xray</option>
                     <option value="sheets">Google Sheets</option>
+                    <option value="looker">Looker</option>
+                    <option value="generic_api">Generic API</option>
                   </select>
                 </div>
               </div>
@@ -2537,6 +3799,10 @@ export default function Configuracion() {
                 />
                 {authForm.connector === 'sheets' ? (
                   <div className="helper-text">Opcional. Ejemplo: https://sheets.googleapis.com</div>
+                ) : authForm.connector === 'looker' ? (
+                  <div className="helper-text">Ejemplo: https://mi-looker.empresa.com o https://mi-looker.empresa.com/api/4.0</div>
+                ) : authForm.connector === 'generic_api' ? (
+                  <div className="helper-text">Ejemplo: https://api.empresa.com o https://tu-looker/api/4.0</div>
                 ) : (
                   <div className="helper-text">Ejemplo: https://tu-dominio.atlassian.net</div>
                 )}
@@ -2594,6 +3860,40 @@ export default function Configuracion() {
                       }))
                     }
                   />
+                </div>
+              )}
+              {authForm.connector === 'looker' && (
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Client ID</label>
+                    <input
+                      value={authForm.authConfig.clientId}
+                      onChange={(e) =>
+                        setAuthForm((prev) => ({
+                          ...prev,
+                          authConfig: { ...prev.authConfig, clientId: e.target.value },
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Client Secret</label>
+                    <input
+                      type="password"
+                      value={authForm.authConfig.clientSecret}
+                      onChange={(e) =>
+                        setAuthForm((prev) => ({
+                          ...prev,
+                          authConfig: { ...prev.authConfig, clientSecret: e.target.value },
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+              {authForm.connector === 'looker' && (
+                <div className="helper-text">
+                  Si cargás `clientId/clientSecret`, KPI Manager hace `POST /api/4.0/login`. También podés usar token directo.
                 </div>
               )}
               {authForm.authType === 'apiKey' && (
@@ -2886,8 +4186,9 @@ export default function Configuracion() {
               {targetPreviewResult ? (
                 <div className="preview-box">
                   <div className="muted">
-                    A: {targetPreviewResult.testsTotal} · B: {targetPreviewResult.storiesTotal} · Valor:{' '}
-                    {targetPreviewResult.computed}
+                    {targetPreviewResult.sourceMeta
+                      ? `Valor: ${targetPreviewResult.computed}`
+                      : `A: ${targetPreviewResult.testsTotal} · B: ${targetPreviewResult.storiesTotal} · Valor: ${targetPreviewResult.computed}`}
                   </div>
                   <div className="muted">
                     Rango: {targetPreviewResult.from} → {targetPreviewResult.to}
@@ -2895,14 +4196,20 @@ export default function Configuracion() {
                   {targetPreviewResult.warnings?.length ? (
                     <div className="form-error">{targetPreviewResult.warnings.join(' · ')}</div>
                   ) : null}
-                  <div className="preview-jql">
-                    <strong>Filtro A</strong>
-                    <pre>{targetPreviewResult.testsJql}</pre>
-                  </div>
-                  <div className="preview-jql">
-                    <strong>Filtro B</strong>
-                    <pre>{targetPreviewResult.storiesJql}</pre>
-                  </div>
+                  {targetPreviewResult.sourceMeta ? (
+                    <PreviewSourceMeta sourceMeta={targetPreviewResult.sourceMeta} />
+                  ) : (
+                    <>
+                      <div className="preview-jql">
+                        <strong>Filtro A</strong>
+                        <pre>{targetPreviewResult.testsJql}</pre>
+                      </div>
+                      <div className="preview-jql">
+                        <strong>Filtro B</strong>
+                        <pre>{targetPreviewResult.storiesJql}</pre>
+                      </div>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="muted">Probando target…</div>
@@ -2921,7 +4228,7 @@ export default function Configuracion() {
         <div className="modal-overlay" onClick={() => setShowScopeModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{editingScope ? 'Editar scope' : 'Nuevo scope'}</h2>
+              <h2>{editingScope ? 'Editar unidad' : 'Nueva unidad organizacional'}</h2>
               <button className="close-button" onClick={() => setShowScopeModal(false)}>
                 ×
               </button>
@@ -2991,6 +4298,33 @@ export default function Configuracion() {
                   placeholder='{"projects":["GT_MISIM"],"authProfileId":1}'
                 />
               </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Source type</label>
+                  <select
+                    value={scopeMappingSourceType}
+                    onChange={(e) => setScopeMappingSourceType(normalizeMappingSourceType(e.target.value))}
+                  >
+                    {MAPPING_SOURCE_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Claves externas</label>
+                  <input
+                    value={scopeExternalKeysBySourceType[scopeMappingSourceType] || ''}
+                    onChange={(e) => updateScopeExternalKeysForSourceType(e.target.value)}
+                    placeholder="revenue, cs, customer success"
+                  />
+                  <small className="form-hint">
+                    Alias o códigos externos separados por coma para{' '}
+                    {getMappingSourceTypeLabel(scopeMappingSourceType)}. Global se usa como fallback.
+                  </small>
+                </div>
+              </div>
               <div className="form-group">
                 <label>Activo</label>
                 <select
@@ -3011,7 +4345,7 @@ export default function Configuracion() {
                 onClick={() => saveScope.mutate()}
                 disabled={!scopeForm.name.trim() || saveScope.isLoading}
               >
-                {saveScope.isLoading ? 'Guardando...' : 'Guardar scope'}
+                {saveScope.isLoading ? 'Guardando...' : 'Guardar unidad'}
               </button>
             </div>
           </div>
