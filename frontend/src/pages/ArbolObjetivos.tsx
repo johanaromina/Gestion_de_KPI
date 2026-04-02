@@ -5,6 +5,7 @@ import api from '../services/api'
 import { ObjectiveTree } from '../types'
 import ObjectiveTreeForm from '../components/ObjectiveTreeForm'
 import ScopeKPIDetailModal from '../components/ScopeKPIDetailModal'
+import { useDialog } from '../components/Dialog'
 import './ArbolObjetivos.css'
 
 type ObjectiveDrilldownScopeLink = {
@@ -66,6 +67,7 @@ export default function ArbolObjetivos() {
   const [detailScopeKpi, setDetailScopeKpi] = useState<ObjectiveDrilldownScopeKpi | null>(null)
 
   const queryClient = useQueryClient()
+  const dialog = useDialog()
 
   const { data: objectives, isLoading } = useQuery<ObjectiveTree[]>(
     'objective-trees',
@@ -106,9 +108,10 @@ export default function ArbolObjetivos() {
         queryClient.invalidateQueries('objective-trees')
       },
       onError: (error: any) => {
-        alert(
+        void dialog.alert(
           error.response?.data?.error ||
-            'Error al eliminar objetivo. Verifica que no tenga objetivos hijos asociados.'
+            'Error al eliminar objetivo. Verificá que no tenga objetivos hijos asociados.',
+          { title: 'Error al eliminar', variant: 'danger' }
         )
       },
     }
@@ -140,13 +143,11 @@ export default function ArbolObjetivos() {
   }
 
   const handleDelete = async (id: number, name: string) => {
-    if (
-      window.confirm(
-        `¿Estás seguro de eliminar el objetivo "${name}"? Esta acción eliminará también todos los objetivos hijos asociados.`
-      )
-    ) {
-      deleteMutation.mutate(id)
-    }
+    const ok = await dialog.confirm(
+      `¿Estás seguro de eliminar el objetivo "${name}"? Esta acción eliminará también todos los objetivos hijos asociados.`,
+      { title: 'Eliminar objetivo', confirmLabel: 'Eliminar', variant: 'danger' }
+    )
+    if (ok) deleteMutation.mutate(id)
   }
 
   const toggleExpansion = (id: number) => {

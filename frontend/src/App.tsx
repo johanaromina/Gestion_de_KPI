@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from 'react-query'
+import { DialogProvider } from './components/Dialog'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
@@ -56,6 +57,7 @@ const RequireAuth = ({ children }: { children: JSX.Element }) => {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <DialogProvider>
       <Router>
         <Layout>
           <Routes>
@@ -262,6 +264,7 @@ function App() {
           </Routes>
         </Layout>
       </Router>
+      </DialogProvider>
     </QueryClientProvider>
   )
 }

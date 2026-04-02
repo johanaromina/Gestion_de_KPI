@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from 'react-query'
 import api from '../services/api'
+import { useDialog } from './Dialog'
 import './ProposeValueModal.css'
 
 interface ProposeValueModalProps {
@@ -34,6 +35,7 @@ export default function ProposeValueModal({
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const queryClient = useQueryClient()
+  const dialog = useDialog()
 
   const proposeMutation = useMutation(
     async (data: { actual?: number; comments?: string; reason?: string; evidenceUrl?: string }) => {
@@ -50,9 +52,10 @@ export default function ProposeValueModal({
         onClose()
       },
       onError: (error: any) => {
-        alert(
+        void dialog.alert(
           error.response?.data?.error ||
-            'Error al proponer valores. Verifica que el período no esté cerrado.'
+            'Error al proponer valores. Verificá que el período no esté cerrado.',
+          { title: 'Error', variant: 'danger' }
         )
       },
     }

@@ -5,6 +5,7 @@ import api from '../services/api'
 import { KPI } from '../types'
 import KPIForm from '../components/KPIForm'
 import { useAuth } from '../hooks/useAuth'
+import { useDialog } from '../components/Dialog'
 import './KPIs.css'
 
 const defaultFormula = (direction?: KPI['direction']) => {
@@ -38,6 +39,7 @@ export default function KPIs() {
 
   const queryClient = useQueryClient()
   const { isCollaborator } = useAuth()
+  const dialog = useDialog()
 
   const { data: kpis, isLoading } = useQuery<KPI[]>(
     'kpis',
@@ -85,7 +87,7 @@ export default function KPIs() {
         queryClient.invalidateQueries('kpis')
       },
       onError: (error: any) => {
-        alert(error.response?.data?.error || 'Error al eliminar KPI. Verifica que no tenga asignaciones asociadas.')
+        void dialog.alert(error.response?.data?.error || 'Error al eliminar KPI. Verificá que no tenga asignaciones asociadas.', { title: 'Error al eliminar', variant: 'danger' })
       },
     }
   )
@@ -100,7 +102,7 @@ export default function KPIs() {
         queryClient.invalidateQueries('collaborator-kpis-summary')
       },
       onError: (error: any) => {
-        alert(error.response?.data?.error || 'Error al cerrar el KPI en el período.')
+        void dialog.alert(error.response?.data?.error || 'Error al cerrar el KPI en el período.', { title: 'Error', variant: 'danger' })
       },
     }
   )
@@ -145,14 +147,12 @@ export default function KPIs() {
 }
 
   const handleDelete = async (id: number, name: string) => {
-  if (isCollaborator) return
-  if (
-    window.confirm(
-        `¿Estás seguro de eliminar el KPI "${name}"? Esta acción no se puede deshacer y eliminará todas las asignaciones asociadas.`
-      )
-    ) {
-      deleteMutation.mutate(id)
-    }
+    if (isCollaborator) return
+    const ok = await dialog.confirm(
+      `¿Estás seguro de eliminar el KPI "${name}"? Esta acción no se puede deshacer y eliminará todas las asignaciones asociadas.`,
+      { title: 'Eliminar KPI', confirmLabel: 'Eliminar', variant: 'danger' }
+    )
+    if (ok) deleteMutation.mutate(id)
   }
 
   const filteredKPIs = kpis?.filter((kpi) => {
@@ -352,14 +352,14 @@ export default function KPIs() {
                         </button>
                         <button
                           className="btn-text warning"
-                          onClick={() => {
+                          onClick={async () => {
+                            if (!filterPeriodId) return
                             const periodName = getPeriodName(filterPeriodId)
-                            if (
-                              filterPeriodId &&
-                              window.confirm(
-                                `¿Cerrar el KPI "${kpi.name}" en ${periodName}? Esta acción cerrará todas sus asignaciones en ese período.`
-                              )
-                            ) {
+                            const ok = await dialog.confirm(
+                              `¿Cerrar el KPI "${kpi.name}" en ${periodName}? Esta acción cerrará todas sus asignaciones en ese período.`,
+                              { title: 'Cerrar KPI en período', confirmLabel: 'Cerrar', variant: 'warning' }
+                            )
+                            if (ok) {
                               closePeriodKpiMutation.mutate({
                                 periodId: filterPeriodId as number,
                                 kpiId: kpi.id,

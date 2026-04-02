@@ -5,6 +5,7 @@ import api from '../services/api'
 import { OrgScope, Collaborator } from '../types'
 import CollaboratorForm from '../components/CollaboratorForm'
 import { useAuth } from '../hooks/useAuth'
+import { useDialog } from '../components/Dialog'
 import './Colaboradores.css'
 
 export default function Colaboradores() {
@@ -24,6 +25,7 @@ export default function Colaboradores() {
   const isDirector = Boolean(auth?.isDirector)
   const isManager = Boolean(auth?.isManager)
   const isLeader = Boolean(auth?.isLeader)
+  const dialog = useDialog()
   const { data: orgScopes } = useQuery<OrgScope[]>(
     'org-scopes',
     async () => {
@@ -60,9 +62,10 @@ export default function Colaboradores() {
         queryClient.invalidateQueries('collaborators')
       },
       onError: (error: any) => {
-        alert(
+        void dialog.alert(
           error.response?.data?.error ||
-            'Error al eliminar colaborador. Verifica que no tenga asignaciones asociadas.'
+            'Error al eliminar colaborador. Verifica que no tenga asignaciones asociadas.',
+          { title: 'Error al eliminar', variant: 'danger' }
         )
       },
     }
@@ -77,7 +80,7 @@ export default function Colaboradores() {
         queryClient.invalidateQueries('collaborators')
       },
       onError: (error: any) => {
-        alert(error.response?.data?.error || 'Error al desactivar colaborador')
+        void dialog.alert(error.response?.data?.error || 'Error al desactivar colaborador', { title: 'Error', variant: 'danger' })
       },
     }
   )
@@ -93,20 +96,19 @@ export default function Colaboradores() {
   }
 
   const handleDelete = async (id: number, name: string) => {
-    if (
-      window.confirm(
-        `¿Estás seguro de eliminar al colaborador "${name}"? Esta acción no se puede deshacer y eliminará todas sus asignaciones asociadas.`
-      )
-    ) {
-      deleteMutation.mutate(id)
-    }
+    const ok = await dialog.confirm(
+      `¿Estás seguro de eliminar al colaborador "${name}"? Esta acción no se puede deshacer y eliminará todas sus asignaciones asociadas.`,
+      { title: 'Eliminar colaborador', confirmLabel: 'Eliminar', variant: 'danger' }
+    )
+    if (ok) deleteMutation.mutate(id)
   }
 
   const handleDeactivate = async (id: number, name: string) => {
-    const reason = window.prompt(
-      `Desactivar a "${name}". Opcional: indica un motivo (desvinculacion, cambio de rol, licencia).`
+    const reason = await dialog.prompt(
+      `Desactivar a "${name}". Opcional: indicá un motivo (desvinculación, cambio de rol, licencia).`,
+      { title: 'Desactivar colaborador', placeholder: 'Ej: desvinculación voluntaria', confirmLabel: 'Desactivar', variant: 'warning' }
     )
-    deactivateMutation.mutate({ id, reason: reason || undefined })
+    if (reason !== null) deactivateMutation.mutate({ id, reason: reason || undefined })
   }
 
   const handleResendInvite = async (id: number) => {

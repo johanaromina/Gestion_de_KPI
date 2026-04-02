@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
+import { useDialog } from '../components/Dialog'
 import './InputDatos.css'
 
 type Measurement = {
@@ -59,7 +60,7 @@ export default function InputDatos() {
   const [inlineAlert, setInlineAlert] = useState<{ type: 'info' | 'warning' | 'error'; message: string } | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const navigate = useNavigate()
-
+  const dialog = useDialog()
   const queryClient = useQueryClient()
 
   const { data: assignments } = useQuery('collaborator-kpis', async () => {
@@ -375,11 +376,12 @@ export default function InputDatos() {
     return 'Curaduría pendiente, no se puede aprobar'
   }, [isCurationApproved, canApproveWithWarning])
 
-  const handleApprove = (id: number) => {
+  const handleApprove = async (id: number) => {
     if (!canApproveMeasurement) return
     if (canApproveWithWarning) {
-      const confirmed = window.confirm(
-        'La curaduría está en revisión. ¿Querés aprobar la medición igual?'
+      const confirmed = await dialog.confirm(
+        'La curaduría está en revisión. ¿Querés aprobar la medición igual?',
+        { title: 'Curaduría pendiente', confirmLabel: 'Aprobar igual', variant: 'warning' }
       )
       if (!confirmed) return
     }
@@ -535,7 +537,9 @@ export default function InputDatos() {
       setInlineAlert({ type: 'warning', message: 'Seleccioná una asignación primero para ejecutar el fetch.' })
       return
     }
-    const value = window.prompt('Valor obtenido automáticamente:')
+    const value = await dialog.prompt('Ingresá el valor obtenido automáticamente:', {
+      title: 'Valor automático', placeholder: 'Ej: 95.5', confirmLabel: 'Cargar'
+    })
     if (!value) return
     await api.post('/measurements', {
       assignmentId: selectedAssignmentId,

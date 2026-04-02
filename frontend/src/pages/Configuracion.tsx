@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from 'react-query'
 import api from '../services/api'
 import { useAuth } from '../hooks/useAuth'
 import SubPeriodForm from '../components/SubPeriodForm'
+import { useDialog } from '../components/Dialog'
 import './Configuracion.css'
 import { PreviewSourceMeta } from './configuracion/PreviewSourceMeta'
 import {
@@ -156,6 +157,7 @@ type CalendarProfile = {
 
 export default function Configuracion() {
   const { user } = useAuth()
+  const dialog = useDialog()
   const queryClient = useQueryClient()
   const [activeIntegrationTab, setActiveIntegrationTab] = useState<'templates' | 'targets' | 'runs' | 'auth'>(
     'templates'
@@ -1839,7 +1841,7 @@ export default function Configuracion() {
         setScopeExternalKeysBySourceType({ [DEFAULT_MAPPING_SOURCE_TYPE]: '' })
         setScopeMappingSourceType(DEFAULT_MAPPING_SOURCE_TYPE)
         if (data?.warning) {
-          alert(data.warning)
+          void dialog.alert(data.warning, { title: 'Advertencia', variant: 'warning' })
         }
       },
     }
@@ -1855,7 +1857,7 @@ export default function Configuracion() {
         queryClient.invalidateQueries('org-scopes')
       },
       onError: (error: any) => {
-        alert(error.response?.data?.error || 'Error al eliminar la unidad organizacional')
+        void dialog.alert(error.response?.data?.error || 'Error al eliminar la unidad organizacional', { title: 'Error', variant: 'danger' })
       },
     }
   )
@@ -2153,11 +2155,10 @@ export default function Configuracion() {
                 <>
                   <button
                     className="btn-secondary"
-                    onClick={() => {
+                    onClick={async () => {
                       if (!selectedTemplateId) return
-                      if (window.confirm('¿Archivar todos los runs con error de esta plantilla?')) {
-                        archiveErrorRuns.mutate()
-                      }
+                      const ok = await dialog.confirm('¿Archivar todos los runs con error de esta plantilla?', { title: 'Archivar errores', confirmLabel: 'Archivar', variant: 'warning' })
+                      if (ok) archiveErrorRuns.mutate()
                     }}
                     disabled={!selectedTemplateId || archiveErrorRuns.isLoading}
                   >
@@ -2165,11 +2166,10 @@ export default function Configuracion() {
                   </button>
                   <button
                     className="btn-danger"
-                    onClick={() => {
+                    onClick={async () => {
                       if (!selectedTemplateId) return
-                      if (window.confirm('¿Eliminar todos los runs con error de esta plantilla?')) {
-                        deleteErrorRuns.mutate()
-                      }
+                      const ok = await dialog.confirm('¿Eliminar todos los runs con error de esta plantilla?', { title: 'Eliminar errores', confirmLabel: 'Eliminar', variant: 'danger' })
+                      if (ok) deleteErrorRuns.mutate()
                     }}
                     disabled={!selectedTemplateId || deleteErrorRuns.isLoading}
                   >
@@ -2379,10 +2379,9 @@ export default function Configuracion() {
                         </button>
                         <button
                           className="btn-secondary"
-                          onClick={() => {
-                            if (window.confirm('¿Duplicar este target por cada user del params?')) {
-                              openTargetWizard(target)
-                            }
+                          onClick={async () => {
+                            const ok = await dialog.confirm('¿Duplicar este target por cada user del params?', { title: 'Duplicar target', confirmLabel: 'Duplicar', variant: 'warning' })
+                            if (ok) openTargetWizard(target)
                           }}
                           disabled={duplicateTargetByUsers.isLoading}
                         >
@@ -2453,10 +2452,9 @@ export default function Configuracion() {
                       <div className="action-buttons">
                         <button
                           className="btn-secondary"
-                          onClick={() => {
-                            if (window.confirm('¿Archivar este run?')) {
-                              archiveRunMutation.mutate(run.id)
-                            }
+                          onClick={async () => {
+                            const ok = await dialog.confirm('¿Archivar este run?', { title: 'Archivar run', confirmLabel: 'Archivar', variant: 'warning' })
+                            if (ok) archiveRunMutation.mutate(run.id)
                           }}
                           disabled={archiveRunMutation.isLoading}
                         >
@@ -2464,10 +2462,9 @@ export default function Configuracion() {
                         </button>
                         <button
                           className="btn-danger"
-                          onClick={() => {
-                            if (window.confirm('¿Eliminar este run?')) {
-                              deleteRunMutation.mutate(run.id)
-                            }
+                          onClick={async () => {
+                            const ok = await dialog.confirm('¿Eliminar este run?', { title: 'Eliminar run', confirmLabel: 'Eliminar', variant: 'danger' })
+                            if (ok) deleteRunMutation.mutate(run.id)
                           }}
                           disabled={deleteRunMutation.isLoading}
                         >
@@ -2707,14 +2704,12 @@ export default function Configuracion() {
                       </button>
                       <button
                         className="btn-secondary danger"
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              `¿Eliminar la unidad "${scope.name}"? Esta acción no se puede deshacer.`
-                            )
-                          ) {
-                            deleteScope.mutate(scope)
-                          }
+                        onClick={async () => {
+                          const ok = await dialog.confirm(
+                            `¿Eliminar la unidad "${scope.name}"? Esta acción no se puede deshacer.`,
+                            { title: 'Eliminar unidad', confirmLabel: 'Eliminar', variant: 'danger' }
+                          )
+                          if (ok) deleteScope.mutate(scope)
                         }}
                         disabled={deleteScope.isLoading}
                       >

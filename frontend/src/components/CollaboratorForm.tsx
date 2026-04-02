@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import api from '../services/api'
 import { OrgScope, Collaborator, DataSourceMapping } from '../types'
+import { useDialog } from './Dialog'
 import './CollaboratorForm.css'
 import {
   buildExternalKeysTextBySourceType,
@@ -43,6 +44,7 @@ export default function CollaboratorForm({
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const queryClient = useQueryClient()
+  const dialog = useDialog()
 
   const { data: collaborators } = useQuery<Collaborator[]>(
     'collaborators',
@@ -143,7 +145,7 @@ export default function CollaboratorForm({
         }))
       },
       onError: (error: any) => {
-        alert(error.response?.data?.error || 'Error al crear area')
+        void dialog.alert(error.response?.data?.error || 'Error al crear área', { title: 'Error', variant: 'danger' })
       },
     }
   )
@@ -311,8 +313,10 @@ export default function CollaboratorForm({
                 <button
                   type="button"
                   className="btn-secondary small"
-                  onClick={() => {
-                    const name = window.prompt('Nombre del area')
+                  onClick={async () => {
+                    const name = await dialog.prompt('Nombre del área nueva:', {
+                      title: 'Crear área', placeholder: 'Ej: Tecnología', confirmLabel: 'Crear'
+                    })
                     if (name && name.trim()) {
                       createAreaMutation.mutate(name.trim())
                     }

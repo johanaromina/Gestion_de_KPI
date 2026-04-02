@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import api from '../services/api'
 import { KPI } from '../types'
+import { useDialog } from './Dialog'
 import './GenerateBaseGridModal.css'
 
 interface GenerateBaseGridModalProps {
@@ -27,6 +28,7 @@ export default function GenerateBaseGridModal({
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const queryClient = useQueryClient()
+  const dialog = useDialog()
 
   // Obtener períodos
   const { data: periods } = useQuery('periods', async () => {
@@ -57,19 +59,21 @@ export default function GenerateBaseGridModal({
     {
       onSuccess: (data) => {
         queryClient.invalidateQueries('collaborator-kpis')
-        alert(
+        void dialog.alert(
           `Parrillas base generadas exitosamente.\n` +
-            `- Asignaciones creadas: ${data.created}\n` +
-            `- Colaboradores: ${data.details.collaboratorsCount}\n` +
-            `- KPIs: ${data.details.kpisCount}`
+            `Asignaciones creadas: ${data.created} — ` +
+            `Colaboradores: ${data.details.collaboratorsCount} — ` +
+            `KPIs: ${data.details.kpisCount}`,
+          { title: 'Parrillas generadas', variant: 'info' }
         )
         onSuccess?.()
         onClose()
       },
       onError: (error: any) => {
-        alert(
+        void dialog.alert(
           error.response?.data?.error ||
-            'Error al generar parrillas base. Verifica los datos ingresados.'
+            'Error al generar parrillas base. Verificá los datos ingresados.',
+          { title: 'Error', variant: 'danger' }
         )
       },
     }

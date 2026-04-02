@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from 'react-query'
 import api from '../services/api'
 import { useAuth } from '../hooks/useAuth'
 import { Collaborator, DataSourceMapping, OrgScope } from '../types'
+import { useDialog } from '../components/Dialog'
 import {
   DEFAULT_MAPPING_SOURCE_TYPE,
   getMappingSourceTypeLabel,
@@ -216,6 +217,7 @@ const mergePendingGroups = (
 export default function DataSourceMappings() {
   const queryClient = useQueryClient()
   const { canConfig, isLoading: authLoading } = useAuth()
+  const dialog = useDialog()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const [search, setSearch] = useState('')
@@ -296,7 +298,7 @@ export default function DataSourceMappings() {
         setToastMessage('Mapping actualizado correctamente.')
       },
       onError: (error: any) => {
-        alert(error?.response?.data?.error || 'No se pudo guardar el mapping')
+        void dialog.alert(error?.response?.data?.error || 'No se pudo guardar el mapping', { title: 'Error', variant: 'danger' })
       },
     }
   )
@@ -336,7 +338,7 @@ export default function DataSourceMappings() {
         setToastMessage('Mappings guardados por lote.')
       },
       onError: (error: any) => {
-        alert(error?.response?.data?.error || 'No se pudieron guardar los mappings')
+        void dialog.alert(error?.response?.data?.error || 'No se pudieron guardar los mappings', { title: 'Error', variant: 'danger' })
       },
     }
   )
@@ -383,7 +385,7 @@ export default function DataSourceMappings() {
         setToastMessage('Grupo de mappings creado correctamente.')
       },
       onError: (error: any) => {
-        alert(error instanceof Error ? error.message : error?.response?.data?.error || 'No se pudo crear el mapping')
+        void dialog.alert(error instanceof Error ? error.message : error?.response?.data?.error || 'No se pudo crear el mapping', { title: 'Error', variant: 'danger' })
       },
     }
   )
@@ -594,7 +596,7 @@ export default function DataSourceMappings() {
     try {
       await handleImportCsv(file)
     } catch (error: any) {
-      alert(error?.message || 'No se pudo importar el CSV')
+      void dialog.alert(error?.message || 'No se pudo importar el CSV', { title: 'Error al importar', variant: 'danger' })
     }
   }
 

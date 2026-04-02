@@ -10,6 +10,7 @@ import CloseParrillaModal from '../components/CloseParrillaModal'
 import GenerateBaseGridModal from '../components/GenerateBaseGridModal'
 import ReviewModal from '../components/ReviewModal'
 import ConsistencyAlerts from '../components/ConsistencyAlerts'
+import { useDialog } from '../components/Dialog'
 import './Asignaciones.css'
 
 const toNumber = (value: any): number | null => {
@@ -37,7 +38,7 @@ export default function Asignaciones() {
   } | null>(null)
 
   const navigate = useNavigate()
-
+  const dialog = useDialog()
   const queryClient = useQueryClient()
 
   // Periodos
@@ -154,7 +155,7 @@ export default function Asignaciones() {
         queryClient.invalidateQueries('collaborator-kpis')
       },
       onError: (error: any) => {
-        alert(error?.response?.data?.error || 'No se pudo cerrar la asignación')
+        void dialog.alert(error?.response?.data?.error || 'No se pudo cerrar la asignación', { title: 'Error', variant: 'danger' })
       },
     }
   )
@@ -168,61 +169,61 @@ export default function Asignaciones() {
         queryClient.invalidateQueries('collaborator-kpis')
       },
       onError: (error: any) => {
-        alert(error?.response?.data?.error || 'No se pudo reabrir la asignación')
+        void dialog.alert(error?.response?.data?.error || 'No se pudo reabrir la asignación', { title: 'Error', variant: 'danger' })
       },
     }
   )
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!selectedPeriodId) {
-      alert('Por favor selecciona un período primero')
+      await dialog.alert('Por favor seleccioná un período primero.', { title: 'Período requerido', variant: 'warning' })
       return
     }
     const selectedPeriod = periods?.find((p: any) => p.id === selectedPeriodId)
     if (selectedPeriod?.status === 'closed') {
-      alert('No se pueden crear asignaciones en períodos cerrados')
+      await dialog.alert('No se pueden crear asignaciones en períodos cerrados.', { title: 'Período cerrado', variant: 'warning' })
       return
     }
     setEditingAssignment(undefined)
     setShowForm(true)
   }
 
-  const handleEdit = (assignment: CollaboratorKPI) => {
+  const handleEdit = async (assignment: CollaboratorKPI) => {
     const period = periods?.find((p: any) => p.id === assignment.periodId)
     if (period?.status === 'closed') {
-      alert('Periodo cerrado. Solo se puede editar alcance con permisos especiales.')
+      await dialog.alert('Período cerrado. Solo se puede editar alcance con permisos especiales.', { title: 'Período cerrado', variant: 'warning' })
     }
     setEditingAssignment(assignment)
     setShowForm(true)
   }
 
-  const handleDelete = (id: number) => {
-    if (window.confirm('¿Estás seguro de eliminar esta asignación?')) {
-      deleteMutation.mutate(id)
-    }
+  const handleDelete = async (id: number) => {
+    const ok = await dialog.confirm('¿Estás seguro de eliminar esta asignación?', {
+      title: 'Eliminar asignación', confirmLabel: 'Eliminar', variant: 'danger'
+    })
+    if (ok) deleteMutation.mutate(id)
   }
 
-  const handleCloseAssignment = (assignment: CollaboratorKPI) => {
+  const handleCloseAssignment = async (assignment: CollaboratorKPI) => {
     if (isAssignmentClosed(assignment)) return
-    if (
-      window.confirm(
-        `¿Cerrar este KPI para el período? Se bloquearán ediciones sobre esta asignación.`
-      )
-    ) {
-      closeAssignmentMutation.mutate(assignment.id)
-    }
+    const ok = await dialog.confirm(
+      '¿Cerrar este KPI para el período? Se bloquearán ediciones sobre esta asignación.',
+      { title: 'Cerrar KPI', confirmLabel: 'Cerrar', variant: 'warning' }
+    )
+    if (ok) closeAssignmentMutation.mutate(assignment.id)
   }
 
-  const handleReopenAssignment = (assignment: CollaboratorKPI) => {
+  const handleReopenAssignment = async (assignment: CollaboratorKPI) => {
     if (!isAssignmentClosed(assignment)) return
-    if (window.confirm('¿Reabrir este KPI? Volverá a ser editable.')) {
-      reopenAssignmentMutation.mutate(assignment.id)
-    }
+    const ok = await dialog.confirm('¿Reabrir este KPI? Volverá a ser editable.', {
+      title: 'Reabrir KPI', confirmLabel: 'Reabrir', variant: 'info'
+    })
+    if (ok) reopenAssignmentMutation.mutate(assignment.id)
   }
 
-  const handleCloseParrilla = () => {
+  const handleCloseParrilla = async () => {
     if (!selectedPeriodId) {
-      alert('Selecciona un período primero')
+      await dialog.alert('Seleccioná un período primero.', { title: 'Período requerido', variant: 'warning' })
       return
     }
     setClosingCollaboratorId(selectedCollaboratorId)
@@ -789,7 +790,7 @@ export default function Asignaciones() {
                           </button>
                           <button
                             className="btn-icon"
-                            onClick={() => alert('Recalculo solicitado')}
+                            onClick={() => void dialog.alert('Recálculo solicitado.', { title: 'Recalcular', variant: 'info' })}
                             title="Forzar recalculo"
                           >
                             Recalcular

@@ -8,6 +8,7 @@ import { Period, SubPeriod } from '../types'
 import PeriodForm from '../components/PeriodForm'
 import SubPeriodForm from '../components/SubPeriodForm'
 import { useAuth } from '../hooks/useAuth'
+import { useDialog } from '../components/Dialog'
 import './Periodos.css'
 
 function SubPeriodsSection({
@@ -187,6 +188,7 @@ export default function Periodos() {
   const [calendarByPeriod, setCalendarByPeriod] = useState<Record<number, number | null>>({})
 
   const queryClient = useQueryClient()
+  const dialog = useDialog()
 
   const { data: periods, isLoading } = useQuery<Period[]>(
     'periods',
@@ -263,7 +265,7 @@ export default function Periodos() {
         }
       },
       onError: (error: any) => {
-        alert(error.response?.data?.error || 'No se pudo cerrar el subperíodo')
+        void dialog.alert(error.response?.data?.error || 'No se pudo cerrar el subperíodo', { title: 'Error', variant: 'danger' })
       },
     }
   )
@@ -292,10 +294,10 @@ export default function Periodos() {
         queryClient.invalidateQueries('collaborator-kpis')
         queryClient.invalidateQueries('period-summary-status')
         queryClient.invalidateQueries('period-summary')
-        alert('Resumen anual recalculado correctamente')
+        void dialog.alert('Resumen anual recalculado correctamente.', { title: 'Recálculo completado', variant: 'info' })
       },
       onError: (error: any) => {
-        alert(error.response?.data?.error || 'No se pudo recalcular el resumen anual')
+        void dialog.alert(error.response?.data?.error || 'No se pudo recalcular el resumen anual', { title: 'Error', variant: 'danger' })
       },
     }
   )
@@ -310,7 +312,7 @@ export default function Periodos() {
         queryClient.invalidateQueries('collaborator-kpis')
       },
       onError: (error: any) => {
-        alert(error.response?.data?.error || 'No tienes permisos para reabrir periodos cerrados')
+        void dialog.alert(error.response?.data?.error || 'No tenés permisos para reabrir períodos cerrados', { title: 'Sin permisos', variant: 'danger' })
       },
     }
   )
@@ -347,63 +349,57 @@ export default function Periodos() {
     setShowSubPeriodForm(true)
   }
 
-  const handleDeleteSubPeriod = (subPeriod: SubPeriod) => {
-    if (
-      window.confirm(
-        `Estas seguro de eliminar el subperiodo "${subPeriod.name}"? Esta accion no se puede deshacer.`
-      )
-    ) {
-      deleteSubPeriodMutation.mutate(subPeriod)
-    }
+  const handleDeleteSubPeriod = async (subPeriod: SubPeriod) => {
+    const ok = await dialog.confirm(
+      `¿Estás seguro de eliminar el subperíodo "${subPeriod.name}"? Esta acción no se puede deshacer.`,
+      { title: 'Eliminar subperíodo', confirmLabel: 'Eliminar', variant: 'danger' }
+    )
+    if (ok) deleteSubPeriodMutation.mutate(subPeriod)
   }
 
-  const handleCloseSubPeriod = (subPeriod: SubPeriod) => {
-    if (
-      window.confirm(
-        `Estas seguro de cerrar el subperiodo "${subPeriod.name}"? Se enviara un resumen por email.`
-      )
-    ) {
-      closeSubPeriodMutation.mutate(subPeriod)
-    }
+  const handleCloseSubPeriod = async (subPeriod: SubPeriod) => {
+    const ok = await dialog.confirm(
+      `¿Cerrar el subperíodo "${subPeriod.name}"? Se enviará un resumen por email.`,
+      { title: 'Cerrar subperíodo', confirmLabel: 'Cerrar', variant: 'warning' }
+    )
+    if (ok) closeSubPeriodMutation.mutate(subPeriod)
   }
 
-  const handleDeletePeriod = (id: number, name: string) => {
-    if (window.confirm(`Estas seguro de eliminar el periodo "${name}"? Esta accion no se puede deshacer.`)) {
-      deletePeriodMutation.mutate(id)
-    }
+  const handleDeletePeriod = async (id: number, name: string) => {
+    const ok = await dialog.confirm(
+      `¿Estás seguro de eliminar el período "${name}"? Esta acción no se puede deshacer.`,
+      { title: 'Eliminar período', confirmLabel: 'Eliminar', variant: 'danger' }
+    )
+    if (ok) deletePeriodMutation.mutate(id)
   }
 
-  const handleClosePeriod = (period: Period) => {
-    if (
-      window.confirm(
-        `Estas seguro de cerrar el periodo "${period.name}"? Una vez cerrado no se podran editar asignaciones sin permisos especiales.`
-      )
-    ) {
-      const sendEmail = window.confirm(
-        'Enviar resumen anual por email a los colaboradores?'
-      )
-      closePeriodMutation.mutate({ id: period.id, sendEmail })
-    }
+  const handleClosePeriod = async (period: Period) => {
+    const ok = await dialog.confirm(
+      `¿Cerrar el período "${period.name}"? Una vez cerrado no se podrán editar asignaciones sin permisos especiales.`,
+      { title: 'Cerrar período', confirmLabel: 'Cerrar período', variant: 'warning' }
+    )
+    if (!ok) return
+    const sendEmail = await dialog.confirm(
+      '¿Enviar resumen anual por email a los colaboradores?',
+      { title: 'Enviar resumen', confirmLabel: 'Sí, enviar', cancelLabel: 'No enviar', variant: 'info' }
+    )
+    closePeriodMutation.mutate({ id: period.id, sendEmail })
   }
 
-  const handleRecalculateSummary = (period: Period) => {
-    if (
-      window.confirm(
-        `Recalcular resumen anual para "${period.name}"? Esto regenerará el resumen con los datos actuales.`
-      )
-    ) {
-      recalcSummaryMutation.mutate(period.id)
-    }
+  const handleRecalculateSummary = async (period: Period) => {
+    const ok = await dialog.confirm(
+      `¿Recalcular resumen anual para "${period.name}"? Esto regenerará el resumen con los datos actuales.`,
+      { title: 'Recalcular resumen', confirmLabel: 'Recalcular', variant: 'info' }
+    )
+    if (ok) recalcSummaryMutation.mutate(period.id)
   }
 
-  const handleReopenPeriod = (period: Period) => {
-    if (
-      window.confirm(
-        `Estas seguro de reabrir el periodo "${period.name}"? Esta accion requiere permisos especiales.`
-      )
-    ) {
-      reopenPeriodMutation.mutate(period.id)
-    }
+  const handleReopenPeriod = async (period: Period) => {
+    const ok = await dialog.confirm(
+      `¿Reabrir el período "${period.name}"? Esta acción requiere permisos especiales.`,
+      { title: 'Reabrir período', confirmLabel: 'Reabrir', variant: 'warning' }
+    )
+    if (ok) reopenPeriodMutation.mutate(period.id)
   }
 
   const filteredPeriods = useMemo(() => {

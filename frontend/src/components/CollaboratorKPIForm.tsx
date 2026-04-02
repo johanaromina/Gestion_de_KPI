@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQueryClient, useQuery } from 'react-query'
 import api from '../services/api'
 import { useAuth } from '../hooks/useAuth'
+import { useDialog } from './Dialog'
 import './CollaboratorKPIForm.css'
 
 const toNumber = (value: any): number => {
@@ -74,6 +75,7 @@ export default function CollaboratorKPIForm({
 
   const queryClient = useQueryClient()
   const { user } = useAuth()
+  const dialog = useDialog()
   const isReadOnlyCollaborator = user?.role === 'collaborator'
   const canCurate =
     user?.role === 'admin' ||
@@ -352,7 +354,7 @@ export default function CollaboratorKPIForm({
         onClose()
       },
       onError: (error: any) => {
-        alert(error?.response?.data?.error || 'No se pudo cerrar la asignación')
+        void dialog.alert(error?.response?.data?.error || 'No se pudo cerrar la asignación', { title: 'Error', variant: 'danger' })
       },
     }
   )
@@ -369,7 +371,7 @@ export default function CollaboratorKPIForm({
         onClose()
       },
       onError: (error: any) => {
-        alert(error?.response?.data?.error || 'No se pudo reabrir la asignación')
+        void dialog.alert(error?.response?.data?.error || 'No se pudo reabrir la asignación', { title: 'Error', variant: 'danger' })
       },
     }
   )
@@ -1165,10 +1167,11 @@ export default function CollaboratorKPIForm({
               <button
                 type="button"
                 className="btn-secondary"
-                onClick={() => {
-                  if (window.confirm('¿Cerrar este KPI? Se bloquearán ediciones.')) {
-                    closeAssignmentMutation.mutate()
-                  }
+                onClick={async () => {
+                  const ok = await dialog.confirm('¿Cerrar este KPI? Se bloquearán ediciones.', {
+                    title: 'Cerrar KPI', confirmLabel: 'Cerrar', variant: 'warning'
+                  })
+                  if (ok) closeAssignmentMutation.mutate()
                 }}
                 disabled={closeAssignmentMutation.isLoading}
               >
@@ -1179,10 +1182,11 @@ export default function CollaboratorKPIForm({
               <button
                 type="button"
                 className="btn-secondary"
-                onClick={() => {
-                  if (window.confirm('¿Reabrir este KPI? Volverá a ser editable.')) {
-                    reopenAssignmentMutation.mutate()
-                  }
+                onClick={async () => {
+                  const ok = await dialog.confirm('¿Reabrir este KPI? Volverá a ser editable.', {
+                    title: 'Reabrir KPI', confirmLabel: 'Reabrir', variant: 'info'
+                  })
+                  if (ok) reopenAssignmentMutation.mutate()
                 }}
                 disabled={reopenAssignmentMutation.isLoading}
               >

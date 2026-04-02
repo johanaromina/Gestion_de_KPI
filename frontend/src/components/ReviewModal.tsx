@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from 'react-query'
 import api from '../services/api'
+import { useDialog } from './Dialog'
 import './ReviewModal.css'
 
 interface ReviewModalProps {
@@ -27,6 +28,7 @@ export default function ReviewModal({
   const [comments, setComments] = useState<string>(assignment.comments || '')
 
   const queryClient = useQueryClient()
+  const dialog = useDialog()
 
   const reviewMutation = useMutation(
     async (data: { comments?: string }) => {
@@ -44,9 +46,10 @@ export default function ReviewModal({
         onClose()
       },
       onError: (error: any) => {
-        alert(
+        void dialog.alert(
           error.response?.data?.error ||
-            `Error al ${action === 'approve' ? 'aprobar' : 'rechazar'} la asignación.`
+            `Error al ${action === 'approve' ? 'aprobar' : 'rechazar'} la asignación.`,
+          { title: 'Error', variant: 'danger' }
         )
       },
     }
