@@ -7,6 +7,7 @@ import { appEnv } from '../config/env'
 import { sendMail } from '../utils/mailer'
 import { getEffectivePermissions } from '../utils/permissions'
 import { buildTokenPayload, issueAuthToken } from '../services/auth-session.service'
+import { AuthRequest } from '../middleware/auth.middleware'
 
 if (!appEnv.isProduction && !process.env.JWT_SECRET) {
   console.warn('??  ADVERTENCIA: JWT_SECRET no esta configurado. Usando clave por defecto (solo para desarrollo).')
@@ -248,8 +249,72 @@ export const resetPassword = async (req: Request, res: Response) => {
   }
 }
 
+export const changePassword = async (req: Request, res: Response) => {
+  try {
+    const user = (req as AuthRequest).user
+    const collaboratorId = Number(user?.collaboratorId || user?.id || 0)
+    const { currentPassword, newPassword } = req.body as {
+      currentPassword?: string
+      newPassword?: string
+    }
+
+    if (!collaboratorId) {
+      return res.status(401).json({ error: 'Sesion invalida' })
+    }
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Contrasena actual y nueva contrasena son requeridas' })
+    }
+
+    if (String(newPassword).length < 8) {
+      return res.status(400).json({ error: 'La nueva contrasena debe tener al menos 8 caracteres' })
+    }
+
+    const [rows] = await pool.query<any[]>('SELECT id, passwordHash FROM collaborators WHERE id = ?', [collaboratorId])
+    const collaborator = rows?.[0]
+
+    if (!collaborator) {
+      return res.status(404).json({ error: 'Usuario no encontrado' })
+    }
+
+    if (!collaborator.passwordHash) {
+      return res.status(400).json({
+        error: 'Tu cuenta no tiene una contrasena local configurada. Usa recuperacion de contrasena o el acceso corporativo.',
+      })
+    }
+
+    const matches = await bcrypt.compare(String(currentPassword), collaborator.passwordHash)
+    if (!matches) {
+      return res.status(401).json({ error: 'La contrasena actual es incorrecta' })
+    }
+
+    if (String(currentPassword) === String(newPassword)) {
+      return res.status(400).json({ error: 'La nueva contrasena debe ser distinta de la actual' })
+    }
+
+    const passwordHash = await bcrypt.hash(String(newPassword), 10)
+    await pool.query(
+      `UPDATE collaborators
+       SET passwordHash = ?, passwordResetTokenHash = NULL, passwordResetExpiresAt = NULL
+       WHERE id = ?`,
+      [passwordHash, collaboratorId]
+    )
+
+    return res.json({ message: 'Contrasena actualizada correctamente' })
+  } catch (error: any) {
+    console.error('Error in changePassword:', error)
+    return res.status(500).json({ error: 'Error al cambiar la contrasena' })
+  }
+}
+
 export const register = async (req: Request, res: Response) => {
   try {
+    if (!appEnv.selfRegisterEnabled) {
+      return res.status(403).json({
+        error: 'El registro autonomo esta deshabilitado en esta instancia. El alta inicial se realiza por despliegue/bootstrap del cliente.',
+      })
+    }
+
     const { companyName, adminName, email, password } = req.body
     const normalizedEmail = email ? String(email).trim().toLowerCase() : ''
 
@@ -296,7 +361,7 @@ export const register = async (req: Request, res: Response) => {
     const permissions = await getEffectivePermissions(adminId)
     const [adminRows] = await pool.query<any[]>('SELECT * FROM collaborators WHERE id = ?', [adminId])
     const adminCollaborator = adminRows[0]
-    const token = issueAuthToken(buildTokenPayload(adminCollaborator, permissions), true)
+    const token = issueAuthToken(adminCollaborator, permissions, true)
 
     try {
       await sendMail({

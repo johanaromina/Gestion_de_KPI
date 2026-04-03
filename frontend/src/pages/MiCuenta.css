@@ -1,0 +1,129 @@
+.account-page {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.account-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+}
+
+.account-header h2 {
+  margin: 0 0 8px;
+  font-size: 28px;
+  color: #0f172a;
+}
+
+.account-header p {
+  margin: 0;
+  color: #64748b;
+}
+
+.account-summary {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.account-summary-item {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.account-summary-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.account-summary-value {
+  margin-top: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+  word-break: break-word;
+}
+
+.account-form {
+  margin-top: 28px;
+  display: grid;
+  gap: 18px;
+}
+
+.account-field {
+  display: grid;
+  gap: 8px;
+}
+
+.account-field label {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.account-field input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 15px;
+  background: #fff;
+}
+
+.account-field input:focus {
+  outline: none;
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.14);
+}
+
+.account-hint {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.account-error,
+.account-success {
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 14px;
+}
+
+.account-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+.account-success {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+}
+
+.account-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.account-submit {
+  border: none;
+  border-radius: 10px;
+  padding: 12px 18px;
+  background: #f97316;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.account-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

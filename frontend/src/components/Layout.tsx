@@ -45,6 +45,8 @@ export default function Layout({ children }: LayoutProps) {
         '/seguridad',
         '/consolidado',
         '/auditoria',
+        '/mapa-riesgo',
+        '/simulador',
       ]
       const shouldBlock = blocked.some((p) => location.pathname.startsWith(p))
       if (shouldBlock) {
@@ -104,6 +106,32 @@ export default function Layout({ children }: LayoutProps) {
           )}
 
           {!isCollaborator && (
+            <Link
+              to="/mapa-riesgo"
+              className={`nav-item ${isActive('/mapa-riesgo') ? 'active' : ''}`}
+              onClick={handleNavClick}
+            >
+              <span className="nav-icon" aria-hidden="true">
+                &gt;
+              </span>
+              Mapa de Riesgo
+            </Link>
+          )}
+
+          {!isCollaborator && (
+            <Link
+              to="/simulador"
+              className={`nav-item ${isActive('/simulador') ? 'active' : ''}`}
+              onClick={handleNavClick}
+            >
+              <span className="nav-icon" aria-hidden="true">
+                &gt;
+              </span>
+              Simulador
+            </Link>
+          )}
+
+          {!isCollaborator && (
             <>
               <Link to="/colaboradores" className={`nav-item ${isActive('/colaboradores') ? 'active' : ''}`} onClick={handleNavClick}>
                 <span className="nav-icon" aria-hidden="true">&gt;</span>
@@ -145,6 +173,11 @@ export default function Layout({ children }: LayoutProps) {
             Mi Parrilla
           </Link>
 
+          <Link to="/check-ins" className={`nav-item ${isActive('/check-ins') ? 'active' : ''}`} onClick={handleNavClick}>
+            <span className="nav-icon" aria-hidden="true">&gt;</span>
+            Check-ins
+          </Link>
+
           {!isCollaborator && (
             <>
               <Link to="/historial" className={`nav-item ${isActive('/historial') ? 'active' : ''}`} onClick={handleNavClick}>
@@ -184,6 +217,9 @@ export default function Layout({ children }: LayoutProps) {
             <div className="user-name">{user?.name || 'Usuario'}</div>
             <div className="user-role">{user?.role || ''}</div>
           </div>
+          <Link to="/mi-cuenta" className="footer-link" onClick={handleNavClick}>
+            Mi cuenta
+          </Link>
           <button className="logout-button" onClick={handleLogout}>
             Cerrar sesion
           </button>

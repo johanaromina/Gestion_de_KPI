@@ -5,6 +5,7 @@ import api from '../services/api'
 import { useAuth } from '../hooks/useAuth'
 import { Period, ScopeKPI, SubPeriod } from '../types'
 import ScopeKPIDetailModal from '../components/ScopeKPIDetailModal'
+import { exportExecutivePDF, ExportArea } from '../utils/exportExecutivePDF'
 import './TableroEjecutivo.css'
 
 type ExecutiveSummary = {
@@ -105,6 +106,44 @@ const semaphoreClass = (variation: number | null | undefined): string => {
   if (variation >= 100) return 'semaphore-green'
   if (variation >= 80) return 'semaphore-yellow'
   return 'semaphore-red'
+}
+
+const calcDelta = (current?: number | null, previous?: number | null): number | null => {
+  if (current == null || previous == null || previous === 0) return null
+  return Number(((current - previous) / Math.abs(previous) * 100).toFixed(1))
+}
+
+const deltaArrow = (delta: number | null): string => {
+  if (delta == null) return ''
+  return delta > 0 ? '↑' : delta < 0 ? '↓' : '→'
+}
+
+const deltaClass = (delta: number | null): string => {
+  if (delta == null) return ''
+  return delta > 0 ? 'delta-positive' : delta < 0 ? 'delta-negative' : 'delta-neutral'
+}
+
+// Simple linear projection: extrapolate from the values array to targetIndex
+const linearProject = (values: number[], targetIndex: number): number | null => {
+  if (values.length === 0) return null
+  if (values.length === 1) return values[0]
+  const slope = (values[values.length - 1] - values[0]) / (values.length - 1)
+  const projected = values[values.length - 1] + slope * (targetIndex - values.length + 1)
+  return Math.round(projected * 10) / 10
+}
+
+const projectionRiskClass = (value: number | null): string => {
+  if (value == null) return ''
+  if (value >= 100) return 'projection-ok'
+  if (value >= 80) return 'projection-warning'
+  return 'projection-danger'
+}
+
+const projectionRiskLabel = (value: number | null): string => {
+  if (value == null) return 'Sin datos'
+  if (value >= 100) return 'En track'
+  if (value >= 80) return 'Atención'
+  return 'En riesgo'
 }
 
 const sortScopeKpis = (scopeKpis: ScopeKPI[]) =>
@@ -361,6 +400,140 @@ const ExecutiveTrendCard = ({
   )
 }
 
+const PeriodComparePanel = ({
+  periodSeries,
+}: {
+  periodSeries: ExecutiveTrendPoint[]
+  currentPeriodId?: number | null
+}) => {
+  const slice = periodSeries.slice(-3)
+  if (slice.length < 2) return null
+
+  const current = slice[slice.length - 1]
+  const previous = slice.length >= 2 ? slice[slice.length - 2] : null
+  const twoBack = slice.length >= 3 ? slice[slice.length - 3] : null
+
+  const compareCols = [
+    twoBack ? { point: twoBack, label: twoBack.periodName || 'Período -2', isCurrent: false } : null,
+    previous ? { point: previous, label: previous.periodName || 'Período anterior', isCurrent: false } : null,
+    { point: current, label: current.periodName || 'Período actual', isCurrent: true },
+  ].filter(Boolean) as Array<{ point: ExecutiveTrendPoint; label: string; isCurrent: boolean }>
+
+  return (
+    <article className="executive-compare-panel">
+      <div className="executive-section-header">
+        <h3>Comparativa entre períodos</h3>
+        <span>Evolución de variación y resultado — últimos {slice.length} períodos</span>
+      </div>
+      <div className="executive-compare-grid">
+        {compareCols.map(({ point, label, isCurrent }, i) => {
+          const prevPoint = i > 0 ? compareCols[i - 1].point : null
+          const delta = calcDelta(point.averageVariation, prevPoint?.averageVariation)
+          const deltaResult = calcDelta(point.weightedResultTotal, prevPoint?.weightedResultTotal)
+          return (
+            <div key={`compare-${point.periodId || i}`} className={`executive-compare-col${isCurrent ? ' current' : ''}${i === 0 && !isCurrent ? ' older' : ''}`}>
+              <div className="executive-compare-label">
+                {label}
+                {isCurrent && <span className="executive-compare-badge">Actual</span>}
+              </div>
+              <div className={`executive-compare-value ${semaphoreClass(point.averageVariation)}`}>
+                {formatNumber(point.averageVariation, 1)}%
+              </div>
+              <div className="executive-compare-sub">
+                <span>Resultado: <strong>{formatNumber(point.weightedResultTotal)}</strong></span>
+                <span>KPIs: <strong>{point.totalScopeKpis}</strong></span>
+                <span>Cobertura: <strong>{formatNumber(point.completionRate, 0)}%</strong></span>
+              </div>
+              {delta != null && (
+                <div className={`executive-compare-delta ${deltaClass(delta)}`}>
+                  {deltaArrow(delta)} {formatNumber(Math.abs(delta), 1)}% variación vs anterior
+                </div>
+              )}
+              {deltaResult != null && (
+                <div className={`executive-compare-delta small ${deltaClass(deltaResult)}`}>
+                  {deltaArrow(deltaResult)} {formatNumber(Math.abs(deltaResult), 1)}% resultado vs anterior
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </article>
+  )
+}
+
+const ProjectionPanel = ({
+  subPeriodSeries,
+  currentSubPeriodId,
+}: {
+  subPeriodSeries: ExecutiveTrendPoint[]
+  currentSubPeriodId: number | null
+}) => {
+  const dataPoints = subPeriodSeries.filter((p) => p.totalScopeKpis > 0)
+  const completedValues = dataPoints
+    .map((p) => toFinite(p.averageVariation))
+    .filter((v): v is number => v !== null)
+
+  const totalSubPeriods = subPeriodSeries.length
+  const completedCount = dataPoints.length
+  const remainingCount = totalSubPeriods - completedCount
+
+  if (completedValues.length < 2 || remainingCount <= 0) return null
+
+  const projected = linearProject(completedValues, totalSubPeriods - 1)
+  const riskCls = projectionRiskClass(projected)
+  const riskLbl = projectionRiskLabel(projected)
+  const trend = (completedValues[completedValues.length - 1] - completedValues[0]) / (completedValues.length - 1)
+
+  return (
+    <article className={`executive-projection-panel ${riskCls}`}>
+      <div className="executive-projection-header">
+        <div>
+          <h3>Proyección al cierre</h3>
+          <p>
+            {completedCount} de {totalSubPeriods} subperíodos completados ·
+            Tendencia {trend >= 0 ? '+' : ''}{formatNumber(trend, 1)}% por subperíodo
+          </p>
+        </div>
+        <span className={`executive-projection-badge ${riskCls}`}>
+          {riskLbl} — cierre estimado: {formatNumber(projected, 0)}%
+        </span>
+      </div>
+      <div className="executive-projection-rows">
+        {subPeriodSeries.map((point, index) => {
+          const hasData = point.totalScopeKpis > 0 && toFinite(point.averageVariation) !== null
+          const projectedValue = hasData
+            ? toFinite(point.averageVariation)
+            : linearProject(completedValues, completedCount + (index - completedCount))
+          const isCurrent = point.subPeriodId === currentSubPeriodId
+          const width = `${Math.min(Math.max(((projectedValue ?? 0) / 120) * 100, 4), 100)}%`
+
+          return (
+            <div
+              key={`proj-row-${point.subPeriodId || index}`}
+              className={`executive-projection-row${!hasData ? ' projected' : ''}${isCurrent ? ' current' : ''}`}
+            >
+              <span className="executive-projection-name">
+                {point.subPeriodName || `S${index + 1}`}
+              </span>
+              <div className="executive-projection-bar">
+                <div
+                  className={`executive-projection-fill ${semaphoreClass(projectedValue)}${!hasData ? ' projected' : ''}`}
+                  style={{ width }}
+                />
+              </div>
+              <span className="executive-projection-val">
+                {projectedValue != null ? `${formatNumber(projectedValue, 0)}%` : '-'}
+              </span>
+              {!hasData && <span className="executive-projection-tag">proy.</span>}
+            </div>
+          )
+        })}
+      </div>
+    </article>
+  )
+}
+
 export default function TableroEjecutivo() {
   const { isCollaborator, user } = useAuth()
   const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null)
@@ -570,10 +743,62 @@ export default function TableroEjecutivo() {
           <h1>Tablero Ejecutivo</h1>
           <p className="subtitle">
             Vista real company → area → team con KPIs organizacionales, lentes por objetivo y navegación ejecutiva
-            sobre la misma capa de Scope KPIs.
+            sobre la misma capa de KPIs Grupales.
           </p>
         </div>
-        <div className="executive-user-pill">{user?.name || 'Usuario'} · {user?.role || 'rol'}</div>
+        <div className="executive-header-right">
+          <div className="executive-user-pill">{user?.name || 'Usuario'} · {user?.role || 'rol'}</div>
+          {selectedCompany && !isLoading && (
+            <button
+              className="btn-secondary executive-export-btn"
+              onClick={() => {
+                const areaNodes = (selectedCompany.children || []).filter((c) =>
+                  ['area', 'business_unit', 'team'].includes(c.scope.type)
+                )
+                const exportAreas: ExportArea[] = areaNodes.map((area) => {
+                  const rollupKpis = area.scopeKpis.concat(
+                    area.children.flatMap((t) => t.scopeKpis)
+                  )
+                  const variations = rollupKpis
+                    .map((k) => (k.variation != null ? Number(k.variation) : null))
+                    .filter((v): v is number => v !== null)
+                  const avg =
+                    variations.length > 0
+                      ? Number((variations.reduce((a, b) => a + b, 0) / variations.length).toFixed(1))
+                      : null
+                  return {
+                    name: area.scope.name,
+                    type: area.scope.type,
+                    averageVariation: avg,
+                    kpiCount: rollupKpis.length,
+                    kpis: rollupKpis.map((k) => ({
+                      name: k.name,
+                      variation: k.variation != null ? Number(k.variation) : null,
+                      target: k.target,
+                      actual: k.actual != null ? Number(k.actual) : null,
+                    })),
+                  }
+                })
+                exportExecutivePDF({
+                  periodName: executiveTree?.periodName || null,
+                  subPeriodName: executiveTree?.subPeriodName || null,
+                  companyName: selectedCompany.scope.name,
+                  summary: {
+                    averageVariation: selectedCompany.summary?.averageVariation ?? null,
+                    totalScopeKpis: selectedCompany.summary?.totalScopeKpis ?? 0,
+                    approvedScopeKpis: selectedCompany.summary?.approvedScopeKpis ?? 0,
+                    completionRate: selectedCompany.summary?.completionRate ?? null,
+                    weightedResultTotal: selectedCompany.summary?.weightedResultTotal ?? null,
+                  },
+                  objectiveNames: selectedCompany.objectives || [],
+                  areas: exportAreas,
+                })
+              }}
+            >
+              Exportar PDF
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="executive-filters">
@@ -918,6 +1143,20 @@ export default function TableroEjecutivo() {
                   isCurrent={(point) => point.subPeriodId === executiveTree?.subPeriodId}
                 />
               </div>
+
+              {focusTrends.periodSeries.length >= 2 && (
+                <PeriodComparePanel
+                  periodSeries={focusTrends.periodSeries}
+                  currentPeriodId={executiveTree?.periodId ?? null}
+                />
+              )}
+
+              {focusTrends.subPeriodSeries.length >= 2 && (
+                <ProjectionPanel
+                  subPeriodSeries={focusTrends.subPeriodSeries}
+                  currentSubPeriodId={executiveTree?.subPeriodId ?? null}
+                />
+              )}
             </section>
           ) : null}
 

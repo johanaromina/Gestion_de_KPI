@@ -17,6 +17,7 @@ import InputDatos from './pages/InputDatos'
 import Curaduria from './pages/Curaduria'
 import ArbolObjetivos from './pages/ArbolObjetivos'
 import MiParrilla from './pages/MiParrilla'
+import MiCuenta from './pages/MiCuenta'
 import HistorialEvolutivo from './pages/HistorialEvolutivo'
 import Vistas from './pages/Vistas'
 import ConsolidadoColaborador from './pages/ConsolidadoColaborador'
@@ -29,6 +30,10 @@ import Seguridad from './pages/Seguridad'
 import ParrillaGeneral from './pages/ParrillaGeneral'
 import Evolutivo from './pages/Evolutivo'
 import NotFound from './pages/NotFound'
+import MapaRiesgo from './pages/MapaRiesgo'
+import Simulador from './pages/Simulador'
+import CheckIns from './pages/CheckIns'
+import MarketplaceKPI from './pages/MarketplaceKPI'
 import { isTokenExpired } from './hooks/useAuth'
 
 const queryClient = new QueryClient({
@@ -78,6 +83,38 @@ function App() {
               element={
                 <RequireAuth>
                   <TableroEjecutivo />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/mapa-riesgo"
+              element={
+                <RequireAuth>
+                  <MapaRiesgo />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/simulador"
+              element={
+                <RequireAuth>
+                  <Simulador />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/check-ins"
+              element={
+                <RequireAuth>
+                  <CheckIns />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/marketplace-kpi"
+              element={
+                <RequireAuth>
+                  <MarketplaceKPI />
                 </RequireAuth>
               }
             />
@@ -154,6 +191,14 @@ function App() {
               element={
                 <RequireAuth>
                   <MiParrilla />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/mi-cuenta"
+              element={
+                <RequireAuth>
+                  <MiCuenta />
                 </RequireAuth>
               }
             />

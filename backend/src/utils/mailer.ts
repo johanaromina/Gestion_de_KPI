@@ -1,30 +1,37 @@
 import nodemailer from 'nodemailer'
+import { appEnv } from '../config/env'
 
-const SMTP_HOST = process.env.SMTP_HOST || ''
-const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587')
-const SMTP_USER = process.env.SMTP_USER || ''
-const SMTP_PASS = process.env.SMTP_PASS || ''
-const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER || 'no-reply@example.com'
-const SMTP_IPV4_ONLY = String(process.env.SMTP_IPV4_ONLY || 'true').toLowerCase() === 'true'
+export const isMailConfigured = () => Boolean(appEnv.smtpHost && appEnv.smtpUser && appEnv.smtpPass)
 
-export async function sendMail(options: { to: string; subject: string; html: string; text?: string }) {
-  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
+const createTransport = () => {
+  if (!isMailConfigured()) {
     throw new Error('SMTP no configurado (SMTP_HOST/SMTP_USER/SMTP_PASS)')
   }
 
-  const transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: SMTP_PORT,
-    secure: SMTP_PORT === 465,
-    ...(SMTP_IPV4_ONLY ? { family: 4 } : {}),
+  return nodemailer.createTransport({
+    host: appEnv.smtpHost,
+    port: appEnv.smtpPort,
+    secure: appEnv.smtpSecure,
+    requireTLS: appEnv.smtpRequireTls,
+    ...(appEnv.smtpIpv4Only ? { family: 4 } : {}),
     auth: {
-      user: SMTP_USER,
-      pass: SMTP_PASS,
+      user: appEnv.smtpUser,
+      pass: appEnv.smtpPass,
     },
   })
+}
+
+export async function verifyMailTransport() {
+  const transporter = createTransport()
+  await transporter.verify()
+}
+
+export async function sendMail(options: { to: string; subject: string; html: string; text?: string }) {
+  const transporter = createTransport()
 
   await transporter.sendMail({
-    from: SMTP_FROM,
+    from: appEnv.smtpFrom,
+    ...(appEnv.smtpReplyTo ? { replyTo: appEnv.smtpReplyTo } : {}),
     to: options.to,
     subject: options.subject,
     text: options.text,

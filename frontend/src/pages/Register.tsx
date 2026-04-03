@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import { storeAuthToken } from '../utils/authStorage'
+import { selfRegisterEnabled } from '../config/runtime'
 import './Login.css'
 
 export default function Register() {
@@ -52,90 +53,116 @@ export default function Register() {
         <section className="login-panel" style={{ width: '100%' }}>
           <div className="login-card" style={{ transform: 'none', minHeight: 'auto' }}>
             <div className="login-header">
-              <h2>Crear cuenta</h2>
+              <h2>{selfRegisterEnabled ? 'Crear instancia' : 'Alta deshabilitada'}</h2>
               <p className="subtitle">
-                ¿Ya tenés cuenta?{' '}
-                <a href="/login" style={{ color: '#f97316', fontWeight: 600, textDecoration: 'none' }}>
-                  Ingresar →
-                </a>
+                {selfRegisterEnabled ? (
+                  <>
+                    ¿Ya tenés cuenta?{' '}
+                    <a href="/login" style={{ color: '#f97316', fontWeight: 600, textDecoration: 'none' }}>
+                      Ingresar →
+                    </a>
+                  </>
+                ) : (
+                  <>
+                    Esta instalación es single-tenant. El alta inicial se hace por despliegue o bootstrap del cliente.
+                    {' '}
+                    <a href="/login" style={{ color: '#f97316', fontWeight: 600, textDecoration: 'none' }}>
+                      Volver al login →
+                    </a>
+                  </>
+                )}
               </p>
             </div>
-            <form onSubmit={handleSubmit} className="login-form">
-              <div className="field">
-                <label htmlFor="companyName">Nombre de la empresa</label>
-                <input
-                  id="companyName"
-                  type="text"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="Ej: Acme S.A."
-                  autoComplete="organization"
-                  required
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="adminName">Tu nombre completo</label>
-                <input
-                  id="adminName"
-                  type="text"
-                  value={adminName}
-                  onChange={(e) => setAdminName(e.target.value)}
-                  placeholder="Ej: Juan Pérez"
-                  autoComplete="name"
-                  required
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="email">Email</label>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@empresa.com"
-                  autoComplete="email"
-                  required
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="password">Contraseña</label>
-                <div className="input-wrap">
+            {selfRegisterEnabled ? (
+              <form onSubmit={handleSubmit} className="login-form">
+                <div className="field">
+                  <label htmlFor="companyName">Nombre de la empresa</label>
                   <input
-                    id="password"
+                    id="companyName"
+                    type="text"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    placeholder="Ej: Acme S.A."
+                    autoComplete="organization"
+                    required
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="adminName">Tu nombre completo</label>
+                  <input
+                    id="adminName"
+                    type="text"
+                    value={adminName}
+                    onChange={(e) => setAdminName(e.target.value)}
+                    placeholder="Ej: Juan Pérez"
+                    autoComplete="name"
+                    required
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="email">Email</label>
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="admin@empresa.com"
+                    autoComplete="email"
+                    required
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="password">Contraseña</label>
+                  <div className="input-wrap">
+                    <input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Mínimo 8 caracteres"
+                      autoComplete="new-password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="toggle-visibility"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    >
+                      {showPassword ? 'Ocultar' : 'Mostrar'}
+                    </button>
+                  </div>
+                </div>
+                <div className="field">
+                  <label htmlFor="confirmPassword">Confirmar contraseña</label>
+                  <input
+                    id="confirmPassword"
                     type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Mínimo 8 caracteres"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Repetí tu contraseña"
                     autoComplete="new-password"
                     required
                   />
-                  <button
-                    type="button"
-                    className="toggle-visibility"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                  >
-                    {showPassword ? 'Ocultar' : 'Mostrar'}
-                  </button>
                 </div>
+                {error && <div className="login-error">{error}</div>}
+                <button type="submit" className="btn-primary" disabled={loading}>
+                  {loading ? 'Creando instancia...' : 'Crear instancia'}
+                </button>
+              </form>
+            ) : (
+              <div className="login-form">
+                <div className="login-help" style={{ marginTop: 0 }}>
+                  <span>
+                    Esta URL corresponde a una única empresa. Si necesitás una instancia nueva o acceso inicial,
+                    hacelo por el flujo operativo de despliegue y bootstrap del cliente.
+                  </span>
+                </div>
+                <button type="button" className="btn-primary" onClick={() => navigate('/login')}>
+                  Ir al login
+                </button>
               </div>
-              <div className="field">
-                <label htmlFor="confirmPassword">Confirmar contraseña</label>
-                <input
-                  id="confirmPassword"
-                  type={showPassword ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Repetí tu contraseña"
-                  autoComplete="new-password"
-                  required
-                />
-              </div>
-              {error && <div className="login-error">{error}</div>}
-              <button type="submit" className="btn-primary" disabled={loading}>
-                {loading ? 'Creando cuenta...' : 'Crear empresa'}
-              </button>
-            </form>
+            )}
           </div>
         </section>
       </div>

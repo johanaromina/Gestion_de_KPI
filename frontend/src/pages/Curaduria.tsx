@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import { useSearchParams } from 'react-router-dom'
 import api from '../services/api'
+import { detectOutlier } from '../utils/outlierDetection'
 import './Curaduria.css'
 
 type CurationItem = {
@@ -185,6 +186,30 @@ export default function Curaduria() {
   }
 
   const filteredItems = useMemo(() => items || [], [items])
+
+  /* ── Outlier analysis map: assignmentId → OutlierAnalysis ── */
+  const outlierMap = useMemo(() => {
+    if (!assignments || !items) return new Map()
+    const map = new Map<number, ReturnType<typeof detectOutlier>>()
+    for (const item of items) {
+      if (item.assignmentId == null) continue
+      const currentAssignment = assignments.find((a: any) => a.id === item.assignmentId)
+      if (!currentAssignment || currentAssignment.actual == null) continue
+      const historicalValues = assignments
+        .filter(
+          (a: any) =>
+            a.collaboratorId === currentAssignment.collaboratorId &&
+            a.kpiId === currentAssignment.kpiId &&
+            a.periodId !== currentAssignment.periodId &&
+            a.actual != null &&
+            Number.isFinite(Number(a.actual)) &&
+            (a.status === 'approved' || a.status === 'closed')
+        )
+        .map((a: any) => Number(a.actual))
+      map.set(item.assignmentId, detectOutlier(Number(currentAssignment.actual), historicalValues))
+    }
+    return map
+  }, [assignments, items])
 
   const selectedScopeName = useMemo(() => {
     if (!scopeFilter || !orgScopes) return ''
@@ -475,6 +500,7 @@ export default function Curaduria() {
               <th>Período</th>
               <th>Fuente</th>
               <th>Criterio</th>
+              <th>IA</th>
               <th>Estado</th>
               <th>Actualización</th>
               <th>Acciones</th>
@@ -483,7 +509,7 @@ export default function Curaduria() {
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={8} className="empty-row">Cargando bandeja...</td>
+                <td colSpan={9} className="empty-row">Cargando bandeja...</td>
               </tr>
             ) : (
               filteredItems.map((item) => {
@@ -498,6 +524,20 @@ export default function Curaduria() {
                     <td title={item.sourceConfig || ''}>{formatSource(item)}</td>
                     <td className="criteria-cell" title={resolveCriteriaText(item) || ''}>
                       {resolveCriteriaText(item) || '-'}
+                    </td>
+                    <td className="outlier-td">
+                      {(() => {
+                        const o = outlierMap.get(item.assignmentId)
+                        if (!o || o.severity === 'none') return <span className="outlier-chip outlier-chip-ok" title="Sin anomalías detectadas">✓</span>
+                        return (
+                          <span
+                            className={`outlier-chip outlier-chip-${o.severity}`}
+                            title={o.message || ''}
+                          >
+                            {o.severity === 'high' ? '⚠ Inusual' : o.severity === 'medium' ? '🔍 Revisar' : 'ℹ Info'}
+                          </span>
+                        )
+                      })()}
                     </td>
                     <td>
                       <span className={`status-pill ${status === 'approved' ? 'ok' : 'review'}`}>
@@ -557,7 +597,7 @@ export default function Curaduria() {
             )}
             {filteredItems.length === 0 && (
               <tr>
-                <td colSpan={8} className="empty-row">
+                <td colSpan={9} className="empty-row">
                   No hay items para curar con este filtro.
                 </td>
               </tr>

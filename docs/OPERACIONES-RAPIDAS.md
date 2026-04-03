@@ -40,6 +40,7 @@ Bootstrap de una instancia real por cliente:
 - crea schema base
 - aplica migracion canonica
 - crea un admin inicial usable
+- no habilita auto-registro de nuevas empresas dentro de esa misma instancia
 
 ```powershell
 .\project-ops.ps1 backup-db -DbHost localhost -DbPort <MYSQL_PORT> -DbUser root -DbPassword root123 -DbName gestion_kpi

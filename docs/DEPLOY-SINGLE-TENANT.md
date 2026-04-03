@@ -5,6 +5,7 @@ Modelo recomendado hoy para KPI Manager:
 - una aplicacion por cliente
 - una base MySQL por cliente
 - sin mezclar datos entre empresas
+- con auto-registro deshabilitado por defecto
 
 Esto reduce riesgo tecnico y operativo, y encaja con el estado actual del producto.
 
@@ -101,6 +102,7 @@ Completar al menos:
 - `APP_BASE_URL`
 - `FRONTEND_BASE_URL`
 - `PUBLIC_API_BASE_URL`
+- `SELF_REGISTER_ENABLED=false`
 - `MYSQL_ROOT_PASSWORD`
 - `MYSQL_PASSWORD`
 - `JWT_SECRET`
@@ -113,6 +115,8 @@ Para una instancia real por cliente:
 - usa secretos fuertes y unicos para `JWT_SECRET` y `AUTH_ENCRYPTION_KEY`
 - configura `SMTP_*` real antes de habilitar recovery, MFA o notificaciones
 - no reutilices passwords de desarrollo
+- para demo podes usar tu correo personal
+- para venta real conviene un remitente propio del producto, por ejemplo `no-reply@tu-dominio.com`
 
 Ejemplo:
 
@@ -153,6 +157,7 @@ Eso hace:
 - `setup-db`
 - `migrate-schema`
 - crea el admin inicial local
+- deja la instancia lista para un solo cliente; no crea nuevas empresas dentro de la misma base
 
 ## 5. Validaciones recomendadas
 
@@ -167,6 +172,18 @@ Para produccion real:
 - no ejecutes `test-critical` sobre la base real del cliente
 
 Si no queres dataset demo en produccion, usa solo `bootstrap-client`.
+
+Mantene estas flags en `false` para single-tenant:
+
+- `SELF_REGISTER_ENABLED=false`
+- `VITE_SELF_REGISTER_ENABLED=false`
+
+Para validar SMTP antes de salir a mercado:
+
+```powershell
+cd backend
+npm run test:smtp -- --to=tu-mail@dominio.com
+```
 
 Si queres una instancia demo para ventas:
 

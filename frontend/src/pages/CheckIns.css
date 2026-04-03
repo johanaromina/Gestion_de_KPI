@@ -1,0 +1,389 @@
+/* ─── Check-ins semanales ─────────────────────────────────── */
+
+.checkins-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+  display: grid;
+  gap: 20px;
+}
+
+/* Header */
+.checkins-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.checkins-header h1 {
+  font-size: 28px;
+  font-weight: 800;
+  color: #111827;
+  margin: 0 0 6px;
+}
+
+/* Form card */
+.checkin-form-card {
+  background: #fff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 22px 24px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+}
+
+.checkin-form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.checkin-week-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #374151;
+}
+
+.checkin-edit-badge {
+  margin-left: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #fffbeb;
+  color: #b45309;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #fde68a;
+}
+
+/* Mood */
+.checkin-mood-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.checkin-mood-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.checkin-mood-options {
+  display: flex;
+  gap: 6px;
+}
+
+.checkin-mood-btn {
+  font-size: 22px;
+  background: #f9fafb;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s, background 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkin-mood-btn:hover {
+  border-color: #d1d5db;
+  transform: scale(1.1);
+}
+
+.checkin-mood-btn.selected {
+  border-color: #f97316;
+  background: #fff7ed;
+  transform: scale(1.12);
+}
+
+/* Questions */
+.checkin-questions {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.checkin-question label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.checkin-question textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  color: #111827;
+  transition: border-color 0.15s;
+}
+
+.checkin-question textarea:focus {
+  outline: none;
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12);
+}
+
+.checkin-question textarea.error {
+  border-color: #ef4444;
+}
+
+.checkin-error {
+  font-size: 12px;
+  color: #b91c1c;
+  margin-bottom: 10px;
+}
+
+.checkin-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* Submitted card */
+.checkin-submitted-card {
+  background: #f0fdf4;
+  border: 1.5px solid #bbf7d0;
+  border-radius: 16px;
+  padding: 20px 24px;
+}
+
+.checkin-submitted-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.checkin-submitted-badge {
+  font-size: 12px;
+  font-weight: 700;
+  background: #dcfce7;
+  color: #15803d;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.checkin-submitted-mood {
+  font-size: 18px;
+  margin-bottom: 12px;
+  color: #374151;
+}
+
+/* Q&A list */
+.checkin-qa-list {
+  display: grid;
+  gap: 12px;
+}
+
+.checkin-qa-list.compact {
+  gap: 8px;
+}
+
+.checkin-qa-item {
+  display: grid;
+  gap: 3px;
+}
+
+.checkin-q {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.checkin-a {
+  font-size: 13px;
+  color: #111827;
+  line-height: 1.55;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+/* Team summary */
+.checkin-team-summary {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 20px 24px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+}
+
+.checkin-team-summary h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 14px;
+}
+
+.checkin-summary-bars {
+  display: grid;
+  gap: 8px;
+}
+
+.checkin-summary-row {
+  display: grid;
+  grid-template-columns: 200px 1fr 90px 60px;
+  align-items: center;
+  gap: 12px;
+}
+
+.checkin-summary-week {
+  font-size: 12px;
+  color: #374151;
+  font-weight: 600;
+}
+
+.checkin-summary-bar-wrap {
+  background: #f3f4f6;
+  border-radius: 6px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.checkin-summary-bar {
+  background: #f97316;
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+
+.checkin-summary-count {
+  font-size: 11px;
+  color: #6b7280;
+  text-align: right;
+}
+
+.checkin-summary-mood {
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+}
+
+/* Filters */
+.checkins-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 14px 18px;
+}
+
+.checkins-filters label {
+  display: grid;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.checkins-filters select {
+  padding: 7px 10px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #374151;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.checkins-filters select:focus { border-color: #f97316; }
+
+/* History list */
+.checkins-list h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #374151;
+  margin-bottom: 12px;
+}
+
+.checkins-empty {
+  text-align: center;
+  color: #9ca3af;
+  padding: 40px 20px;
+  font-size: 14px;
+  background: #f9fafb;
+  border-radius: 12px;
+  border: 1.5px dashed #e5e7eb;
+}
+
+.checkin-history-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+  transition: box-shadow 0.15s;
+}
+
+.checkin-history-card:hover {
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.07);
+}
+
+.checkin-history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.checkin-history-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #111827;
+  margin-right: 8px;
+}
+
+.checkin-history-week {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.checkin-history-mood {
+  font-size: 20px;
+}
+
+/* KPI hint bar */
+.checkin-kpi-hint {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.checkin-kpi-chip {
+  background: #fff;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+@media (max-width: 600px) {
+  .checkin-summary-row { grid-template-columns: 1fr auto; }
+  .checkin-summary-bar-wrap, .checkin-summary-count { display: none; }
+}

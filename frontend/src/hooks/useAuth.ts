@@ -4,6 +4,7 @@ import api from '../services/api'
 
 export interface User {
   id: number
+  email?: string
   name: string
   role: 'admin' | 'director' | 'manager' | 'leader' | 'collaborator'
   area?: string

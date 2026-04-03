@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import {
+  changePassword,
   login,
   register,
   getCurrentUser,
@@ -27,6 +28,7 @@ router.post('/login', loginRateLimiter, login)
 router.post('/mfa/verify', mfaRateLimiter, verifyMfa)
 router.post('/request-password-reset', passwordResetRateLimiter, requestPasswordReset)
 router.post('/reset-password', resetPassword)
+router.post('/change-password', authenticate, changePassword)
 router.post('/register', registerRateLimiter, register)
 router.get('/me', authenticate, getCurrentUser)
 

@@ -30,6 +30,8 @@ import calendarProfilesRoutes from './routes/calendar-profiles.routes.js'
 import securityRoutes from './routes/security.routes.js'
 import scopeKpisRoutes from './routes/scope-kpis.routes.js'
 import dataSourceMappingsRoutes from './routes/data-source-mappings.routes.js'
+import checkInsRoutes from './routes/check-ins.routes.js'
+import docsRoutes from './routes/docs.routes.js'
 import { startIntegrationsScheduler } from './utils/integrations-scheduler'
 import { runNotifications } from './utils/notifications'
 
@@ -45,7 +47,21 @@ const resolveCorsOrigin = (origin: string | undefined, callback: (error: Error |
 }
 
 // Middleware
-app.use(helmet())
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", 'unpkg.com', "'unsafe-inline'"],
+        styleSrc: ["'self'", 'unpkg.com', "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:'],
+        connectSrc: ["'self'"],
+      },
+      // Only apply relaxed CSP to the docs route
+      useDefaults: false,
+    },
+  })
+)
 app.set('trust proxy', appEnv.trustProxy)
 app.use(
   cors({
@@ -107,6 +123,8 @@ app.use('/api/security', securityRoutes)
 app.use('/api/scope-kpis', scopeKpisRoutes)
 app.use('/api/macro-kpis', scopeKpisRoutes)
 app.use('/api/data-source-mappings', dataSourceMappingsRoutes)
+app.use('/api/check-ins', checkInsRoutes)
+app.use('/api/docs', docsRoutes)
 
 // Start server
 app.listen(PORT, async () => {

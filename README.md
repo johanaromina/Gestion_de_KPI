@@ -61,10 +61,22 @@ Para comercializar la app en el estado actual, la estrategia recomendada es:
 - una app por empresa
 - una base MySQL por empresa
 
+Importante:
+
+- el auto-registro de empresas debe quedar deshabilitado en instancias `single-tenant`
+- el alta inicial del cliente se hace por `bootstrap-client`, no desde `/register`
+
 Guia operativa:
 
 - [docs/DEPLOY-SINGLE-TENANT.md](/d:/proyectos laborales/Gestion_de_KPI/docs/DEPLOY-SINGLE-TENANT.md)
 - [docs/OPERACIONES-RAPIDAS.md](/d:/proyectos laborales/Gestion_de_KPI/docs/OPERACIONES-RAPIDAS.md)
+
+Correo saliente:
+
+- la app no debe quedar atada a un mailbox corporativo de un cliente o empleador
+- el SMTP se configura por variables de entorno en cada instancia
+- para pruebas podes usar tu correo personal con app password
+- para venta real conviene usar un mailbox del producto o tu dominio comercial
 
 ## Estado actual (funcionalidades principales)
 

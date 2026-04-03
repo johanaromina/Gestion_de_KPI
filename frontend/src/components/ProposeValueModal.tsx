@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from 'react-query'
 import api from '../services/api'
 import { useDialog } from './Dialog'
+import { useOutlierDetection } from '../hooks/useOutlierDetection'
 import './ProposeValueModal.css'
 
 interface ProposeValueModalProps {
@@ -12,6 +13,9 @@ interface ProposeValueModalProps {
     target: number
     actual?: number
     status: string
+    collaboratorId?: number
+    kpiId?: number
+    periodId?: number
   }
   requiresReason?: boolean
   evidenceEnabled?: boolean
@@ -36,6 +40,14 @@ export default function ProposeValueModal({
 
   const queryClient = useQueryClient()
   const dialog = useDialog()
+
+  const parsedActual = actual.trim() !== '' && !isNaN(parseFloat(actual)) ? parseFloat(actual) : null
+  const outlier = useOutlierDetection(
+    assignment.collaboratorId,
+    assignment.kpiId,
+    assignment.periodId,
+    parsedActual
+  )
 
   const proposeMutation = useMutation(
     async (data: { actual?: number; comments?: string; reason?: string; evidenceUrl?: string }) => {
@@ -115,6 +127,31 @@ export default function ProposeValueModal({
               <strong>Target:</strong> {assignment.target}
             </p>
           </div>
+
+          {outlier.severity !== 'none' && outlier.message && (
+            <div className={`outlier-banner outlier-banner-${outlier.severity}`}>
+              <span className="outlier-icon">
+                {outlier.severity === 'high' ? '⚠️' : outlier.severity === 'medium' ? '🔍' : 'ℹ️'}
+              </span>
+              <div className="outlier-body">
+                <span className="outlier-title">
+                  {outlier.severity === 'high'
+                    ? 'Valor altamente inusual'
+                    : outlier.severity === 'medium'
+                    ? 'Valor fuera del rango habitual'
+                    : 'Aviso estadístico'}
+                </span>
+                <span className="outlier-message">{outlier.message}</span>
+                {outlier.sampleSize > 0 && (
+                  <span className="outlier-stats">
+                    Media histórica: {outlier.mean != null ? new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 }).format(outlier.mean) : '-'}
+                    {outlier.zScore != null && ` · Z-score: ${outlier.zScore.toFixed(2)}`}
+                    {` · Muestra: ${outlier.sampleSize} períodos`}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="form-group">
             <label htmlFor="actual">Valor Actual (Alcance) *</label>

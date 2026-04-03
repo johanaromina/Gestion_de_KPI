@@ -57,6 +57,19 @@
   color: #e5e7eb;
 }
 
+.footer-link {
+  display: inline-flex;
+  align-items: center;
+  color: rgba(249, 250, 251, 0.9);
+  text-decoration: none;
+  padding: 8px 0;
+  font-size: 14px;
+}
+
+.footer-link:hover {
+  color: #ffffff;
+}
+
 .logout-button {
   border: 1px solid rgba(249, 250, 251, 0.4);
   background: transparent;
@@ -185,4 +198,3 @@
     padding-top: 64px;
   }
 }
-

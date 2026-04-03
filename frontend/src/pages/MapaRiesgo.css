@@ -1,0 +1,387 @@
+/* ─── Mapa de Riesgo Organizacional ─────────────────────── */
+
+.mapa-riesgo-page {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 24px;
+  display: grid;
+  gap: 20px;
+}
+
+/* Header */
+.mapa-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.mapa-header h1 {
+  font-size: 28px;
+  font-weight: 800;
+  color: #111827;
+  margin: 0 0 6px;
+}
+
+.mapa-summary-pills {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.mapa-pill {
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.mapa-pill.green  { background: #f0fdf4; color: #15803d; border: 1.5px solid #bbf7d0; }
+.mapa-pill.yellow { background: #fffbeb; color: #b45309; border: 1.5px solid #fde68a; }
+.mapa-pill.red    { background: #fef2f2; color: #b91c1c; border: 1.5px solid #fecaca; }
+.mapa-pill.none   { background: #f9fafb; color: #6b7280; border: 1.5px solid #e5e7eb; }
+
+/* Filters */
+.mapa-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+}
+
+.mapa-filters label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.mapa-filters select {
+  padding: 8px 10px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #374151;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.mapa-filters select:focus { border-color: #f97316; }
+
+/* Legend */
+.mapa-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #6b7280;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 16px;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.legend-dot.green  { background: #22c55e; }
+.legend-dot.yellow { background: #f59e0b; }
+.legend-dot.red    { background: #ef4444; }
+.legend-dot.none   { background: #d1d5db; }
+
+.legend-hint {
+  margin-left: auto;
+  font-style: italic;
+  color: #9ca3af;
+}
+
+/* Table */
+.mapa-table-wrap {
+  overflow-x: auto;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+}
+
+.mapa-table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 700px;
+}
+
+.mapa-table thead tr {
+  background: #f9fafb;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.mapa-th-area {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #f9fafb;
+  text-align: left;
+  padding: 12px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #374151;
+  min-width: 160px;
+  white-space: nowrap;
+  border-right: 1px solid #e5e7eb;
+}
+
+.mapa-th-type,
+.mapa-th-avg {
+  padding: 12px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #374151;
+  text-align: center;
+  white-space: nowrap;
+  border-right: 1px solid #e5e7eb;
+}
+
+.mapa-th-kpi {
+  padding: 8px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  text-align: center;
+  min-width: 80px;
+  max-width: 110px;
+  border-right: 1px solid #f3f4f6;
+}
+
+.mapa-th-kpi span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100px;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  height: 80px;
+  line-height: 1;
+  padding: 4px 0;
+}
+
+/* Body rows */
+.mapa-table tbody tr {
+  border-bottom: 1px solid #f3f4f6;
+  transition: background 0.1s ease;
+}
+
+.mapa-table tbody tr:hover { background: #fafafa; }
+
+.mapa-td-area {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #fff;
+  padding: 10px 16px;
+  border-right: 1px solid #e5e7eb;
+}
+
+.mapa-table tbody tr:hover .mapa-td-area { background: #fafafa; }
+
+.mapa-area-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  white-space: nowrap;
+}
+
+.mapa-td-type {
+  padding: 10px 12px;
+  text-align: center;
+  border-right: 1px solid #e5e7eb;
+}
+
+.mapa-type-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.mapa-td-avg {
+  padding: 10px 12px;
+  text-align: center;
+  border-right: 1px solid #e5e7eb;
+  border-radius: 0;
+}
+
+.mapa-avg-val {
+  display: block;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  color: inherit;
+}
+
+.mapa-avg-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.75;
+  margin-top: 2px;
+}
+
+/* heat-cell colors for avg column */
+.mapa-td-avg.heat-cell-green  { background: #f0fdf4; color: #15803d; }
+.mapa-td-avg.heat-cell-yellow { background: #fffbeb; color: #b45309; }
+.mapa-td-avg.heat-cell-red    { background: #fef2f2; color: #b91c1c; }
+.mapa-td-avg.heat-cell-none   { background: #f9fafb; color: #9ca3af; }
+
+.mapa-td-cell {
+  padding: 4px;
+  border-right: 1px solid #f3f4f6;
+}
+
+/* Heat cells */
+.heat-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 64px;
+  height: 40px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  transition: filter 0.15s ease, transform 0.1s ease;
+}
+
+.heat-cell:hover { filter: brightness(0.92); transform: scale(1.04); }
+
+.heat-cell-empty {
+  background: #f9fafb;
+  color: #d1d5db;
+  cursor: default;
+  border: 1.5px dashed #e5e7eb;
+}
+.heat-cell-empty::after { content: '—'; font-size: 11px; }
+
+.heat-cell-green  { background: #dcfce7; color: #15803d; }
+.heat-cell-yellow { background: #fef9c3; color: #854d0e; }
+.heat-cell-red    { background: #fee2e2; color: #991b1b; }
+.heat-cell-none   { background: #f3f4f6; color: #9ca3af; cursor: default; }
+
+.heat-cell-val { font-size: 11px; font-weight: 700; }
+
+/* Column summary */
+.mapa-column-summary {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 22px 24px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+}
+
+.mapa-column-summary h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 18px;
+}
+
+.mapa-kpi-risk-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mapa-kpi-bar-row {
+  display: grid;
+  grid-template-columns: 200px 1fr 90px 70px;
+  align-items: center;
+  gap: 12px;
+}
+
+.mapa-kpi-bar-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mapa-kpi-bar-track {
+  display: flex;
+  height: 22px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f3f4f6;
+}
+
+.mapa-kpi-bar-seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  transition: flex 0.3s ease;
+  min-width: 0;
+}
+
+.mapa-kpi-bar-seg.red    { background: #ef4444; color: #fff; }
+.mapa-kpi-bar-seg.yellow { background: #f59e0b; color: #fff; }
+.mapa-kpi-bar-seg.green  { background: #22c55e; color: #fff; }
+
+.mapa-kpi-bar-avg {
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+  padding: 3px 8px;
+  border-radius: 8px;
+}
+
+.mapa-kpi-bar-avg.heat-cell-green  { background: #f0fdf4; color: #15803d; }
+.mapa-kpi-bar-avg.heat-cell-yellow { background: #fffbeb; color: #b45309; }
+.mapa-kpi-bar-avg.heat-cell-red    { background: #fef2f2; color: #b91c1c; }
+.mapa-kpi-bar-avg.heat-cell-none   { background: #f9fafb; color: #9ca3af; }
+
+.mapa-kpi-bar-total {
+  font-size: 11px;
+  color: #9ca3af;
+  text-align: right;
+}
+
+/* Empty */
+.mapa-empty {
+  text-align: center;
+  color: #9ca3af;
+  padding: 60px 20px;
+  font-size: 15px;
+  background: #f9fafb;
+  border-radius: 12px;
+  border: 1.5px dashed #e5e7eb;
+}
+
+@media (max-width: 768px) {
+  .mapa-header { flex-direction: column; }
+  .legend-hint { display: none; }
+  .mapa-kpi-bar-row { grid-template-columns: 120px 1fr 70px; }
+  .mapa-kpi-bar-total { display: none; }
+}

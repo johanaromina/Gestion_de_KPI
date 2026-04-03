@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import { persistSsoRememberMe, storeAuthToken } from '../utils/authStorage'
+import { selfRegisterEnabled } from '../config/runtime'
 import './Login.css'
 
 type SsoProvider = {
@@ -275,10 +276,16 @@ export default function Login() {
                 </div>
               </form>
               <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '14px', color: '#94a3b8' }}>
-                ¿No tenés cuenta?{' '}
-                <a href="/register" style={{ color: '#f97316', fontWeight: 600, textDecoration: 'none' }}>
-                  Registrá tu empresa →
-                </a>
+                {selfRegisterEnabled ? (
+                  <>
+                    ¿No tenés cuenta?{' '}
+                    <a href="/register" style={{ color: '#f97316', fontWeight: 600, textDecoration: 'none' }}>
+                      Crear instancia →
+                    </a>
+                  </>
+                ) : (
+                  'Alta inicial y nuevos accesos gestionados por el administrador de esta instancia.'
+                )}
               </div>
               </>
             ) : (
