@@ -209,6 +209,10 @@ export default function Layout({ children }: LayoutProps) {
                 <span className="nav-icon" aria-hidden="true">&gt;</span>
                 Seguridad
               </Link>
+              <Link to="/marketplace-kpi" className={`nav-item ${isActive('/marketplace-kpi') ? 'active' : ''}`} onClick={handleNavClick}>
+                <span className="nav-icon" aria-hidden="true">&gt;</span>
+                Templates KPI
+              </Link>
             </>
           )}
         </nav>
