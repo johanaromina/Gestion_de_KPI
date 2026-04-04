@@ -32,6 +32,7 @@ import scopeKpisRoutes from './routes/scope-kpis.routes.js'
 import dataSourceMappingsRoutes from './routes/data-source-mappings.routes.js'
 import checkInsRoutes from './routes/check-ins.routes.js'
 import docsRoutes from './routes/docs.routes.js'
+import contactRoutes from './routes/contact.routes.js'
 import { startIntegrationsScheduler } from './utils/integrations-scheduler'
 import { runNotifications } from './utils/notifications'
 
@@ -125,6 +126,7 @@ app.use('/api/macro-kpis', scopeKpisRoutes)
 app.use('/api/data-source-mappings', dataSourceMappingsRoutes)
 app.use('/api/check-ins', checkInsRoutes)
 app.use('/api/docs', docsRoutes)
+app.use('/api/contact', contactRoutes)
 
 // Start server
 app.listen(PORT, async () => {

@@ -26,12 +26,12 @@ export async function verifyMailTransport() {
   await transporter.verify()
 }
 
-export async function sendMail(options: { to: string; subject: string; html: string; text?: string }) {
+export async function sendMail(options: { to: string; subject: string; html: string; text?: string; replyTo?: string }) {
   const transporter = createTransport()
 
   await transporter.sendMail({
     from: appEnv.smtpFrom,
-    ...(appEnv.smtpReplyTo ? { replyTo: appEnv.smtpReplyTo } : {}),
+    ...(options.replyTo ? { replyTo: options.replyTo } : appEnv.smtpReplyTo ? { replyTo: appEnv.smtpReplyTo } : {}),
     to: options.to,
     subject: options.subject,
     text: options.text,

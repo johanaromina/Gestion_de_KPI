@@ -1289,7 +1289,7 @@
 .landing-cta-inner {
   position: relative;
   z-index: 1;
-  max-width: 960px;
+  max-width: 1120px;
   margin: 0 auto;
   display: grid;
   gap: 20px;
@@ -1323,6 +1323,156 @@
   gap: 14px;
   justify-content: center;
   flex-wrap: wrap;
+}
+
+.landing-contact-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.landing-demo-form {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 22px;
+  padding: 24px;
+  display: grid;
+  gap: 18px;
+  box-shadow: 0 24px 48px rgba(4, 12, 24, 0.18);
+}
+
+.landing-demo-form-header {
+  display: grid;
+  gap: 6px;
+}
+
+.landing-demo-form-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.landing-demo-form-copy {
+  font-size: 14px;
+  line-height: 1.7;
+  color: rgba(255,255,255,0.68);
+}
+
+.landing-demo-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.landing-demo-field {
+  display: grid;
+  gap: 8px;
+}
+
+.landing-demo-field-full {
+  grid-column: 1 / -1;
+}
+
+.landing-demo-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(134, 239, 172, 0.88);
+}
+
+.landing-demo-input {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.96);
+  color: #0f172a;
+  padding: 14px 16px;
+  font-size: 15px;
+  font-family: 'Space Grotesk', sans-serif;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+
+.landing-demo-input:focus {
+  border-color: #86efac;
+  box-shadow: 0 0 0 4px rgba(134, 239, 172, 0.18);
+  transform: translateY(-1px);
+}
+
+.landing-demo-input::placeholder {
+  color: #94a3b8;
+}
+
+.landing-demo-status {
+  border-radius: 14px;
+  padding: 14px 16px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.landing-demo-status.success {
+  background: rgba(34, 197, 94, 0.14);
+  border: 1px solid rgba(134, 239, 172, 0.34);
+  color: #dcfce7;
+}
+
+.landing-demo-status.error {
+  background: rgba(244, 63, 94, 0.14);
+  border: 1px solid rgba(253, 164, 175, 0.34);
+  color: #ffe4e6;
+}
+
+.landing-demo-status.loading {
+  background: rgba(14, 165, 233, 0.14);
+  border: 1px solid rgba(125, 211, 252, 0.34);
+  color: #e0f2fe;
+}
+
+.landing-demo-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.landing-demo-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.landing-demo-submit:disabled {
+  opacity: 0.7;
+  cursor: wait;
+  transform: none;
+  box-shadow: 0 8px 24px rgba(0, 195, 122, 0.28);
+}
+
+.landing-demo-form-note {
+  font-size: 13px;
+  color: rgba(255,255,255,0.6);
+}
+
+.landing-contact-side {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.landing-contact-side-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.landing-contact-side-copy {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: rgba(255,255,255,0.66);
 }
 
 .landing-contact-grid {
@@ -1364,8 +1514,6 @@
 }
 
 .landing-contact-empty {
-  max-width: 720px;
-  margin: 0 auto;
   padding: 16px 18px;
   border-radius: 14px;
   background: rgba(255,255,255,0.08);
@@ -1373,6 +1521,10 @@
   color: rgba(255,255,255,0.72);
   font-size: 14px;
   line-height: 1.7;
+}
+
+.landing-contact-actions {
+  justify-content: flex-start;
 }
 
 .landing-cta-primary {
@@ -1485,6 +1637,10 @@
   .landing-cta-inner {
     max-width: 720px;
   }
+
+  .landing-contact-layout {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 560px) {
@@ -1510,6 +1666,14 @@
     grid-template-columns: 1fr;
   }
 
+  .landing-demo-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-demo-field-full {
+    grid-column: auto;
+  }
+
   .landing-mockup-live-strip,
   .landing-mockup-insight-topline,
   .landing-mockup-controls-head,
@@ -1528,6 +1692,10 @@
 
   .landing-cta-actions {
     flex-direction: column;
+    align-items: stretch;
+  }
+
+  .landing-demo-form-actions {
     align-items: stretch;
   }
 

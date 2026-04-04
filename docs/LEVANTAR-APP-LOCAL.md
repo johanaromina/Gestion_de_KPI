@@ -70,6 +70,7 @@ SMTP_REPLY_TO=
 SMTP_SECURE=false
 SMTP_REQUIRE_TLS=true
 SMTP_IPV4_ONLY=true
+DEMO_REQUEST_TO=
 ```
 
 Para generar una clave segura:
@@ -173,6 +174,11 @@ npm run build
 - MFA por correo
 
 Todo eso depende de `SMTP_*` en `backend/.env`.
+
+Si queres que el formulario comercial de la landing envie la solicitud al equipo correcto:
+
+- definir `DEMO_REQUEST_TO` en `backend/.env`
+- si no lo definis, el backend usa `SMTP_USER` como destinatario por defecto
 
 Si SMTP no esta configurado:
 

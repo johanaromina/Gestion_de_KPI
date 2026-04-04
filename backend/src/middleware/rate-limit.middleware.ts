@@ -43,3 +43,11 @@ export const registerRateLimiter = rateLimit({
   legacyHeaders: false,
   message: jsonMessage('Demasiados intentos de registro. Intentá en una hora.'),
 })
+
+export const demoRequestRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: jsonMessage('Demasiadas solicitudes de demo. Intentá nuevamente en unos minutos.'),
+})

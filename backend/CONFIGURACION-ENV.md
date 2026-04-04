@@ -30,6 +30,7 @@ SMTP_PORT=587
 SMTP_USER=tu_usuario@empresa.com
 SMTP_PASS=tu_app_password
 SMTP_FROM=KPI Manager <no-reply@tuempresa.com>
+DEMO_REQUEST_TO=ventas@tuempresa.com
 
 # MFA y reset (minutos)
 MFA_TTL_MIN=10
@@ -69,4 +70,6 @@ Si no configuras `JWT_SECRET`, el sistema usará una clave por defecto solo para
 4. Genera un `JWT_SECRET` seguro
 5. Guarda el archivo
 6. Reinicia el servidor backend
+
+`DEMO_REQUEST_TO` es opcional. Si no lo configuras, las solicitudes de demo se envian a `SMTP_USER`.
 

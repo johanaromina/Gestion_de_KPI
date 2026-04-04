@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { contactDemoSubject, contactEmail, contactPhones } from '../config/runtime'
+import api from '../services/api'
 import './Landing.css'
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
@@ -31,6 +32,22 @@ const HERO_CONTROLS = [
     initial: 79,
   },
 ] as const
+
+type DemoFormState = {
+  name: string
+  company: string
+  email: string
+  phone: string
+  usersCount: string
+}
+
+const INITIAL_DEMO_FORM: DemoFormState = {
+  name: '',
+  company: '',
+  email: '',
+  phone: '',
+  usersCount: '',
+}
 
 const FEATURES = [
   {
@@ -223,8 +240,12 @@ export default function Landing() {
     delivery: HERO_CONTROLS[1].initial,
     engagement: HERO_CONTROLS[2].initial,
   }))
+  const [demoForm, setDemoForm] = useState<DemoFormState>(INITIAL_DEMO_FORM)
+  const [demoSubmitState, setDemoSubmitState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [demoSubmitMessage, setDemoSubmitMessage] = useState('')
 
-  const demoHref = contactEmail
+  const demoHref = '#contacto'
+  const contactMailHref = contactEmail
     ? `mailto:${contactEmail}?subject=${encodeURIComponent(contactDemoSubject)}`
     : '#contacto'
 
@@ -243,7 +264,7 @@ export default function Landing() {
           {
             label: 'Email comercial',
             value: contactEmail,
-            href: `mailto:${contactEmail}`,
+            href: contactMailHref,
           },
         ]
       : []),
@@ -251,7 +272,7 @@ export default function Landing() {
   ]
 
   const primaryPhone = phoneCards[0]
-  const primaryDemoCtaLabel = contactEmail ? 'Solicitar demo por mail →' : 'Solicitar demo →'
+  const hasDirectChannels = contactCards.length > 0
   const { sales, delivery, engagement } = heroControls
   const overallScore = clamp(Math.round(sales * 0.42 + delivery * 0.34 + engagement * 0.24), 0, 100)
   const volatility = Math.round((Math.abs(sales - delivery) + Math.abs(delivery - engagement) + Math.abs(engagement - sales)) / 3)
@@ -322,6 +343,44 @@ export default function Landing() {
       ...current,
       [key]: value,
     }))
+  }
+
+  const handleDemoFormChange = (field: keyof DemoFormState, value: string) => {
+    setDemoForm((current) => ({
+      ...current,
+      [field]: value,
+    }))
+
+    if (demoSubmitState !== 'idle') {
+      setDemoSubmitState('idle')
+      setDemoSubmitMessage('')
+    }
+  }
+
+  const handleDemoRequestSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setDemoSubmitState('loading')
+    setDemoSubmitMessage('')
+
+    try {
+      const response = await api.post('/contact/demo-request', {
+        ...demoForm,
+        usersCount: Number(demoForm.usersCount),
+      })
+
+      setDemoSubmitState('success')
+      setDemoForm(INITIAL_DEMO_FORM)
+      setDemoSubmitMessage(
+        response.data?.delivery === 'manual'
+          ? 'Recibimos tu solicitud. En este entorno la derivación automática no está configurada; usá también los teléfonos para acelerar el contacto.'
+          : response.data?.message || 'Recibimos tu solicitud. El equipo comercial te va a contactar pronto.'
+      )
+    } catch (error: any) {
+      setDemoSubmitState('error')
+      setDemoSubmitMessage(
+        error.response?.data?.error || 'No pudimos enviar la solicitud. Probá nuevamente o usá los canales directos.'
+      )
+    }
   }
 
   return (
@@ -628,29 +687,127 @@ export default function Landing() {
             <span>gestionamos la compra con tu equipo</span>
           </h2>
           <p className="landing-cta-subtitle">
-            Escribinos o llamanos para revisar usuarios, KPIs, seguridad, integraciones y modalidad de implementación.
+            Completá el formulario y relevamos usuarios, KPIs, seguridad, integraciones y modalidad de implementación.
           </p>
-          {contactCards.length > 0 ? (
-            <div className="landing-contact-grid">
-              {contactCards.map((contact) => (
-                <a className="landing-contact-card" href={contact.href} key={`${contact.label}-${contact.value}`}>
-                  <span className="landing-contact-label">{contact.label}</span>
-                  <span className="landing-contact-value">{contact.value}</span>
-                </a>
-              ))}
+          <div className="landing-contact-layout">
+            <form className="landing-demo-form" onSubmit={handleDemoRequestSubmit}>
+              <div className="landing-demo-form-header">
+                <div className="landing-demo-form-title">Pedí una demo guiada</div>
+                <div className="landing-demo-form-copy">
+                  Te contactamos para coordinar una reunión breve y revisar el alcance comercial.
+                </div>
+              </div>
+              <div className="landing-demo-form-grid">
+                <label className="landing-demo-field">
+                  <span className="landing-demo-label">Nombre</span>
+                  <input
+                    className="landing-demo-input"
+                    type="text"
+                    value={demoForm.name}
+                    onChange={(event) => handleDemoFormChange('name', event.target.value)}
+                    placeholder="Tu nombre"
+                    autoComplete="name"
+                    maxLength={120}
+                    required
+                  />
+                </label>
+                <label className="landing-demo-field">
+                  <span className="landing-demo-label">Empresa</span>
+                  <input
+                    className="landing-demo-input"
+                    type="text"
+                    value={demoForm.company}
+                    onChange={(event) => handleDemoFormChange('company', event.target.value)}
+                    placeholder="Nombre de la empresa"
+                    autoComplete="organization"
+                    maxLength={160}
+                    required
+                  />
+                </label>
+                <label className="landing-demo-field">
+                  <span className="landing-demo-label">Mail</span>
+                  <input
+                    className="landing-demo-input"
+                    type="email"
+                    value={demoForm.email}
+                    onChange={(event) => handleDemoFormChange('email', event.target.value)}
+                    placeholder="nombre@empresa.com"
+                    autoComplete="email"
+                    maxLength={180}
+                    required
+                  />
+                </label>
+                <label className="landing-demo-field">
+                  <span className="landing-demo-label">Teléfono</span>
+                  <input
+                    className="landing-demo-input"
+                    type="tel"
+                    value={demoForm.phone}
+                    onChange={(event) => handleDemoFormChange('phone', event.target.value)}
+                    placeholder="+54 9 ..."
+                    autoComplete="tel"
+                    maxLength={40}
+                    required
+                  />
+                </label>
+                <label className="landing-demo-field landing-demo-field-full">
+                  <span className="landing-demo-label">Cantidad de usuarios</span>
+                  <input
+                    className="landing-demo-input"
+                    type="number"
+                    min="1"
+                    max="50000"
+                    step="1"
+                    value={demoForm.usersCount}
+                    onChange={(event) => handleDemoFormChange('usersCount', event.target.value)}
+                    placeholder="Ej: 35"
+                    inputMode="numeric"
+                    required
+                  />
+                </label>
+              </div>
+              {demoSubmitState !== 'idle' && demoSubmitMessage && (
+                <div className={`landing-demo-status ${demoSubmitState}`}>
+                  {demoSubmitMessage}
+                </div>
+              )}
+              <div className="landing-demo-form-actions">
+                <button className="landing-cta-primary landing-demo-submit" type="submit" disabled={demoSubmitState === 'loading'}>
+                  {demoSubmitState === 'loading' ? 'Enviando solicitud...' : 'Enviar solicitud de demo →'}
+                </button>
+                <div className="landing-demo-form-note">Respuesta comercial estimada: dentro de 1 día hábil.</div>
+              </div>
+            </form>
+            <div className="landing-contact-side">
+              <div className="landing-contact-side-title">Canales directos</div>
+              <p className="landing-contact-side-copy">
+                Si preferís avanzar por llamada o correo, también podés usar estos datos de contacto.
+              </p>
+              {hasDirectChannels ? (
+                <div className="landing-contact-grid">
+                  {contactCards.map((contact) => (
+                    <a className="landing-contact-card" href={contact.href} key={`${contact.label}-${contact.value}`}>
+                      <span className="landing-contact-label">{contact.label}</span>
+                      <span className="landing-contact-value">{contact.value}</span>
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <div className="landing-contact-empty">
+                  Definí el mail y los teléfonos comerciales en la configuración del frontend para publicar esta sección.
+                </div>
+              )}
+              <div className="landing-cta-actions landing-contact-actions">
+                {contactEmail && (
+                  <a href={contactMailHref} className="landing-cta-secondary">Escribir por mail</a>
+                )}
+                {primaryPhone ? (
+                  <a href={primaryPhone.href} className="landing-cta-secondary">Llamar al equipo comercial</a>
+                ) : (
+                  <Link to="/login" className="landing-cta-secondary">Iniciar sesión</Link>
+                )}
+              </div>
             </div>
-          ) : (
-            <div className="landing-contact-empty">
-              Definí el mail y los teléfonos comerciales en la configuración del frontend para publicar esta sección.
-            </div>
-          )}
-          <div className="landing-cta-actions">
-            <a href={demoHref} className="landing-cta-primary">{primaryDemoCtaLabel}</a>
-            {primaryPhone ? (
-              <a href={primaryPhone.href} className="landing-cta-secondary">Llamar al equipo comercial</a>
-            ) : (
-              <Link to="/login" className="landing-cta-secondary">Iniciar sesión</Link>
-            )}
           </div>
         </div>
       </section>
