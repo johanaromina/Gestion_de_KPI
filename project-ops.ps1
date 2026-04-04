@@ -274,8 +274,8 @@ Acciones:
     Crea la base y el schema base desde create_database.sql.
 
   migrate-schema
-    Aplica la migracion canonica actual: scope_kpis, data_source_mappings,
-    scopeType=company y enums de conectores.
+    Aplica la migracion canonica actual: areas, kpi_support, scope_kpis,
+    integration_runs_archive, check_ins.
 
   seed-demo
     Limpia los datos de demo y vuelve a sembrar el dataset preservando a Johana.
@@ -351,6 +351,7 @@ switch ($Action) {
     Invoke-MySqlScript -ScriptPath (Join-Path $BackendPath 'scripts\add-kpi-support-tables.sql')
     Invoke-MySqlScript -ScriptPath (Join-Path $BackendPath 'scripts\add-scope-kpis.sql')
     Invoke-MySqlScript -ScriptPath (Join-Path $BackendPath 'scripts\add-integration-runs-archive.sql')
+    Invoke-MySqlScript -ScriptPath (Join-Path $BackendPath 'scripts\add-check-ins.sql')
   }
 
   'seed-demo' {
@@ -367,6 +368,7 @@ switch ($Action) {
     Invoke-MySqlScript -ScriptPath (Join-Path $BackendPath 'scripts\add-kpi-support-tables.sql')
     Invoke-MySqlScript -ScriptPath (Join-Path $BackendPath 'scripts\add-scope-kpis.sql')
     Invoke-MySqlScript -ScriptPath (Join-Path $BackendPath 'scripts\add-integration-runs-archive.sql')
+    Invoke-MySqlScript -ScriptPath (Join-Path $BackendPath 'scripts\add-check-ins.sql')
 
     Write-Step 'Sembrando dataset demo'
     Invoke-BackendTsxScript -Arguments @('scripts/seed-demo-examples.ts')
@@ -381,6 +383,7 @@ switch ($Action) {
     Invoke-MySqlScript -ScriptPath (Join-Path $BackendPath 'scripts\add-kpi-support-tables.sql')
     Invoke-MySqlScript -ScriptPath (Join-Path $BackendPath 'scripts\add-scope-kpis.sql')
     Invoke-MySqlScript -ScriptPath (Join-Path $BackendPath 'scripts\add-integration-runs-archive.sql')
+    Invoke-MySqlScript -ScriptPath (Join-Path $BackendPath 'scripts\add-check-ins.sql')
 
     if ($SeedDemoData) {
       Write-Step 'Sembrando dataset demo'

@@ -106,23 +106,7 @@ Esto hace:
 - aplica la migracion canonica actual
 - crea un usuario administrador inicial
 
-## 5. Correr la migracion de check-ins
-
-Hoy esta migracion no entra sola en `bootstrap-client`, asi que hay que correrla aparte.
-
-Si estas parado en la raiz del repo:
-
-```powershell
-Get-Content .\backend\scripts\add-check-ins.sql | mysql -h 127.0.0.1 -P 3306 -u root -pTU_PASSWORD_MYSQL gestion_kpi
-```
-
-Despues verificar:
-
-```powershell
-mysql -h 127.0.0.1 -P 3306 -u root -pTU_PASSWORD_MYSQL -D gestion_kpi -e "SHOW TABLES LIKE 'check_ins';"
-```
-
-## 6. Levantar backend
+## 5. Levantar backend
 
 En una terminal:
 
@@ -135,7 +119,7 @@ Backend esperado:
 
 - `http://localhost:5000`
 
-## 7. Levantar frontend
+## 6. Levantar frontend
 
 En otra terminal:
 
@@ -148,7 +132,7 @@ Frontend esperado:
 
 - `http://localhost:5173`
 
-## 8. Entrar a la app
+## 7. Entrar a la app
 
 Abrir:
 
@@ -159,7 +143,7 @@ Ingresar con:
 - email: el que definiste en `-AdminEmail`
 - password: el que definiste en `-AdminPassword`
 
-## 9. Verificaciones utiles
+## 8. Verificaciones utiles
 
 Desde la raiz del repo:
 
@@ -182,7 +166,7 @@ cd frontend
 npm run build
 ```
 
-## 10. Lo que no va a funcionar hasta configurarlo
+## 9. Lo que no va a funcionar hasta configurarlo
 
 - invitaciones por mail
 - recuperacion de contraseña por mail
@@ -195,13 +179,13 @@ Si SMTP no esta configurado:
 - la app puede correr igual
 - pero no va a enviar correos
 
-## 11. Importante para esta instalacion
+## 10. Importante para esta instalacion
 
 - el sistema esta pensado hoy como `single-tenant por cliente`
 - `SELF_REGISTER_ENABLED` debe quedar en `false`
 - no hay que crear varias empresas dentro de la misma base
 
-## 12. Opcion alternativa: levantarlo con Docker
+## 11. Opcion alternativa: levantarlo con Docker
 
 Si prefieren una prueba mas parecida a produccion:
 
@@ -229,13 +213,7 @@ Luego bootstrap:
   -AdminPassword "SuperSecret123!"
 ```
 
-Y despues la misma migracion:
-
-```powershell
-Get-Content .\backend\scripts\add-check-ins.sql | mysql -h 127.0.0.1 -P 33060 -u root -pCAMBIAR_ROOT_PASSWORD gestion_kpi
-```
-
-## 13. Si algo falla
+## 12. Si algo falla
 
 Revisar en este orden:
 
@@ -246,7 +224,7 @@ Revisar en este orden:
 - que el puerto `5000` no este ocupado
 - que el puerto `5173` no este ocupado
 
-## 14. Archivos de referencia
+## 13. Archivos de referencia
 
 - [README.md](/d:/proyectos laborales/Gestion_de_KPI/README.md)
 - [DEPLOY-SINGLE-TENANT.md](/d:/proyectos laborales/Gestion_de_KPI/docs/DEPLOY-SINGLE-TENANT.md)

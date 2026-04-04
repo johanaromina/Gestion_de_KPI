@@ -55,7 +55,10 @@ export default function Layout({ children }: LayoutProps) {
     }
   }, [isCollaborator, location.pathname, navigate])
 
-  if (location.pathname === '/login') {
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+  const isPublicPage = location.pathname === '/login' || (location.pathname === '/' && !token)
+
+  if (isPublicPage) {
     return <>{children}</>
   }
 

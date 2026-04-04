@@ -34,6 +34,7 @@ import MapaRiesgo from './pages/MapaRiesgo'
 import Simulador from './pages/Simulador'
 import CheckIns from './pages/CheckIns'
 import MarketplaceKPI from './pages/MarketplaceKPI'
+import Landing from './pages/Landing'
 import { isTokenExpired } from './hooks/useAuth'
 
 const queryClient = new QueryClient({
@@ -59,6 +60,13 @@ const RequireAuth = ({ children }: { children: JSX.Element }) => {
   return children
 }
 
+const HomeRoute = () => {
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+  const expired = isTokenExpired(token)
+  if (token && !expired) return <Dashboard />
+  return <Landing />
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -70,14 +78,7 @@ function App() {
             <Route path="/sso/callback" element={<SsoCallback />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/register" element={<Register />} />
-            <Route
-              path="/"
-              element={
-                <RequireAuth>
-                  <Dashboard />
-                </RequireAuth>
-              }
-            />
+            <Route path="/" element={<HomeRoute />} />
             <Route
               path="/tablero-ejecutivo"
               element={

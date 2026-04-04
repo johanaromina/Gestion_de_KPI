@@ -116,15 +116,15 @@ Para una instancia real por cliente:
 - configura `SMTP_*` real antes de habilitar recovery, MFA o notificaciones
 - no reutilices passwords de desarrollo
 - para demo podes usar tu correo personal
-- para venta real conviene un remitente propio del producto, por ejemplo `no-reply@tu-dominio.com`
+- para venta real conviene un remitente propio del producto, por ejemplo `no-reply@kpimanager.com.ar`
 
 Ejemplo:
 
 ```env
-APP_BASE_URL=https://cliente-demo.tu-dominio.com
-FRONTEND_BASE_URL=https://cliente-demo.tu-dominio.com
-PUBLIC_API_BASE_URL=https://cliente-demo.tu-dominio.com/api
-CORS_ALLOWED_ORIGINS=https://cliente-demo.tu-dominio.com
+APP_BASE_URL=https://demo.kpimanager.com.ar
+FRONTEND_BASE_URL=https://demo.kpimanager.com.ar
+PUBLIC_API_BASE_URL=https://demo.kpimanager.com.ar/api
+CORS_ALLOWED_ORIGINS=https://demo.kpimanager.com.ar
 TRUST_PROXY=true
 ```
 
