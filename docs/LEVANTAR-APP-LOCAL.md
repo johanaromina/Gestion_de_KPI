@@ -213,7 +213,13 @@ Luego bootstrap:
   -AdminPassword "SuperSecret123!"
 ```
 
-## 12. Si algo falla
+Y despues la misma migracion:
+
+```powershell
+Get-Content .\backend\scripts\add-check-ins.sql | mysql -h 127.0.0.1 -P 33060 -u root -pCAMBIAR_ROOT_PASSWORD gestion_kpi
+```
+
+## 13. Si algo falla
 
 Revisar en este orden:
 
@@ -224,7 +230,7 @@ Revisar en este orden:
 - que el puerto `5000` no este ocupado
 - que el puerto `5173` no este ocupado
 
-## 13. Archivos de referencia
+## 14. Archivos de referencia
 
 - [README.md](/d:/proyectos laborales/Gestion_de_KPI/README.md)
 - [DEPLOY-SINGLE-TENANT.md](/d:/proyectos laborales/Gestion_de_KPI/docs/DEPLOY-SINGLE-TENANT.md)
