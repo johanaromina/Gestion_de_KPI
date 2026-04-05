@@ -272,7 +272,6 @@ export default function Landing() {
   ]
 
   const primaryPhone = phoneCards[0]
-  const hasDirectChannels = contactCards.length > 0
   const { sales, delivery, engagement } = heroControls
   const overallScore = clamp(Math.round(sales * 0.42 + delivery * 0.34 + engagement * 0.24), 0, 100)
   const volatility = Math.round((Math.abs(sales - delivery) + Math.abs(delivery - engagement) + Math.abs(engagement - sales)) / 3)
@@ -783,29 +782,17 @@ export default function Landing() {
               <p className="landing-contact-side-copy">
                 Si preferís avanzar por llamada o correo, también podés usar estos datos de contacto.
               </p>
-              {hasDirectChannels ? (
-                <div className="landing-contact-grid">
-                  {contactCards.map((contact) => (
-                    <a className="landing-contact-card" href={contact.href} key={`${contact.label}-${contact.value}`}>
-                      <span className="landing-contact-label">{contact.label}</span>
-                      <span className="landing-contact-value">{contact.value}</span>
-                    </a>
-                  ))}
-                </div>
-              ) : (
-                <div className="landing-contact-empty">
-                  Definí el mail y los teléfonos comerciales en la configuración del frontend para publicar esta sección.
-                </div>
-              )}
+              <div className="landing-contact-grid">
+                {contactCards.map((contact) => (
+                  <a className="landing-contact-card" href={contact.href} key={`${contact.label}-${contact.value}`}>
+                    <span className="landing-contact-label">{contact.label}</span>
+                    <span className="landing-contact-value">{contact.value}</span>
+                  </a>
+                ))}
+              </div>
               <div className="landing-cta-actions landing-contact-actions">
-                {contactEmail && (
-                  <a href={contactMailHref} className="landing-cta-secondary">Escribir por mail</a>
-                )}
-                {primaryPhone ? (
-                  <a href={primaryPhone.href} className="landing-cta-secondary">Llamar al equipo comercial</a>
-                ) : (
-                  <Link to="/login" className="landing-cta-secondary">Iniciar sesión</Link>
-                )}
+                <a href={contactMailHref} className="landing-cta-secondary">Escribir por mail</a>
+                <a href={primaryPhone.href} className="landing-cta-secondary">Llamar al equipo comercial</a>
               </div>
             </div>
           </div>
