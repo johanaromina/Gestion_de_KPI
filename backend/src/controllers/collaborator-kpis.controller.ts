@@ -5,6 +5,7 @@ import { calculateVariation, calculateWeightedResult } from '../utils/kpi-formul
 import { AuthRequest } from '../middleware/auth.middleware'
 import { closeKpiRecord, ensureAssignmentEditable, reopenKpiRecord } from '../services/kpi-assignment-shared.service'
 import { applyMeasurementToCollaboratorAssignment } from '../services/measurement-application.service'
+import { recalcOKRsLinkedToCollaboratorKpi } from '../services/okr.service'
 
 const canEditAssignment = async (user: AuthRequest['user'], collaboratorId: number) => {
   // Solo usuarios con permisos de configuración (o superpoderes) pueden modificar datos
@@ -845,6 +846,11 @@ export const updateActualValue = async (req: Request, res: Response) => {
     }
 
     await recalcSummaryAssignment(ckRows[0].collaboratorId, kpiId, periodId)
+
+    // Propagar hacia OKRs que usan este collaborator_kpi como fuente de datos
+    recalcOKRsLinkedToCollaboratorKpi(Number(id)).catch((err) =>
+      console.error('[OKR propagation] collaboratorKpi→OKR:', err)
+    )
 
     res.json({
       message: 'Valor actualizado correctamente',

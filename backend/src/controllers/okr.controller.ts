@@ -1,5 +1,6 @@
 import { Response } from 'express'
 import { AuthRequest } from '../middleware/auth.middleware'
+import { pool } from '../config/database'
 import * as okrService from '../services/okr.service'
 
 // ── Objectives ─────────────────────────────────────────────
@@ -180,6 +181,147 @@ export const removeTreeLink = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('[OKR] removeTreeLink:', error)
     res.status(500).json({ error: 'Error al desvincular del arbol' })
+  }
+}
+
+// ── Data sources (trazabilidad) ────────────────────────────
+
+export const getDataSources = async (req: AuthRequest, res: Response) => {
+  try {
+    const objectiveId = Number(req.params.id)
+
+    // KRs del objetivo con sus vínculos a collaborator_kpi y scope_kpi
+    const [krs] = await pool.query<any[]>(
+      `SELECT
+         kr.id        AS krId,
+         kr.title     AS krTitle,
+         kr.krType,
+         kr.progressPercent,
+         kr.status    AS krStatus,
+         kr.collaboratorKpiId,
+         kr.scopeKpiId,
+         ck.actual    AS ckActual,
+         ck.target    AS ckTarget,
+         k1.name      AS ckKpiName,
+         col.name     AS ckCollaboratorName,
+         sk.actual    AS skActual,
+         sk.target    AS skTarget,
+         k2.name      AS skKpiName
+       FROM okr_key_results kr
+       LEFT JOIN collaborator_kpis ck ON kr.collaboratorKpiId = ck.id
+       LEFT JOIN collaborators col ON ck.collaboratorId = col.id
+       LEFT JOIN kpis k1 ON ck.kpiId = k1.id
+       LEFT JOIN scope_kpis sk ON kr.scopeKpiId = sk.id
+       LEFT JOIN kpis k2 ON sk.kpiId = k2.id
+       WHERE kr.objectiveId = ?
+       ORDER BY kr.sortOrder ASC, kr.id ASC`,
+      [objectiveId]
+    )
+
+    if (!Array.isArray(krs) || krs.length === 0) {
+      return res.json([])
+    }
+
+    // Para los KRs vinculados a scope_kpi, traer sus fuentes (collaborator_kpis hijos)
+    const scopeKpiIds = krs
+      .filter((r) => r.scopeKpiId)
+      .map((r) => Number(r.scopeKpiId))
+
+    const scopeSources = new Map<number, any[]>()
+
+    if (scopeKpiIds.length > 0) {
+      const placeholders = scopeKpiIds.map(() => '?').join(', ')
+      const [linkRows] = await pool.query<any[]>(
+        `SELECT
+           l.parentScopeKpiId AS scopeKpiId,
+           'collaborator'     AS sourceType,
+           col.name           AS sourceName,
+           ck.actual          AS actual,
+           ck.target          AS target,
+           k.name             AS kpiName,
+           ck.status          AS sourceStatus
+         FROM scope_kpi_links l
+         JOIN collaborator_kpis ck ON l.collaboratorAssignmentId = ck.id
+         JOIN collaborators col ON ck.collaboratorId = col.id
+         JOIN kpis k ON ck.kpiId = k.id
+         WHERE l.parentScopeKpiId IN (${placeholders})
+         UNION ALL
+         SELECT
+           l.parentScopeKpiId AS scopeKpiId,
+           'scope'            AS sourceType,
+           k.name             AS sourceName,
+           sk.actual          AS actual,
+           sk.target          AS target,
+           k.name             AS kpiName,
+           sk.status          AS sourceStatus
+         FROM scope_kpi_links l
+         JOIN scope_kpis sk ON l.childScopeKpiId = sk.id
+         JOIN kpis k ON sk.kpiId = k.id
+         WHERE l.parentScopeKpiId IN (${placeholders})`,
+        [...scopeKpiIds, ...scopeKpiIds]
+      )
+
+      for (const row of linkRows || []) {
+        const id = Number(row.scopeKpiId)
+        if (!scopeSources.has(id)) scopeSources.set(id, [])
+        scopeSources.get(id)!.push(row)
+      }
+    }
+
+    const result = krs.map((kr) => {
+      if (kr.krType === 'kpi_linked' && kr.scopeKpiId) {
+        return {
+          krId: kr.krId,
+          krTitle: kr.krTitle,
+          krType: kr.krType,
+          krStatus: kr.krStatus,
+          sourceType: 'scope_kpi',
+          kpiName: kr.skKpiName,
+          actual: kr.skActual,
+          target: kr.skTarget,
+          sources: scopeSources.get(Number(kr.scopeKpiId)) ?? [],
+        }
+      }
+      if (kr.krType === 'kpi_linked' && kr.collaboratorKpiId) {
+        return {
+          krId: kr.krId,
+          krTitle: kr.krTitle,
+          krType: kr.krType,
+          krStatus: kr.krStatus,
+          sourceType: 'collaborator_kpi',
+          kpiName: kr.ckKpiName,
+          actual: kr.ckActual,
+          target: kr.ckTarget,
+          sources: [
+            {
+              sourceType: 'collaborator',
+              sourceName: kr.ckCollaboratorName,
+              actual: kr.ckActual,
+              target: kr.ckTarget,
+              kpiName: kr.ckKpiName,
+              sourceStatus: null,
+            },
+          ],
+        }
+      }
+      // KR simple — no tiene fuente de datos externa
+      return {
+        krId: kr.krId,
+        krTitle: kr.krTitle,
+        krType: kr.krType,
+        krStatus: kr.krStatus,
+        sourceType: null,
+        kpiName: null,
+        actual: null,
+        target: null,
+        sources: [],
+      }
+    })
+
+    res.json(result)
+  } catch (error) {
+    console.error('[OKR] getDataSources:', error)
+    res.status(500).json({ error: 'Error al obtener fuentes de datos' })
   }
 }
 

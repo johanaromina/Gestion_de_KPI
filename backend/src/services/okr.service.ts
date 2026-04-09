@@ -378,3 +378,115 @@ export const getAlignmentTree = async (periodId: number): Promise<OKRObjective[]
 
   return roots
 }
+
+// ── Auto-propagación desde datos reales ────────────────────
+// Cuando un collaborator_kpi o scope_kpi se actualiza, estos helpers
+// propagan el cambio hacia arriba a todos los OKR vinculados.
+
+/**
+ * Recalcula el progreso de todos los objetivos que tienen algún KR
+ * vinculado a un collaborator_kpi específico.
+ */
+export const recalcOKRsLinkedToCollaboratorKpi = async (collaboratorKpiId: number): Promise<void> => {
+  const [rows] = await pool.query<any[]>(
+    `SELECT DISTINCT objectiveId FROM okr_key_results WHERE collaboratorKpiId = ?`,
+    [collaboratorKpiId]
+  )
+  if (!Array.isArray(rows) || rows.length === 0) return
+  for (const row of rows) {
+    await recalcObjectiveProgress(row.objectiveId)
+    await autoScoreKRStatuses(row.objectiveId)
+  }
+}
+
+/**
+ * Recalcula el progreso de todos los objetivos que tienen algún KR
+ * vinculado a un scope_kpi específico.
+ */
+export const recalcOKRsLinkedToScopeKpi = async (scopeKpiId: number): Promise<void> => {
+  const [rows] = await pool.query<any[]>(
+    `SELECT DISTINCT objectiveId FROM okr_key_results WHERE scopeKpiId = ?`,
+    [scopeKpiId]
+  )
+  if (!Array.isArray(rows) || rows.length === 0) return
+  for (const row of rows) {
+    await recalcObjectiveProgress(row.objectiveId)
+    await autoScoreKRStatuses(row.objectiveId)
+  }
+}
+
+/**
+ * Actualiza automáticamente el status de cada KR de un objetivo
+ * comparando el progreso actual contra el tiempo transcurrido del período.
+ *
+ * Regla:
+ *   - completed  → si progressPercent >= 100
+ *   - on_track   → si progress >= timeElapsed - 5%
+ *   - at_risk    → si progress >= timeElapsed - 20%
+ *   - behind     → si progress <  timeElapsed - 20%
+ *   - not_started permanece solo si progress == 0 y aún no inició el período
+ */
+export const autoScoreKRStatuses = async (objectiveId: number): Promise<void> => {
+  // Obtener período del objetivo
+  const [objRows] = await pool.query<any[]>(
+    `SELECT o.periodId, p.startDate, p.endDate
+     FROM okr_objectives o
+     JOIN periods p ON p.id = o.periodId
+     WHERE o.id = ?`,
+    [objectiveId]
+  )
+  if (!Array.isArray(objRows) || objRows.length === 0) return
+
+  const { startDate, endDate } = objRows[0]
+  const now = Date.now()
+  const start = new Date(startDate).getTime()
+  const end = new Date(endDate).getTime()
+
+  // Porcentaje de tiempo transcurrido (0-100), clampado
+  const timeElapsed = Math.min(100, Math.max(0, ((now - start) / (end - start)) * 100))
+
+  // Traer KRs del objetivo con su progreso actual
+  const [krs] = await pool.query<any[]>(
+    `SELECT kr.id, kr.krType, kr.status,
+            kr.startValue, kr.targetValue, kr.currentValue, kr.weight,
+            ck.actual AS kpiActual, ck.target AS kpiTarget,
+            sk.actual AS scopeActual, sk.target AS scopeTarget
+     FROM okr_key_results kr
+     LEFT JOIN collaborator_kpis ck ON kr.collaboratorKpiId = ck.id
+     LEFT JOIN scope_kpis sk ON kr.scopeKpiId = sk.id
+     WHERE kr.objectiveId = ?`,
+    [objectiveId]
+  )
+  if (!Array.isArray(krs) || krs.length === 0) return
+
+  for (const row of krs) {
+    // No tocar KRs marcados manualmente como completados
+    if (row.status === 'completed') continue
+
+    const progress = calcKrProgress({
+      ...row,
+      kpiActual: row.kpiActual ?? row.scopeActual,
+      kpiTarget: row.kpiTarget ?? row.scopeTarget,
+    })
+
+    let newStatus: string
+    if (progress >= 100) {
+      newStatus = 'completed'
+    } else if (progress >= timeElapsed - 5) {
+      newStatus = 'on_track'
+    } else if (progress >= timeElapsed - 20) {
+      newStatus = 'at_risk'
+    } else if (progress === 0 && timeElapsed < 5) {
+      newStatus = 'not_started'
+    } else {
+      newStatus = 'behind'
+    }
+
+    if (newStatus !== row.status) {
+      await pool.query(
+        `UPDATE okr_key_results SET status = ? WHERE id = ?`,
+        [newStatus, row.id]
+      )
+    }
+  }
+}

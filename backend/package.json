@@ -25,7 +25,11 @@
     "add:subperiod-status": "tsx scripts/add-subperiod-status.ts",
     "test:critical-flow": "tsx scripts/smoke-critical-flow.ts",
     "test:sheets": "node --import tsx --test tests/integrations/sheets.test.ts",
-    "test:smtp": "tsx scripts/test-smtp.ts"
+    "test:smtp": "tsx scripts/test-smtp.ts",
+    "test:okr": "node --import tsx --test tests/okr.test.ts",
+    "test:auth": "node --import tsx --test tests/auth.test.ts",
+    "test:unit": "node --import tsx --test tests/okr.test.ts tests/auth.test.ts",
+    "smoke:prod": "tsx scripts/smoke-prod.ts"
   },
   "dependencies": {
     "@types/pdfkit": "^0.17.4",

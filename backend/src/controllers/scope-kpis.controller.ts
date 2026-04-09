@@ -11,6 +11,7 @@ import {
 } from '../services/scope-kpi.service'
 import { recalculateScopeKPI } from '../services/scope-kpi-aggregation.service'
 import { hydrateScopeKpiMixedFields } from '../services/scope-kpi-mixed.service'
+import { recalcOKRsLinkedToScopeKpi } from '../services/okr.service'
 
 const isConfigUser = (req: Request) => {
   const user = (req as AuthRequest).user
@@ -242,7 +243,14 @@ export const reopenScopeKPI = async (req: Request, res: Response) => {
 
 export const recalculateScopeKPIController = async (req: Request, res: Response) => {
   try {
-    const result = await recalculateScopeKPI(Number(req.params.id), (req as AuthRequest).user?.id || null)
+    const scopeKpiId = Number(req.params.id)
+    const result = await recalculateScopeKPI(scopeKpiId, (req as AuthRequest).user?.id || null)
+
+    // Propagar hacia OKRs que usan este scope_kpi como fuente de datos
+    recalcOKRsLinkedToScopeKpi(scopeKpiId).catch((err) =>
+      console.error('[OKR propagation] scopeKpi→OKR:', err)
+    )
+
     res.json({ message: 'Scope KPI recalculado correctamente', ...result })
   } catch (error: any) {
     console.error('Error recalculating scope KPI:', error)

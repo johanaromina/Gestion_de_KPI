@@ -15,6 +15,7 @@ import {
   getTreeLinks,
   addTreeLink,
   removeTreeLink,
+  getDataSources,
 } from '../controllers/okr.controller'
 import { authenticate, authorize } from '../middleware/auth.middleware'
 
@@ -41,6 +42,9 @@ router.delete('/:objectiveId/key-results/:krId', deleteKeyResult)
 // Check-ins de un KR
 router.get('/key-results/:krId/check-ins', getCheckIns)
 router.post('/key-results/:krId/check-ins', createCheckIn)
+
+// Fuentes de datos (trazabilidad)
+router.get('/:id/data-sources', getDataSources)
 
 // Vinculos con Arbol de Objetivos
 router.get('/:id/tree-links', getTreeLinks)

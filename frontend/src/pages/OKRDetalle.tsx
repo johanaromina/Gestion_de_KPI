@@ -6,6 +6,25 @@ import './OKRDetalle.css'
 
 type KRStatus = 'not_started' | 'on_track' | 'at_risk' | 'behind' | 'completed'
 
+interface DataSource {
+  krId: number
+  krTitle: string
+  krType: 'simple' | 'kpi_linked'
+  krStatus: KRStatus
+  sourceType: 'scope_kpi' | 'collaborator_kpi' | null
+  kpiName: string | null
+  actual: number | null
+  target: number | null
+  sources: {
+    sourceType: 'collaborator' | 'scope'
+    sourceName: string
+    actual: number | null
+    target: number | null
+    kpiName: string
+    sourceStatus: string | null
+  }[]
+}
+
 interface KeyResult {
   id: number
   title: string
@@ -75,12 +94,28 @@ export default function OKRDetalle() {
   const [checkInNote, setCheckInNote] = useState('')
   const [newKRStatus, setNewKRStatus] = useState<Record<number, KRStatus>>({})
   const [treeNodeId, setTreeNodeId] = useState('')
+  const [expandedSources, setExpandedSources] = useState<Set<number>>(new Set())
 
   const { data: objective, isLoading } = useQuery<Objective>(
     ['okr-objective', id],
     () => api.get(`/okr/${id}`).then((r) => r.data),
     { enabled: !!id }
   )
+
+  const { data: dataSources = [] } = useQuery<DataSource[]>(
+    ['okr-data-sources', id],
+    () => api.get(`/okr/${id}/data-sources`).then((r) => r.data),
+    { enabled: !!id }
+  )
+
+  const dataSourceByKr = new Map(dataSources.map((ds) => [ds.krId, ds]))
+
+  const toggleSources = (krId: number) =>
+    setExpandedSources((prev) => {
+      const next = new Set(prev)
+      next.has(krId) ? next.delete(krId) : next.add(krId)
+      return next
+    })
 
   const { data: checkIns = [] } = useQuery<CheckIn[]>(
     ['okr-check-ins', selectedKR],
@@ -287,15 +322,67 @@ export default function OKRDetalle() {
                 </span>
               )}
 
-              {kr.krType === 'simple' && (
-                <button
-                  className="btn-checkin"
-                  onClick={() => setSelectedKR(selectedKR === kr.id ? null : kr.id)}
-                >
-                  {selectedKR === kr.id ? 'Cerrar' : 'Actualizar progreso'}
-                </button>
-              )}
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                {kr.krType === 'kpi_linked' && dataSourceByKr.get(kr.id)?.sources?.length ? (
+                  <button
+                    className="btn-checkin"
+                    onClick={() => toggleSources(kr.id)}
+                    title="Ver fuentes de datos que alimentan este KR"
+                  >
+                    {expandedSources.has(kr.id) ? 'Ocultar fuentes' : `Ver fuentes (${dataSourceByKr.get(kr.id)!.sources.length})`}
+                  </button>
+                ) : null}
+                {kr.krType === 'simple' && (
+                  <button
+                    className="btn-checkin"
+                    onClick={() => setSelectedKR(selectedKR === kr.id ? null : kr.id)}
+                  >
+                    {selectedKR === kr.id ? 'Cerrar' : 'Actualizar progreso'}
+                  </button>
+                )}
+              </div>
             </div>
+
+            {/* Panel de trazabilidad — fuentes de datos reales */}
+            {kr.krType === 'kpi_linked' && expandedSources.has(kr.id) && (() => {
+              const ds = dataSourceByKr.get(kr.id)
+              if (!ds || ds.sources.length === 0) return null
+              return (
+                <div className="datasource-panel">
+                  <p className="datasource-panel-title">
+                    Fuentes que alimentan este KR
+                  </p>
+                  <div className="datasource-list">
+                    {ds.sources.map((src, i) => {
+                      const pct = src.target && src.target > 0
+                        ? Math.min(100, Math.round((Number(src.actual ?? 0) / Number(src.target)) * 100))
+                        : 0
+                      const color = pct >= 70 ? '#16a34a' : pct >= 40 ? '#d97706' : '#dc2626'
+                      return (
+                        <div key={i} className="datasource-row">
+                          <div className="datasource-row-top">
+                            <span className="datasource-name">
+                              <span className={`datasource-type-badge datasource-type-badge--${src.sourceType}`}>
+                                {src.sourceType === 'collaborator' ? 'Colaborador' : 'Área'}
+                              </span>
+                              {src.sourceName}
+                            </span>
+                            <span className="datasource-pct" style={{ color }}>{pct}%</span>
+                          </div>
+                          <div className="datasource-bar-track">
+                            <div className="datasource-bar-fill" style={{ width: `${pct}%`, background: color }} />
+                          </div>
+                          <span className="datasource-values">
+                            {src.actual ?? '—'} / {src.target ?? '—'}
+                            {src.kpiName ? ` · ${src.kpiName}` : ''}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Panel check-in */}
             {selectedKR === kr.id && kr.krType === 'simple' && (
