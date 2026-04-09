@@ -250,6 +250,21 @@ export default function Dashboard() {
     }
   )
 
+  const { data: okrSummary } = useQuery<{ active: number; avgProgress: number; atRisk: number }>(
+    'okr-dashboard-summary',
+    async () => {
+      const res = await api.get('/okr', { params: { status: 'active' } })
+      const objectives: { progress: number }[] = Array.isArray(res.data) ? res.data : []
+      const active = objectives.length
+      const avgProgress = active > 0
+        ? Math.round(objectives.reduce((s, o) => s + (o.progress ?? 0), 0) / active)
+        : 0
+      const atRisk = objectives.filter((o) => o.progress < 40).length
+      return { active, avgProgress, atRisk }
+    },
+    { retry: false }
+  )
+
   const summaryKPIs = useMemo(() => {
     if (!collaboratorKPIs || collaboratorKPIs.length === 0) return []
     const summary = collaboratorKPIs.filter(
@@ -494,6 +509,46 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {okrSummary && okrSummary.active > 0 && (
+          <div className="dashboard-section">
+            <div className="okr-widget">
+              <div className="okr-widget-header">
+                <h3>OKRs activos</h3>
+                <button className="okr-widget-link" onClick={() => navigate('/okr')}>Ver todos →</button>
+              </div>
+              <div className="okr-widget-stats">
+                <div className="okr-widget-stat">
+                  <span className="okr-widget-value">{okrSummary.active}</span>
+                  <span className="okr-widget-label">Objetivos activos</span>
+                </div>
+                <div className="okr-widget-stat">
+                  <span className="okr-widget-value" style={{ color: okrSummary.avgProgress >= 70 ? '#16a34a' : okrSummary.avgProgress >= 40 ? '#d97706' : '#dc2626' }}>
+                    {okrSummary.avgProgress}%
+                  </span>
+                  <span className="okr-widget-label">Progreso promedio</span>
+                </div>
+                {okrSummary.atRisk > 0 && (
+                  <div className="okr-widget-stat">
+                    <span className="okr-widget-value" style={{ color: '#dc2626' }}>{okrSummary.atRisk}</span>
+                    <span className="okr-widget-label">En riesgo (&lt;40%)</span>
+                  </div>
+                )}
+              </div>
+              <div className="okr-widget-bar-wrap">
+                <div className="okr-widget-bar-track">
+                  <div
+                    className="okr-widget-bar-fill"
+                    style={{
+                      width: `${okrSummary.avgProgress}%`,
+                      background: okrSummary.avgProgress >= 70 ? '#16a34a' : okrSummary.avgProgress >= 40 ? '#d97706' : '#dc2626'
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="charts-grid">
           {areaStats && areaStats.length > 0 && (
             <div className="chart-card">
@@ -679,6 +734,46 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {okrSummary && okrSummary.active > 0 && (
+          <div className="dashboard-section">
+            <div className="okr-widget">
+              <div className="okr-widget-header">
+                <h3>OKRs activos</h3>
+                <button className="okr-widget-link" onClick={() => navigate('/okr')}>Ver todos →</button>
+              </div>
+              <div className="okr-widget-stats">
+                <div className="okr-widget-stat">
+                  <span className="okr-widget-value">{okrSummary.active}</span>
+                  <span className="okr-widget-label">Objetivos activos</span>
+                </div>
+                <div className="okr-widget-stat">
+                  <span className="okr-widget-value" style={{ color: okrSummary.avgProgress >= 70 ? '#16a34a' : okrSummary.avgProgress >= 40 ? '#d97706' : '#dc2626' }}>
+                    {okrSummary.avgProgress}%
+                  </span>
+                  <span className="okr-widget-label">Progreso promedio</span>
+                </div>
+                {okrSummary.atRisk > 0 && (
+                  <div className="okr-widget-stat">
+                    <span className="okr-widget-value" style={{ color: '#dc2626' }}>{okrSummary.atRisk}</span>
+                    <span className="okr-widget-label">En riesgo (&lt;40%)</span>
+                  </div>
+                )}
+              </div>
+              <div className="okr-widget-bar-wrap">
+                <div className="okr-widget-bar-track">
+                  <div
+                    className="okr-widget-bar-fill"
+                    style={{
+                      width: `${okrSummary.avgProgress}%`,
+                      background: okrSummary.avgProgress >= 70 ? '#16a34a' : okrSummary.avgProgress >= 40 ? '#d97706' : '#dc2626'
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {complianceByPeriod && complianceByPeriod.length > 0 && (
           <div className="charts-grid">
@@ -976,6 +1071,40 @@ export default function Dashboard() {
         </div>
       )}
 
+      {okrSummary && okrSummary.active > 0 && (
+        <div className="dashboard-section">
+          <div className="okr-widget">
+            <div className="okr-widget-header">
+              <h3>Mis OKRs</h3>
+              <button className="okr-widget-link" onClick={() => navigate('/okr')}>Ver todos →</button>
+            </div>
+            <div className="okr-widget-stats">
+              <div className="okr-widget-stat">
+                <span className="okr-widget-value">{okrSummary.active}</span>
+                <span className="okr-widget-label">Objetivos activos</span>
+              </div>
+              <div className="okr-widget-stat">
+                <span className="okr-widget-value" style={{ color: okrSummary.avgProgress >= 70 ? '#16a34a' : okrSummary.avgProgress >= 40 ? '#d97706' : '#dc2626' }}>
+                  {okrSummary.avgProgress}%
+                </span>
+                <span className="okr-widget-label">Progreso promedio</span>
+              </div>
+            </div>
+            <div className="okr-widget-bar-wrap">
+              <div className="okr-widget-bar-track">
+                <div
+                  className="okr-widget-bar-fill"
+                  style={{
+                    width: `${okrSummary.avgProgress}%`,
+                    background: okrSummary.avgProgress >= 70 ? '#16a34a' : okrSummary.avgProgress >= 40 ? '#d97706' : '#dc2626'
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="dashboard-section">
         <h2>Acciones Rapidas</h2>
         <div className="quick-actions">
@@ -984,6 +1113,9 @@ export default function Dashboard() {
           </button>
           <button className="action-btn" onClick={() => navigate('/historial')}>
             Mi Historial
+          </button>
+          <button className="action-btn" onClick={() => navigate('/okr')}>
+            Mis OKRs
           </button>
         </div>
       </div>

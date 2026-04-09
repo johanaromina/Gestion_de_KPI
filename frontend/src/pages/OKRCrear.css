@@ -1,0 +1,286 @@
+.okr-crear {
+  padding: 2rem;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.okr-crear-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.okr-crear-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.btn-back {
+  background: none;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: #374151;
+}
+
+.btn-back:hover {
+  background: #f9fafb;
+}
+
+.okr-crear-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.okr-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.okr-section {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 1.5rem;
+}
+
+.okr-section h3 {
+  margin: 0 0 1.25rem;
+  font-size: 1rem;
+  color: #111827;
+  font-weight: 600;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: #fff;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.form-group textarea {
+  resize: vertical;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.form-group--small {
+  max-width: 200px;
+}
+
+.okr-kr-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.okr-kr-section-header h3 {
+  margin: 0;
+}
+
+.btn-add-kr {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-add-kr:hover {
+  background: #dbeafe;
+}
+
+.kr-block {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.kr-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.kr-number {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.btn-remove-kr {
+  background: none;
+  border: none;
+  color: #dc2626;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+}
+
+.btn-remove-kr:hover {
+  text-decoration: underline;
+}
+
+.kr-type-toggle {
+  display: flex;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  overflow: hidden;
+  width: fit-content;
+}
+
+.kr-type-btn {
+  padding: 0.45rem 1rem;
+  border: none;
+  background: #fff;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: #374151;
+  transition: background 0.1s;
+}
+
+.kr-type-btn:hover {
+  background: #f3f4f6;
+}
+
+.kr-type-btn.active {
+  background: #2563eb;
+  color: #fff;
+  font-weight: 600;
+}
+
+.kr-type-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.okr-crear-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding-bottom: 2rem;
+}
+
+.btn-secondary {
+  background: #fff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  padding: 0.6rem 1.2rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background: #f9fafb;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .okr-crear {
+    padding: 1rem;
+  }
+
+  .okr-crear-header {
+    flex-wrap: wrap;
+  }
+
+  .okr-crear-header h2 {
+    font-size: 1.2rem;
+  }
+
+  .okr-section {
+    padding: 1rem;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .form-group--small {
+    max-width: 100%;
+  }
+
+  .kr-type-toggle {
+    width: 100%;
+  }
+
+  .kr-type-btn {
+    flex: 1;
+    text-align: center;
+  }
+
+  .okr-crear-actions {
+    flex-direction: column-reverse;
+  }
+
+  .okr-crear-actions button {
+    width: 100%;
+  }
+}

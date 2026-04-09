@@ -1,0 +1,475 @@
+.okr-detalle {
+  padding: 2rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.okr-detalle-loading {
+  padding: 3rem;
+  text-align: center;
+  color: #6b7280;
+}
+
+.okr-detalle-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.okr-detalle-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.btn-back {
+  background: none;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: #374151;
+}
+
+.btn-back:hover { background: #f9fafb; }
+
+.btn-export {
+  background: white;
+  border: 1px solid #d1d5db;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-export-pdf  { color: #dc2626; }
+.btn-export-pdf:hover  { background: #fee2e2; border-color: #dc2626; }
+.btn-export-excel { color: #059669; }
+.btn-export-excel:hover { background: #d1fae5; border-color: #059669; }
+
+.okr-detalle-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.okr-detalle-meta {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.okr-badge {
+  font-size: 0.72rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.okr-badge--scope { background: #ede9fe; color: #5b21b6; }
+.okr-badge--period { background: #dbeafe; color: #1d4ed8; }
+
+.okr-status-pill {
+  font-size: 0.72rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.okr-status-pill--active { background: #dcfce7; color: #15803d; }
+.okr-status-pill--draft  { background: #f3f4f6; color: #374151; }
+.okr-status-pill--closed { background: #f3f4f6; color: #6b7280; }
+
+.okr-detalle-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.4rem;
+  color: #111827;
+}
+
+.okr-detalle-desc {
+  margin: 0 0 0.5rem;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.okr-detalle-owner {
+  margin: 0 0 1rem;
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.okr-detalle-progress {
+  margin-top: 0.5rem;
+}
+
+.okr-progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  margin-bottom: 0.3rem;
+  color: #374151;
+}
+
+.okr-progress-track {
+  height: 10px;
+  background: #f3f4f6;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.okr-progress-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.4s ease;
+}
+
+.okr-kr-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.okr-kr-section h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+  color: #111827;
+}
+
+.okr-empty-inline {
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+
+.okr-kr-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  transition: box-shadow 0.15s;
+}
+
+.okr-kr-card--selected {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37,99,235,0.1);
+}
+
+.okr-kr-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.5rem;
+  gap: 0.75rem;
+}
+
+.okr-kr-card-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #111827;
+}
+
+.okr-kr-owner {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.okr-kr-card-right {
+  flex-shrink: 0;
+}
+
+.kr-status-select {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: #fff;
+  cursor: pointer;
+}
+
+.okr-kr-progress-section {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.okr-kr-progress-section .okr-progress-track {
+  flex: 1;
+  height: 6px;
+}
+
+.okr-kr-pct {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #374151;
+  min-width: 36px;
+  text-align: right;
+}
+
+.okr-kr-values-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+
+.okr-kr-value-text { color: #374151; }
+
+.okr-kr-linked-badge {
+  background: #fef3c7;
+  color: #92400e;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.btn-checkin {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-checkin:hover { background: #dbeafe; }
+
+.checkin-panel {
+  margin-top: 0.75rem;
+  border-top: 1px solid #f3f4f6;
+  padding-top: 0.75rem;
+}
+
+.checkin-form {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.checkin-form input {
+  padding: 0.4rem 0.65rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.checkin-form input:first-child { width: 120px; }
+.checkin-form input:nth-child(2) { flex: 1; min-width: 160px; }
+
+.checkin-history-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #9ca3af;
+  margin: 0 0 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.checkin-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.35rem 0;
+  border-top: 1px solid #f9fafb;
+  font-size: 0.82rem;
+}
+
+.checkin-value {
+  font-weight: 700;
+  color: #111827;
+  min-width: 60px;
+}
+
+.checkin-note {
+  color: #374151;
+  flex: 1;
+}
+
+.checkin-meta {
+  color: #9ca3af;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  padding: 0.4rem 0.9rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-primary:hover:not(:disabled) { background: #1d4ed8; }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.btn-secondary {
+  background: #fff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  padding: 0.4rem 0.9rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-secondary:hover { background: #f9fafb; }
+
+/* Vinculos Arbol de Objetivos */
+.okr-tree-links-section {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-top: 1.5rem;
+}
+
+.okr-tree-links-section h3 {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  color: #111827;
+}
+
+.okr-tree-links-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.okr-tree-link-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-left: 3px solid #7c3aed;
+  border-radius: 6px;
+  padding: 0.5rem 0.85rem;
+  gap: 1rem;
+}
+
+.okr-tree-link-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.okr-tree-link-level {
+  font-size: 0.72rem;
+  background: #ede9fe;
+  color: #5b21b6;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  margin-left: 0.5rem;
+  font-weight: 500;
+}
+
+.okr-tree-link-add {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+.okr-tree-link-add select {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  background: #fff;
+}
+
+@media (max-width: 768px) {
+  .okr-detalle {
+    padding: 1rem;
+  }
+
+  .okr-detalle-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .okr-detalle-actions {
+    width: 100%;
+  }
+
+  .okr-detalle-actions button {
+    flex: 1;
+  }
+
+  .okr-detalle-title {
+    font-size: 1.15rem;
+  }
+
+  .okr-kr-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .okr-kr-card-right {
+    width: 100%;
+  }
+
+  .kr-status-select {
+    width: 100%;
+  }
+
+  .okr-kr-values-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .btn-checkin {
+    width: 100%;
+    text-align: center;
+  }
+
+  .checkin-form {
+    flex-direction: column;
+  }
+
+  .checkin-form input:first-child {
+    width: 100%;
+  }
+
+  .checkin-row {
+    flex-wrap: wrap;
+  }
+
+  .okr-tree-link-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .okr-tree-link-add {
+    flex-direction: column;
+  }
+
+  .okr-tree-link-add select,
+  .okr-tree-link-add button {
+    width: 100%;
+    min-width: unset;
+  }
+}

@@ -4,6 +4,80 @@
   padding: 24px;
 }
 
+/* OKR Widget */
+.okr-widget {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-left: 4px solid #2563eb;
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+}
+
+.okr-widget-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.okr-widget-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.okr-widget-link {
+  background: none;
+  border: none;
+  color: #2563eb;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.okr-widget-link:hover { text-decoration: underline; }
+
+.okr-widget-stats {
+  display: flex;
+  gap: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+.okr-widget-stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.okr-widget-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #111827;
+}
+
+.okr-widget-label {
+  font-size: 0.78rem;
+  color: #6b7280;
+  margin-top: 0.2rem;
+}
+
+.okr-widget-bar-wrap { margin-top: 0.25rem; }
+
+.okr-widget-bar-track {
+  height: 8px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.okr-widget-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
 .dashboard-header {
   display: flex;
   justify-content: space-between;

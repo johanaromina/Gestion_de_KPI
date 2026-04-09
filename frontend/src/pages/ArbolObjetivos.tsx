@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Fragment, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
+import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import { ObjectiveTree } from '../types'
 import ObjectiveTreeForm from '../components/ObjectiveTreeForm'
@@ -66,6 +67,8 @@ export default function ArbolObjetivos() {
   const [drilldownObjectiveId, setDrilldownObjectiveId] = useState<number | null>(null)
   const [detailScopeKpi, setDetailScopeKpi] = useState<ObjectiveDrilldownScopeKpi | null>(null)
 
+  const navigate = useNavigate()
+
   const queryClient = useQueryClient()
   const dialog = useDialog()
 
@@ -86,6 +89,12 @@ export default function ArbolObjetivos() {
     },
     { retry: false }
   )
+  const { data: linkedOKRs = [] } = useQuery<{ id: number; title: string; progress: number; status: string; ownerName?: string }[]>(
+    ['objective-tree-okrs', drilldownObjectiveId],
+    () => api.get(`/objective-trees/${drilldownObjectiveId}/okrs`).then((r) => r.data),
+    { enabled: !!drilldownObjectiveId, retry: false }
+  )
+
   const { data: drilldownObjective, isLoading: isLoadingDrilldown } = useQuery<ObjectiveDrilldown>(
     ['objective-tree-drilldown', drilldownObjectiveId],
     async () => {
@@ -423,7 +432,47 @@ export default function ArbolObjetivos() {
                     <span className="objective-drilldown-label">Scope KPIs</span>
                     <strong>{drilldownObjective.scopeKpis?.length || 0}</strong>
                   </div>
+                  <div className="objective-drilldown-stat">
+                    <span className="objective-drilldown-label">OKRs vinculados</span>
+                    <strong>{linkedOKRs.length}</strong>
+                  </div>
                 </div>
+
+                {linkedOKRs.length > 0 && (
+                  <div className="objective-drilldown-section">
+                    <h3>OKRs vinculados</h3>
+                    <div className="okr-linked-list">
+                      {linkedOKRs.map((okr) => (
+                        <div key={okr.id} className="okr-linked-row">
+                          <div className="okr-linked-info">
+                            <span className="okr-linked-title">{okr.title}</span>
+                            {okr.ownerName && <span className="okr-linked-owner">{okr.ownerName}</span>}
+                          </div>
+                          <div className="okr-linked-right">
+                            <div className="okr-linked-progress-track">
+                              <div
+                                className="okr-linked-progress-fill"
+                                style={{
+                                  width: `${okr.progress}%`,
+                                  background: okr.progress >= 70 ? '#16a34a' : okr.progress >= 40 ? '#d97706' : '#dc2626'
+                                }}
+                              />
+                            </div>
+                            <span className="okr-linked-pct" style={{ color: okr.progress >= 70 ? '#16a34a' : okr.progress >= 40 ? '#d97706' : '#dc2626' }}>
+                              {Math.round(okr.progress)}%
+                            </span>
+                            <button
+                              className="link-button"
+                              onClick={() => { setDrilldownObjectiveId(null); navigate(`/okr/${okr.id}`) }}
+                            >
+                              Ver OKR →
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {drilldownObjective.kpis?.length ? (
                   <div className="objective-drilldown-section">

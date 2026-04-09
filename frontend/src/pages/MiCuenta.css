@@ -127,3 +127,21 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+@media (max-width: 768px) {
+  .account-page {
+    padding: 1rem;
+  }
+
+  .account-card {
+    padding: 1.25rem;
+  }
+
+  .account-form {
+    gap: 0.75rem;
+  }
+
+  .account-submit {
+    width: 100%;
+  }
+}

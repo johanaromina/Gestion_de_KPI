@@ -86,6 +86,22 @@
   border-color: rgba(249, 250, 251, 0.7);
 }
 
+.nav-group-label {
+  padding: 12px 20px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(249, 250, 251, 0.35);
+  user-select: none;
+}
+
+.nav-group-label:not(:first-child) {
+  margin-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 14px;
+}
+
 .nav-item {
   display: flex;
   align-items: center;

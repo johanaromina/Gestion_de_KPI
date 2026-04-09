@@ -1,3 +1,71 @@
+/* OKRs vinculados en drill-down */
+.okr-linked-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.okr-linked-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-left: 3px solid #2563eb;
+  border-radius: 6px;
+  padding: 0.65rem 0.85rem;
+}
+
+.okr-linked-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.okr-linked-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.okr-linked-owner {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin-top: 0.1rem;
+}
+
+.okr-linked-right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.okr-linked-progress-track {
+  width: 80px;
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.okr-linked-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.okr-linked-pct {
+  font-size: 0.8rem;
+  font-weight: 700;
+  min-width: 32px;
+  text-align: right;
+}
+
 .arbol-objetivos-page {
   max-width: 1400px;
   margin: 0 auto;
@@ -440,3 +508,4 @@
     flex-direction: column;
   }
 }
+

@@ -35,6 +35,10 @@ import Simulador from './pages/Simulador'
 import CheckIns from './pages/CheckIns'
 import MarketplaceKPI from './pages/MarketplaceKPI'
 import Landing from './pages/Landing'
+import OKRBoard from './pages/OKRBoard'
+import OKRCrear from './pages/OKRCrear'
+import OKRAlineacion from './pages/OKRAlineacion'
+import OKRDetalle from './pages/OKRDetalle'
 import { isTokenExpired } from './hooks/useAuth'
 
 const queryClient = new QueryClient({
@@ -296,6 +300,46 @@ function App() {
               element={
                 <RequireAuth>
                   <ParrillaGeneral />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/okr"
+              element={
+                <RequireAuth>
+                  <OKRBoard />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/okr/nuevo"
+              element={
+                <RequireAuth>
+                  <OKRCrear />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/okr/alineacion"
+              element={
+                <RequireAuth>
+                  <OKRAlineacion />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/okr/:id/editar"
+              element={
+                <RequireAuth>
+                  <OKRCrear />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/okr/:id"
+              element={
+                <RequireAuth>
+                  <OKRDetalle />
                 </RequireAuth>
               }
             />

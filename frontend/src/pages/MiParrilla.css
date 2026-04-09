@@ -558,3 +558,52 @@
   font-size: 12px;
   font-weight: 500;
 }
+
+@media (max-width: 768px) {
+  .parrilla-header {
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+  }
+
+  .parrilla-header h1 {
+    font-size: 22px;
+    margin-bottom: 8px;
+  }
+
+  .period-info {
+    text-align: left;
+  }
+
+  .period-status {
+    justify-content: flex-start;
+  }
+
+  .export-buttons {
+    flex-wrap: wrap;
+  }
+
+  .global-result-card {
+    padding: 20px;
+  }
+
+  .result-number {
+    font-size: 36px;
+  }
+
+  .kpis-table-container {
+    border-radius: 8px;
+  }
+
+  /* La tabla ya tiene overflow-x: auto, solo reducimos padding */
+  .kpis-table th,
+  .kpis-table td {
+    padding: 10px 8px;
+    font-size: 12px;
+  }
+
+  .chart-container {
+    padding: 14px;
+  }
+}

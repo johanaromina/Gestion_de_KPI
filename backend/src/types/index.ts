@@ -217,3 +217,72 @@ export interface CalendarProfile {
   createdAt?: Date
   updatedAt?: Date
 }
+
+// ============================================================
+// OKR Types
+// ============================================================
+
+export type OKRObjectiveStatus = 'draft' | 'active' | 'closed'
+export type OKRKeyResultType = 'simple' | 'kpi_linked'
+export type OKRKeyResultStatus = 'not_started' | 'on_track' | 'at_risk' | 'behind' | 'completed'
+
+export interface OKRObjective {
+  id: number
+  title: string
+  description?: string | null
+  parentId?: number | null
+  orgScopeId?: number | null
+  periodId: number
+  ownerId: number
+  status: OKRObjectiveStatus
+  progress: number
+  createdAt?: Date
+  updatedAt?: Date
+  // Enriched fields
+  ownerName?: string
+  orgScopeName?: string
+  periodName?: string
+  keyResults?: OKRKeyResult[]
+  children?: OKRObjective[]
+}
+
+export interface OKRKeyResult {
+  id: number
+  objectiveId: number
+  title: string
+  description?: string | null
+  krType: OKRKeyResultType
+  // Simple type
+  startValue?: number | null
+  targetValue?: number | null
+  currentValue?: number | null
+  unit?: string | null
+  // KPI-linked type
+  collaboratorKpiId?: number | null
+  scopeKpiId?: number | null
+  // Common
+  weight: number
+  ownerId?: number | null
+  status: OKRKeyResultStatus
+  sortOrder: number
+  createdAt?: Date
+  updatedAt?: Date
+  // Enriched fields
+  ownerName?: string
+  progressPercent?: number
+  // KPI linked enrichment
+  kpiName?: string
+  kpiActual?: number | null
+  kpiTarget?: number | null
+}
+
+export interface OKRCheckIn {
+  id: number
+  keyResultId: number
+  value: number
+  note?: string | null
+  authorId: number
+  createdAt?: Date
+  // Enriched
+  authorName?: string
+}

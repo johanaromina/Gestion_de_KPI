@@ -88,54 +88,44 @@ export default function Layout({ children }: LayoutProps) {
           </button>
         </div>
         <nav className="sidebar-nav">
+
+          {/* ── Inicio ── */}
           <Link to="/" className={`nav-item ${isActive('/') ? 'active' : ''}`} onClick={handleNavClick}>
-            <span className="nav-icon" aria-hidden="true">
-              &gt;
-            </span>
+            <span className="nav-icon" aria-hidden="true">&gt;</span>
             Dashboard
           </Link>
+          <Link to="/mi-parrilla" className={`nav-item ${isActive('/mi-parrilla') ? 'active' : ''}`} onClick={handleNavClick}>
+            <span className="nav-icon" aria-hidden="true">&gt;</span>
+            Mi Parrilla
+          </Link>
+          <Link to="/check-ins" className={`nav-item ${isActive('/check-ins') ? 'active' : ''}`} onClick={handleNavClick}>
+            <span className="nav-icon" aria-hidden="true">&gt;</span>
+            Check-ins
+          </Link>
 
+          {/* ── Estrategia ── */}
+          <div className="nav-group-label">Estrategia</div>
+          <Link to="/okr" className={`nav-item ${isActive('/okr') && !isActive('/okr/alineacion') ? 'active' : ''}`} onClick={handleNavClick}>
+            <span className="nav-icon" aria-hidden="true">&gt;</span>
+            OKRs
+          </Link>
           {!isCollaborator && (
-            <Link
-              to="/tablero-ejecutivo"
-              className={`nav-item ${isActive('/tablero-ejecutivo') ? 'active' : ''}`}
-              onClick={handleNavClick}
-            >
-              <span className="nav-icon" aria-hidden="true">
-                &gt;
-              </span>
-              Tablero Ejecutivo
+            <Link to="/okr/alineacion" className={`nav-item ${isActive('/okr/alineacion') ? 'active' : ''}`} onClick={handleNavClick}>
+              <span className="nav-icon" aria-hidden="true">&gt;</span>
+              Alineacion OKR
+            </Link>
+          )}
+          {!isCollaborator && (
+            <Link to="/arbol-objetivos" className={`nav-item ${isActive('/arbol-objetivos') ? 'active' : ''}`} onClick={handleNavClick}>
+              <span className="nav-icon" aria-hidden="true">&gt;</span>
+              Arbol de Objetivos
             </Link>
           )}
 
-          {!isCollaborator && (
-            <Link
-              to="/mapa-riesgo"
-              className={`nav-item ${isActive('/mapa-riesgo') ? 'active' : ''}`}
-              onClick={handleNavClick}
-            >
-              <span className="nav-icon" aria-hidden="true">
-                &gt;
-              </span>
-              Mapa de Riesgo
-            </Link>
-          )}
-
-          {!isCollaborator && (
-            <Link
-              to="/simulador"
-              className={`nav-item ${isActive('/simulador') ? 'active' : ''}`}
-              onClick={handleNavClick}
-            >
-              <span className="nav-icon" aria-hidden="true">
-                &gt;
-              </span>
-              Simulador
-            </Link>
-          )}
-
+          {/* ── Operacion ── */}
           {!isCollaborator && (
             <>
+              <div className="nav-group-label">Operacion</div>
               <Link to="/colaboradores" className={`nav-item ${isActive('/colaboradores') ? 'active' : ''}`} onClick={handleNavClick}>
                 <span className="nav-icon" aria-hidden="true">&gt;</span>
                 Colaboradores
@@ -164,32 +154,32 @@ export default function Layout({ children }: LayoutProps) {
                 <span className="nav-icon" aria-hidden="true">&gt;</span>
                 Curaduria
               </Link>
-              <Link to="/arbol-objetivos" className={`nav-item ${isActive('/arbol-objetivos') ? 'active' : ''}`} onClick={handleNavClick}>
-                <span className="nav-icon" aria-hidden="true">&gt;</span>
-                Arbol de Objetivos
-              </Link>
             </>
           )}
 
-          <Link to="/mi-parrilla" className={`nav-item ${isActive('/mi-parrilla') ? 'active' : ''}`} onClick={handleNavClick}>
-            <span className="nav-icon" aria-hidden="true">&gt;</span>
-            Mi Parrilla
-          </Link>
-
-          <Link to="/check-ins" className={`nav-item ${isActive('/check-ins') ? 'active' : ''}`} onClick={handleNavClick}>
-            <span className="nav-icon" aria-hidden="true">&gt;</span>
-            Check-ins
-          </Link>
-
+          {/* ── Analitica ── */}
           {!isCollaborator && (
             <>
-              <Link to="/historial" className={`nav-item ${isActive('/historial') ? 'active' : ''}`} onClick={handleNavClick}>
+              <div className="nav-group-label">Analitica</div>
+              <Link to="/tablero-ejecutivo" className={`nav-item ${isActive('/tablero-ejecutivo') ? 'active' : ''}`} onClick={handleNavClick}>
                 <span className="nav-icon" aria-hidden="true">&gt;</span>
-                Historico
+                Tablero Ejecutivo
+              </Link>
+              <Link to="/mapa-riesgo" className={`nav-item ${isActive('/mapa-riesgo') ? 'active' : ''}`} onClick={handleNavClick}>
+                <span className="nav-icon" aria-hidden="true">&gt;</span>
+                Mapa de Riesgo
+              </Link>
+              <Link to="/simulador" className={`nav-item ${isActive('/simulador') ? 'active' : ''}`} onClick={handleNavClick}>
+                <span className="nav-icon" aria-hidden="true">&gt;</span>
+                Simulador
               </Link>
               <Link to="/vistas" className={`nav-item ${isActive('/vistas') ? 'active' : ''}`} onClick={handleNavClick}>
                 <span className="nav-icon" aria-hidden="true">&gt;</span>
                 Vistas
+              </Link>
+              <Link to="/historial" className={`nav-item ${isActive('/historial') ? 'active' : ''}`} onClick={handleNavClick}>
+                <span className="nav-icon" aria-hidden="true">&gt;</span>
+                Historico
               </Link>
               <Link to="/auditoria" className={`nav-item ${isActive('/auditoria') ? 'active' : ''}`} onClick={handleNavClick}>
                 <span className="nav-icon" aria-hidden="true">&gt;</span>
@@ -198,19 +188,21 @@ export default function Layout({ children }: LayoutProps) {
             </>
           )}
 
+          {/* ── Configuracion ── */}
           {canConfig && !isCollaborator && (
             <>
+              <div className="nav-group-label">Configuracion</div>
               <Link to="/configuracion" className={`nav-item ${isActive('/configuracion') ? 'active' : ''}`} onClick={handleNavClick}>
                 <span className="nav-icon" aria-hidden="true">&gt;</span>
                 Configuracion
               </Link>
-              <Link to="/mappings-externos" className={`nav-item ${isActive('/mappings-externos') ? 'active' : ''}`} onClick={handleNavClick}>
-                <span className="nav-icon" aria-hidden="true">&gt;</span>
-                Mappings externos
-              </Link>
               <Link to="/seguridad" className={`nav-item ${isActive('/seguridad') ? 'active' : ''}`} onClick={handleNavClick}>
                 <span className="nav-icon" aria-hidden="true">&gt;</span>
                 Seguridad
+              </Link>
+              <Link to="/mappings-externos" className={`nav-item ${isActive('/mappings-externos') ? 'active' : ''}`} onClick={handleNavClick}>
+                <span className="nav-icon" aria-hidden="true">&gt;</span>
+                Mappings externos
               </Link>
               <Link to="/marketplace-kpi" className={`nav-item ${isActive('/marketplace-kpi') ? 'active' : ''}`} onClick={handleNavClick}>
                 <span className="nav-icon" aria-hidden="true">&gt;</span>
@@ -218,6 +210,7 @@ export default function Layout({ children }: LayoutProps) {
               </Link>
             </>
           )}
+
         </nav>
         <div className="sidebar-footer">
           <div className="user-info">

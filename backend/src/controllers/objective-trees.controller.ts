@@ -405,6 +405,18 @@ export const syncObjectiveTreeScopeKpis = async (req: Request, res: Response) =>
   }
 }
 
+export const getOKRsForObjectiveTree = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const { getOKRsForObjectiveTree: fetchOKRs } = await import('../services/okr.service.js')
+    const okrs = await fetchOKRs(Number(id))
+    res.json(okrs)
+  } catch (error: any) {
+    console.error('Error fetching OKRs for objective tree:', error)
+    res.status(500).json({ error: 'Error al obtener OKRs vinculados' })
+  }
+}
+
 export const deleteObjectiveTree = async (req: Request, res: Response) => {
   try {
     const { id } = req.params

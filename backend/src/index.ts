@@ -33,6 +33,7 @@ import dataSourceMappingsRoutes from './routes/data-source-mappings.routes.js'
 import checkInsRoutes from './routes/check-ins.routes.js'
 import docsRoutes from './routes/docs.routes.js'
 import contactRoutes from './routes/contact.routes.js'
+import okrRoutes from './routes/okr.routes.js'
 import { startIntegrationsScheduler } from './utils/integrations-scheduler'
 import { runNotifications } from './utils/notifications'
 
@@ -127,6 +128,7 @@ app.use('/api/data-source-mappings', dataSourceMappingsRoutes)
 app.use('/api/check-ins', checkInsRoutes)
 app.use('/api/docs', docsRoutes)
 app.use('/api/contact', contactRoutes)
+app.use('/api/okr', okrRoutes)
 
 // Start server
 app.listen(PORT, async () => {
