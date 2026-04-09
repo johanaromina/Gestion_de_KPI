@@ -94,6 +94,10 @@ export default function Layout({ children }: LayoutProps) {
             <span className="nav-icon" aria-hidden="true">&gt;</span>
             Dashboard
           </Link>
+          <Link to="/mi-semana" className={`nav-item nav-item--highlight ${isActive('/mi-semana') ? 'active' : ''}`} onClick={handleNavClick}>
+            <span className="nav-icon" aria-hidden="true">⚡</span>
+            Mi semana
+          </Link>
           <Link to="/mi-parrilla" className={`nav-item ${isActive('/mi-parrilla') ? 'active' : ''}`} onClick={handleNavClick}>
             <span className="nav-icon" aria-hidden="true">&gt;</span>
             Mi Parrilla

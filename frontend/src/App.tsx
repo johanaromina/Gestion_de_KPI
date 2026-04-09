@@ -39,6 +39,7 @@ import OKRBoard from './pages/OKRBoard'
 import OKRCrear from './pages/OKRCrear'
 import OKRAlineacion from './pages/OKRAlineacion'
 import OKRDetalle from './pages/OKRDetalle'
+import MiSemana from './pages/MiSemana'
 import { isTokenExpired } from './hooks/useAuth'
 
 const queryClient = new QueryClient({
@@ -104,6 +105,14 @@ function App() {
               element={
                 <RequireAuth>
                   <Simulador />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/mi-semana"
+              element={
+                <RequireAuth>
+                  <MiSemana />
                 </RequireAuth>
               }
             />
