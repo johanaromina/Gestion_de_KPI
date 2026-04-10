@@ -134,6 +134,14 @@ export default function Colaboradores() {
     return manager ? manager.name : `ID: ${managerId}`
   }
 
+  const roleLabel: Record<string, string> = {
+    collaborator: 'Colaborador',
+    leader: 'Líder',
+    manager: 'Gerente',
+    director: 'Director',
+    admin: 'Admin',
+  }
+
   const filteredCollaborators = collaborators?.filter((collaborator) => {
     const safeName = (collaborator.name || '').toLowerCase()
     const safePosition = (collaborator.position || '').toLowerCase()
@@ -193,13 +201,13 @@ export default function Colaboradores() {
           />
         </div>
         <div className="filter-group">
-          <label htmlFor="filter-area">Area:</label>
+          <label htmlFor="filter-area">Área:</label>
           <select
             id="filter-area"
             value={filterArea}
             onChange={(e) => setFilterArea(e.target.value)}
           >
-            <option value="">Todas las areas</option>
+            <option value="">Todas las áreas</option>
             {areaScopes.map((area) => (
               <option key={area.id} value={area.name}>
                 {area.name}
@@ -215,11 +223,11 @@ export default function Colaboradores() {
             onChange={(e) => setFilterRole(e.target.value)}
           >
             <option value="">Todos los roles</option>
-            <option value="admin">Admin</option>
+            <option value="admin">Administrador</option>
             <option value="director">Director</option>
-            <option value="manager">Manager</option>
-            <option value="leader">Leader</option>
-            <option value="collaborator">Collaborator</option>
+            <option value="manager">Gerente</option>
+            <option value="leader">Líder</option>
+            <option value="collaborator">Colaborador</option>
           </select>
         </div>
         <div className="filter-group checkbox-group">
@@ -262,7 +270,7 @@ export default function Colaboradores() {
                   <th>Area</th>
                   <th>Estado</th>
                   <th>Rol</th>
-                  <th>Manager</th>
+                  <th>Jefe directo</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
@@ -286,7 +294,7 @@ export default function Colaboradores() {
                       </span>
                     </td>
                     <td>
-                      <span className={`role-badge role-${collaborator.role}`}>{collaborator.role}</span>
+                      <span className={`role-badge role-${collaborator.role}`}>{roleLabel[collaborator.role] ?? collaborator.role}</span>
                     </td>
                     <td>{getManagerName(collaborator.managerId)}</td>
                     <td>

@@ -42,6 +42,9 @@ export default function CollaboratorForm({
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [submitError, setSubmitError] = useState('')
+  const [managerSearch, setManagerSearch] = useState('')
+  const [managerOpen, setManagerOpen] = useState(false)
 
   const queryClient = useQueryClient()
   const dialog = useDialog()
@@ -150,6 +153,31 @@ export default function CollaboratorForm({
     }
   )
 
+  const handleCollaboratorMutationError = (error: any) => {
+    const message = error?.response?.data?.error || 'No se pudo guardar el colaborador'
+    const normalized = String(message).toLowerCase()
+
+    if (normalized.includes('email')) {
+      setErrors((prev) => ({
+        ...prev,
+        email: 'Ya existe un colaborador con ese email',
+      }))
+      setSubmitError('')
+      return
+    }
+
+    if (normalized.includes('circular')) {
+      setErrors((prev) => ({
+        ...prev,
+        managerId: 'Este jefe genera una relación circular en la jerarquía',
+      }))
+      setSubmitError('')
+      return
+    }
+
+    setSubmitError(message)
+  }
+
   const createMutation = useMutation(
     async (data: Partial<Collaborator>) => {
       const response = await api.post('/collaborators', data)
@@ -166,6 +194,7 @@ export default function CollaboratorForm({
         onSuccess?.()
         onClose()
       },
+      onError: handleCollaboratorMutationError,
     }
   )
 
@@ -184,6 +213,7 @@ export default function CollaboratorForm({
         onSuccess?.()
         onClose()
       },
+      onError: handleCollaboratorMutationError,
     }
   )
 
@@ -210,6 +240,7 @@ export default function CollaboratorForm({
       newErrors.email = 'Email invalido'
     }
 
+    setSubmitError('')
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -238,6 +269,17 @@ export default function CollaboratorForm({
     (c) => c.id !== collaborator?.id
   ) || []
 
+  const selectedManager = availableManagers.find((m) => m.id === formData.managerId)
+
+  const filteredManagers = availableManagers.filter((m) => {
+    const q = managerSearch.toLowerCase()
+    return (
+      !q ||
+      m.name.toLowerCase().includes(q) ||
+      (m.position || '').toLowerCase().includes(q)
+    )
+  })
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -251,15 +293,18 @@ export default function CollaboratorForm({
         </div>
 
         <form onSubmit={handleSubmit} className="collaborator-form">
+          {submitError && <div className="form-submit-error">{submitError}</div>}
+
           <div className="form-group">
             <label htmlFor="name">Nombre Completo *</label>
             <input
               type="text"
               id="name"
               value={formData.name || ''}
-              onChange={(e) =>
+              onChange={(e) => {
+                setSubmitError('')
                 setFormData({ ...formData, name: e.target.value })
-              }
+              }}
               placeholder="Ej: Juan Perez"
               className={errors.name ? 'error' : ''}
             />
@@ -293,6 +338,7 @@ export default function CollaboratorForm({
                   id="area"
                   value={formData.area || ''}
                   onChange={(e) => {
+                    setSubmitError('')
                     const nextArea = e.target.value
                     const scopeMatch = areaScopes.find((scope) => scope.name === nextArea)
                     setFormData({
@@ -338,9 +384,16 @@ export default function CollaboratorForm({
                 type="email"
                 id="email"
                 value={formData.email || ''}
-                onChange={(e) =>
+                onChange={(e) => {
+                  setSubmitError('')
+                  setErrors((prev) => {
+                    if (!prev.email) return prev
+                    const next = { ...prev }
+                    delete next.email
+                    return next
+                  })
                   setFormData({ ...formData, email: e.target.value })
-                }
+                }}
                 placeholder="usuario@empresa.com"
                 className={errors.email ? 'error' : ''}
               />
@@ -366,7 +419,7 @@ export default function CollaboratorForm({
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="mappingSourceType">Source type</label>
+              <label htmlFor="mappingSourceType">Tipo de origen</label>
               <select
                 id="mappingSourceType"
                 value={mappingSourceType}
@@ -390,7 +443,7 @@ export default function CollaboratorForm({
               />
               <span className="helper-text">
                 Alias o claves externas separadas por coma para {getMappingSourceTypeLabel(mappingSourceType)}.
-                {' '}Global se usa como fallback si el conector no tiene mapping específico.
+                {' '}Global se usa como respaldo si el conector no tiene un mapeo específico.
               </span>
             </div>
           </div>
@@ -410,7 +463,7 @@ export default function CollaboratorForm({
                 className={errors.role ? 'error' : ''}
               >
                 <option value="collaborator">Colaborador</option>
-                <option value="leader">Lider</option>
+                <option value="leader">Líder</option>
                 <option value="manager">Gerente</option>
                 <option value="director">Director</option>
                 <option value="admin">Administrador</option>
@@ -420,27 +473,78 @@ export default function CollaboratorForm({
               )}
             </div>
 
-            <div className="form-group">
-              <label htmlFor="managerId">Manager (Jefe Directo)</label>
-              <select
-                id="managerId"
-                value={formData.managerId || ''}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    managerId: e.target.value
-                      ? parseInt(e.target.value)
-                      : undefined,
-                  })
-                }
-              >
-                <option value="">Sin manager</option>
-                {availableManagers.map((manager) => (
-                  <option key={manager.id} value={manager.id}>
-                    {manager.name} - {manager.position}
-                  </option>
-                ))}
-              </select>
+            <div className="form-group manager-search-group">
+              <label htmlFor="managerSearch">Jefe directo</label>
+              <div className="manager-search-wrap">
+                <input
+                  id="managerSearch"
+                  type="text"
+                  autoComplete="off"
+                  placeholder="Buscar por nombre o cargo..."
+                  value={managerOpen ? managerSearch : (selectedManager ? `${selectedManager.name} — ${selectedManager.position}` : '')}
+                  className={errors.managerId ? 'error' : ''}
+                  onFocus={() => {
+                    setManagerSearch('')
+                    setManagerOpen(true)
+                  }}
+                  onChange={(e) => {
+                    setManagerSearch(e.target.value)
+                    setManagerOpen(true)
+                  }}
+                  onBlur={() => setTimeout(() => setManagerOpen(false), 150)}
+                />
+                {formData.managerId && (
+                  <button
+                    type="button"
+                    className="manager-clear"
+                    onClick={() => {
+                      setFormData({ ...formData, managerId: undefined })
+                      setManagerSearch('')
+                      setErrors((prev) => { const n = { ...prev }; delete n.managerId; return n })
+                    }}
+                    aria-label="Quitar manager"
+                  >
+                    ×
+                  </button>
+                )}
+                {managerOpen && (
+                  <ul className="manager-dropdown">
+                    <li
+                      className="manager-option"
+                      onMouseDown={() => {
+                        setFormData({ ...formData, managerId: undefined })
+                        setManagerSearch('')
+                        setManagerOpen(false)
+                        setErrors((prev) => { const n = { ...prev }; delete n.managerId; return n })
+                      }}
+                    >
+                      <span className="manager-option-name">Sin manager</span>
+                    </li>
+                    {filteredManagers.length === 0 ? (
+                      <li className="manager-no-results">Sin resultados</li>
+                    ) : (
+                      filteredManagers.map((m) => (
+                        <li
+                          key={m.id}
+                          className={`manager-option${formData.managerId === m.id ? ' selected' : ''}`}
+                          onMouseDown={() => {
+                            setFormData({ ...formData, managerId: m.id })
+                            setManagerSearch('')
+                            setManagerOpen(false)
+                            setErrors((prev) => { const n = { ...prev }; delete n.managerId; return n })
+                          }}
+                        >
+                          <span className="manager-option-name">{m.name}</span>
+                          <span className="manager-option-pos">{m.position}</span>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                )}
+              </div>
+              {errors.managerId && (
+                <span className="error-message">{errors.managerId}</span>
+              )}
             </div>
           </div>
 

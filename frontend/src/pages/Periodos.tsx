@@ -470,6 +470,13 @@ export default function Periodos() {
         </button>
       </div>
 
+      <div className="info-banner">
+        <strong>¿Qué es un período?</strong> Es el ciclo de tiempo en que se miden los KPIs de tu empresa
+        (por ejemplo: Año 2026, Semestre 1, Q1). Dentro de cada período podés crear
+        <strong> subperíodos</strong> (meses, semanas) para registrar avances parciales.
+        Los KPIs solo se pueden cargar cuando el período está <strong>abierto</strong>.
+      </div>
+
       <div className="filters-section">
         <div className="search-group">
           <label htmlFor="search">Buscar:</label>

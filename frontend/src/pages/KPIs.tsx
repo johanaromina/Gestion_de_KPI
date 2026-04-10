@@ -309,8 +309,15 @@ export default function KPIs() {
                     </div>
                     {kpi.macroKPIId && (
                       <div>
-                        <span className="meta-label">KPI Macro</span>
-                        <p className="meta-value">ID {kpi.macroKPIId}</p>
+                        <span
+                          className="meta-label"
+                          title="KPI Macro: agrupa varios KPIs individuales bajo un mismo indicador padre. Su resultado es el promedio ponderado de los KPIs que lo componen."
+                        >
+                          KPI agrupador ⓘ
+                        </span>
+                        <p className="meta-value">
+                          {kpis?.find((k: any) => k.id === kpi.macroKPIId)?.name || `KPI #${kpi.macroKPIId}`}
+                        </p>
                       </div>
                     )}
                     <div>
@@ -400,11 +407,12 @@ export default function KPIs() {
           </div>
         ) : (
           <div className="empty-state">
-            <div className="empty-icon">:)</div>
-            <h3>No hay KPIs definidos</h3>
-            <p>Crea tu primer KPI para comenzar a evaluar el desempeño</p>
+            <div className="empty-icon">📊</div>
+            <h3>Todavía no hay KPIs definidos</h3>
+            <p>Un KPI es el indicador que vas a medir: ventas mensuales, tickets resueltos, NPS, cumplimiento de entregas, etc.</p>
+            <p className="empty-state-hint">Antes de crear KPIs asegurate de tener al menos un área configurada en <a href="/configuracion">Configuración</a>.</p>
             <button className="btn-primary" onClick={handleCreate}>
-              Crear KPI
+              Crear primer KPI
             </button>
           </div>
         )}

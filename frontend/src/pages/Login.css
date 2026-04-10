@@ -346,21 +346,31 @@
   color: #00c37a;
 }
 
+/* Ocultar el ojito nativo del browser (Chrome/Edge/IE) */
+.input-no-reveal::-ms-reveal,
+.input-no-reveal::-ms-clear {
+  display: none;
+}
+.input-no-reveal::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+}
+
 .toggle-visibility {
   border: none;
-  background: #e2e8f0;
-  color: #0a1628;
-  padding: 8px 12px;
-  border-radius: 10px;
-  font-weight: 600;
+  background: transparent;
+  color: #64748b;
+  padding: 6px;
+  border-radius: 8px;
   cursor: pointer;
-  font-family: 'Space Grotesk', sans-serif;
-  transition: background 0.2s, transform 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s, background 0.2s;
 }
 
 .toggle-visibility:hover {
-  background: #bbf7d0;
-  transform: translateY(-1px);
+  color: #0a1628;
+  background: #e2e8f0;
 }
 
 .btn-primary {

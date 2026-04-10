@@ -264,7 +264,7 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
             </div>
 
             <div className="form-group">
-              <label htmlFor="macroKPIId">KPI Macro (Opcional)</label>
+              <label htmlFor="macroKPIId">KPI agrupador (Opcional)</label>
               <select
                 id="macroKPIId"
                 value={formData.macroKPIId || ''}
@@ -275,13 +275,17 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
                   })
                 }
               >
-                <option value="">Sin KPI macro</option>
+                <option value="">Sin KPI agrupador</option>
                 {availableMacroKPIs.map((macroKPI) => (
                   <option key={macroKPI.id} value={macroKPI.id}>
                     {macroKPI.name}
                   </option>
                 ))}
               </select>
+              <span className="helper-text">
+                Si este KPI forma parte de un indicador más amplio, seleccioná el KPI padre que lo agrupa.
+                El resultado del agrupador se calcula como promedio ponderado de sus KPIs hijos.
+              </span>
             </div>
           </div>
 

@@ -42,6 +42,30 @@ const canEditCollaborator = (
   return false
 }
 
+/**
+ * Detecta si asignar `newManagerId` como jefe de `collaboratorId`
+ * generaría un ciclo en la jerarquía de jefatura.
+ * Recorre la cadena de managers hacia arriba desde newManagerId
+ * hasta encontrar a collaboratorId (ciclo) o llegar a la raíz.
+ */
+const wouldCreateCycle = async (collaboratorId: number, newManagerId: number): Promise<boolean> => {
+  if (collaboratorId === newManagerId) return true
+  let current: number | null = newManagerId
+  const visited = new Set<number>()
+  while (current !== null) {
+    if (visited.has(current)) break // ciclo en datos existentes, parar
+    visited.add(current)
+    if (current === collaboratorId) return true
+    const queryResult = await pool.query<any[]>(
+      'SELECT managerId FROM collaborators WHERE id = ?',
+      [current]
+    )
+    const managerRows: any[] = queryResult[0]
+    current = Array.isArray(managerRows) && managerRows.length > 0 ? (managerRows[0].managerId ?? null) : null
+  }
+  return false
+}
+
 export const getCollaborators = async (req: Request, res: Response) => {
   try {
     const includeInactive = req.query.includeInactive === 'true'
@@ -242,9 +266,18 @@ export const updateCollaborator = async (req: Request, res: Response) => {
       }
     }
 
+    if (managerId && Number(managerId) !== (oldValues?.managerId ?? null)) {
+      const hasCycle = await wouldCreateCycle(Number(id), Number(managerId))
+      if (hasCycle) {
+        return res.status(400).json({
+          error: 'No se puede asignar ese jefe directo porque generaría una relación circular en la jerarquía',
+        })
+      }
+    }
+
     await pool.query(
-      `UPDATE collaborators 
-       SET name = ?, position = ?, area = ?, orgScopeId = ?, managerId = ?, role = ?, email = ?, mfaEnabled = ? 
+      `UPDATE collaborators
+       SET name = ?, position = ?, area = ?, orgScopeId = ?, managerId = ?, role = ?, email = ?, mfaEnabled = ?
        WHERE id = ?`,
       [
         name,

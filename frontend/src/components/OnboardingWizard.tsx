@@ -16,6 +16,7 @@ interface Step {
 interface Props {
   stats: {
     totalCollaborators: number
+    totalOrgUnits?: number
     activePeriods: number
     totalKPIs: number
     totalAssignments: number
@@ -27,7 +28,7 @@ export default function OnboardingWizard({ stats, onDismiss }: Props) {
   const navigate = useNavigate()
   const [expanded, setExpanded] = useState(true)
 
-  const hasOrgStructure = stats.totalCollaborators > 0
+  const hasOrgStructure = (stats.totalOrgUnits ?? stats.totalCollaborators) > 0
   const hasKPIs = stats.totalKPIs > 0
   const hasActivePeriod = stats.activePeriods > 0
   const hasAssignments = stats.totalAssignments > 0

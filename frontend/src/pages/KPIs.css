@@ -196,7 +196,23 @@
 
 .empty-state p {
   color: #6b7280;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
+}
+
+.empty-state-hint {
+  font-size: 13px;
+  color: #9ca3af;
+  margin-bottom: 20px !important;
+}
+
+.empty-state-hint a {
+  color: #f97316;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.empty-state-hint a:hover {
+  text-decoration: underline;
 }
 
 /* Filtros y búsqueda */

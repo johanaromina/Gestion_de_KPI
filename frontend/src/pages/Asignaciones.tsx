@@ -838,11 +838,17 @@ export default function Asignaciones() {
           </>
         ) : (
           <div className="empty-state">
-            <div className="empty-icon">:/</div>
-            <h3>No hay asignaciones registradas</h3>
-            <p>Crea una nueva asignación para vincular KPIs con colaboradores</p>
+            <div className="empty-icon">📋</div>
+            <h3>No hay asignaciones todavía</h3>
+            <p>Una asignación vincula un KPI con un colaborador para un período específico, definiendo la meta y el peso en su evaluación.</p>
+            <p className="empty-state-hint">
+              Para crear asignaciones necesitás tener:
+              &nbsp;✓ <a href="/colaboradores">Colaboradores</a> cargados &nbsp;
+              ✓ <a href="/kpis">KPIs</a> definidos &nbsp;
+              ✓ Un <a href="/periodos">período activo</a>
+            </p>
             <button className="btn-primary" onClick={handleCreate}>
-              Nueva Asignación
+              Nueva asignación
             </button>
           </div>
         )}

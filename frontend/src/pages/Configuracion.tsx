@@ -190,6 +190,7 @@ export default function Configuracion() {
   const [targetDraftPreviewResult, setTargetDraftPreviewResult] = useState<any>(null)
   const [targetDraftPreviewMessage, setTargetDraftPreviewMessage] = useState('')
   const [toastMessage, setToastMessage] = useState('')
+  const [integrationOpen, setIntegrationOpen] = useState(false)
   const [templateFormError, setTemplateFormError] = useState('')
   const [cronPreview, setCronPreview] = useState('')
   const [templateForm, setTemplateForm] = useState<TemplateFormState>({
@@ -261,7 +262,11 @@ export default function Configuracion() {
     return res.data
   })
 
-  const { data: periods } = useQuery<any[]>('config-periods', async () => {
+  const {
+    data: periods,
+    isLoading: periodsLoading,
+    error: periodsError,
+  } = useQuery<any[]>('config-periods', async () => {
     const res = await api.get('/periods')
     return res.data
   })
@@ -385,6 +390,12 @@ export default function Configuracion() {
     return areaScopes.filter((scope) => scope.active !== 0 && scope.active !== false)
   }, [areaScopes])
 
+  const defaultPeriodForCalendar = useMemo<number | ''>(() => {
+    if (!periods || periods.length === 0) return ''
+    const openPeriod = periods.find((period) => period.status === 'open')
+    return Number(openPeriod?.id || periods[0]?.id || '')
+  }, [periods])
+
   const scopeById = useMemo(() => {
     const map = new Map<number, any>()
     orgScopes?.forEach((scope) => map.set(scope.id, scope))
@@ -406,6 +417,25 @@ export default function Configuracion() {
     })
     return map
   }, [assignments])
+
+  useEffect(() => {
+    if (!showCalendarSubperiods || !calendarForSubperiods) return
+    if (!defaultPeriodForCalendar) return
+
+    const hasSelectedPeriod =
+      selectedPeriodForCalendar &&
+      periods?.some((period) => Number(period.id) === Number(selectedPeriodForCalendar))
+
+    if (!hasSelectedPeriod) {
+      setSelectedPeriodForCalendar(defaultPeriodForCalendar)
+    }
+  }, [
+    showCalendarSubperiods,
+    calendarForSubperiods,
+    defaultPeriodForCalendar,
+    periods,
+    selectedPeriodForCalendar,
+  ])
 
   const targetScopeKey = (target: IntegrationTarget) => {
     if (target.orgScopeId) return `org:${target.orgScopeId}`
@@ -2042,11 +2072,34 @@ export default function Configuracion() {
       <div className="page-header">
         <div>
           <h1>Configuración</h1>
-          <p className="subtitle">Gestiona superpoderes y permisos especiales</p>
+          <p className="subtitle">Estructura organizacional, calendarios e integraciones</p>
         </div>
       </div>
       {toastMessage ? <div className="toast">{toastMessage}</div> : null}
 
+      <div className="setup-guide">
+        <div className="setup-guide-title">¿Cómo configurar el sistema por primera vez?</div>
+        <ol className="setup-guide-steps">
+          <li><strong>Creá las áreas y equipos</strong> de tu empresa en <em>Estructura Organizacional</em> (más abajo ↓)</li>
+          <li>Agregá los <strong>colaboradores</strong> y asignales un área y jefe directo → <a href="/colaboradores">Colaboradores</a></li>
+          <li>Definí los <strong>KPIs</strong> que vas a medir → <a href="/kpis">KPIs</a></li>
+          <li>Creá un <strong>período activo</strong> (anual, semestral, trimestral) → <a href="/periodos">Períodos</a></li>
+          <li>Asigná KPIs a cada colaborador con su meta → <a href="/asignaciones">Asignaciones</a></li>
+        </ol>
+        <p className="setup-guide-note">Los calendarios e integraciones son opcionales y se pueden configurar después.</p>
+      </div>
+
+      <button
+        className="advanced-toggle"
+        onClick={() => setIntegrationOpen((v) => !v)}
+        aria-expanded={integrationOpen}
+      >
+        <span>{integrationOpen ? '▲' : '▼'}</span>
+        Configuración avanzada — Integraciones
+        <span className="advanced-toggle-hint">Jira, Zendesk, conectores externos. Solo para administradores técnicos.</span>
+      </button>
+
+      {integrationOpen && (
       <div className="config-section" id="integraciones">
         <div className="card">
           <div className="card-header">
@@ -2546,6 +2599,7 @@ export default function Configuracion() {
           )}
         </div>
       </div>
+      )}
 
       <div className="config-section">
         <div className="card">
@@ -2722,7 +2776,10 @@ export default function Configuracion() {
               {(!orgScopes || orgScopes.length === 0) && (
                 <tr>
                   <td colSpan={5} className="empty-row">
-                    No hay unidades organizacionales configuradas.
+                    <div className="empty-state-inline">
+                      <strong>Todavía no hay áreas ni equipos.</strong>
+                      <span>Hacé clic en <em>Nueva unidad</em> para crear la primera área de tu empresa (por ejemplo: Ventas, Tecnología, Operaciones).</span>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -4032,17 +4089,32 @@ export default function Configuracion() {
                   <label>Período</label>
                   <select
                     value={selectedPeriodForCalendar}
+                    disabled={periodsLoading || !periods?.length}
                     onChange={(e) =>
                       setSelectedPeriodForCalendar(e.target.value ? Number(e.target.value) : '')
                     }
                   >
-                    <option value="">Selecciona un período</option>
+                    <option value="">
+                      {periodsLoading
+                        ? 'Cargando períodos...'
+                        : periods?.length
+                          ? 'Selecciona un período'
+                          : 'No hay períodos disponibles'}
+                    </option>
                     {periods?.map((p: any) => (
                       <option key={p.id} value={p.id}>
                         {p.name}
                       </option>
                     ))}
                   </select>
+                  {periodsError ? (
+                    <div className="form-error">No se pudieron cargar los períodos.</div>
+                  ) : null}
+                  {!periodsLoading && !periodsError && (!periods || periods.length === 0) ? (
+                    <div className="form-hint">
+                      No hay períodos creados. Primero tenés que crear uno en la pantalla Períodos.
+                    </div>
+                  ) : null}
                 </div>
                 <div className="form-group">
                   <label>Frecuencia</label>
@@ -4056,7 +4128,7 @@ export default function Configuracion() {
                 </div>
               </div>
 
-              {!selectedPeriodForCalendar && (
+              {!selectedPeriodForCalendar && periods && periods.length > 0 && (
                 <div className="form-hint">Selecciona un período para ver los subperíodos.</div>
               )}
 
@@ -4243,7 +4315,7 @@ export default function Configuracion() {
                     value={scopeForm.type}
                     onChange={(e) => setScopeForm((prev) => ({ ...prev, type: e.target.value }))}
                   >
-                    <option value="company">Company</option>
+                    <option value="company">Empresa</option>
                     <option value="area">Área</option>
                     <option value="team">Equipo</option>
                     <option value="person">Persona</option>
@@ -4252,12 +4324,12 @@ export default function Configuracion() {
                 </div>
               </div>
               <div className="form-group">
-                <label>Parent</label>
+                <label>Depende de (unidad superior)</label>
                 <select
                   value={scopeForm.parentId}
                   onChange={(e) => setScopeForm((prev) => ({ ...prev, parentId: e.target.value }))}
                 >
-                  <option value="">Sin parent</option>
+                  <option value="">Es una unidad raíz (sin superior)</option>
                   {orgScopes?.map((scope) => (
                     <option key={scope.id} value={scope.id}>
                       {scope.type} · {scope.name}
@@ -4266,14 +4338,14 @@ export default function Configuracion() {
                 </select>
               </div>
               <div className="form-group">
-                <label>Calendario</label>
+                <label>Calendario de medición</label>
                 <select
                   value={scopeForm.calendarProfileId}
                   onChange={(e) =>
                     setScopeForm((prev) => ({ ...prev, calendarProfileId: e.target.value }))
                   }
                 >
-                  <option value="">Default</option>
+                  <option value="">Sin calendario específico (hereda del superior)</option>
                   {calendarProfiles?.map((profile) => (
                     <option key={profile.id} value={profile.id}>
                       {profile.name}
@@ -4281,21 +4353,24 @@ export default function Configuracion() {
                   ))}
                 </select>
                 <small className="form-hint">
-                  Define el ciclo de medición que hereda este scope.
+                  Define con qué frecuencia se miden los KPIs de esta unidad (mensual, trimestral, etc.).
                 </small>
               </div>
               <div className="form-group">
-                <label>Metadata (JSON)</label>
+                <label>Datos adicionales (opcional)</label>
                 <textarea
                   rows={5}
                   value={scopeForm.metadataText}
                   onChange={(e) => setScopeForm((prev) => ({ ...prev, metadataText: e.target.value }))}
                   placeholder='{"projects":["GT_MISIM"],"authProfileId":1}'
                 />
+                <small className="form-hint">
+                  Solo completar si usás integraciones externas (Jira, Zendesk, etc.) y necesitás asociar esta unidad con un proyecto o equipo del conector.
+                </small>
               </div>
               <div className="form-row">
                 <div className="form-group">
-                  <label>Source type</label>
+                  <label>Conector externo</label>
                   <select
                     value={scopeMappingSourceType}
                     onChange={(e) => setScopeMappingSourceType(normalizeMappingSourceType(e.target.value))}
@@ -4308,15 +4383,15 @@ export default function Configuracion() {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Claves externas</label>
+                  <label>Alias en el conector</label>
                   <input
                     value={scopeExternalKeysBySourceType[scopeMappingSourceType] || ''}
                     onChange={(e) => updateScopeExternalKeysForSourceType(e.target.value)}
                     placeholder="revenue, cs, customer success"
                   />
                   <small className="form-hint">
-                    Alias o códigos externos separados por coma para{' '}
-                    {getMappingSourceTypeLabel(scopeMappingSourceType)}. Global se usa como fallback.
+                    Nombre o código con el que esta unidad aparece en {getMappingSourceTypeLabel(scopeMappingSourceType)}.
+                    Podés poner varios separados por coma. "Global" se aplica a todos los conectores si no hay uno específico.
                   </small>
                 </div>
               </div>
@@ -4349,4 +4424,3 @@ export default function Configuracion() {
     </div>
   )
 }
-

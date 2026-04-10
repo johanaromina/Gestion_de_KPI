@@ -233,6 +233,14 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       ? assignmentsResult[0].total
       : 0
 
+    // Contar unidades organizacionales (áreas/equipos configurados)
+    const [orgUnitsResult] = await pool.query<any[]>(
+      "SELECT COUNT(*) as total FROM org_scopes WHERE type IN ('area', 'team', 'company')"
+    )
+    const totalOrgUnits = Array.isArray(orgUnitsResult) && orgUnitsResult.length > 0
+      ? orgUnitsResult[0].total
+      : 0
+
     // Contar asignaciones completadas (con actual)
     const [completedResult] = await pool.query<any[]>(
       'SELECT COUNT(*) as total FROM collaborator_kpis WHERE actual IS NOT NULL'
@@ -246,7 +254,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     // Calcular cumplimiento promedio
     const [complianceResult] = await pool.query<any[]>(
       `SELECT AVG(
-        CASE 
+        CASE
           WHEN actual IS NOT NULL AND target > 0 THEN (actual / target) * 100
           ELSE NULL
         END
@@ -258,6 +266,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
 
     res.json({
       totalCollaborators,
+      totalOrgUnits,
       activePeriods,
       totalKPIs,
       totalAssignments,
