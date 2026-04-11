@@ -28,6 +28,7 @@ const envSchema = z.object({
   CORS_ALLOWED_ORIGINS: z.string().optional(),
   TRUST_PROXY: z.string().optional(),
   GOOGLE_API_KEY: z.string().optional(),
+  SLACK_WEBHOOK_URL: z.string().optional(),
 })
 
 const parsed = envSchema.parse(process.env)
@@ -81,4 +82,5 @@ export const appEnv = {
   corsAllowedOrigins,
   trustProxy,
   googleApiKey: parsed.GOOGLE_API_KEY || '',
+  slackWebhookUrl: parsed.SLACK_WEBHOOK_URL || '',
 }

@@ -707,40 +707,69 @@ export default function CollaboratorKPIForm({
             </div>
           </div>
 
+          <div className="form-section-title">2) Período</div>
+          <div className="form-group">
+            <label>Período</label>
+            <div className="period-badge">
+              {periodInfo?.name || `#${periodId}`}
+              {periodInfo?.status && (
+                <span className={`period-status-tag period-status-${periodInfo.status}`}>
+                  {periodInfo.status === 'open' ? 'Abierto' : periodInfo.status === 'closed' ? 'Cerrado' : periodInfo.status}
+                </span>
+              )}
+            </div>
+          </div>
+
           {subPeriods && subPeriods.length > 0 && (
             <>
-              <div className="form-section-title">2) Periodo y subperiodo</div>
+              <div className="form-group" style={{ marginTop: 12 }}>
+                <label htmlFor="subPeriodId">
+                  Subperíodo específico <span className="field-optional">(opcional)</span>
+                </label>
+                <select
+                  id="subPeriodId"
+                  value={formData.subPeriodId || ''}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      subPeriodId: e.target.value ? parseInt(e.target.value) : undefined,
+                    })
+                  }
+                  disabled={isReadOnlyCollaborator}
+                >
+                  <option value="">Sin subperíodo — usar Plan Mensual para todos los meses</option>
+                  {subPeriods.map((sp: any) => (
+                    <option key={sp.id} value={sp.id}>
+                      {sp.name} {sp.weight ? `(${sp.weight}%)` : ''}
+                    </option>
+                  ))}
+                </select>
+                {!formData.subPeriodId && (
+                  <small className="form-hint">
+                    Dejá vacío si querés definir targets mes a mes en el <strong>Plan Mensual</strong> (disponible más abajo una vez que elijas colaborador y KPI).
+                  </small>
+                )}
+                {formData.subPeriodId && (
+                  <small className="form-hint">
+                    Asignación para un mes específico. Para los demás meses podés crear asignaciones individuales o usar el Plan Mensual en la asignación resumen.
+                  </small>
+                )}
+              </div>
               <div className="calendar-timeline">
                 {subPeriods.map((sp: any) => (
                   <span
                     key={sp.id}
-                    className={`calendar-chip ${sp.status === 'closed' ? 'closed' : 'open'}`}
+                    className={`calendar-chip ${formData.subPeriodId === sp.id ? 'selected' : sp.status === 'closed' ? 'closed' : 'open'}`}
                     title={`${sp.name}${sp.weight ? ` · ${sp.weight}%` : ''}`}
+                    onClick={() => !isReadOnlyCollaborator && setFormData((prev) => ({
+                      ...prev,
+                      subPeriodId: prev.subPeriodId === sp.id ? undefined : sp.id,
+                    }))}
+                    style={{ cursor: isReadOnlyCollaborator ? 'default' : 'pointer' }}
                   >
                     {sp.name}
                   </span>
                 ))}
-              </div>
-              <div className="form-group">
-              <label htmlFor="subPeriodId">Subperiodo (opcional)</label>
-              <select
-                id="subPeriodId"
-                value={formData.subPeriodId || ''}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    subPeriodId: e.target.value ? parseInt(e.target.value) : undefined,
-                  })
-                }
-                disabled={isReadOnlyCollaborator}
-              >
-                <option value="">Sin subperiodo específico</option>
-                {subPeriods.map((sp: any) => (
-                  <option key={sp.id} value={sp.id}>
-                    {sp.name} {sp.weight ? `(${sp.weight}%)` : ''}
-                  </option>
-                ))}
-              </select>
               </div>
             </>
           )}
@@ -815,6 +844,115 @@ export default function CollaboratorKPIForm({
               </div>
             </div>
             </>
+          )}
+
+          {subPeriods && subPeriods.length > 0 && formData.kpiId !== 0 && formData.collaboratorId !== 0 && !formData.subPeriodId && (
+            <div className="plan-section">
+              <div className="plan-header">
+                <h3>Plan mensual — targets por subperíodo</h3>
+                <span className="plan-helper">
+                  Definí el target de cada mes. Guardá el plan antes de cerrar el formulario.
+                </span>
+              </div>
+              {canOverrideWeight && (
+                <label className="toggle">
+                  <input
+                    type="checkbox"
+                    checked={weightOverrideEnabled}
+                    onChange={(e) => setWeightOverrideEnabled(e.target.checked)}
+                  />
+                  <span>Override de ponderación (solo casos especiales)</span>
+                </label>
+              )}
+              {planErrors && <div className="error-message">{planErrors}</div>}
+              <table className="plan-table">
+                <thead>
+                  <tr>
+                    <th>Subperíodo</th>
+                    <th>Target</th>
+                    <th>Peso (%)</th>
+                    {weightOverrideEnabled && <th>Override</th>}
+                    <th>Actual</th>
+                    <th>% Mes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {planRows.map((row) => (
+                    <tr key={row.subPeriodId}>
+                      <td>{row.name}</td>
+                      <td>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={row.target}
+                          disabled={!canEditPlan}
+                          onChange={(e) =>
+                            setPlanRows((prev) =>
+                              prev.map((r) =>
+                                r.subPeriodId === row.subPeriodId
+                                  ? { ...r, target: e.target.value === '' ? '' : parseFloat(e.target.value) }
+                                  : r
+                              )
+                            )
+                          }
+                        />
+                      </td>
+                      <td>
+                        <input type="number" value={row.subPeriodWeight.toFixed(2)} disabled />
+                      </td>
+                      {weightOverrideEnabled && (
+                        <td>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={row.weightOverride}
+                            disabled={!canEditPlan || !canOverrideWeight}
+                            onChange={(e) =>
+                              setPlanRows((prev) =>
+                                prev.map((r) =>
+                                  r.subPeriodId === row.subPeriodId
+                                    ? {
+                                        ...r,
+                                        weightOverride: e.target.value === '' ? '' : parseFloat(e.target.value),
+                                      }
+                                    : r
+                                )
+                              )
+                            }
+                          />
+                        </td>
+                      )}
+                      <td>{row.actual !== '' ? Number(row.actual).toFixed(2) : '-'}</td>
+                      <td>
+                        {row.target && row.actual !== ''
+                          ? `${((Number(row.actual) / Number(row.target)) * 100).toFixed(1)}%`
+                          : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="plan-footer">
+                <span>Peso total: {planWeightTotal.toFixed(2)}%</span>
+                <span>Target acumulado: {planTargetTotal.toFixed(2)}</span>
+                <span>Actual acumulado: {planActualTotal.toFixed(2)}</span>
+                <span>Avance: {planProgressTotal.toFixed(1)}%</span>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={!canEditPlan || upsertPlanMutation.isLoading}
+                  onClick={() => {
+                    setPlanErrors(null)
+                    upsertPlanMutation.mutate(planRows)
+                  }}
+                >
+                  {upsertPlanMutation.isLoading ? 'Guardando plan…' : 'Guardar plan'}
+                </button>
+              </div>
+            </div>
           )}
 
           <div className="curation-section">
@@ -1061,115 +1199,6 @@ export default function CollaboratorKPIForm({
               disabled={isReadOnlyCollaborator}
             />
           </div>
-
-          {subPeriods && subPeriods.length > 0 && formData.kpiId !== 0 && formData.collaboratorId !== 0 && (
-            <div className="plan-section">
-              <div className="plan-header">
-                <h3>Plan mensual por subperiodo</h3>
-                <span className="plan-helper">
-                  Ajusta targets mensuales. El peso temporal viene del período.
-                </span>
-              </div>
-              {canOverrideWeight && (
-                <label className="toggle">
-                  <input
-                    type="checkbox"
-                    checked={weightOverrideEnabled}
-                    onChange={(e) => setWeightOverrideEnabled(e.target.checked)}
-                  />
-                  <span>Override de ponderación (solo casos especiales)</span>
-                </label>
-              )}
-              {planErrors && <div className="error-message">{planErrors}</div>}
-              <table className="plan-table">
-                <thead>
-                  <tr>
-                    <th>Subperiodo</th>
-                    <th>Target</th>
-                    <th>Peso periodo</th>
-                    {weightOverrideEnabled && <th>Override</th>}
-                    <th>Actual</th>
-                    <th>% Mes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {planRows.map((row) => (
-                    <tr key={row.subPeriodId}>
-                      <td>{row.name}</td>
-                      <td>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={row.target}
-                          disabled={!canEditPlan}
-                          onChange={(e) =>
-                            setPlanRows((prev) =>
-                              prev.map((r) =>
-                                r.subPeriodId === row.subPeriodId
-                                  ? { ...r, target: e.target.value === '' ? '' : parseFloat(e.target.value) }
-                                  : r
-                              )
-                            )
-                          }
-                        />
-                      </td>
-                      <td>
-                        <input type="number" value={row.subPeriodWeight.toFixed(2)} disabled />
-                      </td>
-                      {weightOverrideEnabled && (
-                        <td>
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.01"
-                            value={row.weightOverride}
-                            disabled={!canEditPlan || !canOverrideWeight}
-                            onChange={(e) =>
-                              setPlanRows((prev) =>
-                                prev.map((r) =>
-                                  r.subPeriodId === row.subPeriodId
-                                    ? {
-                                        ...r,
-                                        weightOverride: e.target.value === '' ? '' : parseFloat(e.target.value),
-                                      }
-                                    : r
-                                )
-                              )
-                            }
-                          />
-                        </td>
-                      )}
-                      <td>{row.actual !== '' ? Number(row.actual).toFixed(2) : '-'}</td>
-                      <td>
-                        {row.target && row.actual !== ''
-                          ? `${((Number(row.actual) / Number(row.target)) * 100).toFixed(1)}%`
-                          : '-'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="plan-footer">
-                <span>Peso total periodo: {planWeightTotal.toFixed(2)}%</span>
-                <span>Target acumulado: {planTargetTotal.toFixed(2)}</span>
-                <span>Actual acumulado: {planActualTotal.toFixed(2)}</span>
-                <span>Avance acumulado: {planProgressTotal.toFixed(1)}%</span>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  disabled={!canEditPlan || upsertPlanMutation.isLoading}
-                  onClick={() => {
-                    setPlanErrors(null)
-                    upsertPlanMutation.mutate(planRows)
-                  }}
-                >
-                  {upsertPlanMutation.isLoading ? 'Guardando plan...' : 'Guardar plan'}
-                </button>
-              </div>
-            </div>
-          )}
 
           <div className="form-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>

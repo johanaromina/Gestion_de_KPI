@@ -163,6 +163,53 @@
   text-decoration: line-through;
 }
 
+.calendar-chip.selected {
+  background: #f97316;
+  color: #fff;
+  font-weight: 600;
+}
+
+.period-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.period-status-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.period-status-open {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.period-status-closed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.period-status-in_review {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.field-optional {
+  font-weight: 400;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
 .weight-info {
   min-height: 38px;
 }

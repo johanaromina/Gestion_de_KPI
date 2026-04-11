@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 import SubPeriodForm from '../components/SubPeriodForm'
 import { useDialog } from '../components/Dialog'
 import SheetsWizard from '../components/SheetsWizard'
+import SlackWizard from '../components/SlackWizard'
 import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
 import './Configuracion.css'
 import { PreviewSourceMeta } from './configuracion/PreviewSourceMeta'
@@ -196,6 +197,7 @@ export default function Configuracion() {
   const [toastMessage, setToastMessage] = useState('')
   const [integrationOpen, setIntegrationOpen] = useState(false)
   const [sheetsWizardOpen, setSheetsWizardOpen] = useState(false)
+  const [slackWizardOpen, setSlackWizardOpen] = useState(false)
   const [setupGuideOpen, setSetupGuideOpen] = useState(false)
   const [setupGuideHydrated, setSetupGuideHydrated] = useState(false)
   const [templateFormError, setTemplateFormError] = useState('')
@@ -2225,6 +2227,19 @@ export default function Configuracion() {
         </div>
         <button className="btn-primary" onClick={() => setSheetsWizardOpen(true)}>
           Conectar planilla →
+        </button>
+      </div>
+
+      <div className="sheets-wizard-banner">
+        <div className="sheets-wizard-banner-text">
+          <span className="sheets-wizard-banner-icon">💬</span>
+          <div>
+            <strong>Conectar Slack</strong>
+            <p>Recibí alertas de KPIs en riesgo directamente en tu canal de Slack.</p>
+          </div>
+        </div>
+        <button className="btn-primary" onClick={() => setSlackWizardOpen(true)}>
+          Configurar Slack →
         </button>
       </div>
 
@@ -4617,6 +4632,10 @@ export default function Configuracion() {
           onClose={() => setSheetsWizardOpen(false)}
           onSuccess={() => setSheetsWizardOpen(false)}
         />
+      )}
+
+      {slackWizardOpen && (
+        <SlackWizard onClose={() => setSlackWizardOpen(false)} />
       )}
     </div>
   )

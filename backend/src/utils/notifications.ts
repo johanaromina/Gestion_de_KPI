@@ -1,5 +1,6 @@
 import { pool } from '../config/database'
 import { sendMail } from './mailer'
+import { appEnv } from '../config/env'
 import crypto from 'crypto'
 
 const NOTIFY_WINDOW_DAYS = parseInt(process.env.NOTIFY_WINDOW_DAYS || '7')
@@ -169,6 +170,95 @@ async function ensureNotificationStatesTable() {
   )
 }
 
+async function getSlackWebhookUrl(): Promise<string> {
+  try {
+    const [rows] = await pool.query<any[]>(
+      `SELECT value FROM app_config WHERE key_ = 'slack_webhook_url' LIMIT 1`
+    )
+    const dbUrl = rows?.[0]?.value
+    if (dbUrl) return dbUrl
+  } catch {
+    // tabla puede no existir aún
+  }
+  return appEnv.slackWebhookUrl || ''
+}
+
+export async function sendSlackMessage(webhookUrl: string, text: string, blocks?: any[]): Promise<void> {
+  if (!webhookUrl) return
+  const body: any = { text }
+  if (blocks) body.blocks = blocks
+  const response = await fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) {
+    const msg = await response.text()
+    throw new Error(`Slack error ${response.status}: ${msg}`)
+  }
+}
+
+function buildSlackBlocks(summary: NotificationSummary): any[] {
+  const blocks: any[] = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: '⚠️ Alertas KPI', emoji: true },
+    },
+    { type: 'divider' },
+  ]
+
+  if (summary.atRisk.length > 0) {
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*🔴 KPIs en riesgo (< 80%)*\n${summary.atRisk
+          .slice(0, 5)
+          .map((r) => `• ${r.collaboratorName} — ${r.kpiName}: *${r.variation.toFixed(0)}%*`)
+          .join('\n')}`,
+      },
+    })
+  }
+
+  if (summary.missingActual.length > 0) {
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*📭 Sin valor cargado*\n${summary.missingActual
+          .slice(0, 5)
+          .map((r) => `• ${r.collaboratorName}: ${r.count} KPI${r.count !== 1 ? 's' : ''} sin dato`)
+          .join('\n')}`,
+      },
+    })
+  }
+
+  if (summary.periodsExpiring.length > 0) {
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*📅 Períodos por vencer*\n${summary.periodsExpiring
+          .map((p) => `• ${p.periodName}: vence en *${p.daysLeft} día${p.daysLeft !== 1 ? 's' : ''}*`)
+          .join('\n')}`,
+      },
+    })
+  }
+
+  blocks.push({ type: 'divider' })
+  blocks.push({
+    type: 'context',
+    elements: [
+      {
+        type: 'mrkdwn',
+        text: `Generado por KPI Manager · ${new Date().toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}`,
+      },
+    ],
+  })
+
+  return blocks
+}
+
 export async function runNotifications() {
   if (!NOTIFY_ENABLED) return
 
@@ -285,6 +375,17 @@ export async function runNotifications() {
       html,
       text: newEvents.join('\n'),
     })
+  }
+
+  // Slack
+  const slackUrl = await getSlackWebhookUrl()
+  if (slackUrl) {
+    try {
+      const blocks = buildSlackBlocks(summary)
+      await sendSlackMessage(slackUrl, newEvents.join('\n'), blocks)
+    } catch (err: any) {
+      console.error('Error enviando notificación Slack:', err?.message)
+    }
   }
 
   await upsertState('digest', digestKey, hashValue(newEvents.join('|')), true)
