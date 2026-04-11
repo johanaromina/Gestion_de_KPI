@@ -4493,62 +4493,92 @@ export default function Configuracion() {
                 ×
               </button>
             </div>
-            <div className="modal-body">
-              <div className="form-row">
+            <div className="modal-body scope-form-body">
+              <div className="scope-form-section">
                 <div className="form-group">
-                  <label>Nombre</label>
+                  <label>Nombre <span className="field-required">*</span></label>
                   <input
+                    autoFocus
+                    placeholder="Ej: Comercial, Tecnología, Operaciones"
                     value={scopeForm.name}
                     onChange={(e) => setScopeForm((prev) => ({ ...prev, name: e.target.value }))}
                   />
                 </div>
-                <div className="form-group">
-                  <label>Tipo</label>
-                  <select
-                    value={scopeForm.type}
-                    onChange={(e) => setScopeForm((prev) => ({ ...prev, type: e.target.value }))}
-                  >
-                    <option value="company">Empresa</option>
-                    <option value="area">Área</option>
-                    <option value="team">Equipo</option>
-                    <option value="person">Persona</option>
-                    <option value="product">Producto</option>
-                  </select>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Tipo</label>
+                    <select
+                      value={scopeForm.type}
+                      onChange={(e) => setScopeForm((prev) => ({ ...prev, type: e.target.value }))}
+                    >
+                      <option value="company">🏢 Empresa</option>
+                      <option value="area">🗂 Área</option>
+                      <option value="team">👥 Equipo</option>
+                      <option value="person">👤 Persona</option>
+                      <option value="product">📦 Producto</option>
+                    </select>
+                    <small className="form-hint">
+                      {scopeForm.type === 'area' && 'Sector estable: Comercial, RRHH, Tecnología…'}
+                      {scopeForm.type === 'team' && 'Subgrupo dentro de un área: Soporte Técnico, Ventas B2B…'}
+                      {scopeForm.type === 'company' && 'Unidad raíz de la organización.'}
+                      {scopeForm.type === 'person' && 'Persona individual como unidad de estructura.'}
+                      {scopeForm.type === 'product' && 'Producto o línea de negocio.'}
+                    </small>
+                  </div>
+                  <div className="form-group">
+                    <label>Estado</label>
+                    <select
+                      value={scopeForm.active ? '1' : '0'}
+                      onChange={(e) => setScopeForm((prev) => ({ ...prev, active: e.target.value === '1' }))}
+                    >
+                      <option value="1">✅ Activo</option>
+                      <option value="0">⏸ Inactivo</option>
+                    </select>
+                    <small className="form-hint">Las unidades inactivas no aparecen en nuevas asignaciones.</small>
+                  </div>
                 </div>
               </div>
-              <div className="form-group">
-                <label>Depende de (unidad superior)</label>
-                <select
-                  value={scopeForm.parentId}
-                  onChange={(e) => setScopeForm((prev) => ({ ...prev, parentId: e.target.value }))}
-                >
-                  <option value="">Es una unidad raíz (sin superior)</option>
-                  {orgScopes?.map((scope) => (
-                    <option key={scope.id} value={scope.id}>
-                      {scope.type} · {scope.name}
-                    </option>
-                  ))}
-                </select>
+
+              <div className="scope-form-section">
+                <div className="scope-form-section-title">Jerarquía y calendario</div>
+                <div className="form-group">
+                  <label>Depende de</label>
+                  <select
+                    value={scopeForm.parentId}
+                    onChange={(e) => setScopeForm((prev) => ({ ...prev, parentId: e.target.value }))}
+                  >
+                    <option value="">— Sin superior (unidad raíz) —</option>
+                    {orgScopes?.filter((s: any) => s.id !== editingScope?.id).map((scope: any) => (
+                      <option key={scope.id} value={scope.id}>
+                        {scope.type === 'company' ? '🏢' : scope.type === 'area' ? '🗂' : scope.type === 'team' ? '👥' : '📦'} {scope.name}
+                      </option>
+                    ))}
+                  </select>
+                  <small className="form-hint">
+                    Elegí la unidad de la que depende esta. Dejalo vacío si es un área raíz.
+                  </small>
+                </div>
+                <div className="form-group">
+                  <label>Calendario de medición</label>
+                  <select
+                    value={scopeForm.calendarProfileId}
+                    onChange={(e) =>
+                      setScopeForm((prev) => ({ ...prev, calendarProfileId: e.target.value }))
+                    }
+                  >
+                    <option value="">📅 Hereda el calendario del superior</option>
+                    {calendarProfiles?.map((profile: any) => (
+                      <option key={profile.id} value={profile.id}>
+                        {profile.name}
+                      </option>
+                    ))}
+                  </select>
+                  <small className="form-hint">
+                    Define la frecuencia de medición de KPIs (mensual, trimestral, etc.). Si no lo cambiás, hereda del padre.
+                  </small>
+                </div>
               </div>
-              <div className="form-group">
-                <label>Calendario de medición</label>
-                <select
-                  value={scopeForm.calendarProfileId}
-                  onChange={(e) =>
-                    setScopeForm((prev) => ({ ...prev, calendarProfileId: e.target.value }))
-                  }
-                >
-                  <option value="">Sin calendario específico (hereda del superior)</option>
-                  {calendarProfiles?.map((profile) => (
-                    <option key={profile.id} value={profile.id}>
-                      {profile.name}
-                    </option>
-                  ))}
-                </select>
-                <small className="form-hint">
-                  Define con qué frecuencia se miden los KPIs de esta unidad (mensual, trimestral, etc.).
-                </small>
-              </div>
+
               <button
                 type="button"
                 className="scope-advanced-toggle"
@@ -4556,20 +4586,20 @@ export default function Configuracion() {
               >
                 <span>{scopeAdvancedOpen ? '▲' : '▼'}</span>
                 {scopeAdvancedOpen ? 'Ocultar' : 'Mostrar'} opciones avanzadas
-                <span className="scope-advanced-hint">Solo para integraciones externas (Jira, Sheets, etc.)</span>
+                <span className="scope-advanced-hint">Solo si usás conectores externos (Jira, Sheets, etc.)</span>
               </button>
               {scopeAdvancedOpen && (
-                <>
+                <div className="scope-form-section scope-advanced-section">
                   <div className="form-group">
                     <label>Parámetros de integración (JSON)</label>
                     <textarea
-                      rows={4}
+                      rows={3}
                       value={scopeForm.metadataText}
                       onChange={(e) => setScopeForm((prev) => ({ ...prev, metadataText: e.target.value }))}
                       placeholder='{"projects":["GT_MISIM"],"authProfileId":1}'
                     />
                     <small className="form-hint">
-                      Parámetros extra que hereda esta unidad al ejecutar integraciones. Dejalo vacío si no usás conectores.
+                      Parámetros técnicos heredables para integraciones. Dejalo vacío si no usás conectores.
                     </small>
                   </div>
                   <div className="form-row">
@@ -4591,25 +4621,15 @@ export default function Configuracion() {
                       <input
                         value={scopeExternalKeysBySourceType[scopeMappingSourceType] || ''}
                         onChange={(e) => updateScopeExternalKeysForSourceType(e.target.value)}
-                        placeholder="revenue, cs, customer success"
+                        placeholder="comercial, ventas, sales"
                       />
                       <small className="form-hint">
-                        Nombre o código con el que esta unidad aparece en {getMappingSourceTypeLabel(scopeMappingSourceType)}.
+                        Nombre con el que aparece esta unidad en {getMappingSourceTypeLabel(scopeMappingSourceType)}. Podés poner varios separados por coma.
                       </small>
                     </div>
                   </div>
-                </>
+                </div>
               )}
-              <div className="form-group">
-                <label>Activo</label>
-                <select
-                  value={scopeForm.active ? '1' : '0'}
-                  onChange={(e) => setScopeForm((prev) => ({ ...prev, active: e.target.value === '1' }))}
-                >
-                  <option value="1">Activo</option>
-                  <option value="0">Inactivo</option>
-                </select>
-              </div>
             </div>
             <div className="modal-actions">
               <button className="btn-secondary" onClick={() => setShowScopeModal(false)}>

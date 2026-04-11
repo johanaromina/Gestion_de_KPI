@@ -137,7 +137,6 @@
   border-radius: 8px;
   font-size: 14px;
   transition: border-color 0.2s;
-  text-transform: uppercase;
 }
 
 .form-group input:focus {
