@@ -379,7 +379,10 @@ export default function CollaboratorKPIForm({
   const calculateTotalWeight = (): number => {
     if (!existingAssignments) return toNumber(formData.weight)
 
-    const otherAssignments = existingAssignments.filter((a: any) => a.id !== assignment?.id)
+    // Solo cuenta filas resumen (sin subPeriodId) para no inflar el total con asignaciones de subperíodo
+    const otherAssignments = existingAssignments.filter(
+      (a: any) => a.id !== assignment?.id && (a.subPeriodId === null || a.subPeriodId === undefined)
+    )
     const otherWeights = otherAssignments.reduce((sum: number, a: any) => sum + toNumber(a.weight), 0)
     return otherWeights + toNumber(formData.weight)
   }
@@ -424,11 +427,15 @@ export default function CollaboratorKPIForm({
         newErrors.weight = 'La ponderación no puede ser mayor a 100%'
       }
 
-      const totalWeight = toNumber(calculateTotalWeight())
-      if (totalWeight > 100) {
-        newErrors.weight = `La suma de ponderaciones sería ${totalWeight.toFixed(
-          1
-        )}%. Debe ser máximo 100%`
+      // La validación de suma de pesos solo aplica a asignaciones resumen (sin subperíodo)
+      // Las asignaciones de subperíodo tienen su propio cálculo de peso y no se suman al total general
+      if (!formData.subPeriodId) {
+        const totalWeight = toNumber(calculateTotalWeight())
+        if (totalWeight > 100) {
+          newErrors.weight = `La suma de ponderaciones sería ${totalWeight.toFixed(
+            1
+          )}%. Debe ser máximo 100%`
+        }
       }
     }
 

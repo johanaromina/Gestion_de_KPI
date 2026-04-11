@@ -252,6 +252,7 @@ export default function Configuracion() {
     metadataText: '',
     active: true,
   })
+  const [scopeAdvancedOpen, setScopeAdvancedOpen] = useState(false)
   const [scopeMappingSourceType, setScopeMappingSourceType] = useState(DEFAULT_MAPPING_SOURCE_TYPE)
   const [scopeExternalKeysBySourceType, setScopeExternalKeysBySourceType] = useState<Record<string, string>>({
     [DEFAULT_MAPPING_SOURCE_TYPE]: '',
@@ -1937,6 +1938,7 @@ export default function Configuracion() {
         })
         setScopeExternalKeysBySourceType({ [DEFAULT_MAPPING_SOURCE_TYPE]: '' })
         setScopeMappingSourceType(DEFAULT_MAPPING_SOURCE_TYPE)
+        setScopeAdvancedOpen(false)
         if (data?.warning) {
           void dialog.alert(data.warning, { title: 'Advertencia', variant: 'warning' })
         }
@@ -2840,6 +2842,7 @@ export default function Configuracion() {
                   })
                   setScopeExternalKeysBySourceType({ [DEFAULT_MAPPING_SOURCE_TYPE]: '' })
                   setScopeMappingSourceType(DEFAULT_MAPPING_SOURCE_TYPE)
+                  setScopeAdvancedOpen(false)
                   setShowScopeModal(true)
                 }}
             >
@@ -2883,6 +2886,9 @@ export default function Configuracion() {
                         })
                         setScopeExternalKeysBySourceType(getEntityExternalKeysBySourceType('org_scope', scope.id))
                         setScopeMappingSourceType(DEFAULT_MAPPING_SOURCE_TYPE)
+                        // Si ya tiene metadata o alias externos, mostramos la sección avanzada abierta
+                        const hasAdvancedData = !!(scope.metadata || getEntityExternalKeysBySourceType('org_scope', scope.id)[DEFAULT_MAPPING_SOURCE_TYPE])
+                        setScopeAdvancedOpen(hasAdvancedData)
                         setShowScopeModal(true)
                       }}
                       >
@@ -4488,45 +4494,57 @@ export default function Configuracion() {
                   Define con qué frecuencia se miden los KPIs de esta unidad (mensual, trimestral, etc.).
                 </small>
               </div>
-              <div className="form-group">
-                <label>Datos adicionales (opcional)</label>
-                <textarea
-                  rows={5}
-                  value={scopeForm.metadataText}
-                  onChange={(e) => setScopeForm((prev) => ({ ...prev, metadataText: e.target.value }))}
-                  placeholder='{"projects":["GT_MISIM"],"authProfileId":1}'
-                />
-                <small className="form-hint">
-                  Solo completar si usás integraciones externas (Jira, Zendesk, etc.) y necesitás asociar esta unidad con un proyecto o equipo del conector.
-                </small>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Conector externo</label>
-                  <select
-                    value={scopeMappingSourceType}
-                    onChange={(e) => setScopeMappingSourceType(normalizeMappingSourceType(e.target.value))}
-                  >
-                    {MAPPING_SOURCE_TYPE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Alias en el conector</label>
-                  <input
-                    value={scopeExternalKeysBySourceType[scopeMappingSourceType] || ''}
-                    onChange={(e) => updateScopeExternalKeysForSourceType(e.target.value)}
-                    placeholder="revenue, cs, customer success"
-                  />
-                  <small className="form-hint">
-                    Nombre o código con el que esta unidad aparece en {getMappingSourceTypeLabel(scopeMappingSourceType)}.
-                    Podés poner varios separados por coma. "Global" se aplica a todos los conectores si no hay uno específico.
-                  </small>
-                </div>
-              </div>
+              <button
+                type="button"
+                className="scope-advanced-toggle"
+                onClick={() => setScopeAdvancedOpen((v) => !v)}
+              >
+                <span>{scopeAdvancedOpen ? '▲' : '▼'}</span>
+                {scopeAdvancedOpen ? 'Ocultar' : 'Mostrar'} opciones avanzadas
+                <span className="scope-advanced-hint">Solo para integraciones externas (Jira, Sheets, etc.)</span>
+              </button>
+              {scopeAdvancedOpen && (
+                <>
+                  <div className="form-group">
+                    <label>Parámetros de integración (JSON)</label>
+                    <textarea
+                      rows={4}
+                      value={scopeForm.metadataText}
+                      onChange={(e) => setScopeForm((prev) => ({ ...prev, metadataText: e.target.value }))}
+                      placeholder='{"projects":["GT_MISIM"],"authProfileId":1}'
+                    />
+                    <small className="form-hint">
+                      Parámetros extra que hereda esta unidad al ejecutar integraciones. Dejalo vacío si no usás conectores.
+                    </small>
+                  </div>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Conector externo</label>
+                      <select
+                        value={scopeMappingSourceType}
+                        onChange={(e) => setScopeMappingSourceType(normalizeMappingSourceType(e.target.value))}
+                      >
+                        {MAPPING_SOURCE_TYPE_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Alias en el conector</label>
+                      <input
+                        value={scopeExternalKeysBySourceType[scopeMappingSourceType] || ''}
+                        onChange={(e) => updateScopeExternalKeysForSourceType(e.target.value)}
+                        placeholder="revenue, cs, customer success"
+                      />
+                      <small className="form-hint">
+                        Nombre o código con el que esta unidad aparece en {getMappingSourceTypeLabel(scopeMappingSourceType)}.
+                      </small>
+                    </div>
+                  </div>
+                </>
+              )}
               <div className="form-group">
                 <label>Activo</label>
                 <select
