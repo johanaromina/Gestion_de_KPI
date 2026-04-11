@@ -115,7 +115,49 @@ export const listObjectives = async (filters: {
     params
   )
 
-  return Array.isArray(rows) ? rows : []
+  const objectives = Array.isArray(rows) ? rows : []
+  if (objectives.length === 0) return []
+
+  // Batch-fetch all KRs in a single query — no N+1
+  const ids = objectives.map((o) => o.id)
+  const placeholders = ids.map(() => '?').join(',')
+  const [krRows] = await pool.query<any[]>(
+    `SELECT
+       kr.*,
+       c.name AS ownerName,
+       k.name AS kpiName,
+       ck.actual AS kpiActual,
+       ck.target AS kpiTarget,
+       sk.actual AS scopeActual,
+       sk.target AS scopeTarget
+     FROM okr_key_results kr
+     LEFT JOIN collaborators c ON kr.ownerId = c.id
+     LEFT JOIN collaborator_kpis ck ON kr.collaboratorKpiId = ck.id
+     LEFT JOIN scope_kpis sk ON kr.scopeKpiId = sk.id
+     LEFT JOIN kpis k ON COALESCE(ck.kpiId, sk.kpiId) = k.id
+     WHERE kr.objectiveId IN (${placeholders})
+     ORDER BY kr.objectiveId, kr.sortOrder ASC, kr.id ASC`,
+    ids
+  )
+
+  const krsByObjective = new Map<number, OKRKeyResult[]>()
+  for (const row of Array.isArray(krRows) ? krRows : []) {
+    const kr: OKRKeyResult = {
+      ...row,
+      kpiActual: row.kpiActual ?? row.scopeActual ?? null,
+      kpiTarget: row.kpiTarget ?? row.scopeTarget ?? null,
+      progressPercent: calcKrProgress({
+        ...row,
+        kpiActual: row.kpiActual ?? row.scopeActual,
+        kpiTarget: row.kpiTarget ?? row.scopeTarget,
+      }),
+    }
+    const list = krsByObjective.get(row.objectiveId) ?? []
+    list.push(kr)
+    krsByObjective.set(row.objectiveId, list)
+  }
+
+  return objectives.map((o) => ({ ...o, keyResults: krsByObjective.get(o.id) ?? [] }))
 }
 
 export const getObjectiveById = async (id: number): Promise<OKRObjective | null> => {

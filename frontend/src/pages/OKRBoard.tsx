@@ -63,10 +63,13 @@ const progressColor = (p: number) => {
   return '#dc2626'
 }
 
+const PAGE_SIZE = 12
+
 export default function OKRBoard() {
   const navigate = useNavigate()
   const [selectedPeriod, setSelectedPeriod] = useState<number | ''>('')
   const [statusFilter, setStatusFilter] = useState<string>('')
+  const [page, setPage] = useState(1)
 
   const { data: periods = [] } = useQuery<Period[]>('periods', async () => {
     const res = await api.get('/periods')
@@ -82,25 +85,15 @@ export default function OKRBoard() {
       const res = await api.get('/okr', { params })
       return res.data
     },
-    { enabled: true }
+    { enabled: true, keepPreviousData: true }
   )
 
-  // Enrich with key results
-  const { data: enriched = [] } = useQuery<Objective[]>(
-    ['okr-objectives-enriched', objectives.map((o) => o.id).join(',')],
-    async () => {
-      const results = await Promise.all(
-        objectives.map(async (obj) => {
-          const res = await api.get(`/okr/${obj.id}`)
-          return res.data as Objective
-        })
-      )
-      return results
-    },
-    { enabled: objectives.length > 0 }
-  )
+  // Reset page when filters change
+  const handlePeriodChange = (v: string) => { setSelectedPeriod(v ? Number(v) : ''); setPage(1) }
+  const handleStatusChange = (v: string) => { setStatusFilter(v); setPage(1) }
 
-  const displayed = enriched.length > 0 ? enriched : objectives
+  const totalPages = Math.max(1, Math.ceil(objectives.length / PAGE_SIZE))
+  const displayed = objectives.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
     <div className="okr-board">
@@ -115,17 +108,14 @@ export default function OKRBoard() {
       </div>
 
       <div className="okr-filters">
-        <select
-          value={selectedPeriod}
-          onChange={(e) => setSelectedPeriod(e.target.value ? Number(e.target.value) : '')}
-        >
+        <select value={selectedPeriod} onChange={(e) => handlePeriodChange(e.target.value)}>
           <option value="">Todos los periodos</option>
           {periods.map((p) => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
 
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+        <select value={statusFilter} onChange={(e) => handleStatusChange(e.target.value)}>
           <option value="">Todos los estados</option>
           <option value="active">Activo</option>
           <option value="draft">Borrador</option>
@@ -166,6 +156,14 @@ export default function OKRBoard() {
           <button className="btn-primary" onClick={() => navigate('/okr/nuevo')}>
             Crear primer objetivo
           </button>
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="okr-pagination">
+          <button className="okr-page-btn" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>← Anterior</button>
+          <span className="okr-page-info">Página {page} de {totalPages} · {objectives.length} objetivos</span>
+          <button className="okr-page-btn" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Siguiente →</button>
         </div>
       )}
 
@@ -245,6 +243,14 @@ export default function OKRBoard() {
           </div>
         ))}
       </div>
+
+      {totalPages > 1 && (
+        <div className="okr-pagination okr-pagination--bottom">
+          <button className="okr-page-btn" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>← Anterior</button>
+          <span className="okr-page-info">Página {page} de {totalPages}</span>
+          <button className="okr-page-btn" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Siguiente →</button>
+        </div>
+      )}
     </div>
   )
 }

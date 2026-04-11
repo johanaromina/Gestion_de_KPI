@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../hooks/useAuth'
+import { useDialog } from '../components/Dialog'
 import './OKRCrear.css'
 
 interface Period { id: number; name: string }
@@ -44,14 +45,18 @@ export default function OKRCrear() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
 
+  const dialog = useDialog()
+
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [periodId, setPeriodId] = useState('')
   const [orgScopeId, setOrgScopeId] = useState('')
   const [ownerId, setOwnerId] = useState(String(user?.id ?? ''))
+  const [parentId, setParentId] = useState('')
   const [status, setStatus] = useState<'draft' | 'active'>('active')
   const [krs, setKrs] = useState<KRDraft[]>([emptyKR()])
   const [error, setError] = useState('')
+  const [krErrors, setKrErrors] = useState<Record<string, string>>({})
 
   // Cargar datos existentes en modo edicion
   const { data: existingObjective } = useQuery(
@@ -67,6 +72,7 @@ export default function OKRCrear() {
     setPeriodId(String(existingObjective.periodId ?? ''))
     setOrgScopeId(String(existingObjective.orgScopeId ?? ''))
     setOwnerId(String(existingObjective.ownerId ?? ''))
+    setParentId(String(existingObjective.parentId ?? ''))
     setStatus(existingObjective.status === 'draft' ? 'draft' : 'active')
     if (existingObjective.keyResults && existingObjective.keyResults.length > 0) {
       setKrs(existingObjective.keyResults.map((kr: any) => ({
@@ -119,6 +125,14 @@ export default function OKRCrear() {
     { enabled: !!periodId }
   )
 
+  // Objetivos del mismo período para selector de padre (excluye el actual en edición)
+  const { data: siblingObjectives = [] } = useQuery<{ id: number; title: string }[]>(
+    ['okr-objectives-for-parent', periodId],
+    () => api.get('/okr', { params: { periodId } }).then((r) => r.data),
+    { enabled: !!periodId }
+  )
+  const parentOptions = siblingObjectives.filter((o) => !id || String(o.id) !== id)
+
   const buildKrPayload = (kr: KRDraft) => ({
     title: kr.title,
     description: kr.description || null,
@@ -139,6 +153,7 @@ export default function OKRCrear() {
         periodId: Number(periodId),
         orgScopeId: orgScopeId ? Number(orgScopeId) : null,
         ownerId: Number(ownerId),
+        parentId: parentId ? Number(parentId) : null,
         status,
       })
       const objectiveId = objRes.data.id
@@ -164,6 +179,7 @@ export default function OKRCrear() {
         title,
         description: description || null,
         orgScopeId: orgScopeId ? Number(orgScopeId) : null,
+        parentId: parentId ? Number(parentId) : null,
         status,
       })
 
@@ -209,9 +225,32 @@ export default function OKRCrear() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    if (!title.trim()) { setError('El titulo es requerido'); return }
-    if (!isEdit && !periodId) { setError('El periodo es requerido'); return }
+    setKrErrors({})
+
+    if (!title.trim()) { setError('El título es requerido'); return }
+    if (!isEdit && !periodId) { setError('El período es requerido'); return }
     if (!ownerId) { setError('El responsable es requerido'); return }
+
+    // Validar KRs numéricos
+    const newKrErrors: Record<string, string> = {}
+    for (const kr of krs) {
+      if (!kr.title.trim()) continue
+      if (kr.krType === 'simple') {
+        const start = Number(kr.startValue)
+        const target = Number(kr.targetValue)
+        if (!kr.targetValue) {
+          newKrErrors[kr.tempId] = 'La meta es requerida'
+        } else if (target <= start) {
+          newKrErrors[kr.tempId] = `La meta (${target}) debe ser mayor al valor inicial (${start})`
+        }
+      }
+    }
+    if (Object.keys(newKrErrors).length > 0) {
+      setKrErrors(newKrErrors)
+      setError('Corregí los errores en los Key Results')
+      return
+    }
+
     if (isEdit) {
       editMutation.mutate()
     } else {
@@ -221,10 +260,21 @@ export default function OKRCrear() {
 
   const updateKR = (tempId: string, field: keyof KRDraft, value: string) => {
     setKrs((prev) => prev.map((kr) => kr.tempId === tempId ? { ...kr, [field]: value } : kr))
+    // limpiar error del KR al editar
+    setKrErrors((prev) => { const next = { ...prev }; delete next[tempId]; return next })
   }
 
-  const removeKR = (tempId: string) => {
+  const removeKR = async (tempId: string, hasTitle: boolean) => {
+    if (hasTitle) {
+      const ok = await dialog.confirm('¿Eliminar este Key Result?', {
+        title: 'Quitar KR',
+        confirmLabel: 'Eliminar',
+        variant: 'danger',
+      })
+      if (!ok) return
+    }
     setKrs((prev) => prev.filter((kr) => kr.tempId !== tempId))
+    setKrErrors((prev) => { const next = { ...prev }; delete next[tempId]; return next })
   }
 
   return (
@@ -301,6 +351,21 @@ export default function OKRCrear() {
               </select>
             </div>
           </div>
+
+          {parentOptions.length > 0 && (
+            <div className="form-group">
+              <label>Objetivo padre <span className="form-label-optional">(opcional)</span></label>
+              <select value={parentId} onChange={(e) => setParentId(e.target.value)}>
+                <option value="">— Sin padre (objetivo raíz) —</option>
+                {parentOptions.map((o) => (
+                  <option key={o.id} value={o.id}>{o.title}</option>
+                ))}
+              </select>
+              <small className="form-hint">
+                Usalo para crear un objetivo subordinado a otro del mismo período. Los objetivos padre muestran el progreso agregado de sus hijos en el árbol de alineación.
+              </small>
+            </div>
+          )}
         </section>
 
         {/* Key Results */}
@@ -317,7 +382,7 @@ export default function OKRCrear() {
               <div className="kr-block-header">
                 <span className="kr-number">KR {idx + 1}</span>
                 {krs.length > 1 && (
-                  <button type="button" className="btn-remove-kr" onClick={() => removeKR(kr.tempId)}>
+                  <button type="button" className="btn-remove-kr" onClick={() => removeKR(kr.tempId, !!kr.title.trim())}>
                     Quitar
                   </button>
                 )}
@@ -334,73 +399,92 @@ export default function OKRCrear() {
               </div>
 
               <div className="form-group">
-                <label>Tipo de medicion</label>
+                <label>Tipo de medición</label>
                 <div className="kr-type-toggle">
                   <button
                     type="button"
                     className={`kr-type-btn ${kr.krType === 'simple' ? 'active' : ''}`}
                     onClick={() => updateKR(kr.tempId, 'krType', 'simple')}
                   >
-                    Valor manual
+                    📝 Valor manual
                   </button>
                   <button
                     type="button"
                     className={`kr-type-btn ${kr.krType === 'kpi_linked' ? 'active' : ''}`}
                     onClick={() => updateKR(kr.tempId, 'krType', 'kpi_linked')}
                     disabled={!periodId}
-                    title={!periodId ? 'Selecciona un periodo primero' : ''}
+                    title={!periodId ? 'Seleccioná un período primero' : ''}
                   >
-                    Vinculado a KPI
+                    🔗 Vinculado a KPI
                   </button>
                 </div>
+                <small className="form-hint">
+                  {kr.krType === 'simple'
+                    ? 'Vas a cargar el progreso manualmente con check-ins. Usalo para métricas que no están en el sistema (NPS, encuestas, metas cualitativas).'
+                    : 'El progreso se actualiza automáticamente desde el KPI asignado. No hace falta cargar check-ins.'}
+                </small>
               </div>
 
               {kr.krType === 'simple' && (
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Valor inicial</label>
-                    <input type="number" value={kr.startValue} onChange={(e) => updateKR(kr.tempId, 'startValue', e.target.value)} />
+                <>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Valor inicial</label>
+                      <input type="number" value={kr.startValue} onChange={(e) => updateKR(kr.tempId, 'startValue', e.target.value)} />
+                      <small className="form-hint">Punto de partida (puede ser 0).</small>
+                    </div>
+                    <div className="form-group">
+                      <label>Meta *</label>
+                      <input
+                        type="number"
+                        value={kr.targetValue}
+                        onChange={(e) => updateKR(kr.tempId, 'targetValue', e.target.value)}
+                        className={krErrors[kr.tempId] ? 'input-error' : ''}
+                      />
+                      <small className="form-hint">Valor a alcanzar para considerar este KR completado.</small>
+                    </div>
+                    <div className="form-group">
+                      <label>Unidad</label>
+                      <input type="text" value={kr.unit} onChange={(e) => updateKR(kr.tempId, 'unit', e.target.value)} placeholder="%, tickets, $, días…" />
+                    </div>
                   </div>
-                  <div className="form-group">
-                    <label>Meta</label>
-                    <input type="number" value={kr.targetValue} onChange={(e) => updateKR(kr.tempId, 'targetValue', e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label>Unidad</label>
-                    <input type="text" value={kr.unit} onChange={(e) => updateKR(kr.tempId, 'unit', e.target.value)} placeholder="%, tickets, $..." />
-                  </div>
-                </div>
+                  {krErrors[kr.tempId] && (
+                    <div className="kr-error-msg">{krErrors[kr.tempId]}</div>
+                  )}
+                </>
               )}
 
               {kr.krType === 'kpi_linked' && (
                 <div className="form-row">
                   <div className="form-group">
-                    <label>KPI individual (collaborator KPI)</label>
+                    <label>KPI individual</label>
                     <select value={kr.collaboratorKpiId} onChange={(e) => updateKR(kr.tempId, 'collaboratorKpiId', e.target.value)}>
-                      <option value="">Sin vinculo individual</option>
+                      <option value="">— Sin vínculo individual —</option>
                       {collabKpis.map((ck) => (
                         <option key={ck.id} value={ck.id}>
                           {ck.kpiName} — {ck.collaboratorName} (meta: {ck.target})
                         </option>
                       ))}
                     </select>
+                    <small className="form-hint">KPI asignado a una persona específica.</small>
                   </div>
                   <div className="form-group">
-                    <label>KPI grupal (scope KPI)</label>
+                    <label>KPI grupal</label>
                     <select value={kr.scopeKpiId} onChange={(e) => updateKR(kr.tempId, 'scopeKpiId', e.target.value)}>
-                      <option value="">Sin vinculo grupal</option>
+                      <option value="">— Sin vínculo grupal —</option>
                       {scopeKpis.map((sk) => (
                         <option key={sk.id} value={sk.id}>
                           {sk.name} — {sk.orgScopeName} (meta: {sk.target})
                         </option>
                       ))}
                     </select>
+                    <small className="form-hint">KPI consolidado de un área o equipo.</small>
                   </div>
                 </div>
               )}
 
               <div className="form-group form-group--small">
-                <label>Peso (para progreso del objetivo)</label>
+                <label>Peso relativo</label>
                 <input
                   type="number"
                   min="0.1"
@@ -409,6 +493,9 @@ export default function OKRCrear() {
                   value={kr.weight}
                   onChange={(e) => updateKR(kr.tempId, 'weight', e.target.value)}
                 />
+                <small className="form-hint">
+                  Define cuánto influye este KR en el progreso total del objetivo. Ej: peso 2 vale el doble que peso 1.
+                </small>
               </div>
             </div>
           ))}

@@ -94,6 +94,8 @@ export default function OKRDetalle() {
   const [checkInNote, setCheckInNote] = useState('')
   const [newKRStatus, setNewKRStatus] = useState<Record<number, KRStatus>>({})
   const [treeNodeId, setTreeNodeId] = useState('')
+  const [treeSearch, setTreeSearch] = useState('')
+  const [treeDropdownOpen, setTreeDropdownOpen] = useState(false)
   const [expandedSources, setExpandedSources] = useState<Set<number>>(new Set())
 
   const { data: objective, isLoading } = useQuery<Objective>(
@@ -431,10 +433,15 @@ export default function OKRDetalle() {
 
       {/* Vinculos con Arbol de Objetivos */}
       <div className="okr-tree-links-section">
-        <h3>Arbol de Objetivos vinculado</h3>
+        <div className="okr-tree-links-header">
+          <h3>Árbol de Objetivos vinculado</h3>
+          <small className="okr-tree-hint">
+            Vinculá este OKR a un nodo del árbol estratégico para que aparezca en el organigrama y análisis de alineación.
+          </small>
+        </div>
 
         {treeLinks.length === 0 && (
-          <p className="okr-empty-inline">Sin vinculos al arbol organizacional.</p>
+          <p className="okr-empty-inline">Sin vínculos al árbol organizacional.</p>
         )}
 
         {treeLinks.length > 0 && (
@@ -458,16 +465,46 @@ export default function OKRDetalle() {
 
         {objective?.status !== 'closed' && availableNodes.length > 0 && (
           <div className="okr-tree-link-add">
-            <select value={treeNodeId} onChange={(e) => setTreeNodeId(e.target.value)}>
-              <option value="">Vincular a nodo del arbol...</option>
-              {availableNodes.map((n) => (
-                <option key={n.id} value={n.id}>{n.name} ({n.level})</option>
-              ))}
-            </select>
+            <div className="tree-search-wrapper">
+              <input
+                className="tree-search-input"
+                type="text"
+                placeholder="Buscar nodo del árbol…"
+                value={treeSearch}
+                onChange={(e) => { setTreeSearch(e.target.value); setTreeDropdownOpen(true); setTreeNodeId('') }}
+                onFocus={() => setTreeDropdownOpen(true)}
+                onBlur={() => setTimeout(() => setTreeDropdownOpen(false), 150)}
+              />
+              {treeDropdownOpen && treeSearch && (
+                <div className="tree-search-dropdown">
+                  {availableNodes
+                    .filter((n) => n.name.toLowerCase().includes(treeSearch.toLowerCase()))
+                    .slice(0, 15)
+                    .map((n) => (
+                      <button
+                        key={n.id}
+                        type="button"
+                        className="tree-search-option"
+                        onMouseDown={() => {
+                          setTreeNodeId(String(n.id))
+                          setTreeSearch(n.name)
+                          setTreeDropdownOpen(false)
+                        }}
+                      >
+                        <span className="tree-option-name">{n.name}</span>
+                        <span className="tree-option-level">{n.level}</span>
+                      </button>
+                    ))}
+                  {availableNodes.filter((n) => n.name.toLowerCase().includes(treeSearch.toLowerCase())).length === 0 && (
+                    <div className="tree-search-empty">Sin resultados para "{treeSearch}"</div>
+                  )}
+                </div>
+              )}
+            </div>
             <button
               className="btn-primary"
               disabled={!treeNodeId || linkTreeMutation.isLoading}
-              onClick={() => linkTreeMutation.mutate(Number(treeNodeId))}
+              onClick={() => { linkTreeMutation.mutate(Number(treeNodeId)); setTreeSearch(''); setTreeNodeId('') }}
             >
               Vincular
             </button>
