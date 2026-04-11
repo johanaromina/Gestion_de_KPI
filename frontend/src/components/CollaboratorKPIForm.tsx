@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQueryClient, useQuery } from 'react-query'
 import api from '../services/api'
 import { useAuth } from '../hooks/useAuth'
+import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
 import { useDialog } from './Dialog'
 import './CollaboratorKPIForm.css'
 
@@ -578,7 +579,11 @@ export default function CollaboratorKPIForm({
   }, [assignment?.id, formData.subPeriodId, planRows])
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div
+      className="modal-overlay"
+      onPointerDown={markOverlayPointerDown}
+      onClick={(e) => closeOnOverlayClick(e, onClose)}
+    >
       <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div>

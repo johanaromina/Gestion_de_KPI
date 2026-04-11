@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from 'react-query'
 import api from '../services/api'
 import { KPI } from '../types'
 import { KPI_TEMPLATE_CATEGORIES, KPITemplate } from '../data/kpiTemplates'
+import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
 import './MarketplaceKPI.css'
 
 const directionLabel = (d: KPITemplate['direction']) =>
@@ -232,7 +233,11 @@ export default function MarketplaceKPI() {
 
       {/* Preview modal */}
       {preview && (
-        <div className="marketplace-modal-overlay" onClick={() => setPreview(null)}>
+        <div
+          className="marketplace-modal-overlay"
+          onPointerDown={markOverlayPointerDown}
+          onClick={(e) => closeOnOverlayClick(e, () => setPreview(null))}
+        >
           <div className="marketplace-modal" onClick={(e) => e.stopPropagation()}>
             <div className="marketplace-modal-header">
               <div>

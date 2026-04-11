@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from 'react-query'
 import api from '../services/api'
 import { useDialog } from './Dialog'
 import { useOutlierDetection } from '../hooks/useOutlierDetection'
+import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
 import './ProposeValueModal.css'
 
 interface ProposeValueModalProps {
@@ -109,7 +110,11 @@ export default function ProposeValueModal({
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div
+      className="modal-overlay"
+      onPointerDown={markOverlayPointerDown}
+      onClick={(e) => closeOnOverlayClick(e, onClose)}
+    >
       <div className="modal-content propose-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Proponer Valores</h2>

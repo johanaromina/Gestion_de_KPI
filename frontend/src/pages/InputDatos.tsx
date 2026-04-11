@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from 'react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { useDialog } from '../components/Dialog'
+import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
 import './InputDatos.css'
 
 type Measurement = {
@@ -965,7 +966,11 @@ export default function InputDatos() {
       </div>
 
       {showMeasurementModal && (
-        <div className="modal-overlay" onClick={() => setShowMeasurementModal(false)}>
+        <div
+          className="modal-overlay"
+          onPointerDown={markOverlayPointerDown}
+          onClick={(e) => closeOnOverlayClick(e, () => setShowMeasurementModal(false))}
+        >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Cargar medición</h2>

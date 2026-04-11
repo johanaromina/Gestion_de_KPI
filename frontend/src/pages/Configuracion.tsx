@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 import SubPeriodForm from '../components/SubPeriodForm'
 import { useDialog } from '../components/Dialog'
 import SheetsWizard from '../components/SheetsWizard'
+import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
 import './Configuracion.css'
 import { PreviewSourceMeta } from './configuracion/PreviewSourceMeta'
 import {
@@ -2156,7 +2157,11 @@ export default function Configuracion() {
       {toastMessage ? <div className="toast">{toastMessage}</div> : null}
 
       {setupGuideOpen && (
-        <div className="modal-overlay" onClick={hideSetupGuide}>
+        <div
+          className="modal-overlay"
+          onPointerDown={markOverlayPointerDown}
+          onClick={(e) => closeOnOverlayClick(e, hideSetupGuide)}
+        >
           <div className="modal-content setup-guide-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
@@ -2928,7 +2933,11 @@ export default function Configuracion() {
 
 
       {showTemplateModal && (
-        <div className="modal-overlay" onClick={() => setShowTemplateModal(false)}>
+        <div
+          className="modal-overlay"
+          onPointerDown={markOverlayPointerDown}
+          onClick={(e) => closeOnOverlayClick(e, () => setShowTemplateModal(false))}
+        >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{editingTemplate ? 'Editar plantilla' : 'Nueva plantilla'}</h2>
@@ -3237,7 +3246,11 @@ export default function Configuracion() {
       )}
 
       {showTargetModal && (
-        <div className="modal-overlay" onClick={() => setShowTargetModal(false)}>
+        <div
+          className="modal-overlay"
+          onPointerDown={markOverlayPointerDown}
+          onClick={(e) => closeOnOverlayClick(e, () => setShowTargetModal(false))}
+        >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{editingTarget ? 'Editar target' : 'Nuevo target'}</h2>
@@ -3842,7 +3855,11 @@ export default function Configuracion() {
       )}
 
       {showTargetWizard && wizardTarget && (
-        <div className="modal-overlay" onClick={() => setShowTargetWizard(false)}>
+        <div
+          className="modal-overlay"
+          onPointerDown={markOverlayPointerDown}
+          onClick={(e) => closeOnOverlayClick(e, () => setShowTargetWizard(false))}
+        >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Duplicar target por users</h2>
@@ -3949,7 +3966,11 @@ export default function Configuracion() {
       )}
 
       {showAuthModal && (
-        <div className="modal-overlay" onClick={() => setShowAuthModal(false)}>
+        <div
+          className="modal-overlay"
+          onPointerDown={markOverlayPointerDown}
+          onClick={(e) => closeOnOverlayClick(e, () => setShowAuthModal(false))}
+        >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{editingAuth ? 'Editar auth profile' : 'Nuevo auth profile'}</h2>
@@ -4132,7 +4153,11 @@ export default function Configuracion() {
       )}
 
       {showCalendarModal && (
-        <div className="modal-overlay" onClick={() => setShowCalendarModal(false)}>
+        <div
+          className="modal-overlay"
+          onPointerDown={markOverlayPointerDown}
+          onClick={(e) => closeOnOverlayClick(e, () => setShowCalendarModal(false))}
+        >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{editingCalendar ? 'Editar calendario' : 'Nuevo calendario'}</h2>
@@ -4203,10 +4228,13 @@ export default function Configuracion() {
       {showCalendarSubperiods && calendarForSubperiods && (
         <div
           className="modal-overlay"
-          onClick={() => {
-            setShowCalendarSubperiods(false)
-            setEditingCalendarSubperiod(undefined)
-          }}
+          onPointerDown={markOverlayPointerDown}
+          onClick={(e) =>
+            closeOnOverlayClick(e, () => {
+              setShowCalendarSubperiods(false)
+              setEditingCalendarSubperiod(undefined)
+            })
+          }
         >
           <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
@@ -4350,7 +4378,11 @@ export default function Configuracion() {
         calendarForSubperiods &&
         selectedPeriodForCalendar &&
         editingCalendarSubperiod !== undefined && (
-          <div className="modal-overlay" onClick={() => setEditingCalendarSubperiod(undefined)}>
+          <div
+            className="modal-overlay"
+            onPointerDown={markOverlayPointerDown}
+            onClick={(e) => closeOnOverlayClick(e, () => setEditingCalendarSubperiod(undefined))}
+          >
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <SubPeriodForm
                 periodId={Number(selectedPeriodForCalendar)}
@@ -4371,7 +4403,11 @@ export default function Configuracion() {
         )}
 
       {showTargetPreview && (
-        <div className="modal-overlay" onClick={() => setShowTargetPreview(false)}>
+        <div
+          className="modal-overlay"
+          onPointerDown={markOverlayPointerDown}
+          onClick={(e) => closeOnOverlayClick(e, () => setShowTargetPreview(false))}
+        >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Preview de target</h2>
@@ -4430,7 +4466,11 @@ export default function Configuracion() {
       )}
 
       {showScopeModal && (
-        <div className="modal-overlay" onClick={() => setShowScopeModal(false)}>
+        <div
+          className="modal-overlay"
+          onPointerDown={markOverlayPointerDown}
+          onClick={(e) => closeOnOverlayClick(e, () => setShowScopeModal(false))}
+        >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{editingScope ? 'Editar unidad' : 'Nueva unidad organizacional'}</h2>

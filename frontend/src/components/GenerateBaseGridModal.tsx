@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import api from '../services/api'
 import { KPI } from '../types'
+import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
 import { useDialog } from './Dialog'
 import './GenerateBaseGridModal.css'
 
@@ -167,7 +168,11 @@ export default function GenerateBaseGridModal({
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div
+      className="modal-overlay"
+      onPointerDown={markOverlayPointerDown}
+      onClick={(e) => closeOnOverlayClick(e, onClose)}
+    >
       <div className="modal-content generate-grid-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Generar Parrillas Base</h2>

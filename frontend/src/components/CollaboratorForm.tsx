@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import api from '../services/api'
 import { OrgScope, Collaborator, DataSourceMapping } from '../types'
+import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
 import { useDialog } from './Dialog'
 import './CollaboratorForm.css'
 import {
@@ -281,7 +282,11 @@ export default function CollaboratorForm({
   })
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div
+      className="modal-overlay"
+      onPointerDown={markOverlayPointerDown}
+      onClick={(e) => closeOnOverlayClick(e, onClose)}
+    >
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>

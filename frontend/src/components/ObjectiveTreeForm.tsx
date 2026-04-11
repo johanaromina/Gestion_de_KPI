@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import api from '../services/api'
 import { ObjectiveTree, KPI, ScopeKPI } from '../types'
+import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
 import './ObjectiveTreeForm.css'
 
 interface ObjectiveTreeFormProps {
@@ -170,7 +171,11 @@ export default function ObjectiveTreeForm({
   })
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div
+      className="modal-overlay"
+      onPointerDown={markOverlayPointerDown}
+      onClick={(e) => closeOnOverlayClick(e, onClose)}
+    >
       <div className="modal-content objective-tree-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>

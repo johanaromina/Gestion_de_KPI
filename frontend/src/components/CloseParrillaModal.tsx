@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from 'react-query'
 import api from '../services/api'
+import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
 import './CloseParrillaModal.css'
 
 interface CloseParrillaModalProps {
@@ -56,7 +57,11 @@ export default function CloseParrillaModal({
   const isConfirmValid = confirmText === requiredText
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div
+      className="modal-overlay"
+      onPointerDown={markOverlayPointerDown}
+      onClick={(e) => closeOnOverlayClick(e, onClose)}
+    >
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header warning">
           <h2>⚠️ Cerrar Parrilla</h2>

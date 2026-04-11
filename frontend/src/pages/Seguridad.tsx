@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import api from '../services/api'
 import './Configuracion.css'
+import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
 
 type Permission = { id: number; code: string; description?: string }
 type Role = {
@@ -434,7 +435,11 @@ export default function Seguridad() {
       </div>
 
       {showRoleModal && (
-        <div className="modal-overlay" onClick={() => setShowRoleModal(false)}>
+        <div
+          className="modal-overlay"
+          onPointerDown={markOverlayPointerDown}
+          onClick={(e) => closeOnOverlayClick(e, () => setShowRoleModal(false))}
+        >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{editingRole ? 'Editar rol' : 'Nuevo rol'}</h2>
@@ -513,7 +518,11 @@ export default function Seguridad() {
       )}
 
       {showOverrideModal && overrideUser && (
-        <div className="modal-overlay" onClick={() => setShowOverrideModal(false)}>
+        <div
+          className="modal-overlay"
+          onPointerDown={markOverlayPointerDown}
+          onClick={(e) => closeOnOverlayClick(e, () => setShowOverrideModal(false))}
+        >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Permisos personalizados · {overrideUser.name}</h2>

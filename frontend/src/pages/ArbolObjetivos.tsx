@@ -6,6 +6,7 @@ import api from '../services/api'
 import { ObjectiveTree } from '../types'
 import ObjectiveTreeForm from '../components/ObjectiveTreeForm'
 import ScopeKPIDetailModal from '../components/ScopeKPIDetailModal'
+import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
 import { useDialog } from '../components/Dialog'
 import './ArbolObjetivos.css'
 
@@ -405,7 +406,11 @@ export default function ArbolObjetivos() {
       )}
 
       {drilldownObjectiveId && (
-        <div className="modal-overlay" onClick={() => setDrilldownObjectiveId(null)}>
+        <div
+          className="modal-overlay"
+          onPointerDown={markOverlayPointerDown}
+          onClick={(e) => closeOnOverlayClick(e, () => setDrilldownObjectiveId(null))}
+        >
           <div className="modal-content objective-drilldown-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>

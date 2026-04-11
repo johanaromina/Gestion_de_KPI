@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import { useSearchParams } from 'react-router-dom'
 import api from '../services/api'
+import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
 import { detectOutlier } from '../utils/outlierDetection'
 import './Curaduria.css'
 
@@ -607,7 +608,11 @@ export default function Curaduria() {
       </div>
 
       {showCriteriaModal && (
-        <div className="modal-overlay" onClick={() => setShowCriteriaModal(false)}>
+        <div
+          className="modal-overlay"
+          onPointerDown={markOverlayPointerDown}
+          onClick={(e) => closeOnOverlayClick(e, () => setShowCriteriaModal(false))}
+        >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Nuevo criterio</h2>
@@ -708,7 +713,11 @@ export default function Curaduria() {
       )}
 
       {reviewModal && (
-        <div className="modal-overlay" onClick={() => setReviewModal(null)}>
+        <div
+          className="modal-overlay"
+          onPointerDown={markOverlayPointerDown}
+          onClick={(e) => closeOnOverlayClick(e, () => setReviewModal(null))}
+        >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>
