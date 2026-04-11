@@ -178,13 +178,18 @@ export const recalcSummaryAssignment = async (collaboratorId: number, kpiId: num
     if (duplicateIds.length > 0) {
       await pool.query(`DELETE FROM collaborator_kpis WHERE id IN (${duplicateIds.map(() => '?').join(',')})`, duplicateIds)
     }
+    // No actualizamos weight: el peso del Resumen representa la contribución del KPI
+    // a la evaluación total del colaborador, no la suma de pesos de subperíodos.
     await pool.query(
-      `UPDATE collaborator_kpis 
-         SET target = ?, weight = ?, actual = ?, variation = ?, weightedResult = ?
+      `UPDATE collaborator_kpis
+         SET target = ?, actual = ?, variation = ?, weightedResult = ?
        WHERE id = ?`,
-      [summaryTarget, summaryWeight, summaryActual, summaryVariation, summaryWeightedResult, parentId]
+      [summaryTarget, summaryActual, summaryVariation, summaryWeightedResult, parentId]
     )
   } else {
+    // El Resumen no existe aún — lo creamos con weight=0 ya que el admin
+    // deberá configurar la ponderación real desde "Nueva Asignación".
+    // No usamos summaryWeight (suma de subperíodos) porque tiene semántica distinta.
     const resolvedCalendarProfileId =
       subRows?.[0]?.calendarProfileId ||
       (await resolveCalendarProfileId({
@@ -194,14 +199,13 @@ export const recalcSummaryAssignment = async (collaboratorId: number, kpiId: num
     await pool.query(
       `INSERT INTO collaborator_kpis
          (collaboratorId, kpiId, periodId, calendarProfileId, subPeriodId, target, weight, actual, variation, weightedResult, status)
-       VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, NULL, ?, 0, ?, ?, ?, ?)`,
       [
         collaboratorId,
         kpiId,
         periodId,
         resolvedCalendarProfileId,
         summaryTarget,
-        summaryWeight,
         summaryActual,
         summaryVariation,
         summaryWeightedResult,
