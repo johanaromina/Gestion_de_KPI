@@ -36,6 +36,7 @@ import CheckIns from './pages/CheckIns'
 import MarketplaceKPI from './pages/MarketplaceKPI'
 import Landing from './pages/Landing'
 import OKRBoard from './pages/OKRBoard'
+import Organigrama from './pages/Organigrama'
 import OKRCrear from './pages/OKRCrear'
 import OKRAlineacion from './pages/OKRAlineacion'
 import OKRDetalle from './pages/OKRDetalle'
@@ -197,6 +198,14 @@ function App() {
               element={
                 <RequireAuth>
                   <ArbolObjetivos />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/organigrama"
+              element={
+                <RequireAuth>
+                  <Organigrama />
                 </RequireAuth>
               }
             />

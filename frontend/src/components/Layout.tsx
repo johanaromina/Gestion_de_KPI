@@ -125,6 +125,12 @@ export default function Layout({ children }: LayoutProps) {
               Arbol de Objetivos
             </Link>
           )}
+          {!isCollaborator && (
+            <Link to="/organigrama" className={`nav-item ${isActive('/organigrama') ? 'active' : ''}`} onClick={handleNavClick}>
+              <span className="nav-icon" aria-hidden="true">&gt;</span>
+              Organigrama
+            </Link>
+          )}
 
           {/* ── Operacion ── */}
           {!isCollaborator && (
