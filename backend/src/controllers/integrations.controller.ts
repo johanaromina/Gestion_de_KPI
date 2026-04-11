@@ -5,6 +5,7 @@ import { AuthRequest } from '../middleware/auth.middleware'
 import { runTemplateQueued } from '../utils/integrations-runner'
 import { decryptSecret, encryptSecret } from '../utils/crypto'
 import { resolveConnectorAdapter } from '../integrations/adapters'
+import { appEnv } from '../config/env'
 
 type IntegrationRow = {
   id: number
@@ -1073,7 +1074,7 @@ export const updateIntegrationStatus = async (req: Request, res: Response) => {
   }
 }
 
-export const runIntegration = async (req: Request, res: Response) => {
+export const runIntegration = async (_req: Request, res: Response) => {
   try {
     return res.status(410).json({
       error: 'Endpoint de integraciones legacy deshabilitado. Usa /integrations/templates/:id/run',
@@ -1110,5 +1111,170 @@ export const listIntegrationRuns = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Error fetching integration runs:', error)
     res.status(500).json({ error: 'Error al obtener ejecuciones' })
+  }
+}
+
+// ─────────────────────────────────────────────
+// Google Sheets Wizard helpers
+// ─────────────────────────────────────────────
+
+const extractSheetId = (urlOrId: string): string => {
+  const match = urlOrId.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/)
+  return match ? match[1] : urlOrId.trim()
+}
+
+const fetchSheetData = async (sheetId: string, range: string, apiKey: string) => {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}/values/${encodeURIComponent(range)}?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE&key=${encodeURIComponent(apiKey)}`
+  const response = await fetch(url, { headers: { Accept: 'application/json' } })
+  if (!response.ok) {
+    const text = await response.text()
+    let msg = `Error Google Sheets ${response.status}`
+    try {
+      const json = JSON.parse(text)
+      if (json?.error?.message) msg = json.error.message
+    } catch { /* ignore */ }
+    throw new Error(msg)
+  }
+  return response.json()
+}
+
+const fetchSheetTabs = async (sheetId: string, apiKey: string) => {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}?fields=sheets.properties.title&key=${encodeURIComponent(apiKey)}`
+  const response = await fetch(url, { headers: { Accept: 'application/json' } })
+  if (!response.ok) {
+    const text = await response.text()
+    let msg = `Error Google Sheets ${response.status}`
+    try {
+      const json = JSON.parse(text)
+      if (json?.error?.message) msg = json.error.message
+    } catch { /* ignore */ }
+    throw new Error(msg)
+  }
+  const data = await response.json()
+  return (data?.sheets || []).map((s: any) => s?.properties?.title).filter(Boolean) as string[]
+}
+
+/** Preview: devuelve pestañas y primeras filas de la pestaña elegida */
+export const sheetsPreview = async (req: Request, res: Response) => {
+  try {
+    const { sheetUrl, tab, apiKey: bodyApiKey } = req.body as { sheetUrl?: string; tab?: string; apiKey?: string }
+    const apiKey = bodyApiKey || appEnv.googleApiKey
+    if (!sheetUrl) return res.status(400).json({ error: 'Falta la URL de la planilla' })
+    if (!apiKey) return res.status(400).json({ error: 'Falta la API key de Google' })
+
+    const sheetId = extractSheetId(sheetUrl)
+    const tabs = await fetchSheetTabs(sheetId, apiKey)
+
+    if (!tab) {
+      return res.json({ sheetId, tabs, headers: [], preview: [] })
+    }
+
+    const range = `${tab}!A1:Z50`
+    const data = await fetchSheetData(sheetId, range, apiKey)
+    const values: any[][] = Array.isArray(data?.values) ? data.values : []
+    const headers: any[] = values.length > 0 ? values[0] : []
+    const preview: any[][] = values.slice(1, 6)
+
+    return res.json({ sheetId, tabs, headers, preview })
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || 'Error al leer la planilla' })
+  }
+}
+
+/**
+ * Wizard: crea Auth Profile + Template + Target en un solo paso.
+ * Payload mínimo:
+ *   sheetUrl, tab, valueColumn, assignmentId | scopeKpiId, name, schedule
+ *   apiKey (optional if GOOGLE_API_KEY env is set)
+ */
+export const sheetsWizard = async (req: AuthRequest, res: Response) => {
+  try {
+    const {
+      name,
+      sheetUrl,
+      tab,
+      valueColumn,
+      periodColumn,
+      areaColumn,
+      aggregation,
+      assignmentId,
+      scopeKpiId,
+      schedule,
+      apiKey: bodyApiKey,
+    } = req.body as {
+      name?: string
+      sheetUrl?: string
+      tab?: string
+      valueColumn?: string | number
+      periodColumn?: string
+      areaColumn?: string
+      aggregation?: string
+      assignmentId?: number
+      scopeKpiId?: number
+      schedule?: string
+      apiKey?: string
+    }
+
+    const apiKey = bodyApiKey || appEnv.googleApiKey
+    if (!sheetUrl) return res.status(400).json({ error: 'Falta la URL de la planilla' })
+    if (!tab) return res.status(400).json({ error: 'Falta la pestaña (tab)' })
+    if (valueColumn === undefined || valueColumn === null || valueColumn === '')
+      return res.status(400).json({ error: 'Falta la columna de valor' })
+    if (!assignmentId && !scopeKpiId) return res.status(400).json({ error: 'Falta el KPI destino (assignmentId o scopeKpiId)' })
+    if (!apiKey) return res.status(400).json({ error: 'Falta la API key de Google' })
+
+    const sheetId = extractSheetId(sheetUrl)
+    const wizardName = name || `Google Sheets — ${tab}`
+
+    // 1. Crear Auth Profile
+    const encryptedAuth = encryptSecret(JSON.stringify({ apiKey }))
+    const [authResult] = await pool.query(
+      `INSERT INTO auth_profiles (name, connector, authType, authConfig) VALUES (?, 'sheets', 'apiKey', ?)`,
+      [wizardName, encryptedAuth]
+    )
+    const authProfileId = (authResult as any).insertId as number
+
+    // 2. Crear Template
+    const metricTypeUi = aggregation && aggregation !== 'FIRST' ? 'value_agg' : 'value'
+    const [templateResult] = await pool.query(
+      `INSERT INTO integration_templates
+         (name, connector, metricType, metricTypeUi, authProfileId, schedule, enabled)
+       VALUES (?, 'sheets', 'count', ?, ?, ?, 1)`,
+      [wizardName, metricTypeUi, authProfileId, schedule || '0 6 * * *']
+    )
+    const templateId = (templateResult as any).insertId as number
+
+    // 3. Construir params del target
+    const targetParams: Record<string, any> = {
+      sheetKey: sheetId,
+      range: tab,
+      valueColumn,
+    }
+    if (periodColumn) targetParams.periodColumn = periodColumn
+    if (areaColumn) targetParams.areaColumn = areaColumn
+    if (aggregation) targetParams.aggregation = aggregation
+
+    // 4. Crear Target
+    const scopeType = assignmentId ? 'assignment' : 'scope_kpi'
+    const scopeId = String(assignmentId || scopeKpiId)
+    const [targetResult] = await pool.query(
+      `INSERT INTO integration_targets
+         (templateId, scopeType, scopeId, assignmentId, scopeKpiId, params, enabled)
+       VALUES (?, ?, ?, ?, ?, ?, 1)`,
+      [
+        templateId,
+        scopeType,
+        scopeId,
+        assignmentId || null,
+        scopeKpiId || null,
+        JSON.stringify(targetParams),
+      ]
+    )
+    const targetId = (targetResult as any).insertId as number
+
+    return res.status(201).json({ authProfileId, templateId, targetId, name: wizardName })
+  } catch (error: any) {
+    console.error('Sheets wizard error:', error)
+    return res.status(500).json({ error: error?.message || 'Error al crear la integración' })
   }
 }

@@ -4,6 +4,7 @@ import api from '../services/api'
 import { useAuth } from '../hooks/useAuth'
 import SubPeriodForm from '../components/SubPeriodForm'
 import { useDialog } from '../components/Dialog'
+import SheetsWizard from '../components/SheetsWizard'
 import './Configuracion.css'
 import { PreviewSourceMeta } from './configuracion/PreviewSourceMeta'
 import {
@@ -155,6 +156,8 @@ type CalendarProfile = {
   active?: boolean
 }
 
+const SETUP_GUIDE_STORAGE_KEY = 'configuracion.setupGuide.hidden'
+
 export default function Configuracion() {
   const { user } = useAuth()
   const dialog = useDialog()
@@ -191,6 +194,9 @@ export default function Configuracion() {
   const [targetDraftPreviewMessage, setTargetDraftPreviewMessage] = useState('')
   const [toastMessage, setToastMessage] = useState('')
   const [integrationOpen, setIntegrationOpen] = useState(false)
+  const [sheetsWizardOpen, setSheetsWizardOpen] = useState(false)
+  const [setupGuideOpen, setSetupGuideOpen] = useState(false)
+  const [setupGuideHydrated, setSetupGuideHydrated] = useState(false)
   const [templateFormError, setTemplateFormError] = useState('')
   const [cronPreview, setCronPreview] = useState('')
   const [templateForm, setTemplateForm] = useState<TemplateFormState>({
@@ -390,6 +396,47 @@ export default function Configuracion() {
     return areaScopes.filter((scope) => scope.active !== 0 && scope.active !== false)
   }, [areaScopes])
 
+  const setupChecklist = useMemo(
+    () => [
+      {
+        id: 'areas',
+        label: 'Áreas y equipos',
+        description: 'Creá la estructura organizacional base.',
+        ready: activeAreaScopes.length > 0,
+      },
+      {
+        id: 'collaborators',
+        label: 'Colaboradores',
+        description: 'Cargá personas y asignales área y jefe directo.',
+        ready: Boolean(collaborators?.length),
+      },
+      {
+        id: 'periods',
+        label: 'Períodos',
+        description: 'Definí al menos un período activo para operar.',
+        ready: Boolean(periods?.length),
+      },
+      {
+        id: 'assignments',
+        label: 'Asignaciones',
+        description: 'Asigná KPIs con metas a cada colaborador.',
+        ready: Boolean(assignments?.length),
+      },
+    ],
+    [activeAreaScopes.length, assignments?.length, collaborators?.length, periods?.length]
+  )
+
+  const setupBaseReady =
+    collaborators !== undefined && orgScopes !== undefined && periods !== undefined && assignments !== undefined
+  const setupCompletedCount = useMemo(
+    () => setupChecklist.filter((item) => item.ready).length,
+    [setupChecklist]
+  )
+  const setupConfigured = useMemo(
+    () => setupChecklist.every((item) => item.ready),
+    [setupChecklist]
+  )
+
   const defaultPeriodForCalendar = useMemo<number | ''>(() => {
     if (!periods || periods.length === 0) return ''
     const openPeriod = periods.find((period) => period.status === 'open')
@@ -436,6 +483,26 @@ export default function Configuracion() {
     periods,
     selectedPeriodForCalendar,
   ])
+
+  useEffect(() => {
+    if (!setupBaseReady || setupGuideHydrated) return
+    if (typeof window === 'undefined') return
+
+    const savedHidden = window.localStorage.getItem(SETUP_GUIDE_STORAGE_KEY) === '1'
+    setSetupGuideOpen(!savedHidden && !setupConfigured)
+    setSetupGuideHydrated(true)
+  }, [setupBaseReady, setupConfigured, setupGuideHydrated])
+
+  const hideSetupGuide = () => {
+    setSetupGuideOpen(false)
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(SETUP_GUIDE_STORAGE_KEY, '1')
+    }
+  }
+
+  const showSetupGuide = () => {
+    setSetupGuideOpen(true)
+  }
 
   const targetScopeKey = (target: IntegrationTarget) => {
     if (target.orgScopeId) return `org:${target.orgScopeId}`
@@ -2074,19 +2141,84 @@ export default function Configuracion() {
           <h1>Configuración</h1>
           <p className="subtitle">Estructura organizacional, calendarios e integraciones</p>
         </div>
+        <div className="config-header-actions">
+          <button
+            className={`setup-guide-toggle ${setupGuideOpen ? 'setup-guide-toggle--active' : ''}`}
+            onClick={() => (setupGuideOpen ? hideSetupGuide() : showSetupGuide())}
+            type="button"
+          >
+            {setupGuideOpen ? 'Ocultar guía inicial' : 'Ver guía inicial'}
+          </button>
+        </div>
       </div>
       {toastMessage ? <div className="toast">{toastMessage}</div> : null}
 
-      <div className="setup-guide">
-        <div className="setup-guide-title">¿Cómo configurar el sistema por primera vez?</div>
-        <ol className="setup-guide-steps">
-          <li><strong>Creá las áreas y equipos</strong> de tu empresa en <em>Estructura Organizacional</em> (más abajo ↓)</li>
-          <li>Agregá los <strong>colaboradores</strong> y asignales un área y jefe directo → <a href="/colaboradores">Colaboradores</a></li>
-          <li>Definí los <strong>KPIs</strong> que vas a medir → <a href="/kpis">KPIs</a></li>
-          <li>Creá un <strong>período activo</strong> (anual, semestral, trimestral) → <a href="/periodos">Períodos</a></li>
-          <li>Asigná KPIs a cada colaborador con su meta → <a href="/asignaciones">Asignaciones</a></li>
-        </ol>
-        <p className="setup-guide-note">Los calendarios e integraciones son opcionales y se pueden configurar después.</p>
+      {setupGuideOpen && (
+        <div className="modal-overlay" onClick={hideSetupGuide}>
+          <div className="modal-content setup-guide-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2>Guía inicial de configuración</h2>
+                <p className="setup-guide-modal-subtitle">
+                  {setupConfigured
+                    ? 'La configuración base ya está completa. Podés reabrir esta guía cuando quieras.'
+                    : `Completaste ${setupCompletedCount} de ${setupChecklist.length} pasos base.`}
+                </p>
+              </div>
+              <button className="close-button" onClick={hideSetupGuide}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="setup-guide">
+                <div className="setup-guide-title">¿Cómo configurar el sistema por primera vez?</div>
+                <ol className="setup-guide-steps">
+                  <li><strong>Creá las áreas y equipos</strong> de tu empresa en <em>Estructura Organizacional</em> (más abajo ↓)</li>
+                  <li>Agregá los <strong>colaboradores</strong> y asignales un área y jefe directo → <a href="/colaboradores">Colaboradores</a></li>
+                  <li>Definí los <strong>KPIs</strong> que vas a medir → <a href="/kpis">KPIs</a></li>
+                  <li>Creá un <strong>período activo</strong> (anual, semestral, trimestral) → <a href="/periodos">Períodos</a></li>
+                  <li>Asigná KPIs a cada colaborador con su meta → <a href="/asignaciones">Asignaciones</a></li>
+                </ol>
+                <p className="setup-guide-note">Los calendarios e integraciones son opcionales y se pueden configurar después.</p>
+              </div>
+
+              <div className="setup-guide-progress">
+                {setupChecklist.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`setup-guide-progress-item ${item.ready ? 'is-ready' : 'is-pending'}`}
+                  >
+                    <span className="setup-guide-progress-icon" aria-hidden="true">
+                      {item.ready ? '✓' : '•'}
+                    </span>
+                    <div>
+                      <div className="setup-guide-progress-title">{item.label}</div>
+                      <div className="setup-guide-progress-desc">{item.description}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="btn-secondary" onClick={hideSetupGuide}>
+                Guardar y ocultar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="sheets-wizard-banner">
+        <div className="sheets-wizard-banner-text">
+          <span className="sheets-wizard-banner-icon">📊</span>
+          <div>
+            <strong>Conectar Google Sheets</strong>
+            <p>Importá valores de KPI directamente desde tus planillas, sin configuración técnica.</p>
+          </div>
+        </div>
+        <button className="btn-primary" onClick={() => setSheetsWizardOpen(true)}>
+          Conectar planilla →
+        </button>
       </div>
 
       <button
@@ -4420,6 +4552,13 @@ export default function Configuracion() {
             </div>
           </div>
         </div>
+      )}
+
+      {sheetsWizardOpen && (
+        <SheetsWizard
+          onClose={() => setSheetsWizardOpen(false)}
+          onSuccess={() => setSheetsWizardOpen(false)}
+        />
       )}
     </div>
   )

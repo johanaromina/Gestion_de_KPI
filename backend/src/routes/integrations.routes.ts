@@ -26,6 +26,8 @@ import {
   updateIntegrationStatus,
   runIntegration,
   listIntegrationRuns,
+  sheetsPreview,
+  sheetsWizard,
 } from '../controllers/integrations.controller'
 import { authenticate, requirePermission } from '../middleware/auth.middleware'
 
@@ -56,6 +58,10 @@ router.post('/targets/:id/run', requirePermission('measurement_run_ingest', 'con
 router.get('/auth-profiles', requirePermission('config.view', 'config.manage'), listAuthProfiles)
 router.post('/auth-profiles', requirePermission('config.manage'), createAuthProfile)
 router.put('/auth-profiles/:id', requirePermission('config.manage'), updateAuthProfile)
+
+// Sheets wizard
+router.post('/sheets-preview', requirePermission('config.manage'), sheetsPreview)
+router.post('/sheets-wizard', requirePermission('config.manage'), sheetsWizard)
 
 // Legacy endpoints
 router.post('/test-jql', requirePermission('config.manage'), testIntegrationJql)

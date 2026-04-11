@@ -27,6 +27,7 @@ const envSchema = z.object({
   SSO_HANDOFF_TTL_MIN: z.string().default('5'),
   CORS_ALLOWED_ORIGINS: z.string().optional(),
   TRUST_PROXY: z.string().optional(),
+  GOOGLE_API_KEY: z.string().optional(),
 })
 
 const parsed = envSchema.parse(process.env)
@@ -79,4 +80,5 @@ export const appEnv = {
   ssoHandoffTtlMin: Number(parsed.SSO_HANDOFF_TTL_MIN),
   corsAllowedOrigins,
   trustProxy,
+  googleApiKey: parsed.GOOGLE_API_KEY || '',
 }
