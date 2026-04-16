@@ -251,24 +251,78 @@
   margin-top: 0.75rem;
   border-top: 1px solid #f3f4f6;
   padding-top: 0.75rem;
+  background: #f9fafb;
+  border-radius: 0 0 8px 8px;
+  padding: 0.85rem 1rem;
+}
+
+.checkin-panel-header {
+  margin-bottom: 0.75rem;
+}
+
+.checkin-panel-title {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.2rem;
+}
+
+.checkin-panel-hint {
+  display: block;
+  font-size: 0.78rem;
+  color: #6b7280;
 }
 
 .checkin-form {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.75rem;
   flex-wrap: wrap;
+  align-items: flex-end;
   margin-bottom: 0.75rem;
 }
 
+.checkin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.checkin-field label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.checkin-field--wide {
+  flex: 1;
+  min-width: 200px;
+}
+
 .checkin-form input {
-  padding: 0.4rem 0.65rem;
+  padding: 0.45rem 0.7rem;
   border: 1px solid #d1d5db;
   border-radius: 6px;
   font-size: 0.85rem;
+  background: #fff;
 }
 
-.checkin-form input:first-child { width: 120px; }
-.checkin-form input:nth-child(2) { flex: 1; min-width: 160px; }
+.checkin-form input:focus {
+  outline: none;
+  border-color: #f97316;
+  box-shadow: 0 0 0 2px rgba(249,115,22,0.15);
+}
+
+.checkin-field:not(.checkin-field--wide) input { width: 130px; }
+
+.okr-kr-auto-badge {
+  font-size: 0.72rem;
+  background: #d1fae5;
+  color: #065f46;
+  padding: 0.2rem 0.55rem;
+  border-radius: 12px;
+  font-weight: 500;
+}
 
 .checkin-history-title {
   font-size: 0.78rem;

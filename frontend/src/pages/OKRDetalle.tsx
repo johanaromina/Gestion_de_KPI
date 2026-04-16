@@ -334,12 +334,17 @@ export default function OKRDetalle() {
                     {expandedSources.has(kr.id) ? 'Ocultar fuentes' : `Ver fuentes (${dataSourceByKr.get(kr.id)!.sources.length})`}
                   </button>
                 ) : null}
+                {kr.krType === 'kpi_linked' && (
+                  <span className="okr-kr-auto-badge" title="El progreso se actualiza automáticamente desde el KPI vinculado">
+                    Automático
+                  </span>
+                )}
                 {kr.krType === 'simple' && (
                   <button
                     className="btn-checkin"
                     onClick={() => setSelectedKR(selectedKR === kr.id ? null : kr.id)}
                   >
-                    {selectedKR === kr.id ? 'Cerrar' : 'Actualizar progreso'}
+                    {selectedKR === kr.id ? 'Cerrar' : '+ Registrar avance'}
                   </button>
                 )}
               </div>
@@ -389,25 +394,37 @@ export default function OKRDetalle() {
             {/* Panel check-in */}
             {selectedKR === kr.id && kr.krType === 'simple' && (
               <div className="checkin-panel">
+                <div className="checkin-panel-header">
+                  <span className="checkin-panel-title">Registrar avance</span>
+                  <span className="checkin-panel-hint">
+                    Ingresá el valor actual del KR. Se guarda en el historial y actualiza el progreso.
+                  </span>
+                </div>
                 <div className="checkin-form">
-                  <input
-                    type="number"
-                    placeholder="Nuevo valor"
-                    value={checkInValue}
-                    onChange={(e) => setCheckInValue(e.target.value)}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Nota opcional"
-                    value={checkInNote}
-                    onChange={(e) => setCheckInNote(e.target.value)}
-                  />
+                  <div className="checkin-field">
+                    <label>Valor actual{kr.unit ? ` (${kr.unit})` : ''}</label>
+                    <input
+                      type="number"
+                      placeholder={`Meta: ${kr.targetValue ?? '—'}`}
+                      value={checkInValue}
+                      onChange={(e) => setCheckInValue(e.target.value)}
+                    />
+                  </div>
+                  <div className="checkin-field checkin-field--wide">
+                    <label>Nota <span className="field-optional">(opcional)</span></label>
+                    <input
+                      type="text"
+                      placeholder="¿Qué pasó esta semana? ¿Hubo bloqueos?"
+                      value={checkInNote}
+                      onChange={(e) => setCheckInNote(e.target.value)}
+                    />
+                  </div>
                   <button
                     className="btn-primary"
                     onClick={handleCheckIn}
                     disabled={!checkInValue || checkInMutation.isLoading}
                   >
-                    Registrar
+                    {checkInMutation.isLoading ? 'Guardando...' : 'Guardar avance'}
                   </button>
                 </div>
 

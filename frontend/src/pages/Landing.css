@@ -809,6 +809,133 @@
   letter-spacing: 0.04em;
 }
 
+/* ─── STATS EYEBROW ─────────────────────────────────────── */
+.landing-stats-eyebrow {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  margin-bottom: 20px;
+}
+
+/* ─── PROBLEM / VALUE SECTION ───────────────────────────── */
+.landing-problem {
+  padding: 88px clamp(16px, 5vw, 64px);
+  background: #0a1628;
+}
+
+.landing-problem-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 56px;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .landing-problem-inner {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+}
+
+.landing-problem-left,
+.landing-problem-right {
+  display: grid;
+  gap: 20px;
+}
+
+.landing-problem-title {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(22px, 2.5vw, 30px);
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.landing-problem-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.landing-problem-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.55;
+}
+
+.landing-problem-bullet {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f87171;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ─── VALUE PILLARS ─────────────────────────────────────── */
+.landing-pillars {
+  display: grid;
+  gap: 12px;
+}
+
+.landing-pillar {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 12px;
+  align-items: start;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 14px 16px;
+  transition: background 0.2s;
+}
+
+.landing-pillar:hover {
+  background: rgba(0, 195, 122, 0.08);
+  border-color: rgba(0, 195, 122, 0.25);
+}
+
+.landing-pillar-icon {
+  font-size: 20px;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.landing-pillar-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 2px;
+}
+
+.landing-pillar-desc {
+  display: block;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.5;
+}
+
+/* ─── PRICING NOTE LINK ─────────────────────────────────── */
+.landing-pricing-note-link {
+  color: #00c37a;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.landing-pricing-note-link:hover {
+  text-decoration: underline;
+}
+
 /* ─── PROCESS ───────────────────────────────────────────── */
 .landing-process {
   padding: 88px clamp(16px, 5vw, 64px);

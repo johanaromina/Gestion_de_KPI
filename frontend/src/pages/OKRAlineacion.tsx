@@ -58,11 +58,11 @@ function ObjectiveNode({ node, depth = 0 }: { node: ObjNode; depth?: number }) {
             <div className="tree-progress-track">
               <div
                 className="tree-progress-fill"
-                style={{ width: `${node.progress}%`, background: progressColor(node.progress) }}
+                style={{ width: `${Number(node.progress) || 0}%`, background: progressColor(Number(node.progress) || 0) }}
               />
             </div>
-            <span className="tree-progress-pct" style={{ color: progressColor(node.progress) }}>
-              {Math.round(node.progress)}%
+            <span className="tree-progress-pct" style={{ color: progressColor(Number(node.progress) || 0) }}>
+              {Math.round(Number(node.progress) || 0)}%
             </span>
           </div>
           <span className={`tree-status-pill tree-status-pill--${node.status}`}>
@@ -98,7 +98,7 @@ export default function OKRAlineacion() {
 
   const totalObjectives = countNodes(tree)
   const avgProgress = totalObjectives > 0
-    ? Math.round(collectAll(tree).reduce((s, n) => s + n.progress, 0) / totalObjectives)
+    ? Math.round(collectAll(tree).reduce((s, n) => s + (Number(n.progress) || 0), 0) / totalObjectives)
     : 0
 
   return (

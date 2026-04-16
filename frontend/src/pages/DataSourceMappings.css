@@ -37,6 +37,46 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+  align-items: end;
+}
+
+.mapping-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.mapping-search-wrap input {
+  width: 100%;
+  padding-right: 2rem;
+}
+
+.mapping-clear-input {
+  position: absolute;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  color: #9ca3af;
+  line-height: 1;
+  padding: 0;
+}
+
+.mapping-clear-input:hover { color: #374151; }
+
+.mapping-field-clear {
+  grid-column: span 1;
+}
+
+.mapping-btn-clear-filters {
+  white-space: nowrap;
+  color: #dc2626;
+  border-color: #fca5a5;
+}
+
+.mapping-btn-clear-filters:hover {
+  background: #fef2f2;
 }
 
 .mapping-create-grid {

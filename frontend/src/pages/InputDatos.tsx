@@ -302,9 +302,9 @@ export default function InputDatos() {
     { enabled: !!selectedAssignmentId }
   )
 
-  const createMeasurement = useMutation(
-    async () => {
-      if (!selectedAssignmentId) return
+  const createMeasurement = useMutation<any, any, boolean>(
+    async (force: boolean) => {
+      if (!selectedAssignmentId) return null
       const response = await api.post('/measurements', {
         assignmentId: selectedAssignmentId,
         value: Number(newValue),
@@ -312,6 +312,7 @@ export default function InputDatos() {
         status: newStatus,
         reason: newReason.trim() || undefined,
         evidenceUrl: newEvidence.trim() || undefined,
+        force: force || undefined,
       })
       return response.data
     },
@@ -326,6 +327,19 @@ export default function InputDatos() {
           setInlineAlert({ type: 'warning', message: data.warning })
         } else {
           setInlineAlert({ type: 'info', message: 'Medición cargada correctamente.' })
+        }
+      },
+      onError: async (error: any) => {
+        if (error?.response?.status === 409) {
+          const { existingValue, existingDate } = error.response.data
+          const fecha = existingDate ? new Date(existingDate).toLocaleDateString('es-AR') : ''
+          const ok = await dialog.confirm(
+            `Ya existe una medición aprobada con valor ${existingValue}${fecha ? ` (${fecha})` : ''}. ¿Querés reemplazarla?`,
+            { title: 'Valor duplicado', confirmLabel: 'Reemplazar', variant: 'danger' }
+          )
+          if (ok) createMeasurement.mutate(true)
+        } else {
+          setInlineAlert({ type: 'error', message: error?.response?.data?.error || 'No se pudo guardar la medición.' })
         }
       },
     }
@@ -984,6 +998,18 @@ export default function InputDatos() {
                   ? `${selectedAssignmentData.collaboratorName || `Colaborador #${selectedAssignmentData.collaboratorId}`} · ${selectedAssignmentData.kpiName || `KPI #${selectedAssignmentData.kpiId}`}`
                   : 'Asignación seleccionada'}
               </div>
+              {(() => {
+                const currentApproved = (measurements ?? []).find((m) => m.status === 'approved')
+                if (!currentApproved) return null
+                return (
+                  <div className="modal-current-value">
+                    Valor aprobado actual: <strong>{currentApproved.value}</strong>
+                    {currentApproved.capturedAt && (
+                      <span> · {new Date(currentApproved.capturedAt).toLocaleDateString('es-AR')}</span>
+                    )}
+                  </div>
+                )
+              })()}
               <div className="form-row">
                 <div className="form-group">
                   <label htmlFor="measurement-value">Valor</label>
@@ -1062,7 +1088,7 @@ export default function InputDatos() {
               </button>
               <button
                 className="btn-primary"
-                onClick={() => createMeasurement.mutate()}
+                onClick={() => createMeasurement.mutate(false)}
                 disabled={!selectedAssignmentId || !newValue || createMeasurement.isLoading}
               >
                 {createMeasurement.isLoading ? 'Guardando...' : 'Guardar medición'}

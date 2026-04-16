@@ -86,6 +86,9 @@ export default function CollaboratorForm({
   )
 
   const areaScopes = (orgScopes || []).filter((s) => s.type === 'area')
+  const personScopes = (orgScopes || []).filter((s) => s.type === 'person').sort((a, b) => a.name.localeCompare(b.name))
+  const selectedOrgScope = orgScopes?.find((s) => s.id === formData.orgScopeId)
+  const orgScopeIsPersonNode = selectedOrgScope?.type === 'person'
 
   useEffect(() => {
     if (formData.orgScopeId || !formData.area || areaScopes.length === 0) return
@@ -211,6 +214,7 @@ export default function CollaboratorForm({
       onSuccess: () => {
         queryClient.invalidateQueries('collaborators')
         queryClient.invalidateQueries('data-source-mappings')
+        queryClient.invalidateQueries(['data-source-mappings-collaborator', collaborator?.id])
         onSuccess?.()
         onClose()
       },
@@ -447,8 +451,9 @@ export default function CollaboratorForm({
                 placeholder="johana, j.garcia, jgarcia@empresa.com"
               />
               <span className="helper-text">
-                Alias o claves externas separadas por coma para {getMappingSourceTypeLabel(mappingSourceType)}.
-                {' '}Global se usa como respaldo si el conector no tiene un mapeo específico.
+                {mappingSourceType === 'global'
+                  ? 'Nombres o apodos con los que esta persona aparece en tus sistemas externos (Jira, Google Sheets, etc.). Se usa como comodín si no hay un alias específico para el conector.'
+                  : `Nombres o identificadores de esta persona en ${getMappingSourceTypeLabel(mappingSourceType)}. Separados por coma. Ej: johana, j.garcia`}
               </span>
             </div>
           </div>
@@ -550,8 +555,47 @@ export default function CollaboratorForm({
               {errors.managerId && (
                 <span className="error-message">{errors.managerId}</span>
               )}
+              {/* Aviso #4: jefe de nivel inferior */}
+              {(() => {
+                if (!selectedManager || !formData.orgScopeId || !selectedManager.orgScopeId) return null
+                const managerScope = orgScopes?.find((s) => s.id === selectedManager.orgScopeId)
+                const myScope = orgScopes?.find((s) => s.id === formData.orgScopeId)
+                // Aviso si el jefe está bajo el mismo scope o un scope hijo
+                if (managerScope && myScope && managerScope.parentId === myScope.id) {
+                  return (
+                    <span className="helper-text warning-text">
+                      Este jefe pertenece a una unidad que depende del área de este colaborador. Verificá si es correcto.
+                    </span>
+                  )
+                }
+                return null
+              })()}
             </div>
           </div>
+
+          {personScopes.length > 0 && (
+            <div className="form-group">
+              <label htmlFor="personScope">
+                Nodo en el organigrama <span className="field-optional">(opcional)</span>
+              </label>
+              <select
+                id="personScope"
+                value={orgScopeIsPersonNode ? (formData.orgScopeId || '') : ''}
+                onChange={(e) => {
+                  const val = e.target.value ? Number(e.target.value) : undefined
+                  setFormData((prev) => ({ ...prev, orgScopeId: val }))
+                }}
+              >
+                <option value="">Sin nodo personal asignado</option>
+                {personScopes.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+              <span className="helper-text">
+                Si esta persona tiene un nodo de tipo "Persona" en la estructura organizacional, vinculala aquí para que aparezca en el organigrama.
+              </span>
+            </div>
+          )}
 
           <div className="form-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>

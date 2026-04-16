@@ -75,6 +75,23 @@ export const createMeasurement = async (req: Request, res: Response) => {
 
     const userId = (req as AuthRequest).user?.id || null
 
+    // Verificar duplicado: si ya existe una medición aprobada para esta asignación, bloquear
+    // salvo que el usuario envíe force=true (override explícito)
+    if ((status || 'draft') === 'approved' && assignmentId && !req.body.force) {
+      const [existingRows] = await pool.query<any[]>(
+        `SELECT id, value, capturedAt FROM kpi_measurements WHERE assignmentId = ? AND status = 'approved' ORDER BY capturedAt DESC LIMIT 1`,
+        [assignmentId]
+      )
+      if (Array.isArray(existingRows) && existingRows.length > 0) {
+        const existing = existingRows[0]
+        return res.status(409).json({
+          error: `Ya existe una medición aprobada con valor ${existing.value} (${new Date(existing.capturedAt).toLocaleDateString('es-AR')}). Para reemplazarla enviá force=true con un motivo.`,
+          existingValue: existing.value,
+          existingDate: existing.capturedAt,
+        })
+      }
+    }
+
     let warning: string | null = null
     if ((status || 'draft') === 'approved' && assignmentId) {
       const [assignmentRows] = await pool.query<any[]>(

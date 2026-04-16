@@ -103,19 +103,55 @@ const FEATURES = [
 const COMMERCIAL_STEPS = [
   {
     step: '01',
-    title: 'Demo guiada',
-    desc: 'Recorremos el tablero ejecutivo, la curaduría, los check-ins y el esquema de reporting con un caso cercano a tu operación.',
+    title: 'Demo',
+    desc: 'Recorremos el tablero ejecutivo, la detección de desvíos y el simulador de escenarios con un caso cercano a tu operación.',
   },
   {
     step: '02',
-    title: 'Relevamiento funcional',
+    title: 'Relevamiento',
     desc: 'Validamos usuarios, áreas, KPIs, seguridad, SSO e integraciones para definir el alcance real de implementación.',
   },
   {
     step: '03',
-    title: 'Propuesta y compra',
-    desc: 'Armamos la propuesta comercial, el onboarding y el plan de salida a producción según tu contexto y prioridades.',
+    title: 'Implementación',
+    desc: 'Onboarding guiado con acompañamiento hasta que el equipo opera con autonomía completa.',
   },
+  {
+    step: '04',
+    title: 'Tomás decisiones',
+    desc: 'Con datos confiables, trazabilidad completa y contexto centralizado, la dirección interviene antes de que los problemas escalen.',
+  },
+]
+
+const PROBLEMS = [
+  'KPIs dispersos en múltiples herramientas',
+  'Reportes que llegan tarde',
+  'Equipos alineados en métricas, no en acciones',
+  'Decisiones basadas en intuición o información parcial',
+]
+
+const VALUE_PILLARS = [
+  {
+    title: 'Visibilidad ejecutiva',
+    desc: 'Estado real del negocio en un solo lugar',
+    icon: '👁',
+  },
+  {
+    title: 'Detección de desvíos',
+    desc: 'Identificá riesgos antes de que escalen',
+    icon: '⚡',
+  },
+  {
+    title: 'Acción guiada',
+    desc: 'Intervenís con contexto y trazabilidad completa',
+    icon: '🎯',
+  },
+]
+
+const IMPACT_METRICS = [
+  { value: '+20–30%', label: 'mejora en cumplimiento de objetivos' },
+  { value: '−15–25%', label: 'desvíos operativos no detectados' },
+  { value: '1–2 sem', label: 'menos en tiempo de reacción' },
 ]
 
 const PLANS = [
@@ -403,19 +439,18 @@ export default function Landing() {
               Demo guiada + propuesta comercial
             </div>
             <h1 className="landing-hero-title">
-              Convertí tus KPIs en<br />
-              <span>decisiones ejecutivas confiables</span><br />
-              sin perder trazabilidad
+              Convertí información en<br />
+              <span>decisiones ejecutivas que mueven resultados</span>
             </h1>
             <p className="landing-hero-subtitle">
-              KPI Manager centraliza objetivos, seguimiento y reporting ejecutivo en una instancia aislada para tu empresa. Solicitá una demo para revisar compra, onboarding, seguridad e integraciones.
+              Centralizá KPIs, detectá desvíos críticos y simulá escenarios antes de que impacten el negocio. Alineá a tu equipo con datos confiables. Pasá de reportar a intervenir con trazabilidad completa.
             </p>
             <div className="landing-hero-ctas">
               <a href={demoHref} className="landing-hero-cta-primary">
-                Solicitar demo →
+                Coordinar demo →
               </a>
-              <a href="#demo" className="landing-hero-cta-secondary">
-                Ver proceso comercial
+              <a href="#como-funciona" className="landing-hero-cta-secondary">
+                Ver cómo funciona
               </a>
             </div>
             <div className="landing-hero-trust">
@@ -537,19 +572,14 @@ export default function Landing() {
       </section>
 
       <section className="landing-stats">
+        <div className="landing-stats-eyebrow">Impacto directo en la gestión del negocio</div>
         <div className="landing-stats-inner">
-          <div className="landing-stat">
-            <div className="landing-stat-value">36+</div>
-            <div className="landing-stat-label">Templates de KPIs listos</div>
-          </div>
-          <div className="landing-stat">
-            <div className="landing-stat-value">6</div>
-            <div className="landing-stat-label">Industrias cubiertas</div>
-          </div>
-          <div className="landing-stat">
-            <div className="landing-stat-value">100%</div>
-            <div className="landing-stat-label">Instancia aislada por cliente</div>
-          </div>
+          {IMPACT_METRICS.map((m) => (
+            <div className="landing-stat" key={m.value}>
+              <div className="landing-stat-value">{m.value}</div>
+              <div className="landing-stat-label">{m.label}</div>
+            </div>
+          ))}
           <div className="landing-stat">
             <div className="landing-stat-value">&lt;1min</div>
             <div className="landing-stat-label">Para generar un reporte ejecutivo</div>
@@ -557,12 +587,44 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="landing-process" id="demo">
+      <section className="landing-problem">
+        <div className="landing-problem-inner">
+          <div className="landing-problem-left">
+            <div className="landing-section-eyebrow">Problema que resolvemos</div>
+            <h2 className="landing-problem-title">"El problema no es la falta de datos.<br />Es la falta de decisión."</h2>
+            <ul className="landing-problem-list">
+              {PROBLEMS.map((p) => (
+                <li key={p} className="landing-problem-item">
+                  <span className="landing-problem-bullet">✗</span>
+                  {p}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="landing-problem-right">
+            <div className="landing-section-eyebrow">Propuesta de valor</div>
+            <h2 className="landing-problem-title">"Un sistema diseñado para decidir,<br />no solo para reportar"</h2>
+            <div className="landing-pillars">
+              {VALUE_PILLARS.map((p) => (
+                <div key={p.title} className="landing-pillar">
+                  <span className="landing-pillar-icon">{p.icon}</span>
+                  <div>
+                    <strong className="landing-pillar-title">{p.title}</strong>
+                    <span className="landing-pillar-desc">{p.desc}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="landing-process" id="como-funciona">
         <div className="landing-section-header">
-          <div className="landing-section-eyebrow">Cómo avanzar</div>
-          <h2 className="landing-section-title">El acceso se coordina por demo, relevamiento y propuesta</h2>
+          <div className="landing-section-eyebrow">Flujo experiencial</div>
+          <h2 className="landing-section-title">De métricas a decisiones.<br />De seguimiento a resultados.</h2>
           <p className="landing-section-subtitle">
-            La app no es freemium. Primero revisamos tu contexto y después definimos la modalidad de compra e implementación más adecuada.
+            Implementación guiada para asegurar impacto real. Cuatro pasos para que tu equipo pase de reportar a intervenir.
           </p>
         </div>
         <div className="landing-process-grid">
@@ -599,9 +661,9 @@ export default function Landing() {
       <section className="landing-pricing" id="planes">
         <div className="landing-section-header">
           <div className="landing-section-eyebrow">Planes y alcance</div>
-          <h2 className="landing-section-title">Elegí la modalidad que mejor se adapta a tu estructura</h2>
+          <h2 className="landing-section-title">Diseñado para adaptarse a tu estructura</h2>
           <p className="landing-section-subtitle">
-            La activación se coordina con demo previa y propuesta comercial según usuarios, integraciones, seguridad y acompañamiento requerido.
+            Implementación guiada para asegurar impacto real. La activación se coordina con demo previa según usuarios, integraciones y requisitos de seguridad.
           </p>
         </div>
         <div className="landing-pricing-grid">
@@ -634,7 +696,7 @@ export default function Landing() {
           ))}
         </div>
         <p className="landing-pricing-note">
-          La compra y el acceso se gestionan con el equipo comercial luego de la demo.
+          La compra y el acceso se gestionan con el equipo comercial luego de la demo. · <a href={demoHref} className="landing-pricing-note-link">Solicitar demo →</a>
         </p>
       </section>
 

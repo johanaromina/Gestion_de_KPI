@@ -192,12 +192,12 @@ export default function OKRBoard() {
             <div className="okr-progress-section">
               <div className="okr-progress-label">
                 <span>Progreso</span>
-                <span style={{ color: progressColor(obj.progress) }}>{Math.round(obj.progress)}%</span>
+                <span style={{ color: progressColor(Number(obj.progress) || 0) }}>{Math.round(Number(obj.progress) || 0)}%</span>
               </div>
               <div className="okr-progress-track">
                 <div
                   className="okr-progress-fill"
-                  style={{ width: `${obj.progress}%`, background: progressColor(obj.progress) }}
+                  style={{ width: `${Number(obj.progress) || 0}%`, background: progressColor(Number(obj.progress) || 0) }}
                 />
               </div>
             </div>
@@ -220,7 +220,7 @@ export default function OKRBoard() {
                       <div
                         className="okr-kr-progress-fill"
                         style={{
-                          width: `${kr.progressPercent}%`,
+                          width: `${Number(kr.progressPercent) || 0}%`,
                           background: STATUS_COLOR[kr.status],
                         }}
                       />
@@ -234,7 +234,7 @@ export default function OKRBoard() {
                           {kr.unit ? ` ${kr.unit}` : ''}
                         </span>
                       )}
-                      <span>{Math.round(kr.progressPercent)}%</span>
+                      <span>{Math.round(Number(kr.progressPercent) || 0)}%</span>
                     </div>
                   </div>
                 ))}

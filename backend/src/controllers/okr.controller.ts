@@ -93,9 +93,10 @@ export const createKeyResult = async (req: AuthRequest, res: Response) => {
     })
     const krs = await okrService.listKeyResults(objectiveId)
     res.status(201).json(krs.find((k) => k.id === id))
-  } catch (error) {
+  } catch (error: any) {
     console.error('[OKR] createKeyResult:', error)
-    res.status(500).json({ error: 'Error al crear key result' })
+    const detail = error?.sqlMessage || error?.message || null
+    res.status(500).json({ error: detail ? `Error al crear key result: ${detail}` : 'Error al crear key result' })
   }
 }
 

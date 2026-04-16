@@ -25,6 +25,8 @@ type ScopeKPI = {
 type ScopeNode = OrgScope & {
   children: ScopeNode[]
   kpis: ScopeKPI[]
+  collaboratorCount: number
+  totalCollaboratorCount: number
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -65,6 +67,14 @@ function ScopeCard({ node, depth }: { node: ScopeNode; depth: number }) {
         {TYPE_LABEL[node.type] || node.type}
       </div>
       <div className="org-card-name">{node.name}</div>
+      {node.totalCollaboratorCount > 0 && (
+        <div className="org-card-collab-count">
+          {node.totalCollaboratorCount === 1 ? '1 persona' : `${node.totalCollaboratorCount} personas`}
+          {node.collaboratorCount !== node.totalCollaboratorCount && node.collaboratorCount > 0 && (
+            <span className="org-card-collab-direct"> ({node.collaboratorCount} directa{node.collaboratorCount !== 1 ? 's' : ''})</span>
+          )}
+        </div>
+      )}
       {avgVariation !== null && (
         <div className="org-card-kpi" style={{ color: getVariationColor(avgVariation) }}>
           {avgVariation.toFixed(0)}% cumplimiento
@@ -128,6 +138,15 @@ export default function Organigrama() {
     }
   )
 
+  const { data: collaborators } = useQuery<{ id: number; orgScopeId?: number | null }[]>(
+    'organigrama-collaborators',
+    async () => {
+      const res = await api.get('/collaborators')
+      return res.data
+    },
+    { retry: false }
+  )
+
   const { data: scopeKpis } = useQuery<ScopeKPI[]>(
     'scope-kpis-organigrama',
     async () => {
@@ -150,9 +169,24 @@ export default function Organigrama() {
       }
     }
 
+    const directCountByScope = new Map<number, number>()
+    if (collaborators) {
+      for (const c of collaborators) {
+        if (c.orgScopeId) {
+          directCountByScope.set(c.orgScopeId, (directCountByScope.get(c.orgScopeId) || 0) + 1)
+        }
+      }
+    }
+
     const nodesById = new Map<number, ScopeNode>()
     for (const s of active) {
-      nodesById.set(s.id, { ...s, children: [], kpis: kpisByScope.get(s.id) || [] })
+      nodesById.set(s.id, {
+        ...s,
+        children: [],
+        kpis: kpisByScope.get(s.id) || [],
+        collaboratorCount: directCountByScope.get(s.id) || 0,
+        totalCollaboratorCount: 0,
+      })
     }
 
     const roots: ScopeNode[] = []
@@ -164,6 +198,13 @@ export default function Organigrama() {
       }
     }
 
+    // Calcular totalCollaboratorCount (directos + descendientes)
+    const calcTotal = (n: ScopeNode): number => {
+      const childTotal = n.children.reduce((sum, c) => sum + calcTotal(c), 0)
+      n.totalCollaboratorCount = n.collaboratorCount + childTotal
+      return n.totalCollaboratorCount
+    }
+
     // Ordenar hijos por nombre
     const sortChildren = (n: ScopeNode) => {
       n.children.sort((a, b) => a.name.localeCompare(b.name))
@@ -171,9 +212,10 @@ export default function Organigrama() {
     }
     roots.sort((a, b) => a.name.localeCompare(b.name))
     roots.forEach(sortChildren)
+    roots.forEach(calcTotal)
 
     return roots
-  }, [orgScopes, scopeKpis])
+  }, [orgScopes, scopeKpis, collaborators])
 
   const types = useMemo(() => {
     const set = new Set<string>()

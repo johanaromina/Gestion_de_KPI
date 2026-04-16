@@ -157,18 +157,30 @@ export default function OKRCrear() {
         status,
       })
       const objectiveId = objRes.data.id
+      const krFailures: string[] = []
       for (const kr of krs) {
         if (!kr.title.trim()) continue
-        await api.post(`/okr/${objectiveId}/key-results`, buildKrPayload(kr))
+        try {
+          await api.post(`/okr/${objectiveId}/key-results`, buildKrPayload(kr))
+        } catch (krErr: any) {
+          const msg = krErr?.response?.data?.error || `Error al guardar el KR "${kr.title}"`
+          krFailures.push(msg)
+        }
       }
-      return objectiveId
+      return { objectiveId, krFailures }
     },
     {
-      onSuccess: (objectiveId) => {
+      onSuccess: ({ objectiveId, krFailures }) => {
         queryClient.invalidateQueries('okr-objectives')
+        if (krFailures.length > 0) {
+          setError(`El objetivo fue guardado, pero algunos Key Results no pudieron cargarse: ${krFailures.join(' | ')}`)
+        }
         navigate(`/okr/${objectiveId}`)
       },
-      onError: () => setError('Error al guardar el objetivo. Verifica los campos.'),
+      onError: (err: any) => {
+        const msg = err?.response?.data?.error || 'No se pudo guardar el objetivo. Verificá los datos e intentá de nuevo.'
+        setError(msg)
+      },
     }
   )
 
@@ -216,7 +228,10 @@ export default function OKRCrear() {
         queryClient.invalidateQueries(['okr-objective', String(objectiveId)])
         navigate(`/okr/${objectiveId}`)
       },
-      onError: () => setError('Error al actualizar el objetivo. Verifica los campos.'),
+      onError: (err: any) => {
+        const msg = err?.response?.data?.error || 'No se pudo actualizar el objetivo. Verificá los datos e intentá de nuevo.'
+        setError(msg)
+      },
     }
   )
 

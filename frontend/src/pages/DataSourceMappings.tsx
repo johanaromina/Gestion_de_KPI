@@ -633,13 +633,25 @@ export default function DataSourceMappings() {
           <div className="mapping-filters-grid">
             <div className="mapping-field">
               <label htmlFor="mapping-search">Buscar</label>
-              <input
-                id="mapping-search"
-                type="text"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Entidad, clave, source type..."
-              />
+              <div className="mapping-search-wrap">
+                <input
+                  id="mapping-search"
+                  type="text"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Entidad, clave, source type..."
+                />
+                {search && (
+                  <button
+                    className="mapping-clear-input"
+                    type="button"
+                    onClick={() => setSearch('')}
+                    title="Limpiar búsqueda"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
             </div>
             <div className="mapping-field">
               <label htmlFor="mapping-source-filter">Source type</label>
@@ -668,6 +680,22 @@ export default function DataSourceMappings() {
                 <option value="org_scope">Scope</option>
               </select>
             </div>
+            {(search || sourceTypeFilter !== 'all' || entityTypeFilter !== 'all') && (
+              <div className="mapping-field mapping-field-clear">
+                <label>&nbsp;</label>
+                <button
+                  className="btn-ghost mapping-btn-clear-filters"
+                  type="button"
+                  onClick={() => {
+                    setSearch('')
+                    setSourceTypeFilter('all')
+                    setEntityTypeFilter('all')
+                  }}
+                >
+                  × Limpiar filtros
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

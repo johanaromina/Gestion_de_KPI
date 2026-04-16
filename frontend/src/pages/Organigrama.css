@@ -137,6 +137,17 @@
   font-size: 15px;
 }
 
+.org-card-collab-count {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.org-card-collab-direct {
+  color: #9ca3af;
+  font-size: 10px;
+}
+
 .org-card-kpi {
   font-size: 13px;
   font-weight: 700;
