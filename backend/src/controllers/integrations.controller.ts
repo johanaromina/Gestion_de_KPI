@@ -1226,20 +1226,23 @@ export const sheetsWizard = async (req: AuthRequest, res: Response) => {
     const sheetId = extractSheetId(sheetUrl)
     const wizardName = name || `Google Sheets — ${tab}`
 
-    // 1. Crear Auth Profile
+    // 1. Crear Auth Profile (reutilizar si ya existe con ese nombre)
     const encryptedAuth = encryptSecret(JSON.stringify({ apiKey }))
     const [authResult] = await pool.query(
-      `INSERT INTO auth_profiles (name, connector, authType, authConfig) VALUES (?, 'sheets', 'apiKey', ?)`,
+      `INSERT INTO auth_profiles (name, connector, authType, authConfig)
+       VALUES (?, 'sheets', 'apiKey', ?)
+       ON DUPLICATE KEY UPDATE authConfig = VALUES(authConfig), id = LAST_INSERT_ID(id)`,
       [wizardName, encryptedAuth]
     )
     const authProfileId = (authResult as any).insertId as number
 
-    // 2. Crear Template
+    // 2. Crear Template (reutilizar si ya existe con ese nombre)
     const metricTypeUi = aggregation && aggregation !== 'FIRST' ? 'value_agg' : 'value'
     const [templateResult] = await pool.query(
       `INSERT INTO integration_templates
          (name, connector, metricType, metricTypeUi, authProfileId, schedule, enabled)
-       VALUES (?, 'sheets', 'count', ?, ?, ?, 1)`,
+       VALUES (?, 'sheets', 'count', ?, ?, ?, 1)
+       ON DUPLICATE KEY UPDATE authProfileId = VALUES(authProfileId), schedule = VALUES(schedule), id = LAST_INSERT_ID(id)`,
       [wizardName, metricTypeUi, authProfileId, schedule || '0 6 * * *']
     )
     const templateId = (templateResult as any).insertId as number
