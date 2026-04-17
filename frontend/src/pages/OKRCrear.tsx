@@ -255,8 +255,8 @@ export default function OKRCrear() {
         const target = Number(kr.targetValue)
         if (!kr.targetValue) {
           newKrErrors[kr.tempId] = 'La meta es requerida'
-        } else if (target <= start) {
-          newKrErrors[kr.tempId] = `La meta (${target}) debe ser mayor al valor inicial (${start})`
+        } else if (target === start) {
+          newKrErrors[kr.tempId] = `La meta no puede ser igual al valor inicial (${start})`
         }
       }
     }
