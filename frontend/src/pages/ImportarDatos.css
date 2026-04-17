@@ -1,0 +1,298 @@
+.importar-page {
+  max-width: 900px;
+  padding-bottom: 48px;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.page-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 6px;
+}
+
+.subtitle {
+  color: #6b7280;
+  font-size: 15px;
+}
+
+/* ── Tabs ───────────────────────────────────────────────────── */
+
+.import-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 0;
+}
+
+.import-tab {
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.import-tab:hover {
+  color: #374151;
+}
+
+.import-tab--active {
+  color: #7c3aed;
+  border-bottom-color: #7c3aed;
+}
+
+/* ── Info box ───────────────────────────────────────────────── */
+
+.import-info-box {
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.import-info-box p {
+  margin: 0;
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.6;
+}
+
+.import-info-box code {
+  background: #ede9fe;
+  color: #5b21b6;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: monospace;
+}
+
+.btn-download-template {
+  align-self: flex-start;
+  margin-top: 8px;
+  background: none;
+  border: 1px solid #7c3aed;
+  color: #7c3aed;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-download-template:hover {
+  background: #ede9fe;
+}
+
+/* ── Upload ─────────────────────────────────────────────────── */
+
+.import-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.btn-upload {
+  background: #7c3aed;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-upload:hover {
+  background: #6d28d9;
+}
+
+.import-file-info {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+/* ── Preview table ──────────────────────────────────────────── */
+
+.import-preview-scroll {
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.import-preview-table {
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 100%;
+}
+
+.import-preview-table th {
+  background: #f9fafb;
+  padding: 8px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.import-preview-table td {
+  padding: 7px 12px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #374151;
+}
+
+.import-row--error td {
+  background: #fef2f2;
+}
+
+.import-row--ok:hover td {
+  background: #f9fafb;
+}
+
+.import-row-num {
+  color: #9ca3af;
+  font-size: 12px;
+  width: 32px;
+}
+
+.import-empty {
+  color: #d1d5db;
+  font-style: italic;
+}
+
+.import-type-badge {
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.import-status {
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.import-status--ok {
+  color: #16a34a;
+}
+
+.import-status--error {
+  color: #dc2626;
+}
+
+/* ── Acciones ───────────────────────────────────────────────── */
+
+.import-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.btn-import-cancel {
+  background: #f3f4f6;
+  color: #374151;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-import-cancel:hover {
+  background: #e5e7eb;
+}
+
+.btn-import-confirm {
+  background: #7c3aed;
+  color: white;
+  border: none;
+  padding: 10px 22px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-import-confirm:hover:not(:disabled) {
+  background: #6d28d9;
+}
+
+.btn-import-confirm:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Resultado ──────────────────────────────────────────────── */
+
+.import-result {
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.import-result p {
+  margin: 0 0 4px;
+}
+
+.import-result ul {
+  margin: 6px 0 0 16px;
+  padding: 0;
+}
+
+.import-result li {
+  color: #dc2626;
+  margin-bottom: 2px;
+}
+
+.import-result--success {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+}
+
+.import-result--partial {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #92400e;
+}
+
+/* ── Responsive ─────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .page-header h1 { font-size: 22px; }
+  .import-tab { padding: 8px 14px; font-size: 13px; }
+}

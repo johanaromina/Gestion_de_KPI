@@ -37,8 +37,11 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
   const [selectedTab, setSelectedTab] = useState('')
   const [selectedColumn, setSelectedColumn] = useState('')
   const [aggregation, setAggregation] = useState('FIRST')
+  const [agentColumn, setAgentColumn] = useState('')
   const [selectedKpi, setSelectedKpi] = useState<AssignmentOption | null>(null)
+  const [selectedKpis, setSelectedKpis] = useState<{ id: number; label: string; agentValue: string }[]>([])
   const [kpiSearch, setKpiSearch] = useState('')
+  const [kpiTab, setKpiTab] = useState<'assignment' | 'scope_kpi'>('assignment')
   const [schedule, setSchedule] = useState('0 6 * * *')
   const [wizardName, setWizardName] = useState('')
   const [preview, setPreview] = useState<PreviewResult | null>(null)
@@ -77,9 +80,10 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
     })),
   ]
 
-  const filteredKpis = kpiSearch.trim()
+  const filteredKpis = (kpiSearch.trim()
     ? allKpiOptions.filter((o) => o.label.toLowerCase().includes(kpiSearch.toLowerCase()))
-    : allKpiOptions.slice(0, 30)
+    : allKpiOptions
+  ).filter((o) => o.type === kpiTab).slice(0, 30)
 
   const previewMutation = useMutation(
     async ({ url, tab, key }: { url: string; tab?: string; key: string }) => {
@@ -97,10 +101,12 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
     }
   )
 
+  const isBulkMode = kpiTab === 'assignment' && !!agentColumn
+
   const wizardMutation = useMutation(
     async () => {
-      const payload: any = {
-        name: wizardName,
+      const base: any = {
+        name: wizardName || `Google Sheets — ${selectedTab}`,
         sheetUrl,
         tab: selectedTab,
         valueColumn: selectedColumn,
@@ -108,9 +114,17 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
         schedule: schedule || null,
         apiKey: apiKey || undefined,
       }
-      if (selectedKpi?.type === 'assignment') payload.assignmentId = selectedKpi.id
-      else if (selectedKpi?.type === 'scope_kpi') payload.scopeKpiId = selectedKpi.id
-      const res = await api.post('/integrations/sheets-wizard', payload)
+      if (isBulkMode) {
+        const res = await api.post('/integrations/sheets-wizard', {
+          ...base,
+          collaboratorColumn: agentColumn,
+          assignments: selectedKpis.map((k) => ({ assignmentId: k.id, collaboratorValue: k.agentValue })),
+        })
+        return res.data
+      }
+      if (selectedKpi?.type === 'assignment') base.assignmentId = selectedKpi.id
+      else if (selectedKpi?.type === 'scope_kpi') base.scopeKpiId = selectedKpi.id
+      const res = await api.post('/integrations/sheets-wizard', base)
       return res.data
     },
     {
@@ -154,13 +168,13 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
   }
 
   const handleKpiNext = () => {
-    if (!selectedKpi) {
-      setError('Seleccioná el KPI destino')
-      return
+    if (isBulkMode) {
+      if (selectedKpis.length === 0) { setError('Seleccioná al menos un colaborador'); return }
+      if (selectedKpis.some((k) => !k.agentValue.trim())) { setError('Completá el nombre en planilla de todos los colaboradores'); return }
+    } else {
+      if (!selectedKpi) { setError('Seleccioná el KPI destino'); return }
     }
-    if (!wizardName) {
-      setWizardName(`Google Sheets — ${selectedTab}`)
-    }
+    if (!wizardName) setWizardName(`Google Sheets — ${selectedTab}`)
     setError('')
     setStep('schedule')
   }
@@ -368,6 +382,28 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
                       <option value="MIN">Valor mínimo</option>
                     </select>
                   </div>
+
+                  <div className="agent-col-row">
+                    <label className="field-label">
+                      ¿Hay una columna que identifica a cada persona?{' '}
+                      <span className="field-optional">(opcional — para conectar varios agentes a la vez)</span>
+                    </label>
+                    <select
+                      className="wizard-select"
+                      value={agentColumn}
+                      onChange={(e) => { setAgentColumn(e.target.value); setSelectedKpis([]) }}
+                    >
+                      <option value="">— No, la planilla tiene un solo valor —</option>
+                      {(preview?.headers || []).map((h) => (
+                        <option key={String(h)} value={String(h)}>{String(h)}</option>
+                      ))}
+                    </select>
+                    {agentColumn && (
+                      <p className="agent-col-hint">
+                        El sistema va a filtrar cada fila por el nombre del agente. En el siguiente paso elegís qué colaboradores conectar.
+                      </p>
+                    )}
+                  </div>
                 </>
               )}
               <div className="wizard-actions">
@@ -387,38 +423,130 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
           {step === 'kpi' && (
             <div className="wizard-step">
               <h3>¿A qué KPI van los datos?</h3>
-              <p className="step-hint">
-                Buscá el KPI del colaborador o del área donde se van a cargar las mediciones.
-              </p>
-              <input
-                className="wizard-input"
-                type="search"
-                placeholder="Buscar por nombre del colaborador o KPI…"
-                value={kpiSearch}
-                onChange={(e) => setKpiSearch(e.target.value)}
-                autoFocus
-              />
-              <div className="kpi-list">
-                {filteredKpis.length === 0 && (
-                  <p className="step-hint">No se encontraron KPIs con ese nombre.</p>
-                )}
-                {filteredKpis.map((opt) => (
-                  <button
-                    key={`${opt.type}-${opt.id}`}
-                    className={`kpi-option ${selectedKpi?.id === opt.id && selectedKpi?.type === opt.type ? 'selected' : ''}`}
-                    onClick={() => setSelectedKpi(opt)}
-                  >
-                    <span className="kpi-option-type">{opt.type === 'scope_kpi' ? 'Área' : 'Colaborador'}</span>
-                    <span className="kpi-option-label">{opt.label}</span>
-                  </button>
-                ))}
+
+              {/* Tabs de tipo */}
+              <div className="kpi-type-tabs">
+                <button
+                  className={`kpi-type-tab ${kpiTab === 'assignment' ? 'active' : ''}`}
+                  onClick={() => { setKpiTab('assignment'); setSelectedKpi(null); setSelectedKpis([]); setKpiSearch('') }}
+                >
+                  <span className="kpi-type-tab-icon">👤</span>
+                  <span className="kpi-type-tab-label">KPI individual</span>
+                </button>
+                <button
+                  className={`kpi-type-tab ${kpiTab === 'scope_kpi' ? 'active' : ''}`}
+                  onClick={() => { setKpiTab('scope_kpi'); setSelectedKpi(null); setSelectedKpis([]); setKpiSearch('') }}
+                >
+                  <span className="kpi-type-tab-icon">🏢</span>
+                  <span className="kpi-type-tab-label">KPI de área o equipo</span>
+                </button>
               </div>
+
+              {/* Descripción contextual */}
+              <div className="kpi-type-hint">
+                {kpiTab === 'scope_kpi' ? (
+                  <p>Los datos van al <strong>KPI consolidado del área o equipo</strong>. Usalo cuando una sola planilla tiene el dato agregado de todo el grupo.</p>
+                ) : isBulkMode ? (
+                  <p>Seleccioná los colaboradores a conectar. El sistema va a filtrar la fila de cada uno por la columna <strong>{agentColumn}</strong>. Podés editar el nombre si no coincide exactamente con la planilla.</p>
+                ) : (
+                  <p>Los datos van a <strong>una persona específica</strong>. Usalo cuando la planilla tiene un único valor.</p>
+                )}
+              </div>
+
+              {/* Modo BULK — multi-select con nombre editable */}
+              {kpiTab === 'assignment' && isBulkMode ? (
+                <>
+                  <input
+                    className="wizard-input"
+                    type="search"
+                    placeholder="Buscar por colaborador o KPI…"
+                    value={kpiSearch}
+                    onChange={(e) => setKpiSearch(e.target.value)}
+                    autoFocus
+                  />
+                  <div className="kpi-list">
+                    {filteredKpis.length === 0 && (
+                      <p className="step-hint">No se encontraron KPIs con ese nombre.</p>
+                    )}
+                    {filteredKpis.map((opt) => {
+                      const isChecked = selectedKpis.some((k) => k.id === opt.id)
+                      const entry = selectedKpis.find((k) => k.id === opt.id)
+                      return (
+                        <div
+                          key={`${opt.type}-${opt.id}`}
+                          className={`kpi-option kpi-option-bulk ${isChecked ? 'selected' : ''}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                const rawName = opt.label.split(' — ')[0]
+                                setSelectedKpis((prev) => [...prev, { id: opt.id, label: opt.label, agentValue: rawName }])
+                              } else {
+                                setSelectedKpis((prev) => prev.filter((k) => k.id !== opt.id))
+                              }
+                            }}
+                          />
+                          <div className="kpi-option-bulk-info">
+                            <span className="kpi-option-label">{opt.label}</span>
+                            {isChecked && (
+                              <input
+                                className="wizard-input agent-value-input"
+                                type="text"
+                                placeholder="Nombre exacto en la planilla"
+                                value={entry?.agentValue || ''}
+                                onChange={(e) => setSelectedKpis((prev) =>
+                                  prev.map((k) => k.id === opt.id ? { ...k, agentValue: e.target.value } : k)
+                                )}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {selectedKpis.length > 0 && (
+                    <p className="agent-col-hint">
+                      {selectedKpis.length} colaborador{selectedKpis.length !== 1 ? 'es' : ''} seleccionado{selectedKpis.length !== 1 ? 's' : ''} — se van a crear {selectedKpis.length} integración{selectedKpis.length !== 1 ? 'es' : ''}.
+                    </p>
+                  )}
+                </>
+              ) : (
+                /* Modo individual / scope */
+                <>
+                  <input
+                    className="wizard-input"
+                    type="search"
+                    placeholder={kpiTab === 'assignment' ? 'Buscar por colaborador o KPI…' : 'Buscar por área o nombre del KPI…'}
+                    value={kpiSearch}
+                    onChange={(e) => setKpiSearch(e.target.value)}
+                    autoFocus
+                  />
+                  <div className="kpi-list">
+                    {filteredKpis.length === 0 && (
+                      <p className="step-hint">No se encontraron KPIs con ese nombre.</p>
+                    )}
+                    {filteredKpis.map((opt) => (
+                      <button
+                        key={`${opt.type}-${opt.id}`}
+                        className={`kpi-option ${selectedKpi?.id === opt.id && selectedKpi?.type === opt.type ? 'selected' : ''}`}
+                        onClick={() => setSelectedKpi(opt)}
+                      >
+                        <span className="kpi-option-label">{opt.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
               <div className="wizard-actions">
                 <button className="btn-wizard-secondary" onClick={() => setStep('column')}>← Atrás</button>
                 <button
                   className="btn-wizard-primary"
                   onClick={handleKpiNext}
-                  disabled={!selectedKpi}
+                  disabled={isBulkMode ? selectedKpis.length === 0 : !selectedKpi}
                 >
                   Siguiente →
                 </button>
@@ -456,7 +584,11 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
                 <p><strong>Planilla:</strong> {sheetUrl.slice(0, 60)}{sheetUrl.length > 60 ? '…' : ''}</p>
                 <p><strong>Pestaña:</strong> {selectedTab}</p>
                 <p><strong>Columna:</strong> {selectedColumn}</p>
-                <p><strong>KPI destino:</strong> {selectedKpi?.label}</p>
+                {isBulkMode ? (
+                  <p><strong>Colaboradores:</strong> {selectedKpis.map((k) => k.agentValue).join(', ')}</p>
+                ) : (
+                  <p><strong>KPI destino:</strong> {selectedKpi?.label}</p>
+                )}
               </div>
               {error && <div className="sheets-wizard-error">{error}</div>}
               <div className="wizard-actions">
@@ -476,10 +608,12 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
           {step === 'done' && (
             <div className="wizard-step wizard-done">
               <div className="done-icon">✅</div>
-              <h3>¡Integración creada!</h3>
+              <h3>{isBulkMode ? `¡${selectedKpis.length} integraciones creadas!` : '¡Integración creada!'}</h3>
               <p>
-                Tu planilla <strong>{selectedTab}</strong> ya está conectada al KPI{' '}
-                <strong>{selectedKpi?.label}</strong>.
+                {isBulkMode
+                  ? <>Tu planilla <strong>{selectedTab}</strong> quedó conectada a <strong>{selectedKpis.length} colaboradores</strong> filtrando por la columna <strong>{agentColumn}</strong>.</>
+                  : <>Tu planilla <strong>{selectedTab}</strong> ya está conectada al KPI <strong>{selectedKpi?.label}</strong>.</>
+                }
               </p>
               <p className="step-hint">
                 La próxima sincronización automática ocurrirá según el horario configurado.
@@ -488,7 +622,10 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
               {createdResult && (
                 <div className="done-ids">
                   <span>Template #{createdResult.templateId}</span>
-                  <span>Target #{createdResult.targetId}</span>
+                  {createdResult.targetIds
+                    ? <span>{createdResult.targetIds.length} targets creados</span>
+                    : <span>Target #{createdResult.targetId}</span>
+                  }
                 </div>
               )}
               <div className="wizard-actions">

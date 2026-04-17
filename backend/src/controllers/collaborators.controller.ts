@@ -533,3 +533,68 @@ export const resendInvite = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Error al reenviar invitación' })
   }
 }
+
+export const importCollaborators = async (req: Request, res: Response) => {
+  try {
+    const rows: { name: string; email?: string; position?: string; role?: string; areaName?: string }[] = req.body?.rows
+    if (!Array.isArray(rows) || rows.length === 0)
+      return res.status(400).json({ error: 'No hay filas para importar' })
+
+    const VALID_ROLES = ['admin', 'director', 'leader', 'collaborator']
+
+    // Cargar scopes para resolver areaName → orgScopeId
+    const [scopeRows] = await pool.query<any[]>('SELECT id, name FROM org_scopes WHERE active = 1')
+    const scopeByName = new Map<string, number>()
+    for (const s of scopeRows as any[]) scopeByName.set(s.name.trim().toLowerCase(), s.id)
+
+    // Emails existentes para evitar duplicados
+    const [emailRows] = await pool.query<any[]>('SELECT email FROM collaborators WHERE email IS NOT NULL')
+    const existingEmails = new Set((emailRows as any[]).map((r) => r.email.toLowerCase()))
+
+    const created: number[] = []
+    const errors: { row: number; message: string }[] = []
+
+    for (let i = 0; i < rows.length; i++) {
+      const item = rows[i]
+      const rowNum = i + 1
+
+      if (!item.name?.trim()) { errors.push({ row: rowNum, message: 'Nombre vacío' }); continue }
+
+      const role = item.role?.trim().toLowerCase() || 'collaborator'
+      if (!VALID_ROLES.includes(role)) {
+        errors.push({ row: rowNum, message: `Rol inválido: "${item.role}". Usá: collaborator, leader, director, admin` })
+        continue
+      }
+
+      const normalizedEmail = item.email?.trim().toLowerCase() || null
+      if (normalizedEmail && existingEmails.has(normalizedEmail)) {
+        errors.push({ row: rowNum, message: `Email "${normalizedEmail}" ya registrado` })
+        continue
+      }
+
+      let orgScopeId: number | null = null
+      let areaLabel = item.areaName?.trim() || null
+      if (areaLabel) {
+        orgScopeId = scopeByName.get(areaLabel.toLowerCase()) ?? null
+        if (!orgScopeId) {
+          errors.push({ row: rowNum, message: `Área "${areaLabel}" no encontrada` })
+          continue
+        }
+      }
+
+      const [r] = await pool.query(
+        `INSERT INTO collaborators (name, position, area, orgScopeId, role, status, email, mfaEnabled)
+         VALUES (?, ?, ?, ?, ?, 'active', ?, 0)`,
+        [item.name.trim(), item.position?.trim() || 'Sin cargo', areaLabel, orgScopeId, role, normalizedEmail]
+      ) as any[]
+      const newId = (r as any).insertId
+      if (normalizedEmail) existingEmails.add(normalizedEmail)
+      created.push(newId)
+    }
+
+    return res.status(201).json({ created: created.length, errors })
+  } catch (error: any) {
+    console.error('Error importando colaboradores:', error)
+    return res.status(500).json({ error: error?.message || 'Error al importar colaboradores' })
+  }
+}

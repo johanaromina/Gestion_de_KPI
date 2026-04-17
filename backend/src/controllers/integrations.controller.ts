@@ -1199,6 +1199,8 @@ export const sheetsWizard = async (req: AuthRequest, res: Response) => {
       aggregation,
       assignmentId,
       scopeKpiId,
+      collaboratorColumn,
+      assignments,
       schedule,
       apiKey: bodyApiKey,
     } = req.body as {
@@ -1211,16 +1213,23 @@ export const sheetsWizard = async (req: AuthRequest, res: Response) => {
       aggregation?: string
       assignmentId?: number
       scopeKpiId?: number
+      collaboratorColumn?: string
+      assignments?: { assignmentId: number; collaboratorValue: string }[]
       schedule?: string
       apiKey?: string
     }
+
+    const isBulk = Array.isArray(assignments) && assignments.length > 0
 
     const apiKey = bodyApiKey || appEnv.googleApiKey
     if (!sheetUrl) return res.status(400).json({ error: 'Falta la URL de la planilla' })
     if (!tab) return res.status(400).json({ error: 'Falta la pestaña (tab)' })
     if (valueColumn === undefined || valueColumn === null || valueColumn === '')
       return res.status(400).json({ error: 'Falta la columna de valor' })
-    if (!assignmentId && !scopeKpiId) return res.status(400).json({ error: 'Falta el KPI destino (assignmentId o scopeKpiId)' })
+    if (!isBulk && !assignmentId && !scopeKpiId)
+      return res.status(400).json({ error: 'Falta el KPI destino (assignmentId o scopeKpiId)' })
+    if (isBulk && !collaboratorColumn)
+      return res.status(400).json({ error: 'Falta la columna de agente (collaboratorColumn)' })
     if (!apiKey) return res.status(400).json({ error: 'Falta la API key de Google' })
 
     const sheetId = extractSheetId(sheetUrl)
@@ -1247,19 +1256,36 @@ export const sheetsWizard = async (req: AuthRequest, res: Response) => {
     )
     const templateId = (templateResult as any).insertId as number
 
-    // 3. Construir params del target
-    const targetParams: Record<string, any> = {
+    // 3. Params base del target
+    const baseParams: Record<string, any> = {
       sheetKey: sheetId,
       range: tab,
       valueColumn,
     }
-    if (periodColumn) targetParams.periodColumn = periodColumn
-    if (areaColumn) targetParams.areaColumn = areaColumn
-    if (aggregation) targetParams.aggregation = aggregation
+    if (periodColumn) baseParams.periodColumn = periodColumn
+    if (areaColumn) baseParams.areaColumn = areaColumn
+    if (aggregation) baseParams.aggregation = aggregation
 
-    // 4. Crear Target
+    // 4a. Bulk mode: un target por agente con collaboratorColumn + collaboratorValue
+    if (isBulk) {
+      const targetIds: number[] = []
+      for (const entry of assignments!) {
+        const params = { ...baseParams, collaboratorColumn, collaboratorValue: entry.collaboratorValue }
+        const [r] = await pool.query(
+          `INSERT INTO integration_targets
+             (templateId, scopeType, scopeId, assignmentId, scopeKpiId, params, enabled)
+           VALUES (?, 'assignment', ?, ?, NULL, ?, 1)`,
+          [templateId, String(entry.assignmentId), entry.assignmentId, JSON.stringify(params)]
+        )
+        targetIds.push((r as any).insertId as number)
+      }
+      return res.status(201).json({ authProfileId, templateId, targetIds, name: wizardName })
+    }
+
+    // 4b. Single mode: un target
     const scopeType = assignmentId ? 'assignment' : 'scope_kpi'
     const scopeId = String(assignmentId || scopeKpiId)
+    if (collaboratorColumn) baseParams.collaboratorColumn = collaboratorColumn
     const [targetResult] = await pool.query(
       `INSERT INTO integration_targets
          (templateId, scopeType, scopeId, assignmentId, scopeKpiId, params, enabled)
@@ -1270,7 +1296,7 @@ export const sheetsWizard = async (req: AuthRequest, res: Response) => {
         scopeId,
         assignmentId || null,
         scopeKpiId || null,
-        JSON.stringify(targetParams),
+        JSON.stringify(baseParams),
       ]
     )
     const targetId = (targetResult as any).insertId as number

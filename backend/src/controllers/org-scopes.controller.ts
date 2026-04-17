@@ -101,6 +101,58 @@ export const updateOrgScope = async (req: Request, res: Response) => {
   }
 }
 
+export const importOrgScopes = async (req: Request, res: Response) => {
+  try {
+    const rows: { name: string; type?: string; parentName?: string }[] = req.body?.rows
+    if (!Array.isArray(rows) || rows.length === 0)
+      return res.status(400).json({ error: 'No hay filas para importar' })
+
+    // Cargar scopes existentes para resolver parentName
+    const [existing] = await pool.query<any[]>('SELECT id, name FROM org_scopes')
+    const byName = new Map<string, number>()
+    for (const s of existing as any[]) byName.set(s.name.trim().toLowerCase(), s.id)
+
+    const created: number[] = []
+    const errors: { row: number; message: string }[] = []
+
+    // Dos pasadas: primero los que no tienen padre (o padre ya existe), luego los que dependen de los recién creados
+    const pending = rows.map((r, i) => ({ ...r, rowIndex: i + 1 }))
+
+    for (let pass = 0; pass < 2; pass++) {
+      const remaining: typeof pending = []
+      for (const item of (pass === 0 ? pending : pending.filter((p) => !created.includes(p.rowIndex)))) {
+        if (!item.name?.trim()) {
+          errors.push({ row: item.rowIndex, message: 'Nombre vacío' })
+          continue
+        }
+        let parentId: number | null = null
+        if (item.parentName?.trim()) {
+          const key = item.parentName.trim().toLowerCase()
+          parentId = byName.get(key) ?? null
+          if (!parentId) {
+            if (pass === 0) { remaining.push(item); continue }
+            errors.push({ row: item.rowIndex, message: `Área padre "${item.parentName}" no encontrada` })
+            continue
+          }
+        }
+        const [r] = await pool.query(
+          `INSERT INTO org_scopes (name, type, parentId, active) VALUES (?, ?, ?, 1)`,
+          [item.name.trim(), item.type || 'area', parentId]
+        ) as any[]
+        const newId = (r as any).insertId
+        byName.set(item.name.trim().toLowerCase(), newId)
+        created.push(item.rowIndex)
+      }
+      if (pass === 0) pending.splice(0, pending.length, ...remaining)
+    }
+
+    return res.status(201).json({ created: created.length, errors })
+  } catch (error: any) {
+    console.error('Error importando org scopes:', error)
+    return res.status(500).json({ error: error?.message || 'Error al importar áreas' })
+  }
+}
+
 export const deleteOrgScope = async (req: Request, res: Response) => {
   try {
     const { id } = req.params

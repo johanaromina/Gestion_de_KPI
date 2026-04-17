@@ -140,6 +140,10 @@ export default function Layout({ children }: LayoutProps) {
                 <span className="nav-icon" aria-hidden="true">&gt;</span>
                 Colaboradores
               </Link>
+              <Link to="/importar-datos" className={`nav-item ${isActive('/importar-datos') ? 'active' : ''}`} onClick={handleNavClick}>
+                <span className="nav-icon" aria-hidden="true">&gt;</span>
+                Importar datos
+              </Link>
               <Link to="/periodos" className={`nav-item ${isActive('/periodos') ? 'active' : ''}`} onClick={handleNavClick}>
                 <span className="nav-icon" aria-hidden="true">&gt;</span>
                 Periodos

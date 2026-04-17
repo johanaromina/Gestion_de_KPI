@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from 'react-query'
-import { Tree, TreeNode } from 'react-organizational-chart'
 import api from '../services/api'
 import './Organigrama.css'
 
@@ -43,64 +42,91 @@ const TYPE_COLOR: Record<string, string> = {
   business_unit: '#0f766e',
 }
 
-function getVariationColor(variation: number | null | undefined): string {
-  if (variation === null || variation === undefined) return '#9ca3af'
-  if (variation >= 90) return '#16a34a'
-  if (variation >= 70) return '#d97706'
+const TYPE_ICON: Record<string, string> = {
+  company: '🏢',
+  area: '📂',
+  team: '👥',
+  business_unit: '🏭',
+}
+
+function getVariationColor(v: number | null | undefined) {
+  if (v == null) return '#9ca3af'
+  if (v >= 90) return '#16a34a'
+  if (v >= 70) return '#d97706'
   return '#dc2626'
 }
 
-function ScopeCard({ node, depth }: { node: ScopeNode; depth: number }) {
-  const [expanded, setExpanded] = useState(false)
+function avgVariation(kpis: ScopeKPI[]): number | null {
+  const valid = kpis.filter((k) => k.variation != null)
+  if (valid.length === 0) return null
+  return valid.reduce((s, k) => s + Number(k.variation), 0) / valid.length
+}
+
+function countDescendants(node: ScopeNode): number {
+  return node.children.reduce((acc, c) => acc + 1 + countDescendants(c), 0)
+}
+
+// ─── Tarjeta de nivel ────────────────────────────────────────────────────────
+
+function DrillCard({ node, onDrillDown }: { node: ScopeNode; onDrillDown: (n: ScopeNode) => void }) {
   const color = TYPE_COLOR[node.type] || '#374151'
-  const avgVariation =
-    node.kpis.length > 0
-      ? node.kpis
-          .filter((k) => k.variation !== null && k.variation !== undefined)
-          .reduce((sum, k) => sum + Number(k.variation), 0) /
-        (node.kpis.filter((k) => k.variation !== null && k.variation !== undefined).length || 1)
-      : null
+  const icon = TYPE_ICON[node.type] || '📁'
+  const avg = avgVariation(node.kpis)
+  const hasChildren = node.children.length > 0
+  const subCount = node.children.length
+  const descCount = countDescendants(node)
 
   return (
-    <div className={`org-card org-card--depth-${Math.min(depth, 3)}`} style={{ borderTopColor: color }}>
-      <div className="org-card-type" style={{ color }}>
-        {TYPE_LABEL[node.type] || node.type}
+    <div
+      className={`org-drill-card${hasChildren ? ' org-drill-card--has-children' : ' org-drill-card--leaf'}`}
+      style={{ borderTopColor: color }}
+      onClick={() => hasChildren && onDrillDown(node)}
+      role={hasChildren ? 'button' : undefined}
+      tabIndex={hasChildren ? 0 : undefined}
+      onKeyDown={(e) => e.key === 'Enter' && hasChildren && onDrillDown(node)}
+    >
+      <div className="org-drill-card-top">
+        <span className="org-drill-card-icon">{icon}</span>
+        <span className="org-drill-card-type" style={{ color }}>{TYPE_LABEL[node.type] || node.type}</span>
       </div>
-      <div className="org-card-name">{node.name}</div>
-      {node.totalCollaboratorCount > 0 && (
-        <div className="org-card-collab-count">
-          {node.totalCollaboratorCount === 1 ? '1 persona' : `${node.totalCollaboratorCount} personas`}
-          {node.collaboratorCount !== node.totalCollaboratorCount && node.collaboratorCount > 0 && (
-            <span className="org-card-collab-direct"> ({node.collaboratorCount} directa{node.collaboratorCount !== 1 ? 's' : ''})</span>
-          )}
+
+      <div className="org-drill-card-name">{node.name}</div>
+
+      <div className="org-drill-card-stats">
+        {node.totalCollaboratorCount > 0 && (
+          <span className="org-stat">
+            👤 {node.totalCollaboratorCount} persona{node.totalCollaboratorCount !== 1 ? 's' : ''}
+          </span>
+        )}
+        {hasChildren && (
+          <span className="org-stat">
+            📂 {subCount} sub-unidad{subCount !== 1 ? 'es' : ''}
+            {descCount > subCount && <span className="org-stat-dim"> · {descCount} en total</span>}
+          </span>
+        )}
+      </div>
+
+      {avg !== null && (
+        <div className="org-drill-card-kpi-summary">
+          <div className="org-kpi-bar-wrap">
+            <div
+              className="org-kpi-bar-fill"
+              style={{ width: `${Math.min(avg, 100)}%`, background: getVariationColor(avg) }}
+            />
+          </div>
+          <span className="org-kpi-pct-label" style={{ color: getVariationColor(avg) }}>
+            {avg.toFixed(0)}% cumplimiento
+          </span>
         </div>
       )}
-      {avgVariation !== null && (
-        <div className="org-card-kpi" style={{ color: getVariationColor(avgVariation) }}>
-          {avgVariation.toFixed(0)}% cumplimiento
-        </div>
-      )}
-      {node.kpis.length === 0 && (
-        <div className="org-card-no-kpi">Sin KPIs asignados</div>
-      )}
-      {node.kpis.length > 0 && (
-        <button
-          className="org-card-toggle"
-          onClick={() => setExpanded((v) => !v)}
-        >
-          {expanded ? '▲ Ocultar KPIs' : `▼ ${node.kpis.length} KPI${node.kpis.length !== 1 ? 's' : ''}`}
-        </button>
-      )}
-      {expanded && (
-        <div className="org-card-kpis">
-          {node.kpis.map((k) => (
+
+      {!hasChildren && node.kpis.length > 0 && (
+        <div className="org-drill-card-kpis">
+          {node.kpis.slice(0, 4).map((k) => (
             <div key={k.id} className="org-kpi-row">
               <span className="org-kpi-name">{k.name}</span>
-              {k.variation !== null && k.variation !== undefined ? (
-                <span
-                  className="org-kpi-pct"
-                  style={{ color: getVariationColor(k.variation) }}
-                >
+              {k.variation != null ? (
+                <span className="org-kpi-pct" style={{ color: getVariationColor(k.variation) }}>
                   {Number(k.variation).toFixed(0)}%
                 </span>
               ) : (
@@ -108,57 +134,49 @@ function ScopeCard({ node, depth }: { node: ScopeNode; depth: number }) {
               )}
             </div>
           ))}
+          {node.kpis.length > 4 && (
+            <span className="org-kpi-more">+{node.kpis.length - 4} KPIs más</span>
+          )}
+        </div>
+      )}
+
+      {!hasChildren && node.kpis.length === 0 && (
+        <div className="org-no-kpi">Sin KPIs asignados</div>
+      )}
+
+      {hasChildren && (
+        <div className="org-drill-card-footer">
+          Ver {subCount} sub-unidad{subCount !== 1 ? 'es' : ''} →
         </div>
       )}
     </div>
   )
 }
 
-function renderTree(node: ScopeNode, depth = 0): JSX.Element {
-  if (node.children.length === 0) {
-    return (
-      <TreeNode key={node.id} label={<ScopeCard node={node} depth={depth} />} />
-    )
-  }
-  return (
-    <TreeNode key={node.id} label={<ScopeCard node={node} depth={depth} />}>
-      {node.children.map((child) => renderTree(child, depth + 1))}
-    </TreeNode>
-  )
-}
+// ─── Página principal ─────────────────────────────────────────────────────────
 
 export default function Organigrama() {
-  const [filterType, setFilterType] = useState<string>('all')
+  const [drillPath, setDrillPath] = useState<ScopeNode[]>([])
 
-  const { data: orgScopes, isLoading: loadingScopes } = useQuery<OrgScope[]>(
-    'org-scopes',
-    async () => {
-      const res = await api.get('/org-scopes')
-      return res.data
-    }
-  )
+  const { data: orgScopes, isLoading } = useQuery<OrgScope[]>('org-scopes', async () => {
+    const res = await api.get('/org-scopes')
+    return res.data
+  })
 
   const { data: collaborators } = useQuery<{ id: number; orgScopeId?: number | null }[]>(
     'organigrama-collaborators',
-    async () => {
-      const res = await api.get('/collaborators')
-      return res.data
-    },
+    async () => (await api.get('/collaborators')).data,
     { retry: false }
   )
 
   const { data: scopeKpis } = useQuery<ScopeKPI[]>(
     'scope-kpis-organigrama',
-    async () => {
-      const res = await api.get('/scope-kpis')
-      return res.data
-    },
+    async () => (await api.get('/scope-kpis')).data,
     { retry: false }
   )
 
   const tree = useMemo<ScopeNode[]>(() => {
     if (!orgScopes) return []
-
     const active = orgScopes.filter((s) => s.active !== 0 && s.active !== false)
 
     const kpisByScope = new Map<number, ScopeKPI[]>()
@@ -169,43 +187,29 @@ export default function Organigrama() {
       }
     }
 
-    const directCountByScope = new Map<number, number>()
+    const directCount = new Map<number, number>()
     if (collaborators) {
       for (const c of collaborators) {
-        if (c.orgScopeId) {
-          directCountByScope.set(c.orgScopeId, (directCountByScope.get(c.orgScopeId) || 0) + 1)
-        }
+        if (c.orgScopeId) directCount.set(c.orgScopeId, (directCount.get(c.orgScopeId) || 0) + 1)
       }
     }
 
-    const nodesById = new Map<number, ScopeNode>()
+    const byId = new Map<number, ScopeNode>()
     for (const s of active) {
-      nodesById.set(s.id, {
-        ...s,
-        children: [],
-        kpis: kpisByScope.get(s.id) || [],
-        collaboratorCount: directCountByScope.get(s.id) || 0,
-        totalCollaboratorCount: 0,
-      })
+      byId.set(s.id, { ...s, children: [], kpis: kpisByScope.get(s.id) || [], collaboratorCount: directCount.get(s.id) || 0, totalCollaboratorCount: 0 })
     }
 
     const roots: ScopeNode[] = []
-    for (const node of nodesById.values()) {
-      if (node.parentId && nodesById.has(node.parentId)) {
-        nodesById.get(node.parentId)!.children.push(node)
-      } else {
-        roots.push(node)
-      }
+    for (const node of byId.values()) {
+      if (node.parentId && byId.has(node.parentId)) byId.get(node.parentId)!.children.push(node)
+      else roots.push(node)
     }
 
-    // Calcular totalCollaboratorCount (directos + descendientes)
     const calcTotal = (n: ScopeNode): number => {
-      const childTotal = n.children.reduce((sum, c) => sum + calcTotal(c), 0)
+      const childTotal = n.children.reduce((s, c) => s + calcTotal(c), 0)
       n.totalCollaboratorCount = n.collaboratorCount + childTotal
       return n.totalCollaboratorCount
     }
-
-    // Ordenar hijos por nombre
     const sortChildren = (n: ScopeNode) => {
       n.children.sort((a, b) => a.name.localeCompare(b.name))
       n.children.forEach(sortChildren)
@@ -213,35 +217,32 @@ export default function Organigrama() {
     roots.sort((a, b) => a.name.localeCompare(b.name))
     roots.forEach(sortChildren)
     roots.forEach(calcTotal)
-
     return roots
   }, [orgScopes, scopeKpis, collaborators])
 
-  const types = useMemo(() => {
-    const set = new Set<string>()
-    orgScopes?.forEach((s) => set.add(s.type))
-    return Array.from(set)
-  }, [orgScopes])
+  // Nodos del nivel actual
+  const currentNodes = useMemo(
+    () => (drillPath.length === 0 ? tree : drillPath[drillPath.length - 1].children),
+    [drillPath, tree]
+  )
 
-  const filteredTree = useMemo(() => {
-    if (filterType === 'all') return tree
-    const filterNode = (node: ScopeNode): ScopeNode | null => {
-      const filteredChildren = node.children.map(filterNode).filter(Boolean) as ScopeNode[]
-      if (node.type === filterType || filteredChildren.length > 0) {
-        return { ...node, children: filteredChildren }
-      }
-      return null
-    }
-    return tree.map(filterNode).filter(Boolean) as ScopeNode[]
-  }, [tree, filterType])
+  const currentParent = drillPath.length > 0 ? drillPath[drillPath.length - 1] : null
+
+  const handleDrillDown = (node: ScopeNode) => {
+    setDrillPath((prev) => [...prev, node])
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleBreadcrumb = (index: number) => {
+    setDrillPath((prev) => prev.slice(0, index + 1))
+  }
 
   const totalNodes = useMemo(() => {
-    const count = (nodes: ScopeNode[]): number =>
-      nodes.reduce((acc, n) => acc + 1 + count(n.children), 0)
+    const count = (nodes: ScopeNode[]): number => nodes.reduce((acc, n) => acc + 1 + count(n.children), 0)
     return count(tree)
   }, [tree])
 
-  if (loadingScopes) {
+  if (isLoading) {
     return (
       <div className="organigrama-page">
         <div className="org-loading">Cargando estructura organizacional…</div>
@@ -264,7 +265,7 @@ export default function Organigrama() {
           <p>
             Creá las áreas y equipos en{' '}
             <a href="/configuracion">Configuración → Estructura Organizacional</a>{' '}
-            y aparecerán aquí con su jerarquía.
+            y aparecerán aquí.
           </p>
         </div>
       </div>
@@ -273,52 +274,78 @@ export default function Organigrama() {
 
   return (
     <div className="organigrama-page">
+
+      {/* Header */}
       <div className="page-header">
         <div>
           <h1>Organigrama</h1>
           <p className="subtitle">
-            Estructura jerárquica de la organización · {totalNodes} unidades
+            {totalNodes} unidades · {drillPath.length === 0 ? 'Vista general' : `Nivel ${drillPath.length + 1} de 4`}
           </p>
         </div>
-        <div className="org-filters">
-          <select
-            className="org-filter-select"
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
-          >
-            <option value="all">Todos los tipos</option>
-            {types.map((t) => (
-              <option key={t} value={t}>
-                {TYPE_LABEL[t] || t}
-              </option>
-            ))}
-          </select>
-        </div>
       </div>
 
-      <div className="org-legend">
-        {Object.entries(TYPE_LABEL).filter(([k]) => types.includes(k)).map(([k, label]) => (
-          <span key={k} className="org-legend-item">
-            <span className="org-legend-dot" style={{ background: TYPE_COLOR[k] || '#374151' }} />
-            {label}
+      {/* Breadcrumb */}
+      <nav className="org-breadcrumb">
+        <button
+          className={`org-breadcrumb-item ${drillPath.length === 0 ? 'org-breadcrumb-item--active' : ''}`}
+          onClick={() => setDrillPath([])}
+        >
+          🏠 Inicio
+        </button>
+        {drillPath.map((node, i) => (
+          <span key={node.id} className="org-breadcrumb-entry">
+            <span className="org-breadcrumb-sep">›</span>
+            <button
+              className={`org-breadcrumb-item ${i === drillPath.length - 1 ? 'org-breadcrumb-item--active' : ''}`}
+              onClick={() => handleBreadcrumb(i)}
+            >
+              {node.name}
+            </button>
           </span>
         ))}
-      </div>
+      </nav>
 
-      <div className="org-tree-wrap">
-        {filteredTree.map((root) => (
-          <div key={root.id} className="org-tree-root">
-            <Tree
-              lineWidth="2px"
-              lineColor="#e2e8f0"
-              lineBorderRadius="6px"
-              label={<ScopeCard node={root} depth={0} />}
-            >
-              {root.children.map((child) => renderTree(child, 1))}
-            </Tree>
+      {/* Cabecera del nivel actual */}
+      {currentParent && (
+        <div className="org-level-header" style={{ borderLeftColor: TYPE_COLOR[currentParent.type] || '#374151' }}>
+          <div className="org-level-header-type" style={{ color: TYPE_COLOR[currentParent.type] || '#374151' }}>
+            {TYPE_ICON[currentParent.type] || '📁'} {TYPE_LABEL[currentParent.type] || currentParent.type}
           </div>
-        ))}
-      </div>
+          <div className="org-level-header-name">{currentParent.name}</div>
+          <div className="org-level-header-meta">
+            {currentParent.totalCollaboratorCount > 0 && (
+              <span>{currentParent.totalCollaboratorCount} personas en total</span>
+            )}
+            <span>{currentNodes.length} sub-unidad{currentNodes.length !== 1 ? 'es' : ''}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Grilla del nivel actual */}
+      {currentNodes.length === 0 ? (
+        <div className="org-level-empty">
+          <p>Este nivel no tiene sub-unidades.</p>
+        </div>
+      ) : (
+        <div className={`org-drill-grid org-drill-grid--level-${Math.min(drillPath.length, 3)}`}>
+          {currentNodes.map((node) => (
+            <DrillCard key={node.id} node={node} onDrillDown={handleDrillDown} />
+          ))}
+        </div>
+      )}
+
+      {/* Indicador de profundidad */}
+      {drillPath.length > 0 && (
+        <div className="org-depth-indicator">
+          {[0, 1, 2, 3].map((i) => (
+            <span
+              key={i}
+              className={`org-depth-dot ${i < drillPath.length ? 'org-depth-dot--done' : i === drillPath.length ? 'org-depth-dot--current' : ''}`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

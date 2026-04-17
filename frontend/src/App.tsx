@@ -37,6 +37,7 @@ import MarketplaceKPI from './pages/MarketplaceKPI'
 import Landing from './pages/Landing'
 import OKRBoard from './pages/OKRBoard'
 import Organigrama from './pages/Organigrama'
+import ImportarDatos from './pages/ImportarDatos'
 import OKRCrear from './pages/OKRCrear'
 import OKRAlineacion from './pages/OKRAlineacion'
 import OKRDetalle from './pages/OKRDetalle'
@@ -278,6 +279,14 @@ function App() {
               element={
                 <RequireAuth>
                   <Auditoria />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/importar-datos"
+              element={
+                <RequireAuth>
+                  <ImportarDatos />
                 </RequireAuth>
               }
             />
