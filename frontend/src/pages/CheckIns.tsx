@@ -124,6 +124,21 @@ export default function CheckIns() {
     }
   )
 
+  /* Own check-in history (for leaders who also report up) */
+  const { data: myOwnCheckIns } = useQuery<CheckIn[]>(
+    ['my-own-check-ins', user?.collaboratorId, filterWeeks],
+    async () =>
+      (
+        await api.get('/check-ins', {
+          params: {
+            collaboratorId: user?.collaboratorId,
+            weekStart: getMonday(-(filterWeeks - 1)),
+          },
+        })
+      ).data,
+    { enabled: !isCollaborator && !!user?.collaboratorId }
+  )
+
   const alreadySubmitted = !!currentCheckIn
   const canEdit = alreadySubmitted || showForm
 
@@ -137,12 +152,12 @@ export default function CheckIns() {
             3 preguntas · cada lunes · visibles para tu líder. Conecta tu semana con los KPIs del período.
           </p>
         </div>
-        {isCollaborator && !canEdit && (
+        {!canEdit && (
           <button className="btn-primary" onClick={() => setShowForm(true)}>
             Hacer check-in esta semana
           </button>
         )}
-        {isCollaborator && alreadySubmitted && !showForm && (
+        {alreadySubmitted && !showForm && (
           <button className="btn-secondary" onClick={() => setShowForm(true)}>
             Editar check-in
           </button>
@@ -150,7 +165,7 @@ export default function CheckIns() {
       </div>
 
       {/* Check-in form */}
-      {isCollaborator && (showForm || (!loadingCurrent && !alreadySubmitted)) && (
+      {(showForm || (!loadingCurrent && !alreadySubmitted)) && (
         <div className="checkin-form-card">
           <div className="checkin-form-header">
             <div>
@@ -230,7 +245,7 @@ export default function CheckIns() {
       )}
 
       {/* Already submitted — read-only card */}
-      {isCollaborator && alreadySubmitted && !showForm && (
+      {alreadySubmitted && !showForm && (
         <div className="checkin-submitted-card">
           <div className="checkin-submitted-header">
             <span className="checkin-week-label">Semana del {formatWeek(currentCheckIn!.weekStart)}</span>
@@ -275,6 +290,38 @@ export default function CheckIns() {
         </div>
       )}
 
+      {/* Leader: own check-in history */}
+      {!isCollaborator && (
+        <div className="checkins-list">
+          <h3>Mis check-ins anteriores</h3>
+          {!myOwnCheckIns ? (
+            <div className="checkins-empty">Cargando...</div>
+          ) : myOwnCheckIns.filter((ci) => ci.weekStart !== thisWeek).length === 0 ? (
+            <div className="checkins-empty">No hay check-ins anteriores registrados.</div>
+          ) : (
+            myOwnCheckIns
+              .filter((ci) => ci.weekStart !== thisWeek)
+              .map((ci) => (
+                <div key={ci.id} className="checkin-history-card">
+                  <div className="checkin-history-header">
+                    <span className="checkin-history-week">{formatWeek(ci.weekStart)}</span>
+                    {ci.mood && (
+                      <span className="checkin-history-mood">
+                        {MOODS.find((m) => m.value === ci.mood)?.emoji}
+                      </span>
+                    )}
+                  </div>
+                  <div className="checkin-qa-list compact">
+                    <div className="checkin-qa-item"><span className="checkin-q">Avances</span><p className="checkin-a">{ci.q1}</p></div>
+                    <div className="checkin-qa-item"><span className="checkin-q">Obstáculos</span><p className="checkin-a">{ci.q2}</p></div>
+                    <div className="checkin-qa-item"><span className="checkin-q">Foco próxima semana</span><p className="checkin-a">{ci.q3}</p></div>
+                  </div>
+                </div>
+              ))
+          )}
+        </div>
+      )}
+
       {/* Filters (leaders) */}
       {!isCollaborator && (
         <div className="checkins-filters">
@@ -301,7 +348,7 @@ export default function CheckIns() {
 
       {/* History list */}
       <div className="checkins-list">
-        <h3>{isCollaborator ? 'Mis check-ins anteriores' : 'Check-ins del equipo'}</h3>
+        <h3>{isCollaborator ? 'Mis check-ins anteriores' : 'Check-ins del equipo' }</h3>
         {isLoading ? (
           <div className="checkins-empty">Cargando...</div>
         ) : !checkIns?.length ? (
@@ -334,8 +381,8 @@ export default function CheckIns() {
         )}
       </div>
 
-      {/* My KPIs quick access (collaborators) */}
-      {isCollaborator && myKpis && myKpis.length > 0 && showForm && (
+      {/* My KPIs quick access */}
+      {myKpis && myKpis.length > 0 && showForm && (
         <div className="checkin-kpi-hint">
           <span>Tus KPIs activos:</span>
           {myKpis.filter((k: any) => k.status !== 'closed').slice(0, 5).map((k: any) => (
