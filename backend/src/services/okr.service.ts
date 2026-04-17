@@ -200,7 +200,7 @@ export const updateObjective = async (
   const params: any[] = []
 
   if (data.title !== undefined) { fields.push('title = ?'); params.push(data.title) }
-  if (data.description !== undefined) { fields.push('description = ?'); params.push(data.description) }
+
   if (data.parentId !== undefined) { fields.push('parentId = ?'); params.push(data.parentId) }
   if (data.orgScopeId !== undefined) { fields.push('orgScopeId = ?'); params.push(data.orgScopeId) }
   if (data.status !== undefined) { fields.push('status = ?'); params.push(data.status) }
@@ -253,11 +253,11 @@ export const createKeyResult = async (
 ): Promise<number> => {
   const [result] = await pool.query<any>(
     `INSERT INTO okr_key_results
-       (objectiveId, title, description, krType, startValue, targetValue, currentValue, unit,
+       (objectiveId, title, krType, startValue, targetValue, currentValue, unit,
         collaboratorKpiId, scopeKpiId, weight, ownerId, sortOrder)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      data.objectiveId, data.title, data.description ?? null,
+      data.objectiveId, data.title,
       data.krType ?? 'simple',
       data.startValue ?? null, data.targetValue ?? null, data.currentValue ?? null,
       data.unit ?? null,
@@ -277,7 +277,7 @@ export const updateKeyResult = async (
   const params: any[] = []
 
   if (data.title !== undefined) { fields.push('title = ?'); params.push(data.title) }
-  if (data.description !== undefined) { fields.push('description = ?'); params.push(data.description) }
+
   if (data.currentValue !== undefined) { fields.push('currentValue = ?'); params.push(data.currentValue) }
   if (data.targetValue !== undefined) { fields.push('targetValue = ?'); params.push(data.targetValue) }
   if (data.startValue !== undefined) { fields.push('startValue = ?'); params.push(data.startValue) }
