@@ -24,7 +24,7 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- ==========================================================
 
 -- Periodo activo
-SET @periodId = (SELECT id FROM periods WHERE name LIKE '%Demo%' LIMIT 1);
+SET @periodId = (SELECT id FROM periods ORDER BY startDate DESC LIMIT 1);
 
 -- Subperiodo más reciente del periodo demo
 SET @subPeriodId = (
@@ -74,10 +74,9 @@ SET @kpiQuality = (
 -- ==========================================================
 -- OBJETIVO 1 (Empresa): Escalar el negocio con eficiencia
 -- ==========================================================
-INSERT INTO okr_objectives (title, description, parentId, orgScopeId, periodId, ownerId, status, progress)
+INSERT INTO okr_objectives (title, parentId, orgScopeId, periodId, ownerId, status, progress)
 VALUES (
   'Escalar el negocio con eficiencia operativa',
-  'Crecer revenue mientras mantenemos calidad de entrega y satisfacción del cliente por encima del benchmark.',
   NULL,
   @scopeCompany,
   @periodId,
@@ -88,11 +87,10 @@ VALUES (
 SET @obj1 = LAST_INSERT_ID();
 
 -- KR 1.1 — vinculado a KPI de revenue (kpi_linked)
-INSERT INTO okr_key_results (objectiveId, title, description, krType, collaboratorKpiId, weight, ownerId, status, sortOrder)
+INSERT INTO okr_key_results (objectiveId, title, krType, collaboratorKpiId, weight, ownerId, status, sortOrder)
 VALUES (
   @obj1,
   'Ingresos por ventas ≥ $250.000 mensuales',
-  'Medido directamente desde el KPI de ventas del equipo comercial.',
   'kpi_linked',
   @kpiRevenue,
   1.5,
@@ -103,11 +101,10 @@ VALUES (
 SET @kr1_1 = LAST_INSERT_ID();
 
 -- KR 1.2 — simple, con check-ins
-INSERT INTO okr_key_results (objectiveId, title, description, krType, startValue, targetValue, currentValue, unit, weight, ownerId, status, sortOrder)
+INSERT INTO okr_key_results (objectiveId, title, krType, startValue, targetValue, currentValue, unit, weight, ownerId, status, sortOrder)
 VALUES (
   @obj1,
   'Cerrar 3 nuevos clientes enterprise',
-  'Contratos firmados con empresas de más de 200 empleados.',
   'simple',
   0, 3, 1,
   'clientes',
@@ -119,11 +116,10 @@ VALUES (
 SET @kr1_2 = LAST_INSERT_ID();
 
 -- KR 1.3 — simple, con check-ins
-INSERT INTO okr_key_results (objectiveId, title, description, krType, startValue, targetValue, currentValue, unit, weight, ownerId, status, sortOrder)
+INSERT INTO okr_key_results (objectiveId, title, krType, startValue, targetValue, currentValue, unit, weight, ownerId, status, sortOrder)
 VALUES (
   @obj1,
   'NPS de clientes activos > 60',
-  'Encuesta NPS trimestral a todos los clientes activos.',
   'simple',
   45, 60, 55,
   'puntos',
@@ -137,10 +133,9 @@ SET @kr1_3 = LAST_INSERT_ID();
 -- ==========================================================
 -- OBJETIVO 2 (Área - hijo de obj1): Calidad del producto
 -- ==========================================================
-INSERT INTO okr_objectives (title, description, parentId, orgScopeId, periodId, ownerId, status, progress)
+INSERT INTO okr_objectives (title, parentId, orgScopeId, periodId, ownerId, status, progress)
 VALUES (
   'Mejorar la calidad de entrega del producto',
-  'Reducir defectos en producción y aumentar la cobertura de tests para sostener el crecimiento con estabilidad.',
   @obj1,
   @scopeQA,
   @periodId,
@@ -151,11 +146,10 @@ VALUES (
 SET @obj2 = LAST_INSERT_ID();
 
 -- KR 2.1 — vinculado a KPI de historias (kpi_linked)
-INSERT INTO okr_key_results (objectiveId, title, description, krType, collaboratorKpiId, weight, ownerId, status, sortOrder)
+INSERT INTO okr_key_results (objectiveId, title, krType, collaboratorKpiId, weight, ownerId, status, sortOrder)
 VALUES (
   @obj2,
   'US entregadas acumuladas ≥ 80 en el período',
-  'Medido desde el motor KPI de entrega del equipo QA.',
   'kpi_linked',
   @kpiStories,
   1.0,
@@ -166,11 +160,10 @@ VALUES (
 SET @kr2_1 = LAST_INSERT_ID();
 
 -- KR 2.2 — simple
-INSERT INTO okr_key_results (objectiveId, title, description, krType, startValue, targetValue, currentValue, unit, weight, ownerId, status, sortOrder)
+INSERT INTO okr_key_results (objectiveId, title, krType, startValue, targetValue, currentValue, unit, weight, ownerId, status, sortOrder)
 VALUES (
   @obj2,
   'Bug rate en producción < 5%',
-  'Ratio de tickets críticos sobre total de deploys en el período.',
   'simple',
   12, 5, 7,
   '%',
@@ -182,11 +175,10 @@ VALUES (
 SET @kr2_2 = LAST_INSERT_ID();
 
 -- KR 2.3 — simple
-INSERT INTO okr_key_results (objectiveId, title, description, krType, startValue, targetValue, currentValue, unit, weight, ownerId, status, sortOrder)
+INSERT INTO okr_key_results (objectiveId, title, krType, startValue, targetValue, currentValue, unit, weight, ownerId, status, sortOrder)
 VALUES (
   @obj2,
   'Cobertura de tests automatizados ≥ 85%',
-  'Cobertura medida sobre el código de producción en el repositorio principal.',
   'simple',
   60, 85, 78,
   '%',
@@ -200,10 +192,9 @@ SET @kr2_3 = LAST_INSERT_ID();
 -- ==========================================================
 -- OBJETIVO 3 (Área - hijo de obj1): Equipo y talento
 -- ==========================================================
-INSERT INTO okr_objectives (title, description, parentId, orgScopeId, periodId, ownerId, status, progress)
+INSERT INTO okr_objectives (title, parentId, orgScopeId, periodId, ownerId, status, progress)
 VALUES (
   'Fortalecer el equipo para sostener el crecimiento',
-  'Clima laboral, retención y capacidades del equipo como palanca de escalabilidad.',
   @obj1,
   @scopeCS,
   @periodId,
@@ -214,11 +205,10 @@ VALUES (
 SET @obj3 = LAST_INSERT_ID();
 
 -- KR 3.1 — simple
-INSERT INTO okr_key_results (objectiveId, title, description, krType, startValue, targetValue, currentValue, unit, weight, ownerId, status, sortOrder)
+INSERT INTO okr_key_results (objectiveId, title, krType, startValue, targetValue, currentValue, unit, weight, ownerId, status, sortOrder)
 VALUES (
   @obj3,
   'eNPS del equipo > 50',
-  'Encuesta interna de clima laboral aplicada trimestralmente.',
   'simple',
   30, 50, 42,
   'puntos',
@@ -230,11 +220,10 @@ VALUES (
 SET @kr3_1 = LAST_INSERT_ID();
 
 -- KR 3.2 — simple
-INSERT INTO okr_key_results (objectiveId, title, description, krType, startValue, targetValue, currentValue, unit, weight, ownerId, status, sortOrder)
+INSERT INTO okr_key_results (objectiveId, title, krType, startValue, targetValue, currentValue, unit, weight, ownerId, status, sortOrder)
 VALUES (
   @obj3,
   'Retención de talento ≥ 90% en el período',
-  'Porcentaje de colaboradores que permanecen vs. inicio del período.',
   'simple',
   85, 90, 91,
   '%',
@@ -246,11 +235,10 @@ VALUES (
 SET @kr3_2 = LAST_INSERT_ID();
 
 -- KR 3.3 — vinculado a KPI de calidad (kpi_linked)
-INSERT INTO okr_key_results (objectiveId, title, description, krType, collaboratorKpiId, weight, ownerId, status, sortOrder)
+INSERT INTO okr_key_results (objectiveId, title, krType, collaboratorKpiId, weight, ownerId, status, sortOrder)
 VALUES (
   @obj3,
   'Calidad de gestión del equipo ≥ 75%',
-  'Medido desde el KPI de calidad de gestión asignado al área.',
   'kpi_linked',
   @kpiQuality,
   1.0,
