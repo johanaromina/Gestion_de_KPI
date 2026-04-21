@@ -6,6 +6,7 @@ import {
   getCollaboratorKPIsByPeriod,
   getConsolidatedByCollaborator,
   createCollaboratorKPI,
+  bulkCreateCollaboratorKPIs,
   updateCollaboratorKPI,
   deleteCollaboratorKPI,
   updateActualValue,
@@ -31,6 +32,7 @@ router.get('/collaborator/:collaboratorId/consolidated', getConsolidatedByCollab
 router.get('/collaborator/:collaboratorId', getCollaboratorKPIsByCollaborator)
 router.get('/period/:periodId', getCollaboratorKPIsByPeriod)
 router.post('/', createCollaboratorKPI)
+router.post('/bulk', bulkCreateCollaboratorKPIs)
 router.post('/generate-base-grids', generateBaseGrids)
 router.get('/plan/:collaboratorId/:kpiId/:periodId', getMonthlyPlan)
 router.post('/plan/:collaboratorId/:kpiId/:periodId', upsertMonthlyPlan)

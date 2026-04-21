@@ -1787,3 +1787,59 @@ export const getConsolidatedByCollaborator = async (req: Request, res: Response)
     res.status(500).json({ error: 'Error al obtener consolidado' })
   }
 }
+
+export const bulkCreateCollaboratorKPIs = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!canManageConfig(req.user)) {
+      return res.status(403).json({ error: 'Sin permisos para crear asignaciones' })
+    }
+
+    const { kpiId, periodId, collaboratorIds, target, weight, dataSource, inputMode } = req.body
+
+    if (!kpiId || !periodId || !Array.isArray(collaboratorIds) || collaboratorIds.length === 0) {
+      return res.status(400).json({ error: 'Faltan campos requeridos: kpiId, periodId, collaboratorIds' })
+    }
+    if (target == null || Number(target) <= 0) {
+      return res.status(400).json({ error: 'La meta debe ser mayor a 0' })
+    }
+
+    // Buscar asignaciones ya existentes para el mismo kpi+periodo (sin subperiodo)
+    const placeholders = collaboratorIds.map(() => '?').join(',')
+    const [existing] = await pool.query<any[]>(
+      `SELECT collaboratorId FROM collaborator_kpis
+       WHERE kpiId = ? AND periodId = ? AND subPeriodId IS NULL AND collaboratorId IN (${placeholders})`,
+      [kpiId, periodId, ...collaboratorIds]
+    )
+    const alreadyAssigned = new Set((existing as any[]).map((r: any) => Number(r.collaboratorId)))
+
+    const toCreate = collaboratorIds.filter((id: number) => !alreadyAssigned.has(Number(id)))
+    const created: number[] = []
+
+    for (const collaboratorId of toCreate) {
+      const calendarProfileId = await resolveCalendarProfileId({ collaboratorId: Number(collaboratorId) })
+      const [result] = await pool.query(
+        `INSERT INTO collaborator_kpis
+         (collaboratorId, kpiId, periodId, calendarProfileId, subPeriodId, target, weight, status, curationStatus, dataSource, inputMode)
+         VALUES (?, ?, ?, ?, NULL, ?, ?, 'draft', 'pending', ?, ?)`,
+        [
+          Number(collaboratorId), kpiId, periodId,
+          calendarProfileId,
+          Number(target), Number(weight) || 0,
+          dataSource || null,
+          inputMode || 'manual',
+        ]
+      )
+      created.push((result as any).insertId)
+    }
+
+    return res.status(201).json({
+      created: created.length,
+      skipped: alreadyAssigned.size,
+      createdIds: created,
+      skippedCollaboratorIds: Array.from(alreadyAssigned),
+    })
+  } catch (error: any) {
+    console.error('[CollaboratorKPI] bulkCreate:', error)
+    return res.status(500).json({ error: 'Error al crear asignaciones masivas' })
+  }
+}

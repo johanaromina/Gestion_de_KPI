@@ -10,6 +10,7 @@ import CloseParrillaModal from '../components/CloseParrillaModal'
 import GenerateBaseGridModal from '../components/GenerateBaseGridModal'
 import ReviewModal from '../components/ReviewModal'
 import ConsistencyAlerts from '../components/ConsistencyAlerts'
+import BulkKPIAssignmentModal from '../components/BulkKPIAssignmentModal'
 import { useDialog } from '../components/Dialog'
 import './Asignaciones.css'
 
@@ -32,6 +33,11 @@ export default function Asignaciones() {
   const [showCloseModal, setShowCloseModal] = useState(false)
   const [closingCollaboratorId, setClosingCollaboratorId] = useState<number | null>(null)
   const [showGenerateModal, setShowGenerateModal] = useState(false)
+  const [showBulkModal, setShowBulkModal] = useState(false)
+  const [bulkPrefill, setBulkPrefill] = useState<{
+    kpiId: number; kpiName: string; periodId: number; periodName: string; target: number; weight: number
+  } | undefined>(undefined)
+  const [bulkResult, setBulkResult] = useState<{ created: number; skipped: number } | null>(null)
   const [reviewingAssignment, setReviewingAssignment] = useState<{
     assignment: CollaboratorKPI
     action: 'approve' | 'reject'
@@ -415,6 +421,12 @@ export default function Asignaciones() {
           <button className="btn-secondary" onClick={handleCloseParrilla}>
             Cerrar Parrilla
           </button>
+          <button
+            className="btn-secondary"
+            onClick={() => { setBulkPrefill(undefined); setShowBulkModal(true) }}
+          >
+            Asignación masiva
+          </button>
           <button className="btn-primary" onClick={handleCreate}>
             Nueva Asignación
           </button>
@@ -741,6 +753,25 @@ export default function Asignaciones() {
                               </button>
                             </>
                           )}
+                          <button
+                            className="btn-icon"
+                            title="Replicar a otros colaboradores"
+                            onClick={() => {
+                              const kpi = kpis?.find((k: any) => k.id === assignment.kpiId)
+                              const period = periods?.find((p: any) => p.id === assignment.periodId)
+                              setBulkPrefill({
+                                kpiId: assignment.kpiId,
+                                kpiName: kpi?.name ?? `KPI #${assignment.kpiId}`,
+                                periodId: assignment.periodId,
+                                periodName: period?.name ?? `Período #${assignment.periodId}`,
+                                target: Number(assignment.target) || 0,
+                                weight: Number(assignment.weight) || 0,
+                              })
+                              setShowBulkModal(true)
+                            }}
+                          >
+                            Replicar
+                          </button>
                           {canEditAssignment(assignment) && assignment.status !== 'proposed' && (
                             <>
                               <button className="btn-icon" onClick={() => handleEdit(assignment)} title="Editar">
@@ -897,6 +928,38 @@ export default function Asignaciones() {
           onClose={() => setReviewingAssignment(null)}
           onSuccess={() => {
             setReviewingAssignment(null)
+          }}
+        />
+      )}
+
+      {bulkResult && (
+        <div
+          className="bulk-result-toast"
+          style={{
+            position: 'fixed', bottom: 24, right: 24, zIndex: 2000,
+            background: '#d1fae5', border: '1px solid #6ee7b7', color: '#065f46',
+            padding: '12px 20px', borderRadius: 8, fontWeight: 500, fontSize: 14,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+          }}
+        >
+          ✓ {bulkResult.created} asignación{bulkResult.created !== 1 ? 'es' : ''} creada{bulkResult.created !== 1 ? 's' : ''}
+          {bulkResult.skipped > 0 && ` · ${bulkResult.skipped} ya existían`}
+          <button
+            onClick={() => setBulkResult(null)}
+            style={{ marginLeft: 12, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, color: '#065f46' }}
+          >×</button>
+        </div>
+      )}
+
+      {showBulkModal && (
+        <BulkKPIAssignmentModal
+          prefill={bulkPrefill}
+          onClose={() => { setShowBulkModal(false); setBulkPrefill(undefined) }}
+          onSuccess={(created, skipped) => {
+            setShowBulkModal(false)
+            setBulkPrefill(undefined)
+            setBulkResult({ created, skipped })
+            setTimeout(() => setBulkResult(null), 6000)
           }}
         />
       )}
