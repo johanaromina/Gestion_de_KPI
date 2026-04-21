@@ -36,7 +36,7 @@ export default function Colaboradores() {
   )
 
   const areaScopes = Array.isArray(orgScopes)
-    ? orgScopes.filter((scope) => scope.type === 'area')
+    ? orgScopes.filter((scope) => scope.type !== 'person').sort((a, b) => a.name.localeCompare(b.name))
     : []
 
   const { data: collaborators, isLoading } = useQuery<Collaborator[]>(

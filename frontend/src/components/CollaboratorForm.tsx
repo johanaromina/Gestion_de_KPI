@@ -85,7 +85,21 @@ export default function CollaboratorForm({
     }
   )
 
-  const areaScopes = (orgScopes || []).filter((s) => s.type === 'area')
+  // Todos los scopes asignables (excluye 'person' que es un nodo especial)
+  const assignableScopes = (orgScopes || []).filter((s) => s.type !== 'person')
+  const areaScopes = assignableScopes // alias para compatibilidad con el resto del formulario
+
+  // Construir label con jerarquía: "Dirección Comercial › Ventas Norte"
+  const scopeLabel = (scope: OrgScope): string => {
+    const parent = orgScopes?.find((s) => s.id === scope.parentId)
+    return parent ? `${parent.name} › ${scope.name}` : scope.name
+  }
+
+  // Ordenar jerárquicamente: padres primero, luego hijos indentados
+  const sortedAssignableScopes = [...assignableScopes].sort((a, b) =>
+    scopeLabel(a).localeCompare(scopeLabel(b))
+  )
+
   const personScopes = (orgScopes || []).filter((s) => s.type === 'person').sort((a, b) => a.name.localeCompare(b.name))
   const selectedOrgScope = orgScopes?.find((s) => s.id === formData.orgScopeId)
   const orgScopeIsPersonNode = selectedOrgScope?.type === 'person'
@@ -349,7 +363,7 @@ export default function CollaboratorForm({
                   onChange={(e) => {
                     setSubmitError('')
                     const nextArea = e.target.value
-                    const scopeMatch = areaScopes.find((scope) => scope.name === nextArea)
+                    const scopeMatch = sortedAssignableScopes.find((scope) => scope.name === nextArea)
                     setFormData({
                       ...formData,
                       area: nextArea,
@@ -358,10 +372,10 @@ export default function CollaboratorForm({
                   }}
                   className={errors.area ? 'error' : ''}
                 >
-                  <option value="">Seleccione un area</option>
-                  {areaScopes.map((a) => (
+                  <option value="">Seleccione un área o equipo</option>
+                  {sortedAssignableScopes.map((a) => (
                     <option key={a.id} value={a.name}>
-                      {a.name}
+                      {scopeLabel(a)}
                     </option>
                   ))}
                 </select>
