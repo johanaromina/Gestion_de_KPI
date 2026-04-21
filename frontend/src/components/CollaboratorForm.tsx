@@ -118,9 +118,14 @@ export default function CollaboratorForm({
       setMappingSourceType(DEFAULT_MAPPING_SOURCE_TYPE)
       return
     }
-    setExternalKeysBySourceType(
-      buildExternalKeysTextBySourceType(collaboratorMappings, 'collaborator', collaborator.id)
+    const keysByType = buildExternalKeysTextBySourceType(collaboratorMappings, 'collaborator', collaborator.id)
+    setExternalKeysBySourceType(keysByType)
+    // Auto-seleccionar el primer tipo no-global que tenga valor
+    const nonGlobal = Object.entries(keysByType).find(
+      ([type, val]) => type !== DEFAULT_MAPPING_SOURCE_TYPE && val.trim() !== ''
     )
+    if (nonGlobal) setMappingSourceType(nonGlobal[0])
+    else setMappingSourceType(DEFAULT_MAPPING_SOURCE_TYPE)
   }, [collaborator?.id, collaboratorMappings])
 
   const updateExternalKeysForSourceType = (value: string) => {
