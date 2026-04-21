@@ -12,6 +12,8 @@ interface Collaborator { id: number; name: string }
 interface CollaboratorKPI { id: number; kpiName: string; collaboratorName: string; target: number }
 interface ScopeKPI { id: number; name: string; orgScopeName: string; target: number }
 
+interface KpiLink { type: 'collaborator' | 'scope'; id: number; label: string }
+
 interface KRDraft {
   tempId: string
   title: string
@@ -20,8 +22,7 @@ interface KRDraft {
   startValue: string
   targetValue: string
   unit: string
-  collaboratorKpiId: string
-  scopeKpiId: string
+  kpiLinks: KpiLink[]
   weight: string
 }
 
@@ -33,8 +34,7 @@ const emptyKR = (): KRDraft => ({
   startValue: '0',
   targetValue: '',
   unit: '',
-  collaboratorKpiId: '',
-  scopeKpiId: '',
+  kpiLinks: [],
   weight: '1',
 })
 
@@ -84,8 +84,11 @@ export default function OKRCrear() {
         startValue: String(kr.startValue ?? '0'),
         targetValue: String(kr.targetValue ?? ''),
         unit: kr.unit ?? '',
-        collaboratorKpiId: String(kr.collaboratorKpiId ?? ''),
-        scopeKpiId: String(kr.scopeKpiId ?? ''),
+        kpiLinks: (kr.linkedKpis ?? []).map((lk: any) => ({
+          type: lk.type as 'collaborator' | 'scope',
+          id: lk.id,
+          label: lk.label ?? `KPI #${lk.id}`,
+        })),
         weight: String(kr.weight ?? '1'),
       })))
     }
@@ -140,10 +143,23 @@ export default function OKRCrear() {
     startValue: kr.krType === 'simple' ? Number(kr.startValue) : null,
     targetValue: kr.krType === 'simple' ? Number(kr.targetValue) : null,
     unit: kr.unit || null,
-    collaboratorKpiId: kr.krType === 'kpi_linked' && kr.collaboratorKpiId ? Number(kr.collaboratorKpiId) : null,
-    scopeKpiId: kr.krType === 'kpi_linked' && kr.scopeKpiId ? Number(kr.scopeKpiId) : null,
+    kpiLinks: kr.krType === 'kpi_linked' ? kr.kpiLinks : [],
     weight: Number(kr.weight) || 1,
   })
+
+  const addKpiLink = (tempId: string, link: KpiLink) => {
+    setKrs((prev) => prev.map((kr) => {
+      if (kr.tempId !== tempId) return kr
+      if (kr.kpiLinks.some((l) => l.type === link.type && l.id === link.id)) return kr
+      return { ...kr, kpiLinks: [...kr.kpiLinks, link] }
+    }))
+  }
+
+  const removeKpiLink = (tempId: string, type: string, linkId: number) => {
+    setKrs((prev) => prev.map((kr) =>
+      kr.tempId !== tempId ? kr : { ...kr, kpiLinks: kr.kpiLinks.filter((l) => !(l.type === type && l.id === linkId)) }
+    ))
+  }
 
   const createMutation = useMutation(
     async () => {
@@ -470,31 +486,46 @@ export default function OKRCrear() {
               )}
 
               {kr.krType === 'kpi_linked' && (
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>KPI individual</label>
-                    <select value={kr.collaboratorKpiId} onChange={(e) => updateKR(kr.tempId, 'collaboratorKpiId', e.target.value)}>
-                      <option value="">— Sin vínculo individual —</option>
-                      {collabKpis.map((ck) => (
-                        <option key={ck.id} value={ck.id}>
-                          {ck.kpiName} — {ck.collaboratorName} (meta: {ck.target})
-                        </option>
+                <div className="form-group">
+                  <label>KPIs vinculados</label>
+                  {kr.kpiLinks.length > 0 && (
+                    <div className="kpi-chips">
+                      {kr.kpiLinks.map((lk) => (
+                        <span key={`${lk.type}-${lk.id}`} className={`kpi-chip kpi-chip--${lk.type}`}>
+                          {lk.label}
+                          <button type="button" className="kpi-chip-remove" onClick={() => removeKpiLink(kr.tempId, lk.type, lk.id)}>×</button>
+                        </span>
                       ))}
-                    </select>
-                    <small className="form-hint">KPI asignado a una persona específica.</small>
-                  </div>
-                  <div className="form-group">
-                    <label>KPI grupal</label>
-                    <select value={kr.scopeKpiId} onChange={(e) => updateKR(kr.tempId, 'scopeKpiId', e.target.value)}>
-                      <option value="">— Sin vínculo grupal —</option>
-                      {scopeKpis.map((sk) => (
-                        <option key={sk.id} value={sk.id}>
-                          {sk.name} — {sk.orgScopeName} (meta: {sk.target})
-                        </option>
-                      ))}
-                    </select>
-                    <small className="form-hint">KPI consolidado de un área o equipo.</small>
-                  </div>
+                    </div>
+                  )}
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      const [type, rawId] = e.target.value.split(':')
+                      const id = Number(rawId)
+                      if (!type || !id) return
+                      if (type === 'collaborator') {
+                        const ck = collabKpis.find((c) => c.id === id)
+                        if (ck) addKpiLink(kr.tempId, { type: 'collaborator', id, label: `${ck.kpiName} — ${ck.collaboratorName}` })
+                      } else {
+                        const sk = scopeKpis.find((s) => s.id === id)
+                        if (sk) addKpiLink(kr.tempId, { type: 'scope', id, label: `${sk.name} — ${sk.orgScopeName}` })
+                      }
+                    }}
+                  >
+                    <option value="">+ Agregar KPI...</option>
+                    {collabKpis.filter((ck) => !kr.kpiLinks.some((l) => l.type === 'collaborator' && l.id === ck.id)).map((ck) => (
+                      <option key={`collaborator:${ck.id}`} value={`collaborator:${ck.id}`}>
+                        👤 {ck.kpiName} — {ck.collaboratorName} (meta: {ck.target})
+                      </option>
+                    ))}
+                    {scopeKpis.filter((sk) => !kr.kpiLinks.some((l) => l.type === 'scope' && l.id === sk.id)).map((sk) => (
+                      <option key={`scope:${sk.id}`} value={`scope:${sk.id}`}>
+                        🏢 {sk.name} — {sk.orgScopeName} (meta: {sk.target})
+                      </option>
+                    ))}
+                  </select>
+                  <small className="form-hint">Podés vincular uno o más KPIs (individuales o grupales). El progreso del KR se calcula como el promedio de todos.</small>
                 </div>
               )}
 

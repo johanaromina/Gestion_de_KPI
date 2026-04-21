@@ -6,6 +6,19 @@ import './OKRDetalle.css'
 
 type KRStatus = 'not_started' | 'on_track' | 'at_risk' | 'behind' | 'completed'
 
+interface KpiLink { type: 'collaborator' | 'scope'; id: number; label: string }
+
+interface KREditDraft {
+  title: string
+  description: string
+  krType: 'simple' | 'kpi_linked'
+  startValue: string
+  targetValue: string
+  unit: string
+  kpiLinks: KpiLink[]
+  weight: string
+}
+
 interface DataSource {
   krId: number
   krTitle: string
@@ -40,6 +53,7 @@ interface KeyResult {
   status: KRStatus
   progressPercent: number
   ownerName?: string
+  linkedKpis?: KpiLink[]
 }
 
 interface CheckIn {
@@ -97,6 +111,8 @@ export default function OKRDetalle() {
   const [treeSearch, setTreeSearch] = useState('')
   const [treeDropdownOpen, setTreeDropdownOpen] = useState(false)
   const [expandedSources, setExpandedSources] = useState<Set<number>>(new Set())
+  const [editingKrId, setEditingKrId] = useState<number | null>(null)
+  const [krEditDraft, setKrEditDraft] = useState<KREditDraft | null>(null)
 
   const { data: objective, isLoading } = useQuery<Objective>(
     ['okr-objective', id],
@@ -183,6 +199,78 @@ export default function OKRDetalle() {
 
   const linkedTreeIds = new Set(treeLinks.map((l) => l.objectiveTreeId))
   const availableNodes = allTreeNodes.filter((n) => !linkedTreeIds.has(n.id))
+
+  const periodId = (objective as any)?.periodId
+  const { data: collabKpis = [] } = useQuery<{ id: number; kpiName: string; collaboratorName: string; target: number }[]>(
+    ['collab-kpis-det', periodId],
+    () => api.get('/collaborator-kpis', { params: { periodId } }).then((r) =>
+      r.data.map((ck: any) => ({ id: ck.id, kpiName: ck.kpiName ?? `KPI #${ck.kpiId}`, collaboratorName: ck.collaboratorName ?? '', target: ck.target }))
+    ),
+    { enabled: !!periodId && editingKrId !== null }
+  )
+  const { data: scopeKpis = [] } = useQuery<{ id: number; name: string; orgScopeName: string; target: number }[]>(
+    ['scope-kpis-det', periodId],
+    () => api.get('/scope-kpis', { params: { periodId } }).then((r) =>
+      r.data.map((sk: any) => ({ id: sk.id, name: sk.name, orgScopeName: sk.orgScopeName ?? '', target: sk.target }))
+    ),
+    { enabled: !!periodId && editingKrId !== null }
+  )
+
+  const updateKrMutation = useMutation(
+    ({ krId, data }: { krId: number; data: object }) =>
+      api.put(`/okr/${id}/key-results/${krId}`, data),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(['okr-objective', id])
+        setEditingKrId(null)
+        setKrEditDraft(null)
+      },
+    }
+  )
+
+  const openKrEdit = (kr: KeyResult) => {
+    setEditingKrId(kr.id)
+    setKrEditDraft({
+      title: kr.title,
+      description: '',
+      krType: kr.krType,
+      startValue: String(kr.startValue ?? '0'),
+      targetValue: String(kr.targetValue ?? ''),
+      unit: kr.unit ?? '',
+      kpiLinks: kr.linkedKpis ?? [],
+      weight: String(kr.weight ?? '1'),
+    })
+  }
+
+  const addKrKpiLink = (link: KpiLink) => {
+    setKrEditDraft((prev) => {
+      if (!prev) return prev
+      if (prev.kpiLinks.some((l) => l.type === link.type && l.id === link.id)) return prev
+      return { ...prev, kpiLinks: [...prev.kpiLinks, link] }
+    })
+  }
+
+  const removeKrKpiLink = (type: string, linkId: number) => {
+    setKrEditDraft((prev) =>
+      prev ? { ...prev, kpiLinks: prev.kpiLinks.filter((l) => !(l.type === type && l.id === linkId)) } : prev
+    )
+  }
+
+  const saveKrEdit = (krId: number) => {
+    if (!krEditDraft) return
+    updateKrMutation.mutate({
+      krId,
+      data: {
+        title: krEditDraft.title,
+        krType: krEditDraft.krType,
+        startValue: krEditDraft.krType === 'simple' ? Number(krEditDraft.startValue) : null,
+        targetValue: krEditDraft.krType === 'simple' ? Number(krEditDraft.targetValue) : null,
+        unit: krEditDraft.unit || null,
+        kpiLinks: krEditDraft.krType === 'kpi_linked' ? krEditDraft.kpiLinks : [],
+        weight: Number(krEditDraft.weight) || 1,
+      },
+    })
+  }
 
   if (isLoading) return <div className="okr-detalle-loading">Cargando...</div>
   if (!objective) return <div className="okr-detalle-loading">Objetivo no encontrado.</div>
@@ -283,6 +371,14 @@ export default function OKRDetalle() {
                 {kr.ownerName && <span className="okr-kr-owner"> — {kr.ownerName}</span>}
               </div>
               <div className="okr-kr-card-right">
+                {objective.status !== 'closed' && (
+                  <button
+                    className="btn-checkin"
+                    onClick={() => editingKrId === kr.id ? (setEditingKrId(null), setKrEditDraft(null)) : openKrEdit(kr)}
+                  >
+                    {editingKrId === kr.id ? 'Cancelar edición' : 'Editar KR'}
+                  </button>
+                )}
                 <select
                   className="kr-status-select"
                   value={newKRStatus[kr.id] ?? kr.status}
@@ -390,6 +486,125 @@ export default function OKRDetalle() {
                 </div>
               )
             })()}
+
+            {/* Panel edición inline de KR */}
+            {editingKrId === kr.id && krEditDraft && (
+              <div className="kr-edit-panel">
+                <div className="kr-edit-panel-title">Editar Key Result</div>
+                <div className="checkin-form" style={{ flexDirection: 'column', gap: '12px' }}>
+                  <div className="checkin-field checkin-field--wide">
+                    <label>Título</label>
+                    <input
+                      type="text"
+                      value={krEditDraft.title}
+                      onChange={(e) => setKrEditDraft((p) => p ? { ...p, title: e.target.value } : p)}
+                    />
+                  </div>
+
+                  <div className="checkin-field">
+                    <label>Tipo de medición</label>
+                    <div className="kr-type-toggle">
+                      <button
+                        type="button"
+                        className={`kr-type-btn ${krEditDraft.krType === 'simple' ? 'active' : ''}`}
+                        onClick={() => setKrEditDraft((p) => p ? { ...p, krType: 'simple' } : p)}
+                      >
+                        📝 Valor manual
+                      </button>
+                      <button
+                        type="button"
+                        className={`kr-type-btn ${krEditDraft.krType === 'kpi_linked' ? 'active' : ''}`}
+                        onClick={() => setKrEditDraft((p) => p ? { ...p, krType: 'kpi_linked' } : p)}
+                      >
+                        🔗 Vinculado a KPI
+                      </button>
+                    </div>
+                  </div>
+
+                  {krEditDraft.krType === 'simple' && (
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                      <div className="checkin-field">
+                        <label>Valor inicial</label>
+                        <input type="number" value={krEditDraft.startValue} onChange={(e) => setKrEditDraft((p) => p ? { ...p, startValue: e.target.value } : p)} />
+                      </div>
+                      <div className="checkin-field">
+                        <label>Meta</label>
+                        <input type="number" value={krEditDraft.targetValue} onChange={(e) => setKrEditDraft((p) => p ? { ...p, targetValue: e.target.value } : p)} />
+                      </div>
+                      <div className="checkin-field">
+                        <label>Unidad</label>
+                        <input type="text" value={krEditDraft.unit} placeholder="%, días, $..." onChange={(e) => setKrEditDraft((p) => p ? { ...p, unit: e.target.value } : p)} />
+                      </div>
+                    </div>
+                  )}
+
+                  {krEditDraft.krType === 'kpi_linked' && (
+                    <div className="checkin-field checkin-field--wide">
+                      <label>KPIs vinculados</label>
+                      {krEditDraft.kpiLinks.length > 0 && (
+                        <div className="kpi-chips" style={{ marginBottom: '8px' }}>
+                          {krEditDraft.kpiLinks.map((lk) => (
+                            <span key={`${lk.type}-${lk.id}`} className={`kpi-chip kpi-chip--${lk.type}`}>
+                              {lk.label}
+                              <button type="button" className="kpi-chip-remove" onClick={() => removeKrKpiLink(lk.type, lk.id)}>×</button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          const [type, rawId] = e.target.value.split(':')
+                          const lid = Number(rawId)
+                          if (!type || !lid) return
+                          if (type === 'collaborator') {
+                            const ck = collabKpis.find((c) => c.id === lid)
+                            if (ck) addKrKpiLink({ type: 'collaborator', id: lid, label: `${ck.kpiName} — ${ck.collaboratorName}` })
+                          } else {
+                            const sk = scopeKpis.find((s) => s.id === lid)
+                            if (sk) addKrKpiLink({ type: 'scope', id: lid, label: `${sk.name} — ${sk.orgScopeName}` })
+                          }
+                        }}
+                      >
+                        <option value="">+ Agregar KPI...</option>
+                        {collabKpis.filter((ck) => !krEditDraft.kpiLinks.some((l) => l.type === 'collaborator' && l.id === ck.id)).map((ck) => (
+                          <option key={`collaborator:${ck.id}`} value={`collaborator:${ck.id}`}>
+                            👤 {ck.kpiName} — {ck.collaboratorName} (meta: {ck.target})
+                          </option>
+                        ))}
+                        {scopeKpis.filter((sk) => !krEditDraft.kpiLinks.some((l) => l.type === 'scope' && l.id === sk.id)).map((sk) => (
+                          <option key={`scope:${sk.id}`} value={`scope:${sk.id}`}>
+                            🏢 {sk.name} — {sk.orgScopeName} (meta: {sk.target})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="checkin-field">
+                    <label>Peso relativo</label>
+                    <input
+                      type="number" min="0.1" max="10" step="0.1"
+                      value={krEditDraft.weight}
+                      onChange={(e) => setKrEditDraft((p) => p ? { ...p, weight: e.target.value } : p)}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      className="btn-primary"
+                      onClick={() => saveKrEdit(kr.id)}
+                      disabled={!krEditDraft.title.trim() || updateKrMutation.isLoading}
+                    >
+                      {updateKrMutation.isLoading ? 'Guardando...' : 'Guardar cambios'}
+                    </button>
+                    <button className="btn-secondary" onClick={() => { setEditingKrId(null); setKrEditDraft(null) }}>
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Panel check-in */}
             {selectedKR === kr.id && kr.krType === 'simple' && (

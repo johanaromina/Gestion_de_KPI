@@ -8,10 +8,19 @@ import { OKRObjective, OKRKeyResult, OKRCheckIn } from '../types'
  * - simple:     (current - start) / (target - start) * 100
  * - kpi_linked: delega al actual/target del KPI vinculado
  */
-export const calcKrProgress = (kr: OKRKeyResult): number => {
+export const calcKrProgress = (kr: OKRKeyResult & { linkedKpis?: { actual: number | null; target: number | null }[] }): number => {
   if (kr.krType === 'kpi_linked') {
-    const actual = kr.kpiActual ?? 0
-    const target = kr.kpiTarget ?? 0
+    const links = kr.linkedKpis
+    if (Array.isArray(links) && links.length > 0) {
+      const progresses = links.map((l) => {
+        const a = Number(l.actual ?? 0)
+        const t = Number(l.target ?? 0)
+        return t === 0 ? 0 : Math.min(100, Math.max(0, (a / t) * 100))
+      })
+      return Math.round(progresses.reduce((s, p) => s + p, 0) / progresses.length)
+    }
+    const actual = Number(kr.kpiActual ?? 0)
+    const target = Number(kr.kpiTarget ?? 0)
     if (target === 0) return 0
     return Math.min(100, Math.max(0, (actual / target) * 100))
   }
@@ -44,14 +53,34 @@ export const recalcObjectiveProgress = async (objectiveId: number): Promise<void
     return
   }
 
+  // Cargar KPIs múltiples para KRs kpi_linked
+  const krIds = krs.map((r) => r.id)
+  const [kpiLinksRows] = await pool.query<any[]>(
+    `SELECT okk.krId,
+       COALESCE(ck.actual, sk.actual) AS actual,
+       COALESCE(ck.target, sk.target) AS target
+     FROM okr_kr_kpis okk
+     LEFT JOIN collaborator_kpis ck ON okk.collaboratorKpiId = ck.id
+     LEFT JOIN scope_kpis sk ON okk.scopeKpiId = sk.id
+     WHERE okk.krId IN (${krIds.map(() => '?').join(',')})`,
+    krIds
+  )
+  const linkedByKr = new Map<number, { actual: number | null; target: number | null }[]>()
+  for (const row of Array.isArray(kpiLinksRows) ? kpiLinksRows : []) {
+    const list = linkedByKr.get(row.krId) ?? []
+    list.push({ actual: row.actual, target: row.target })
+    linkedByKr.set(row.krId, list)
+  }
+
   let totalWeight = 0
   let weightedSum = 0
 
   for (const row of krs) {
-    const kr: OKRKeyResult = {
+    const kr = {
       ...row,
       kpiActual: row.kpiActual ?? row.scopeActual,
       kpiTarget: row.kpiTarget ?? row.scopeTarget,
+      linkedKpis: linkedByKr.get(row.id),
     }
     const progress = calcKrProgress(kr)
     const w = Number(row.weight) || 1
@@ -236,20 +265,72 @@ export const listKeyResults = async (objectiveId: number): Promise<OKRKeyResult[
     [objectiveId]
   )
 
-  return (Array.isArray(rows) ? rows : []).map((row) => ({
-    ...row,
-    kpiActual: row.kpiActual ?? row.scopeActual ?? null,
-    kpiTarget: row.kpiTarget ?? row.scopeTarget ?? null,
-    progressPercent: calcKrProgress({
+  const krs = Array.isArray(rows) ? rows : []
+  if (krs.length === 0) return []
+
+  const krIds = krs.map((r) => r.id)
+  const [kpiLinksRows] = await pool.query<any[]>(
+    `SELECT okk.id, okk.krId, okk.collaboratorKpiId, okk.scopeKpiId,
+       COALESCE(ck.actual, sk.actual) AS actual,
+       COALESCE(ck.target, sk.target) AS target,
+       COALESCE(kck.name, ksk.name) AS kpiName,
+       COALESCE(col.name, sc.name) AS sourceName
+     FROM okr_kr_kpis okk
+     LEFT JOIN collaborator_kpis ck ON okk.collaboratorKpiId = ck.id
+     LEFT JOIN scope_kpis sk ON okk.scopeKpiId = sk.id
+     LEFT JOIN kpis kck ON ck.kpiId = kck.id
+     LEFT JOIN kpis ksk ON sk.kpiId = ksk.id
+     LEFT JOIN collaborators col ON ck.collaboratorId = col.id
+     LEFT JOIN org_scopes sc ON sk.orgScopeId = sc.id
+     WHERE okk.krId IN (${krIds.map(() => '?').join(',')})`,
+    krIds
+  )
+
+  const linkedByKr = new Map<number, any[]>()
+  for (const row of Array.isArray(kpiLinksRows) ? kpiLinksRows : []) {
+    const list = linkedByKr.get(row.krId) ?? []
+    list.push(row)
+    linkedByKr.set(row.krId, list)
+  }
+
+  return krs.map((row) => {
+    const linkedKpis = linkedByKr.get(row.id) ?? []
+    return {
       ...row,
-      kpiActual: row.kpiActual ?? row.scopeActual,
-      kpiTarget: row.kpiTarget ?? row.scopeTarget,
-    }),
-  }))
+      kpiActual: row.kpiActual ?? row.scopeActual ?? null,
+      kpiTarget: row.kpiTarget ?? row.scopeTarget ?? null,
+      linkedKpis,
+      progressPercent: calcKrProgress({
+        ...row,
+        kpiActual: row.kpiActual ?? row.scopeActual,
+        kpiTarget: row.kpiTarget ?? row.scopeTarget,
+        linkedKpis,
+      }),
+    }
+  })
+}
+
+type KpiLink = { collaboratorKpiId?: number | null; scopeKpiId?: number | null }
+
+const syncKpiLinks = async (krId: number, kpiLinks: KpiLink[]): Promise<void> => {
+  await pool.query(`DELETE FROM okr_kr_kpis WHERE krId = ?`, [krId])
+  if (kpiLinks.length === 0) return
+  for (const link of kpiLinks) {
+    await pool.query(
+      `INSERT INTO okr_kr_kpis (krId, collaboratorKpiId, scopeKpiId) VALUES (?, ?, ?)`,
+      [krId, link.collaboratorKpiId ?? null, link.scopeKpiId ?? null]
+    )
+  }
+  // Mantener legacy columns apuntando al primero para compatibilidad con recalc legado
+  const first = kpiLinks[0]
+  await pool.query(
+    `UPDATE okr_key_results SET collaboratorKpiId = ?, scopeKpiId = ? WHERE id = ?`,
+    [first.collaboratorKpiId ?? null, first.scopeKpiId ?? null, krId]
+  )
 }
 
 export const createKeyResult = async (
-  data: Pick<OKRKeyResult, 'objectiveId' | 'title' | 'description' | 'krType' | 'startValue' | 'targetValue' | 'currentValue' | 'unit' | 'collaboratorKpiId' | 'scopeKpiId' | 'weight' | 'ownerId' | 'sortOrder'>
+  data: Pick<OKRKeyResult, 'objectiveId' | 'title' | 'description' | 'krType' | 'startValue' | 'targetValue' | 'currentValue' | 'unit' | 'collaboratorKpiId' | 'scopeKpiId' | 'weight' | 'ownerId' | 'sortOrder'> & { kpiLinks?: KpiLink[] }
 ): Promise<number> => {
   const [result] = await pool.query<any>(
     `INSERT INTO okr_key_results
@@ -265,19 +346,25 @@ export const createKeyResult = async (
       data.weight ?? 1, data.ownerId ?? null, data.sortOrder ?? 0,
     ]
   )
+  const krId = result.insertId
+  const links = data.kpiLinks ?? (
+    data.collaboratorKpiId ? [{ collaboratorKpiId: data.collaboratorKpiId }] :
+    data.scopeKpiId ? [{ scopeKpiId: data.scopeKpiId }] : []
+  )
+  if (links.length > 0) await syncKpiLinks(krId, links)
   await recalcObjectiveProgress(data.objectiveId)
-  return result.insertId
+  return krId
 }
 
 export const updateKeyResult = async (
   id: number,
-  data: Partial<Pick<OKRKeyResult, 'title' | 'description' | 'currentValue' | 'targetValue' | 'startValue' | 'unit' | 'weight' | 'status' | 'sortOrder'>>
+  data: Partial<Pick<OKRKeyResult, 'title' | 'krType' | 'currentValue' | 'targetValue' | 'startValue' | 'unit' | 'weight' | 'status' | 'sortOrder' | 'ownerId' | 'collaboratorKpiId' | 'scopeKpiId'>> & { kpiLinks?: KpiLink[] }
 ): Promise<void> => {
   const fields: string[] = []
   const params: any[] = []
 
   if (data.title !== undefined) { fields.push('title = ?'); params.push(data.title) }
-
+  if (data.krType !== undefined) { fields.push('krType = ?'); params.push(data.krType) }
   if (data.currentValue !== undefined) { fields.push('currentValue = ?'); params.push(data.currentValue) }
   if (data.targetValue !== undefined) { fields.push('targetValue = ?'); params.push(data.targetValue) }
   if (data.startValue !== undefined) { fields.push('startValue = ?'); params.push(data.startValue) }
@@ -285,12 +372,19 @@ export const updateKeyResult = async (
   if (data.weight !== undefined) { fields.push('weight = ?'); params.push(data.weight) }
   if (data.status !== undefined) { fields.push('status = ?'); params.push(data.status) }
   if (data.sortOrder !== undefined) { fields.push('sortOrder = ?'); params.push(data.sortOrder) }
+  if (data.ownerId !== undefined) { fields.push('ownerId = ?'); params.push(data.ownerId) }
+  if (data.collaboratorKpiId !== undefined && !data.kpiLinks) { fields.push('collaboratorKpiId = ?'); params.push(data.collaboratorKpiId) }
+  if (data.scopeKpiId !== undefined && !data.kpiLinks) { fields.push('scopeKpiId = ?'); params.push(data.scopeKpiId) }
 
-  if (fields.length === 0) return
-  params.push(id)
-  await pool.query(`UPDATE okr_key_results SET ${fields.join(', ')} WHERE id = ?`, params)
+  if (fields.length > 0) {
+    params.push(id)
+    await pool.query(`UPDATE okr_key_results SET ${fields.join(', ')} WHERE id = ?`, params)
+  }
 
-  // Recalcular progreso del objetivo padre
+  if (data.kpiLinks !== undefined) {
+    await syncKpiLinks(id, data.kpiLinks)
+  }
+
   const [rows] = await pool.query<any[]>(`SELECT objectiveId FROM okr_key_results WHERE id = ?`, [id])
   if (Array.isArray(rows) && rows[0]) {
     await recalcObjectiveProgress(rows[0].objectiveId)

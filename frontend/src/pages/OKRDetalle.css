@@ -709,3 +709,81 @@
   color: #6b7280;
   text-align: center;
 }
+
+.kr-edit-panel {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.kr-edit-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 14px;
+}
+
+.kr-type-toggle {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.kr-type-btn {
+  padding: 6px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #374151;
+}
+
+.kr-type-btn.active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+
+.kpi-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.kpi-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.kpi-chip--collaborator {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.kpi-chip--scope {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.kpi-chip-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 2px;
+  color: inherit;
+  opacity: 0.7;
+}
+
+.kpi-chip-remove:hover {
+  opacity: 1;
+}
