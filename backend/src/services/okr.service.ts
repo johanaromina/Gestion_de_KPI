@@ -310,22 +310,36 @@ export const listKeyResults = async (objectiveId: number): Promise<OKRKeyResult[
   })
 }
 
-type KpiLink = { collaboratorKpiId?: number | null; scopeKpiId?: number | null }
+// Acepta tanto el formato del frontend { type, id } como el legacy { collaboratorKpiId, scopeKpiId }
+type KpiLink =
+  | { type: 'collaborator' | 'scope'; id: number }
+  | { collaboratorKpiId?: number | null; scopeKpiId?: number | null }
+
+const normalizeKpiLink = (link: KpiLink): { collaboratorKpiId: number | null; scopeKpiId: number | null } => {
+  if ('type' in link) {
+    return {
+      collaboratorKpiId: link.type === 'collaborator' ? link.id : null,
+      scopeKpiId: link.type === 'scope' ? link.id : null,
+    }
+  }
+  return { collaboratorKpiId: link.collaboratorKpiId ?? null, scopeKpiId: link.scopeKpiId ?? null }
+}
 
 const syncKpiLinks = async (krId: number, kpiLinks: KpiLink[]): Promise<void> => {
   await pool.query(`DELETE FROM okr_kr_kpis WHERE krId = ?`, [krId])
   if (kpiLinks.length === 0) return
   for (const link of kpiLinks) {
+    const { collaboratorKpiId, scopeKpiId } = normalizeKpiLink(link)
     await pool.query(
       `INSERT INTO okr_kr_kpis (krId, collaboratorKpiId, scopeKpiId) VALUES (?, ?, ?)`,
-      [krId, link.collaboratorKpiId ?? null, link.scopeKpiId ?? null]
+      [krId, collaboratorKpiId, scopeKpiId]
     )
   }
   // Mantener legacy columns apuntando al primero para compatibilidad con recalc legado
-  const first = kpiLinks[0]
+  const { collaboratorKpiId: firstCollab, scopeKpiId: firstScope } = normalizeKpiLink(kpiLinks[0])
   await pool.query(
     `UPDATE okr_key_results SET collaboratorKpiId = ?, scopeKpiId = ? WHERE id = ?`,
-    [first.collaboratorKpiId ?? null, first.scopeKpiId ?? null, krId]
+    [firstCollab, firstScope, krId]
   )
 }
 
