@@ -12,6 +12,7 @@ import {
   getCheckIns,
   createCheckIn,
   getAlignmentTree,
+  getFullTree,
   getTreeLinks,
   addTreeLink,
   removeTreeLink,
@@ -25,6 +26,9 @@ router.use(authenticate)
 
 // Alignment tree
 router.get('/alignment-tree', getAlignmentTree)
+
+// Full visualization tree (OKR → KR → KPI by scope)
+router.get('/full-tree', getFullTree)
 
 // Objectives
 router.get('/', getObjectives)

@@ -626,3 +626,103 @@ export const autoScoreKRStatuses = async (objectiveId: number): Promise<void> =>
     }
   }
 }
+
+// ── Full tree for visualization ────────────────────────────
+
+export const getFullTree = async (): Promise<any[]> => {
+  // 1. All objectives
+  const [objRows] = await pool.query<any[]>(
+    `SELECT o.id, o.title, o.description, o.status, o.progress, o.orgScopeId, o.parentId,
+            c.name AS ownerName, s.name AS orgScopeName, p.name AS periodName, p.id AS periodId
+     FROM okr_objectives o
+     LEFT JOIN collaborators c ON o.ownerId = c.id
+     LEFT JOIN org_scopes s ON o.orgScopeId = s.id
+     LEFT JOIN periods p ON o.periodId = p.id
+     WHERE o.status IN ('active','draft')
+     ORDER BY s.name ASC, o.title ASC`
+  )
+  if (!Array.isArray(objRows) || objRows.length === 0) return []
+
+  // 2. All KRs for those objectives
+  const objIds = objRows.map((o) => o.id)
+  const placeholders = objIds.map(() => '?').join(',')
+  const [krRows] = await pool.query<any[]>(
+    `SELECT kr.id, kr.objectiveId, kr.title, kr.krType, kr.status,
+            kr.startValue, kr.targetValue, kr.currentValue, kr.unit, kr.weight, kr.progressPercent,
+            c.name AS ownerName,
+            ck.actual AS kpiActual, ck.target AS kpiTarget,
+            sk.actual AS scopeActual, sk.target AS scopeTarget
+     FROM okr_key_results kr
+     LEFT JOIN collaborators c ON kr.ownerId = c.id
+     LEFT JOIN collaborator_kpis ck ON kr.collaboratorKpiId = ck.id
+     LEFT JOIN scope_kpis sk ON kr.scopeKpiId = sk.id
+     WHERE kr.objectiveId IN (${placeholders})
+     ORDER BY kr.objectiveId, kr.sortOrder ASC, kr.id ASC`,
+    objIds
+  )
+
+  // 3. KPI links per KR
+  const krIds = (Array.isArray(krRows) ? krRows : []).map((r) => r.id)
+  let kpiLinksByKr = new Map<number, any[]>()
+  if (krIds.length > 0) {
+    const krPlaceholders = krIds.map(() => '?').join(',')
+    const [linkRows] = await pool.query<any[]>(
+      `SELECT okk.krId,
+              COALESCE(kck.name, ksk.name) AS kpiName,
+              COALESCE(ck.actual, sk.actual) AS actual,
+              COALESCE(ck.target, sk.target) AS target,
+              CASE WHEN okk.collaboratorKpiId IS NOT NULL THEN 'collaborator' ELSE 'scope' END AS type,
+              COALESCE(col.name, sc.name) AS sourceName
+       FROM okr_kr_kpis okk
+       LEFT JOIN collaborator_kpis ck ON okk.collaboratorKpiId = ck.id
+       LEFT JOIN scope_kpis sk ON okk.scopeKpiId = sk.id
+       LEFT JOIN kpis kck ON ck.kpiId = kck.id
+       LEFT JOIN kpis ksk ON sk.kpiId = ksk.id
+       LEFT JOIN collaborators col ON ck.collaboratorId = col.id
+       LEFT JOIN org_scopes sc ON sk.orgScopeId = sc.id
+       WHERE okk.krId IN (${krPlaceholders})`,
+      krIds
+    )
+    for (const row of Array.isArray(linkRows) ? linkRows : []) {
+      const list = kpiLinksByKr.get(row.krId) ?? []
+      list.push({ kpiName: row.kpiName, actual: row.actual, target: row.target, type: row.type, sourceName: row.sourceName })
+      kpiLinksByKr.set(row.krId, list)
+    }
+  }
+
+  // 4. Assemble KRs with progress
+  const krsByObjective = new Map<number, any[]>()
+  for (const kr of Array.isArray(krRows) ? krRows : []) {
+    const linkedKpis = kpiLinksByKr.get(kr.id) ?? []
+    const progress = Math.round(calcKrProgress({
+      ...kr,
+      kpiActual: kr.kpiActual ?? kr.scopeActual,
+      kpiTarget: kr.kpiTarget ?? kr.scopeTarget,
+      linkedKpis,
+    }))
+    const list = krsByObjective.get(kr.objectiveId) ?? []
+    list.push({ ...kr, progressPercent: progress, linkedKpis })
+    krsByObjective.set(kr.objectiveId, list)
+  }
+
+  // 5. Group objectives by scope
+  const scopeMap = new Map<string, any>()
+  for (const obj of objRows) {
+    const key = obj.orgScopeId ? String(obj.orgScopeId) : '__sin_area__'
+    const label = obj.orgScopeName ?? 'Sin área'
+    if (!scopeMap.has(key)) scopeMap.set(key, { scopeId: obj.orgScopeId, scopeName: label, objectives: [] })
+    scopeMap.get(key)!.objectives.push({
+      id: obj.id,
+      title: obj.title,
+      description: obj.description,
+      status: obj.status,
+      progress: obj.progress ?? 0,
+      ownerName: obj.ownerName,
+      periodName: obj.periodName,
+      parentId: obj.parentId,
+      keyResults: krsByObjective.get(obj.id) ?? [],
+    })
+  }
+
+  return Array.from(scopeMap.values())
+}

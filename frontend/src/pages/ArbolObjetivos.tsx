@@ -1,638 +1,345 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { Fragment, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from 'react-query'
+import { useState } from 'react'
+import { useQuery } from 'react-query'
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
-import { ObjectiveTree } from '../types'
-import ObjectiveTreeForm from '../components/ObjectiveTreeForm'
-import ScopeKPIDetailModal from '../components/ScopeKPIDetailModal'
-import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
-import { useDialog } from '../components/Dialog'
 import './ArbolObjetivos.css'
 
-type ObjectiveDrilldownScopeLink = {
-  id: number
-  childType: 'collaborator' | 'scope'
-  contributionWeight?: number | null
-  aggregationMethod: string
-  collaboratorName?: string | null
-  collaboratorKpiName?: string | null
-  collaboratorActual?: number | null
-  collaboratorTarget?: number | null
-  collaboratorWeightedResult?: number | null
-  collaboratorPeriodName?: string | null
-  collaboratorSubPeriodName?: string | null
-  childScopeKpiName?: string | null
-  childScopeOrgScopeName?: string | null
-  childScopeActual?: number | null
-  childScopeTarget?: number | null
-  childScopeWeightedResult?: number | null
-  childScopeStatus?: string | null
-  childScopePeriodName?: string | null
-  childScopeSubPeriodName?: string | null
+interface KpiLink {
+  kpiName: string | null
+  actual: number | null
+  target: number | null
+  type: 'collaborator' | 'scope'
+  sourceName: string | null
 }
 
-type ObjectiveDrilldownScopeKpi = {
+interface KeyResult {
   id: number
-  name: string
-  orgScopeName?: string | null
-  ownerLevel?: string | null
-  sourceMode?: string | null
-  status?: string | null
-  actual?: number | null
-  directActual?: number | null
-  aggregatedActual?: number | null
-  mixedConfig?: {
-    directWeight: number
-    aggregatedWeight: number
-    directLabel?: string | null
-    aggregatedLabel?: string | null
-  } | null
-  target?: number | null
-  variation?: number | null
-  weightedResult?: number | null
-  periodName?: string | null
-  subPeriodName?: string | null
-  links?: ObjectiveDrilldownScopeLink[]
+  title: string
+  krType: 'simple' | 'kpi_linked'
+  status: string
+  progressPercent: number
+  startValue: number | null
+  targetValue: number | null
+  currentValue: number | null
+  unit: string | null
+  weight: number
+  ownerName: string | null
+  linkedKpis: KpiLink[]
 }
 
-type ObjectiveDrilldown = Omit<ObjectiveTree, 'scopeKpis'> & {
-  scopeKpis?: ObjectiveDrilldownScopeKpi[]
+interface OKRNode {
+  id: number
+  title: string
+  description: string | null
+  status: 'draft' | 'active' | 'closed'
+  progress: number
+  ownerName: string | null
+  periodName: string | null
+  parentId: number | null
+  keyResults: KeyResult[]
+}
+
+interface ScopeGroup {
+  scopeId: number | null
+  scopeName: string
+  objectives: OKRNode[]
+}
+
+const progressColor = (p: number) => {
+  if (p >= 70) return '#16a34a'
+  if (p >= 40) return '#d97706'
+  return '#dc2626'
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  not_started: 'Sin iniciar',
+  on_track: 'En camino',
+  at_risk: 'En riesgo',
+  behind: 'Atrasado',
+  completed: 'Completado',
+}
+
+const STATUS_DOT: Record<string, string> = {
+  not_started: '#9ca3af',
+  on_track: '#16a34a',
+  at_risk: '#d97706',
+  behind: '#dc2626',
+  completed: '#2563eb',
 }
 
 export default function ArbolObjetivos() {
-  const [showForm, setShowForm] = useState(false)
-  const [editingObjective, setEditingObjective] = useState<ObjectiveTree | undefined>(undefined)
-  const [expandedObjectives, setExpandedObjectives] = useState<Set<number>>(new Set())
-  const [expandedKpis, setExpandedKpis] = useState<Set<number>>(new Set())
-  const [drilldownObjectiveId, setDrilldownObjectiveId] = useState<number | null>(null)
-  const [detailScopeKpi, setDetailScopeKpi] = useState<ObjectiveDrilldownScopeKpi | null>(null)
-
   const navigate = useNavigate()
+  const [expandedScopes, setExpandedScopes] = useState<Set<string>>(new Set())
+  const [expandedOkrs, setExpandedOkrs] = useState<Set<number>>(new Set())
+  const [expandedKrs, setExpandedKrs] = useState<Set<number>>(new Set())
+  const [filterPeriod, setFilterPeriod] = useState('')
 
-  const queryClient = useQueryClient()
-  const dialog = useDialog()
-
-  const { data: objectives, isLoading } = useQuery<ObjectiveTree[]>(
-    'objective-trees',
-    async () => {
-      const response = await api.get('/objective-trees')
-      return response.data
-    },
+  const { data: tree = [], isLoading } = useQuery<ScopeGroup[]>(
+    'okr-full-tree',
+    () => api.get('/okr/full-tree').then((r) => r.data),
     { retry: false }
   )
 
-  const { data: collaborators } = useQuery(
-    'collaborators',
-    async () => {
-      const res = await api.get('/collaborators')
-      return res.data as any[]
-    },
-    { retry: false }
-  )
-  const { data: linkedOKRs = [] } = useQuery<{ id: number; title: string; progress: number; status: string; ownerName?: string }[]>(
-    ['objective-tree-okrs', drilldownObjectiveId],
-    () => api.get(`/objective-trees/${drilldownObjectiveId}/okrs`).then((r) => r.data),
-    { enabled: !!drilldownObjectiveId, retry: false }
-  )
-
-  const { data: drilldownObjective, isLoading: isLoadingDrilldown } = useQuery<ObjectiveDrilldown>(
-    ['objective-tree-drilldown', drilldownObjectiveId],
-    async () => {
-      const response = await api.get(`/objective-trees/${drilldownObjectiveId}/drilldown`)
-      return response.data
-    },
-    {
-      enabled: !!drilldownObjectiveId,
-      retry: false,
-    }
-  )
-  const collaboratorNames = new Set((collaborators || []).map((c: any) => (c.name || '').trim().toLowerCase()))
-
-  const deleteMutation = useMutation(
-    async (id: number) => {
-      await api.delete(`/objective-trees/${id}`)
-    },
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('objective-trees')
-      },
-      onError: (error: any) => {
-        void dialog.alert(
-          error.response?.data?.error ||
-            'Error al eliminar objetivo. Verificá que no tenga objetivos hijos asociados.',
-          { title: 'Error al eliminar', variant: 'danger' }
-        )
-      },
-    }
-  )
-
-  const getLevelBadge = (level?: ObjectiveTree['level']) => {
-    const levelConfig = {
-      company: { label: 'Empresa', class: 'level-company' },
-      direction: { label: 'Dirección', class: 'level-direction' },
-      management: { label: 'Gerencia', class: 'level-management' },
-      leadership: { label: 'Liderazgo', class: 'level-leadership' },
-      individual: { label: 'Individual', class: 'level-individual' },
-    }
-    const config = (level && (levelConfig as any)[level]) || {
-      label: level || 'N/A',
-      class: 'level-unknown',
-    }
-    return <span className={`level-badge ${config.class}`}>{config.label}</span>
-  }
-
-  const handleCreate = () => {
-    setEditingObjective(undefined)
-    setShowForm(true)
-  }
-
-  const handleEdit = (objective: ObjectiveTree) => {
-    setEditingObjective(objective)
-    setShowForm(true)
-  }
-
-  const handleDelete = async (id: number, name: string) => {
-    const ok = await dialog.confirm(
-      `¿Estás seguro de eliminar el objetivo "${name}"? Esta acción eliminará también todos los objetivos hijos asociados.`,
-      { title: 'Eliminar objetivo', confirmLabel: 'Eliminar', variant: 'danger' }
-    )
-    if (ok) deleteMutation.mutate(id)
-  }
-
-  const toggleExpansion = (id: number) => {
-    const next = new Set(expandedObjectives)
-    if (next.has(id)) {
-      next.delete(id)
-    } else {
-      next.add(id)
-    }
-    setExpandedObjectives(next)
-  }
-
-  const toggleKpiExpansion = (id: number) => {
-    const next = new Set(expandedKpis)
-    if (next.has(id)) {
-      next.delete(id)
-    } else {
-      next.add(id)
-    }
-    setExpandedKpis(next)
-  }
-
-  const isOKR = (name?: string) => {
-    if (!name) return false
-    return name.trim().toUpperCase().startsWith('OKR')
-  }
-
-  const isCompany = (obj?: ObjectiveTree) => {
-    if (!obj) return false
-    return obj.level === 'company' || (obj.name || '').toLowerCase().includes('compa')
-  }
-
-  const buildHierarchy = (): (ObjectiveTree & { depth: number; children?: any[] })[] => {
-    if (!objectives) return []
-
-    const filtered = objectives.filter((o) => {
-      const isCollaboratorName = collaboratorNames.has((o.name || '').trim().toLowerCase())
-      return !isCollaboratorName
+  const toggleScope = (key: string) => {
+    setExpandedScopes((prev) => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
     })
+  }
 
-    const rootObjectives = filtered.filter((o) => !o.parentId)
-    const childrenMap = new Map<number, ObjectiveTree[]>()
-
-    filtered.forEach((obj) => {
-      if (obj.parentId) {
-        if (!childrenMap.has(obj.parentId)) {
-          childrenMap.set(obj.parentId, [])
-        }
-        childrenMap.get(obj.parentId)!.push(obj)
-      }
+  const toggleOkr = (id: number) => {
+    setExpandedOkrs((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
     })
-
-    const buildTree = (
-      parent: ObjectiveTree,
-      depth: number = 0
-    ): ObjectiveTree & { depth: number; children?: any[] } => {
-      const children = childrenMap.get(parent.id) || []
-      const sortedChildren = [...children].sort((a, b) => {
-        const okrA = isOKR(a.name) ? 0 : 1
-        const okrB = isOKR(b.name) ? 0 : 1
-        if (okrA !== okrB) return okrA - okrB
-        return (a.name || '').localeCompare(b.name || '')
-      })
-      return {
-        ...parent,
-        depth,
-        children: sortedChildren.map((child) => buildTree(child, depth + 1)),
-      }
-    }
-
-    // Ordenar raíces: compañía primero, luego OKRs, luego resto
-    const companyRoot = rootObjectives.find((r) => isCompany(r))
-    const remainingRoots = rootObjectives.filter((r) => r !== companyRoot)
-    const orderedRoots = [
-      ...(companyRoot ? [companyRoot] : []),
-      ...remainingRoots.sort((a, b) => {
-        const okrA = isOKR(a.name) ? 0 : 1
-        const okrB = isOKR(b.name) ? 0 : 1
-        if (okrA !== okrB) return okrA - okrB
-        return (a.name || '').localeCompare(b.name || '')
-      }),
-    ]
-
-    return orderedRoots.map((root) => buildTree(root))
   }
 
-  const renderObjectiveRow = (
-    objective: ObjectiveTree & { depth?: number; children?: any[] },
-    isChild: boolean = false
-  ) => {
-    const hasChildren = objective.children && objective.children.length > 0
-    const isExpanded = expandedObjectives.has(objective.id)
-    const isKpiExpanded = expandedKpis.has(objective.id)
-    const okr = isOKR(objective.name)
-    const kpiCount = objective.kpis?.length || 0
-    const scopeKpiCount = objective.scopeKpis?.length || 0
-    const totalLinkedItems = kpiCount + scopeKpiCount
+  const toggleKr = (id: number) => {
+    setExpandedKrs((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
 
-    return (
-      <Fragment key={objective.id}>
-        <tr className={`${isChild ? 'child-row' : ''} ${okr ? 'okr-row' : ''}`}>
-          <td>{objective.id}</td>
-          <td className="name-cell" style={{ paddingLeft: `${(objective.depth || 0) * 20}px` }}>
-            {hasChildren && (
-              <button className="expand-button" onClick={() => toggleExpansion(objective.id)}>
-                {isExpanded ? '▼' : '▶'}
-              </button>
-            )}
-            {!hasChildren && <span className="expand-spacer" />}
-            {okr && <span className="okr-badge">OKR</span>}
-            {objective.name}
-          </td>
-          <td>{getLevelBadge(objective.level || 'individual')}</td>
-          <td>
-            {objective.parentId
-              ? objectives?.find((o) => o.id === objective.parentId)?.name ||
-                `Objetivo #${objective.parentId}`
-              : '-'}
-          </td>
-          <td>
-            <div className="kpis-cell">
-              <span>
-                {kpiCount} KPIs · {scopeKpiCount} Scope KPIs
-              </span>
-              {totalLinkedItems > 0 && (
-                <button className="link-button" onClick={() => toggleKpiExpansion(objective.id)}>
-                  {isKpiExpanded ? 'Ocultar' : 'Ver'}
-                </button>
-              )}
-            </div>
-          </td>
-          <td>
-            <div className="action-buttons">
-              <button className="btn-icon" title="Editar" onClick={() => handleEdit(objective)}>
-                ✎
-              </button>
-              <button className="btn-icon" title="Drill-down" onClick={() => setDrilldownObjectiveId(objective.id)}>
-                ⇲
-              </button>
-              <button
-                className="btn-icon"
-                title="Eliminar"
-                onClick={() => handleDelete(objective.id, objective.name)}
-                disabled={deleteMutation.isLoading}
-              >
-                🗑
-              </button>
-            </div>
-          </td>
-        </tr>
-        {isKpiExpanded && totalLinkedItems > 0 && (
-          <tr className="kpi-row">
-            <td />
-            <td colSpan={4}>
-              <div className="kpi-list">
-                {objective.kpis?.map((kpi) => (
-                  <div key={`kpi-${kpi.id}`} className="kpi-pill">
-                    <div className="kpi-title">{kpi.name}</div>
-                    <div className="kpi-meta">
-                      <span className="kpi-type">{kpi.type}</span>
-                      {((kpi as any).area || (kpi as any).areas) && (
-                        <span className="kpi-area">
-                          Área: {(kpi as any).area || ((kpi as any).areas || []).join(', ')}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {objective.scopeKpis?.map((scopeKpi) => (
-                  <div key={`scope-kpi-${scopeKpi.id}`} className="kpi-pill">
-                    <div className="kpi-title">{scopeKpi.name}</div>
-                    <div className="kpi-meta">
-                      <span className="kpi-type">scope KPI</span>
-                      <span className="kpi-area">
-                        Scope: {scopeKpi.orgScopeName || `#${scopeKpi.orgScopeId}`}
-                      </span>
-                      {scopeKpi.periodName ? <span className="kpi-area">Periodo: {scopeKpi.periodName}</span> : null}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </td>
-            <td />
-          </tr>
-        )}
-        {hasChildren && isExpanded && objective.children?.map((child) => renderObjectiveRow(child, true))}
-      </Fragment>
+  // Collect unique period names for filter
+  const allPeriods = Array.from(
+    new Set(
+      tree.flatMap((g) => g.objectives.map((o) => o.periodName).filter(Boolean) as string[])
     )
-  }
+  ).sort()
 
-  const hierarchicalObjectives = buildHierarchy()
+  const filteredTree = tree.map((group) => ({
+    ...group,
+    objectives: group.objectives.filter((o) => !filterPeriod || o.periodName === filterPeriod),
+  })).filter((group) => group.objectives.length > 0)
+
+  const totalObjectives = filteredTree.reduce((s, g) => s + g.objectives.length, 0)
+  const totalKrs = filteredTree.reduce((s, g) => s + g.objectives.reduce((ss, o) => ss + o.keyResults.length, 0), 0)
+
+  if (isLoading) {
+    return <div className="arbol-loading">Cargando árbol de objetivos...</div>
+  }
 
   return (
-    <div className="arbol-objetivos-page">
-      <div className="page-header">
+    <div className="arbol-page">
+      <div className="arbol-header">
         <div>
           <h1>Árbol de Objetivos</h1>
-          <p className="subtitle">Visualiza la jerarquía de objetivos organizacionales</p>
+          <p className="arbol-subtitle">
+            Jerarquía real de OKRs, Key Results y KPIs por área
+          </p>
         </div>
-        <button className="btn-primary" onClick={handleCreate}>
-          + Agregar Objetivo
+        <button className="btn-primary" onClick={() => navigate('/okr/nuevo')}>
+          + Nuevo OKR
         </button>
       </div>
 
-      <div className="table-container">
-        {isLoading ? (
-          <div className="loading">Cargando objetivos...</div>
-        ) : hierarchicalObjectives && hierarchicalObjectives.length > 0 ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Nombre</th>
-                <th>Nivel</th>
-                <th>Padre</th>
-                <th>KPIs Asociados</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>{hierarchicalObjectives.map((objective) => renderObjectiveRow(objective))}</tbody>
-          </table>
-        ) : (
-          <div className="empty-state">
-            <div className="empty-icon">📄</div>
-            <h3>No hay objetivos definidos</h3>
-            <p>Comienza creando el árbol de objetivos de tu organización</p>
-            <button className="btn-primary" onClick={handleCreate}>
-              Agregar Objetivo
-            </button>
-          </div>
+      <div className="arbol-toolbar">
+        <div className="arbol-stats">
+          <span><strong>{filteredTree.length}</strong> áreas</span>
+          <span><strong>{totalObjectives}</strong> objetivos</span>
+          <span><strong>{totalKrs}</strong> key results</span>
+        </div>
+        {allPeriods.length > 1 && (
+          <select
+            className="arbol-period-filter"
+            value={filterPeriod}
+            onChange={(e) => setFilterPeriod(e.target.value)}
+          >
+            <option value="">Todos los períodos</option>
+            {allPeriods.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
         )}
       </div>
 
-      {showForm && (
-        <ObjectiveTreeForm
-          objective={editingObjective}
-          onClose={() => {
-            setShowForm(false)
-            setEditingObjective(undefined)
-          }}
-          onSuccess={() => {
-            setShowForm(false)
-            setEditingObjective(undefined)
-          }}
-        />
-      )}
+      {filteredTree.length === 0 ? (
+        <div className="arbol-empty">
+          <div className="arbol-empty-icon">📋</div>
+          <h3>No hay objetivos activos</h3>
+          <p>Creá tu primer OKR para verlo aquí organizado por área y período.</p>
+          <button className="btn-primary" onClick={() => navigate('/okr/nuevo')}>
+            Crear OKR
+          </button>
+        </div>
+      ) : (
+        <div className="arbol-tree">
+          {filteredTree.map((group) => {
+            const scopeKey = group.scopeId ? String(group.scopeId) : '__sin_area__'
+            const scopeOpen = expandedScopes.has(scopeKey)
 
-      {drilldownObjectiveId && (
-        <div
-          className="modal-overlay"
-          onPointerDown={markOverlayPointerDown}
-          onClick={(e) => closeOnOverlayClick(e, () => setDrilldownObjectiveId(null))}
-        >
-          <div className="modal-content objective-drilldown-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div>
-                <h2>{drilldownObjective?.name || 'Drill-down objetivo'}</h2>
-                <p className="subtitle">
-                  {drilldownObjective?.level ? `Nivel ${drilldownObjective.level}` : 'Cargando relación estratégica...'}
-                </p>
-              </div>
-              <button className="close-button" onClick={() => setDrilldownObjectiveId(null)}>
-                ×
-              </button>
-            </div>
+            return (
+              <div key={scopeKey} className="arbol-scope-block">
+                {/* ── NIVEL 1: Área / Scope ── */}
+                <button
+                  className="arbol-scope-header"
+                  onClick={() => toggleScope(scopeKey)}
+                >
+                  <span className="arbol-scope-chevron">{scopeOpen ? '▼' : '▶'}</span>
+                  <span className="arbol-scope-icon">🏢</span>
+                  <span className="arbol-scope-name">{group.scopeName}</span>
+                  <span className="arbol-scope-count">{group.objectives.length} OKR{group.objectives.length !== 1 ? 's' : ''}</span>
+                </button>
 
-            {isLoadingDrilldown ? (
-              <div className="loading">Cargando drill-down...</div>
-            ) : drilldownObjective ? (
-              <div className="objective-drilldown-content">
-                <div className="objective-drilldown-summary">
-                  <div className="objective-drilldown-stat">
-                    <span className="objective-drilldown-label">KPIs base</span>
-                    <strong>{drilldownObjective.kpis?.length || 0}</strong>
-                  </div>
-                  <div className="objective-drilldown-stat">
-                    <span className="objective-drilldown-label">Scope KPIs</span>
-                    <strong>{drilldownObjective.scopeKpis?.length || 0}</strong>
-                  </div>
-                  <div className="objective-drilldown-stat">
-                    <span className="objective-drilldown-label">OKRs vinculados</span>
-                    <strong>{linkedOKRs.length}</strong>
-                  </div>
-                </div>
+                {scopeOpen && (
+                  <div className="arbol-scope-body">
+                    {group.objectives.map((okr) => {
+                      const okrOpen = expandedOkrs.has(okr.id)
 
-                {linkedOKRs.length > 0 && (
-                  <div className="objective-drilldown-section">
-                    <h3>OKRs vinculados</h3>
-                    <div className="okr-linked-list">
-                      {linkedOKRs.map((okr) => (
-                        <div key={okr.id} className="okr-linked-row">
-                          <div className="okr-linked-info">
-                            <span className="okr-linked-title">{okr.title}</span>
-                            {okr.ownerName && <span className="okr-linked-owner">{okr.ownerName}</span>}
-                          </div>
-                          <div className="okr-linked-right">
-                            <div className="okr-linked-progress-track">
-                              <div
-                                className="okr-linked-progress-fill"
-                                style={{
-                                  width: `${okr.progress}%`,
-                                  background: okr.progress >= 70 ? '#16a34a' : okr.progress >= 40 ? '#d97706' : '#dc2626'
-                                }}
-                              />
-                            </div>
-                            <span className="okr-linked-pct" style={{ color: okr.progress >= 70 ? '#16a34a' : okr.progress >= 40 ? '#d97706' : '#dc2626' }}>
-                              {Math.round(okr.progress)}%
-                            </span>
+                      return (
+                        <div key={okr.id} className="arbol-okr-block">
+                          {/* ── NIVEL 2: OKR ── */}
+                          <div className="arbol-okr-row">
                             <button
-                              className="link-button"
-                              onClick={() => { setDrilldownObjectiveId(null); navigate(`/okr/${okr.id}`) }}
+                              className="arbol-expand-btn"
+                              onClick={() => toggleOkr(okr.id)}
+                              disabled={okr.keyResults.length === 0}
+                              title={okr.keyResults.length === 0 ? 'Sin Key Results' : undefined}
                             >
-                              Ver OKR →
+                              {okr.keyResults.length > 0 ? (okrOpen ? '▼' : '▶') : '·'}
+                            </button>
+                            <div className="arbol-okr-main">
+                              <div className="arbol-okr-top">
+                                <span className="arbol-okr-badge">OKR</span>
+                                <span className="arbol-okr-title">{okr.title}</span>
+                                <span className={`arbol-status-pill arbol-status-pill--${okr.status}`}>
+                                  {okr.status === 'active' ? 'Activo' : okr.status === 'draft' ? 'Borrador' : 'Cerrado'}
+                                </span>
+                              </div>
+                              <div className="arbol-okr-meta">
+                                {okr.periodName && <span>📅 {okr.periodName}</span>}
+                                {okr.ownerName && <span>👤 {okr.ownerName}</span>}
+                                <span>{okr.keyResults.length} KR{okr.keyResults.length !== 1 ? 's' : ''}</span>
+                              </div>
+                              <div className="arbol-progress-row">
+                                <div className="arbol-progress-track">
+                                  <div
+                                    className="arbol-progress-fill"
+                                    style={{ width: `${okr.progress}%`, background: progressColor(okr.progress) }}
+                                  />
+                                </div>
+                                <span className="arbol-progress-pct" style={{ color: progressColor(okr.progress) }}>
+                                  {Math.round(okr.progress)}%
+                                </span>
+                              </div>
+                            </div>
+                            <button
+                              className="arbol-goto-btn"
+                              onClick={() => navigate(`/okr/${okr.id}`)}
+                              title="Ver detalle del OKR"
+                            >
+                              Ver →
                             </button>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
-                {drilldownObjective.kpis?.length ? (
-                  <div className="objective-drilldown-section">
-                    <h3>KPIs base asociados</h3>
-                    <div className="kpi-list">
-                      {drilldownObjective.kpis.map((kpi) => (
-                        <div key={`drilldown-kpi-${kpi.id}`} className="kpi-pill">
-                          <div className="kpi-title">{kpi.name}</div>
-                          <div className="kpi-meta">
-                            <span className="kpi-type">{kpi.type}</span>
-                            {((kpi as any).area || (kpi as any).areas) && (
-                              <span className="kpi-area">
-                                Área: {(kpi as any).area || ((kpi as any).areas || []).join(', ')}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
+                          {/* ── NIVEL 3: Key Results ── */}
+                          {okrOpen && okr.keyResults.map((kr) => {
+                            const krOpen = expandedKrs.has(kr.id)
+                            const hasKpis = kr.linkedKpis.length > 0
 
-                <div className="objective-drilldown-section">
-                  <h3>Scope KPIs vinculados</h3>
-                  {drilldownObjective.scopeKpis?.length ? (
-                    <div className="objective-scope-grid">
-                      {drilldownObjective.scopeKpis.map((scopeKpi: ObjectiveDrilldownScopeKpi) => (
-                        <div key={`drilldown-scope-${scopeKpi.id}`} className="objective-scope-card">
-                          <div className="objective-scope-header">
-                            <div>
-                              <h4>{scopeKpi.name}</h4>
-                              <p>
-                                {scopeKpi.orgScopeName || 'Scope'} · {scopeKpi.ownerLevel || 'owner'}
-                              </p>
-                            </div>
-                            <span className={`level-badge level-${scopeKpi.status === 'approved' ? 'management' : 'individual'}`}>
-                              {scopeKpi.status || 'draft'}
-                            </span>
-                          </div>
-
-                          <div className="objective-scope-metrics">
-                            <div>
-                              <span>Actual</span>
-                              <strong>{scopeKpi.actual ?? '-'}</strong>
-                            </div>
-                            <div>
-                              <span>Target</span>
-                              <strong>{scopeKpi.target ?? '-'}</strong>
-                            </div>
-                            <div>
-                              <span>Resultado</span>
-                              <strong>{scopeKpi.weightedResult ?? '-'}</strong>
-                            </div>
-                          </div>
-
-                          <div className="objective-scope-meta">
-                            <span>Source: {scopeKpi.sourceMode || '-'}</span>
-                            {scopeKpi.periodName ? <span>Período: {scopeKpi.periodName}</span> : null}
-                            {scopeKpi.subPeriodName ? <span>Subperíodo: {scopeKpi.subPeriodName}</span> : null}
-                          </div>
-                          {scopeKpi.sourceMode === 'mixed' ? (
-                            <div className="objective-scope-meta">
-                              <span>
-                                {scopeKpi.mixedConfig?.directLabel || 'Directo'}: {scopeKpi.directActual ?? '-'}
-                              </span>
-                              <span>
-                                {scopeKpi.mixedConfig?.aggregatedLabel || 'Agregado'}: {scopeKpi.aggregatedActual ?? '-'}
-                              </span>
-                              <span>
-                                Mix: {scopeKpi.mixedConfig?.directWeight ?? 50}/{scopeKpi.mixedConfig?.aggregatedWeight ?? 50}
-                              </span>
-                            </div>
-                          ) : null}
-
-                          <div className="objective-scope-links">
-                            <h5>Contribuciones</h5>
-                            <div className="objective-scope-actions">
-                              <button
-                                type="button"
-                                className="link-button"
-                                onClick={() => setDetailScopeKpi(scopeKpi)}
-                              >
-                                Ver detalle
-                              </button>
-                            </div>
-                            {scopeKpi.links?.length ? (
-                              <div className="objective-link-list">
-                                {scopeKpi.links.map((link: ObjectiveDrilldownScopeLink) => (
-                                  <div key={`drilldown-link-${link.id}`} className="objective-link-item">
-                                    <div className="objective-link-main">
-                                      <strong>
-                                        {link.childType === 'collaborator'
-                                          ? `${link.collaboratorName || 'Colaborador'} · ${link.collaboratorKpiName || 'KPI'}`
-                                          : `${link.childScopeKpiName || 'Scope KPI'} · ${link.childScopeOrgScopeName || 'Scope'}`}
-                                      </strong>
-                                      <span>
-                                        {link.aggregationMethod}
-                                        {link.contributionWeight != null ? ` · peso ${link.contributionWeight}` : ''}
+                            return (
+                              <div key={kr.id} className="arbol-kr-block">
+                                <div className="arbol-kr-row">
+                                  <button
+                                    className="arbol-expand-btn arbol-expand-btn--sm"
+                                    onClick={() => toggleKr(kr.id)}
+                                    disabled={!hasKpis}
+                                    title={!hasKpis ? 'Sin KPIs vinculados' : undefined}
+                                  >
+                                    {hasKpis ? (krOpen ? '▼' : '▶') : '·'}
+                                  </button>
+                                  <div className="arbol-kr-main">
+                                    <div className="arbol-kr-top">
+                                      <span className="arbol-kr-badge">KR</span>
+                                      <span className="arbol-kr-title">{kr.title}</span>
+                                      {kr.ownerName && (
+                                        <span className="arbol-kr-owner">👤 {kr.ownerName}</span>
+                                      )}
+                                      <span
+                                        className="arbol-kr-status-dot"
+                                        style={{ background: STATUS_DOT[kr.status] ?? '#9ca3af' }}
+                                        title={STATUS_LABEL[kr.status] ?? kr.status}
+                                      />
+                                      <span className="arbol-kr-status-label">
+                                        {STATUS_LABEL[kr.status] ?? kr.status}
                                       </span>
                                     </div>
-                                    <div className="objective-link-meta">
-                                      {link.childType === 'collaborator' ? (
-                                        <>
-                                          <span>Actual: {link.collaboratorActual ?? '-'}</span>
-                                          <span>Target: {link.collaboratorTarget ?? '-'}</span>
-                                          <span>Resultado: {link.collaboratorWeightedResult ?? '-'}</span>
-                                          {link.collaboratorSubPeriodName || link.collaboratorPeriodName ? (
-                                            <span>
-                                              {link.collaboratorSubPeriodName || link.collaboratorPeriodName}
-                                            </span>
-                                          ) : null}
-                                        </>
+                                    <div className="arbol-kr-values">
+                                      {kr.krType === 'kpi_linked' ? (
+                                        <span className="arbol-kr-linked">
+                                          🔗 Vinculado a {kr.linkedKpis.length} KPI{kr.linkedKpis.length !== 1 ? 's' : ''}
+                                        </span>
                                       ) : (
-                                        <>
-                                          <span>Actual: {link.childScopeActual ?? '-'}</span>
-                                          <span>Target: {link.childScopeTarget ?? '-'}</span>
-                                          <span>Resultado: {link.childScopeWeightedResult ?? '-'}</span>
-                                          {link.childScopeSubPeriodName || link.childScopePeriodName ? (
-                                            <span>{link.childScopeSubPeriodName || link.childScopePeriodName}</span>
-                                          ) : null}
-                                        </>
+                                        <span className="arbol-kr-manual">
+                                          {kr.currentValue ?? kr.startValue ?? 0} / {kr.targetValue ?? 0}
+                                          {kr.unit ? ` ${kr.unit}` : ''}
+                                        </span>
                                       )}
                                     </div>
+                                    <div className="arbol-progress-row">
+                                      <div className="arbol-progress-track arbol-progress-track--sm">
+                                        <div
+                                          className="arbol-progress-fill"
+                                          style={{ width: `${kr.progressPercent}%`, background: STATUS_DOT[kr.status] ?? progressColor(kr.progressPercent) }}
+                                        />
+                                      </div>
+                                      <span className="arbol-progress-pct arbol-progress-pct--sm">
+                                        {Math.round(kr.progressPercent)}%
+                                      </span>
+                                    </div>
                                   </div>
-                                ))}
+                                </div>
+
+                                {/* ── NIVEL 4: KPIs ── */}
+                                {krOpen && hasKpis && (
+                                  <div className="arbol-kpi-list">
+                                    {kr.linkedKpis.map((lk, i) => {
+                                      const pct = lk.target && lk.target > 0
+                                        ? Math.min(100, Math.round(((lk.actual ?? 0) / lk.target) * 100))
+                                        : 0
+                                      return (
+                                        <div key={i} className="arbol-kpi-row">
+                                          <span className={`arbol-kpi-type-badge arbol-kpi-type-badge--${lk.type}`}>
+                                            {lk.type === 'collaborator' ? '👤' : '🏢'}
+                                          </span>
+                                          <span className="arbol-kpi-name">
+                                            {lk.kpiName ?? 'KPI'}
+                                            {lk.sourceName && <span className="arbol-kpi-source"> — {lk.sourceName}</span>}
+                                          </span>
+                                          <span className="arbol-kpi-values">
+                                            {lk.actual ?? '—'} / {lk.target ?? '—'}
+                                          </span>
+                                          <div className="arbol-progress-track arbol-progress-track--xs">
+                                            <div
+                                              className="arbol-progress-fill"
+                                              style={{ width: `${pct}%`, background: progressColor(pct) }}
+                                            />
+                                          </div>
+                                          <span className="arbol-kpi-pct" style={{ color: progressColor(pct) }}>
+                                            {pct}%
+                                          </span>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                )}
                               </div>
-                            ) : (
-                              <div className="helper-text">Este Scope KPI todavía no tiene contribuciones configuradas.</div>
-                            )}
-                          </div>
+                            )
+                          })}
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="empty-state compact">
-                      <p>Este objetivo todavía no tiene Scope KPIs vinculados.</p>
-                    </div>
-                  )}
-                </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="empty-state compact">
-                <p>No se pudo cargar el drill-down del objetivo.</p>
-              </div>
-            )}
-          </div>
+            )
+          })}
         </div>
       )}
-      {detailScopeKpi ? (
-        <ScopeKPIDetailModal
-          scopeKpiId={detailScopeKpi.id}
-          initialScopeKpi={detailScopeKpi as any}
-          onClose={() => setDetailScopeKpi(null)}
-        />
-      ) : null}
     </div>
   )
 }

@@ -339,3 +339,13 @@ export const getAlignmentTree = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: 'Error al obtener árbol de alineación' })
   }
 }
+
+export const getFullTree = async (_req: AuthRequest, res: Response) => {
+  try {
+    const tree = await okrService.getFullTree()
+    res.json(tree)
+  } catch (error) {
+    console.error('[OKR] getFullTree:', error)
+    res.status(500).json({ error: 'Error al obtener árbol completo de OKRs' })
+  }
+}
