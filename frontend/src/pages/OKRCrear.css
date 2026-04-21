@@ -345,3 +345,33 @@
 .kpi-chip-remove:hover {
   opacity: 1;
 }
+
+.kr-weight-summary {
+  margin-top: 8px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+}
+
+.kr-weight-summary--ok {
+  background: #d1fae5;
+  border-color: #6ee7b7;
+  color: #065f46;
+}
+
+.kr-weight-summary--over {
+  background: #fef3c7;
+  border-color: #fcd34d;
+  color: #92400e;
+}
+
+.kr-weight-warning {
+  font-weight: 500;
+}
+
+.kr-weight-ok {
+  font-weight: 500;
+}

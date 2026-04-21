@@ -533,18 +533,31 @@ export default function OKRCrear() {
                 <label>Peso relativo</label>
                 <input
                   type="number"
-                  min="0.1"
-                  max="10"
-                  step="0.1"
+                  min="0.01"
+                  step="0.01"
                   value={kr.weight}
                   onChange={(e) => updateKR(kr.tempId, 'weight', e.target.value)}
                 />
                 <small className="form-hint">
-                  Define cuánto influye este KR en el progreso total del objetivo. Ej: peso 2 vale el doble que peso 1.
+                  Define cuánto influye este KR en el progreso total. Podés usar valores como 0.25, 0.50, o enteros como 1, 2, 3.
                 </small>
               </div>
             </div>
           ))}
+
+          {/* Resumen de pesos */}
+          {krs.filter((kr) => kr.title.trim()).length > 1 && (() => {
+            const total = krs.filter((kr) => kr.title.trim()).reduce((sum, kr) => sum + (Number(kr.weight) || 0), 0)
+            const isOver = total > 1.001
+            const isExact = Math.abs(total - 1) < 0.001
+            return (
+              <div className={`kr-weight-summary ${isOver ? 'kr-weight-summary--over' : isExact ? 'kr-weight-summary--ok' : ''}`}>
+                <span>Total de pesos: <strong>{total.toFixed(2)}</strong></span>
+                {isOver && <span className="kr-weight-warning"> ⚠ Superás 1.00 — el progreso del objetivo puede verse distorsionado.</span>}
+                {isExact && <span className="kr-weight-ok"> ✓ Los pesos suman exactamente 1.00</span>}
+              </div>
+            )
+          })()}
         </section>
 
         <div className="okr-crear-actions">

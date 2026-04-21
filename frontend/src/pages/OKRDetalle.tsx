@@ -584,7 +584,7 @@ export default function OKRDetalle() {
                   <div className="checkin-field">
                     <label>Peso relativo</label>
                     <input
-                      type="number" min="0.1" max="10" step="0.1"
+                      type="number" min="0.01" step="0.01"
                       value={krEditDraft.weight}
                       onChange={(e) => setKrEditDraft((p) => p ? { ...p, weight: e.target.value } : p)}
                     />
