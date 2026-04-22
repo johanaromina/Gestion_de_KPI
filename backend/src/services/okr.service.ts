@@ -55,21 +55,25 @@ export const recalcObjectiveProgress = async (objectiveId: number): Promise<void
 
   // Cargar KPIs múltiples para KRs kpi_linked
   const krIds = krs.map((r) => r.id)
-  const [kpiLinksRows] = await pool.query<any[]>(
-    `SELECT okk.krId,
-       COALESCE(ck.actual, sk.actual) AS actual,
-       COALESCE(ck.target, sk.target) AS target
-     FROM okr_kr_kpis okk
-     LEFT JOIN collaborator_kpis ck ON okk.collaboratorKpiId = ck.id
-     LEFT JOIN scope_kpis sk ON okk.scopeKpiId = sk.id
-     WHERE okk.krId IN (${krIds.map(() => '?').join(',')})`,
-    krIds
-  )
   const linkedByKr = new Map<number, { actual: number | null; target: number | null }[]>()
-  for (const row of Array.isArray(kpiLinksRows) ? kpiLinksRows : []) {
-    const list = linkedByKr.get(row.krId) ?? []
-    list.push({ actual: row.actual, target: row.target })
-    linkedByKr.set(row.krId, list)
+  try {
+    const [kpiLinksRows] = await pool.query<any[]>(
+      `SELECT okk.krId,
+         COALESCE(ck.actual, sk.actual) AS actual,
+         COALESCE(ck.target, sk.target) AS target
+       FROM okr_kr_kpis okk
+       LEFT JOIN collaborator_kpis ck ON okk.collaboratorKpiId = ck.id
+       LEFT JOIN scope_kpis sk ON okk.scopeKpiId = sk.id
+       WHERE okk.krId IN (${krIds.map(() => '?').join(',')})`,
+      krIds
+    )
+    for (const row of Array.isArray(kpiLinksRows) ? kpiLinksRows : []) {
+      const list = linkedByKr.get(row.krId) ?? []
+      list.push({ actual: row.actual, target: row.target })
+      linkedByKr.set(row.krId, list)
+    }
+  } catch {
+    // tabla okr_kr_kpis no existe aún
   }
 
   let totalWeight = 0
@@ -269,25 +273,31 @@ export const listKeyResults = async (objectiveId: number): Promise<OKRKeyResult[
   if (krs.length === 0) return []
 
   const krIds = krs.map((r) => r.id)
-  const [kpiLinksRows] = await pool.query<any[]>(
-    `SELECT okk.id, okk.krId, okk.collaboratorKpiId, okk.scopeKpiId,
-       COALESCE(ck.actual, sk.actual) AS actual,
-       COALESCE(ck.target, sk.target) AS target,
-       COALESCE(kck.name, ksk.name) AS kpiName,
-       COALESCE(col.name, sc.name) AS sourceName
-     FROM okr_kr_kpis okk
-     LEFT JOIN collaborator_kpis ck ON okk.collaboratorKpiId = ck.id
-     LEFT JOIN scope_kpis sk ON okk.scopeKpiId = sk.id
-     LEFT JOIN kpis kck ON ck.kpiId = kck.id
-     LEFT JOIN kpis ksk ON sk.kpiId = ksk.id
-     LEFT JOIN collaborators col ON ck.collaboratorId = col.id
-     LEFT JOIN org_scopes sc ON sk.orgScopeId = sc.id
-     WHERE okk.krId IN (${krIds.map(() => '?').join(',')})`,
-    krIds
-  )
+  let kpiLinksRows: any[] = []
+  try {
+    const [rows2] = await pool.query<any[]>(
+      `SELECT okk.id, okk.krId, okk.collaboratorKpiId, okk.scopeKpiId,
+         COALESCE(ck.actual, sk.actual) AS actual,
+         COALESCE(ck.target, sk.target) AS target,
+         COALESCE(kck.name, ksk.name) AS kpiName,
+         COALESCE(col.name, sc.name) AS sourceName
+       FROM okr_kr_kpis okk
+       LEFT JOIN collaborator_kpis ck ON okk.collaboratorKpiId = ck.id
+       LEFT JOIN scope_kpis sk ON okk.scopeKpiId = sk.id
+       LEFT JOIN kpis kck ON ck.kpiId = kck.id
+       LEFT JOIN kpis ksk ON sk.kpiId = ksk.id
+       LEFT JOIN collaborators col ON ck.collaboratorId = col.id
+       LEFT JOIN org_scopes sc ON sk.orgScopeId = sc.id
+       WHERE okk.krId IN (${krIds.map(() => '?').join(',')})`,
+      krIds
+    )
+    kpiLinksRows = Array.isArray(rows2) ? rows2 : []
+  } catch {
+    // tabla okr_kr_kpis no existe aún
+  }
 
   const linkedByKr = new Map<number, any[]>()
-  for (const row of Array.isArray(kpiLinksRows) ? kpiLinksRows : []) {
+  for (const row of kpiLinksRows) {
     const list = linkedByKr.get(row.krId) ?? []
     list.push(row)
     linkedByKr.set(row.krId, list)
@@ -675,32 +685,36 @@ export const getFullTree = async (): Promise<any[]> => {
     objIds
   )
 
-  // 3. KPI links per KR
+  // 3. KPI links per KR (tabla okr_kr_kpis puede no existir si la migración no fue ejecutada)
   const krIds = (Array.isArray(krRows) ? krRows : []).map((r) => r.id)
   let kpiLinksByKr = new Map<number, any[]>()
   if (krIds.length > 0) {
-    const krPlaceholders = krIds.map(() => '?').join(',')
-    const [linkRows] = await pool.query<any[]>(
-      `SELECT okk.krId,
-              COALESCE(kck.name, ksk.name) AS kpiName,
-              COALESCE(ck.actual, sk.actual) AS actual,
-              COALESCE(ck.target, sk.target) AS target,
-              CASE WHEN okk.collaboratorKpiId IS NOT NULL THEN 'collaborator' ELSE 'scope' END AS type,
-              COALESCE(col.name, sc.name) AS sourceName
-       FROM okr_kr_kpis okk
-       LEFT JOIN collaborator_kpis ck ON okk.collaboratorKpiId = ck.id
-       LEFT JOIN scope_kpis sk ON okk.scopeKpiId = sk.id
-       LEFT JOIN kpis kck ON ck.kpiId = kck.id
-       LEFT JOIN kpis ksk ON sk.kpiId = ksk.id
-       LEFT JOIN collaborators col ON ck.collaboratorId = col.id
-       LEFT JOIN org_scopes sc ON sk.orgScopeId = sc.id
-       WHERE okk.krId IN (${krPlaceholders})`,
-      krIds
-    )
-    for (const row of Array.isArray(linkRows) ? linkRows : []) {
-      const list = kpiLinksByKr.get(row.krId) ?? []
-      list.push({ kpiName: row.kpiName, actual: row.actual, target: row.target, type: row.type, sourceName: row.sourceName })
-      kpiLinksByKr.set(row.krId, list)
+    try {
+      const krPlaceholders = krIds.map(() => '?').join(',')
+      const [linkRows] = await pool.query<any[]>(
+        `SELECT okk.krId,
+                COALESCE(kck.name, ksk.name) AS kpiName,
+                COALESCE(ck.actual, sk.actual) AS actual,
+                COALESCE(ck.target, sk.target) AS target,
+                CASE WHEN okk.collaboratorKpiId IS NOT NULL THEN 'collaborator' ELSE 'scope' END AS type,
+                COALESCE(col.name, sc.name) AS sourceName
+         FROM okr_kr_kpis okk
+         LEFT JOIN collaborator_kpis ck ON okk.collaboratorKpiId = ck.id
+         LEFT JOIN scope_kpis sk ON okk.scopeKpiId = sk.id
+         LEFT JOIN kpis kck ON ck.kpiId = kck.id
+         LEFT JOIN kpis ksk ON sk.kpiId = ksk.id
+         LEFT JOIN collaborators col ON ck.collaboratorId = col.id
+         LEFT JOIN org_scopes sc ON sk.orgScopeId = sc.id
+         WHERE okk.krId IN (${krPlaceholders})`,
+        krIds
+      )
+      for (const row of Array.isArray(linkRows) ? linkRows : []) {
+        const list = kpiLinksByKr.get(row.krId) ?? []
+        list.push({ kpiName: row.kpiName, actual: row.actual, target: row.target, type: row.type, sourceName: row.sourceName })
+        kpiLinksByKr.set(row.krId, list)
+      }
+    } catch {
+      // tabla okr_kr_kpis no existe aún — continuar sin links
     }
   }
 
