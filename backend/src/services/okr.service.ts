@@ -672,7 +672,7 @@ export const getFullTree = async (): Promise<any[]> => {
   const placeholders = objIds.map(() => '?').join(',')
   const [krRows] = await pool.query<any[]>(
     `SELECT kr.id, kr.objectiveId, kr.title, kr.krType, kr.status,
-            kr.startValue, kr.targetValue, kr.currentValue, kr.unit, kr.weight, kr.progressPercent,
+            kr.startValue, kr.targetValue, kr.currentValue, kr.unit, kr.weight,
             c.name AS ownerName,
             ck.actual AS kpiActual, ck.target AS kpiTarget,
             sk.actual AS scopeActual, sk.target AS scopeTarget

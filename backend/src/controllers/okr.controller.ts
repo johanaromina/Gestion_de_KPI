@@ -197,7 +197,6 @@ export const getDataSources = async (req: AuthRequest, res: Response) => {
          kr.id        AS krId,
          kr.title     AS krTitle,
          kr.krType,
-         kr.progressPercent,
          kr.status    AS krStatus,
          kr.collaboratorKpiId,
          kr.scopeKpiId,
