@@ -162,11 +162,17 @@ export default function ScopeKPIForm({
             Área / Equipo
             <select value={formData.orgScopeId} onChange={(e) => setFormData((prev) => ({ ...prev, orgScopeId: Number(e.target.value) }))}>
               <option value={0}>Seleccioná un área o equipo</option>
-              {(orgScopes || []).map((scope: any) => (
-                <option key={scope.id} value={scope.id}>
-                  {scope.name} ({scope.type})
-                </option>
-              ))}
+              {(orgScopes || []).map((scope: any) => {
+                const typeLabel: Record<string, string> = {
+                  team: 'equipo', area: 'área', business_unit: 'unidad de negocio',
+                  company: 'empresa', executive: 'ejecutivo', person: 'persona',
+                }
+                return (
+                  <option key={scope.id} value={scope.id}>
+                    {scope.name} ({typeLabel[scope.type] ?? scope.type})
+                  </option>
+                )
+              })}
             </select>
           </label>
           <label>
@@ -192,25 +198,25 @@ export default function ScopeKPIForm({
             </select>
           </label>
           <label>
-            Owner level
+            Nivel organizacional
             <select value={formData.ownerLevel} onChange={(e) => setFormData((prev) => ({ ...prev, ownerLevel: e.target.value as any }))}>
-              <option value="team">Team</option>
-              <option value="area">Area</option>
-              <option value="business_unit">Business Unit</option>
-              <option value="company">Company</option>
-              <option value="executive">Executive</option>
+              <option value="team">Equipo</option>
+              <option value="area">Área</option>
+              <option value="business_unit">Unidad de negocio</option>
+              <option value="company">Empresa</option>
+              <option value="executive">Ejecutivo</option>
             </select>
           </label>
           <label>
-            Source mode
+            Modo de cálculo
             <select value={formData.sourceMode} onChange={(e) => setFormData((prev) => ({ ...prev, sourceMode: e.target.value as any }))}>
-              <option value="direct">Direct</option>
-              <option value="aggregated">Aggregated</option>
-              <option value="mixed">Mixed</option>
+              <option value="direct">Directo (ingreso manual)</option>
+              <option value="aggregated">Agregado (suma de vinculados)</option>
+              <option value="mixed">Mixto (manual + agregado)</option>
             </select>
           </label>
           <label>
-            Target
+            Meta
             <input type="number" value={formData.target} onChange={(e) => setFormData((prev) => ({ ...prev, target: Number(e.target.value) }))} />
           </label>
           <label>
