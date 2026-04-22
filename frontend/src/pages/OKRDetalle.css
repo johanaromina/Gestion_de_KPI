@@ -725,6 +725,53 @@
   margin-bottom: 14px;
 }
 
+.kr-edit-body {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.kr-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.kr-edit-field--full {
+  grid-column: 1 / -1;
+}
+
+.kr-edit-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.kr-edit-field input,
+.kr-edit-field select {
+  padding: 7px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  background: #fff;
+  width: 100%;
+}
+
+.kr-edit-field input:focus,
+.kr-edit-field select:focus {
+  outline: none;
+  border-color: #f97316;
+  box-shadow: 0 0 0 2px rgba(249,115,22,0.15);
+}
+
+.kr-edit-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 .kr-type-toggle {
   display: flex;
   gap: 8px;

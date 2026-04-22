@@ -491,8 +491,9 @@ export default function OKRDetalle() {
             {editingKrId === kr.id && krEditDraft && (
               <div className="kr-edit-panel">
                 <div className="kr-edit-panel-title">Editar Key Result</div>
-                <div className="checkin-form" style={{ flexDirection: 'column', gap: '12px' }}>
-                  <div className="checkin-field checkin-field--wide">
+                <div className="kr-edit-body">
+
+                  <div className="kr-edit-field kr-edit-field--full">
                     <label>Título</label>
                     <input
                       type="text"
@@ -501,7 +502,7 @@ export default function OKRDetalle() {
                     />
                   </div>
 
-                  <div className="checkin-field">
+                  <div className="kr-edit-field kr-edit-field--full">
                     <label>Tipo de medición</label>
                     <div className="kr-type-toggle">
                       <button
@@ -522,27 +523,27 @@ export default function OKRDetalle() {
                   </div>
 
                   {krEditDraft.krType === 'simple' && (
-                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                      <div className="checkin-field">
+                    <>
+                      <div className="kr-edit-field">
                         <label>Valor inicial</label>
                         <input type="number" value={krEditDraft.startValue} onChange={(e) => setKrEditDraft((p) => p ? { ...p, startValue: e.target.value } : p)} />
                       </div>
-                      <div className="checkin-field">
+                      <div className="kr-edit-field">
                         <label>Meta</label>
                         <input type="number" value={krEditDraft.targetValue} onChange={(e) => setKrEditDraft((p) => p ? { ...p, targetValue: e.target.value } : p)} />
                       </div>
-                      <div className="checkin-field">
+                      <div className="kr-edit-field">
                         <label>Unidad</label>
                         <input type="text" value={krEditDraft.unit} placeholder="%, días, $..." onChange={(e) => setKrEditDraft((p) => p ? { ...p, unit: e.target.value } : p)} />
                       </div>
-                    </div>
+                    </>
                   )}
 
                   {krEditDraft.krType === 'kpi_linked' && (
-                    <div className="checkin-field checkin-field--wide">
+                    <div className="kr-edit-field kr-edit-field--full">
                       <label>KPIs vinculados</label>
                       {krEditDraft.kpiLinks.length > 0 && (
-                        <div className="kpi-chips" style={{ marginBottom: '8px' }}>
+                        <div className="kpi-chips">
                           {krEditDraft.kpiLinks.map((lk) => (
                             <span key={`${lk.type}-${lk.id}`} className={`kpi-chip kpi-chip--${lk.type}`}>
                               {lk.label}
@@ -581,7 +582,7 @@ export default function OKRDetalle() {
                     </div>
                   )}
 
-                  <div className="checkin-field">
+                  <div className="kr-edit-field">
                     <label>Peso relativo</label>
                     <input
                       type="number" min="0.01" step="0.01"
@@ -590,7 +591,7 @@ export default function OKRDetalle() {
                     />
                   </div>
 
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div className="kr-edit-actions">
                     <button
                       className="btn-primary"
                       onClick={() => saveKrEdit(kr.id)}
