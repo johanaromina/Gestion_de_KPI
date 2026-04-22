@@ -234,7 +234,7 @@ export const getDataSources = async (req: AuthRequest, res: Response) => {
       const placeholders = scopeKpiIds.map(() => '?').join(', ')
       const [linkRows] = await pool.query<any[]>(
         `SELECT
-           l.parentScopeKpiId AS scopeKpiId,
+           l.scopeKpiId       AS scopeKpiId,
            'collaborator'     AS sourceType,
            col.name           AS sourceName,
            ck.actual          AS actual,
@@ -245,10 +245,10 @@ export const getDataSources = async (req: AuthRequest, res: Response) => {
          JOIN collaborator_kpis ck ON l.collaboratorAssignmentId = ck.id
          JOIN collaborators col ON ck.collaboratorId = col.id
          JOIN kpis k ON ck.kpiId = k.id
-         WHERE l.parentScopeKpiId IN (${placeholders})
+         WHERE l.childType = 'collaborator' AND l.scopeKpiId IN (${placeholders})
          UNION ALL
          SELECT
-           l.parentScopeKpiId AS scopeKpiId,
+           l.scopeKpiId       AS scopeKpiId,
            'scope'            AS sourceType,
            k.name             AS sourceName,
            sk.actual          AS actual,
@@ -258,7 +258,7 @@ export const getDataSources = async (req: AuthRequest, res: Response) => {
          FROM scope_kpi_links l
          JOIN scope_kpis sk ON l.childScopeKpiId = sk.id
          JOIN kpis k ON sk.kpiId = k.id
-         WHERE l.parentScopeKpiId IN (${placeholders})`,
+         WHERE l.childType = 'scope' AND l.scopeKpiId IN (${placeholders})`,
         [...scopeKpiIds, ...scopeKpiIds]
       )
 
