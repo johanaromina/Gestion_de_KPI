@@ -530,16 +530,19 @@ export default function OKRCrear() {
               )}
 
               <div className="form-group form-group--small">
-                <label>Peso relativo</label>
+                <label title="El peso indica cuánto contribuye este KR al progreso del objetivo. Escala de 0,01 a 1,00 (donde 1 = 100%). Todos los KRs juntos deberían sumar 1,00.">
+                  Peso relativo ⓘ
+                </label>
                 <input
                   type="number"
                   min="0.01"
+                  max="1"
                   step="0.01"
                   value={kr.weight}
                   onChange={(e) => updateKR(kr.tempId, 'weight', e.target.value)}
                 />
                 <small className="form-hint">
-                  Define cuánto influye este KR en el progreso total. Podés usar valores como 0.25, 0.50, o enteros como 1, 2, 3.
+                  Escala 0,01–1,00. La suma de todos los KRs debe ser 1,00 (100%).
                 </small>
               </div>
             </div>
@@ -549,12 +552,14 @@ export default function OKRCrear() {
           {krs.filter((kr) => kr.title.trim()).length > 1 && (() => {
             const total = krs.filter((kr) => kr.title.trim()).reduce((sum, kr) => sum + (Number(kr.weight) || 0), 0)
             const isOver = total > 1.001
-            const isExact = Math.abs(total - 1) < 0.001
+            const isUnder = total < 0.999
+            const isExact = !isOver && !isUnder
             return (
               <div className={`kr-weight-summary ${isOver ? 'kr-weight-summary--over' : isExact ? 'kr-weight-summary--ok' : ''}`}>
-                <span>Total de pesos: <strong>{total.toFixed(2)}</strong></span>
-                {isOver && <span className="kr-weight-warning"> ⚠ Superás 1.00 — el progreso del objetivo puede verse distorsionado.</span>}
-                {isExact && <span className="kr-weight-ok"> ✓ Los pesos suman exactamente 1.00</span>}
+                <span>Suma de pesos: <strong>{total.toFixed(2)}</strong> / 1,00</span>
+                {isOver && <span className="kr-weight-warning"> ⚠ La suma supera 1,00 — reducí algún peso.</span>}
+                {isUnder && <span className="kr-weight-warning"> · Podés distribuir el resto ({(1 - total).toFixed(2)}) entre los KRs.</span>}
+                {isExact && <span className="kr-weight-ok"> ✓ Distribución completa</span>}
               </div>
             )
           })()}

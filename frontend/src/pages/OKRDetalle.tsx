@@ -583,9 +583,11 @@ export default function OKRDetalle() {
                   )}
 
                   <div className="kr-edit-field">
-                    <label>Peso relativo</label>
+                    <label title="Escala 0,01–1,00. La suma de todos los KRs del objetivo debe ser 1,00 (100%).">
+                      Peso relativo ⓘ
+                    </label>
                     <input
-                      type="number" min="0.01" step="0.01"
+                      type="number" min="0.01" max="1" step="0.01"
                       value={krEditDraft.weight}
                       onChange={(e) => setKrEditDraft((p) => p ? { ...p, weight: e.target.value } : p)}
                     />
