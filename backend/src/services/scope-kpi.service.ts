@@ -47,6 +47,8 @@ export const getScopeKPIByIdOrThrow = async (id: number) => {
 }
 
 export const validateScopeKPIInput = async (payload: ScopeKPIInput, currentId?: number) => {
+  const w = Number(payload.weight ?? 0)
+  if (w < 0.01 || w > 1) throw new Error('El peso debe estar entre 0,01 y 1,00')
   await ensurePeriodOpen(payload.periodId, 'No se pueden modificar Scope KPIs en períodos cerrados')
   const [scopeRows] = await pool.query<any[]>(`SELECT id FROM org_scopes WHERE id = ? LIMIT 1`, [payload.orgScopeId])
   if (!Array.isArray(scopeRows) || scopeRows.length === 0) {

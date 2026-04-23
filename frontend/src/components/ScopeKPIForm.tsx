@@ -224,7 +224,7 @@ export default function ScopeKPIForm({
           </label>
           <label title="Peso de este KPI dentro del área (0,01 a 1,00). La suma de todos los KPIs del área debería ser 1,00.">
             Peso ⓘ
-            <input type="number" min="0" max="1" step="0.01" value={formData.weight} onChange={(e) => setFormData((prev) => ({ ...prev, weight: Number(e.target.value) }))} />
+            <input type="number" min="0.01" max="1" step="0.01" value={formData.weight} onChange={(e) => setFormData((prev) => ({ ...prev, weight: Number(e.target.value) }))} />
           </label>
           <label>
             Estado

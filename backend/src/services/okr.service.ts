@@ -356,8 +356,14 @@ const normalizeKpiLink = (link: KpiLink): { collaboratorKpiId: number | null; sc
 const syncKpiLinks = async (krId: number, kpiLinks: KpiLink[]): Promise<void> => {
   await pool.query(`DELETE FROM okr_kr_kpis WHERE krId = ?`, [krId])
   if (kpiLinks.length === 0) return
+  // Deduplicar: si llega el mismo KPI dos veces, queda solo el último
+  const seen = new Map<string, { collaboratorKpiId: number | null; scopeKpiId: number | null; weight: number }>()
   for (const link of kpiLinks) {
     const { collaboratorKpiId, scopeKpiId, weight } = normalizeKpiLink(link)
+    const key = `${collaboratorKpiId ?? 'null'}-${scopeKpiId ?? 'null'}`
+    seen.set(key, { collaboratorKpiId, scopeKpiId, weight })
+  }
+  for (const { collaboratorKpiId, scopeKpiId, weight } of seen.values()) {
     await pool.query(
       `INSERT INTO okr_kr_kpis (krId, collaboratorKpiId, scopeKpiId, weight) VALUES (?, ?, ?, ?)`,
       [krId, collaboratorKpiId, scopeKpiId, weight]
@@ -374,6 +380,8 @@ const syncKpiLinks = async (krId: number, kpiLinks: KpiLink[]): Promise<void> =>
 export const createKeyResult = async (
   data: Pick<OKRKeyResult, 'objectiveId' | 'title' | 'description' | 'krType' | 'startValue' | 'targetValue' | 'currentValue' | 'unit' | 'collaboratorKpiId' | 'scopeKpiId' | 'weight' | 'ownerId' | 'sortOrder'> & { kpiLinks?: KpiLink[] }
 ): Promise<number> => {
+  const w = Number(data.weight ?? 1)
+  if (w <= 0 || w > 1) throw new Error('El peso del KR debe estar entre 0,01 y 1,00')
   const [result] = await pool.query<any>(
     `INSERT INTO okr_key_results
        (objectiveId, title, krType, startValue, targetValue, currentValue, unit,
@@ -402,6 +410,10 @@ export const updateKeyResult = async (
   id: number,
   data: Partial<Pick<OKRKeyResult, 'title' | 'krType' | 'currentValue' | 'targetValue' | 'startValue' | 'unit' | 'weight' | 'status' | 'sortOrder' | 'ownerId' | 'collaboratorKpiId' | 'scopeKpiId'>> & { kpiLinks?: KpiLink[] }
 ): Promise<void> => {
+  if (data.weight !== undefined) {
+    const w = Number(data.weight)
+    if (w <= 0 || w > 1) throw new Error('El peso del KR debe estar entre 0,01 y 1,00')
+  }
   const fields: string[] = []
   const params: any[] = []
 
