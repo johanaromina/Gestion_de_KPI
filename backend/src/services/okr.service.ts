@@ -3,26 +3,30 @@ import { OKRObjective, OKRKeyResult, OKRCheckIn } from '../types'
 
 // ── Helpers ────────────────────────────────────────────────
 
-/**
- * Calcula el progreso de un KR (0-100).
- * - simple:     (current - start) / (target - start) * 100
- * - kpi_linked: delega al actual/target del KPI vinculado
- */
-export const calcKrProgress = (kr: OKRKeyResult & { linkedKpis?: { actual: number | null; target: number | null }[] }): number => {
+const calcKpiProgress = (actual: number, target: number, direction?: string): number => {
+  if (target === 0) return 0
+  if (direction === 'reduction') {
+    return actual <= 0 ? 0 : Math.min(100, Math.max(0, (target / actual) * 100))
+  }
+  if (direction === 'exact') {
+    const diff = Math.abs(actual - target)
+    return Math.max(0, 100 - (diff / target) * 100)
+  }
+  return Math.min(100, Math.max(0, (actual / target) * 100))
+}
+
+export const calcKrProgress = (kr: OKRKeyResult & { linkedKpis?: { actual: number | null; target: number | null; direction?: string }[] }): number => {
   if (kr.krType === 'kpi_linked') {
     const links = kr.linkedKpis
     if (Array.isArray(links) && links.length > 0) {
-      const progresses = links.map((l) => {
-        const a = Number(l.actual ?? 0)
-        const t = Number(l.target ?? 0)
-        return t === 0 ? 0 : Math.min(100, Math.max(0, (a / t) * 100))
-      })
+      const progresses = links.map((l) =>
+        calcKpiProgress(Number(l.actual ?? 0), Number(l.target ?? 0), l.direction ?? 'growth')
+      )
       return Math.round(progresses.reduce((s, p) => s + p, 0) / progresses.length)
     }
     const actual = Number(kr.kpiActual ?? 0)
     const target = Number(kr.kpiTarget ?? 0)
-    if (target === 0) return 0
-    return Math.min(100, Math.max(0, (actual / target) * 100))
+    return calcKpiProgress(actual, target, 'growth')
   }
   const start = kr.startValue ?? 0
   const target = kr.targetValue ?? 0
@@ -279,8 +283,10 @@ export const listKeyResults = async (objectiveId: number): Promise<OKRKeyResult[
       `SELECT okk.id, okk.krId, okk.collaboratorKpiId, okk.scopeKpiId,
          COALESCE(ck.actual, sk.actual) AS actual,
          COALESCE(ck.target, sk.target) AS target,
-         COALESCE(kck.name, ksk.name) AS kpiName,
-         COALESCE(col.name, sc.name) AS sourceName
+         COALESCE(kck.name, ksk.name, sk.name) AS kpiName,
+         COALESCE(col.name, sc.name) AS sourceName,
+         CASE WHEN okk.collaboratorKpiId IS NOT NULL THEN 'collaborator' ELSE 'scope' END AS type,
+         COALESCE(kck.direction, ksk.direction) AS direction
        FROM okr_kr_kpis okk
        LEFT JOIN collaborator_kpis ck ON okk.collaboratorKpiId = ck.id
        LEFT JOIN scope_kpis sk ON okk.scopeKpiId = sk.id
@@ -693,11 +699,12 @@ export const getFullTree = async (): Promise<any[]> => {
       const krPlaceholders = krIds.map(() => '?').join(',')
       const [linkRows] = await pool.query<any[]>(
         `SELECT okk.krId,
-                COALESCE(kck.name, ksk.name) AS kpiName,
+                COALESCE(kck.name, ksk.name, sk.name) AS kpiName,
                 COALESCE(ck.actual, sk.actual) AS actual,
                 COALESCE(ck.target, sk.target) AS target,
                 CASE WHEN okk.collaboratorKpiId IS NOT NULL THEN 'collaborator' ELSE 'scope' END AS type,
-                COALESCE(col.name, sc.name) AS sourceName
+                COALESCE(col.name, sc.name) AS sourceName,
+                COALESCE(kck.direction, ksk.direction) AS direction
          FROM okr_kr_kpis okk
          LEFT JOIN collaborator_kpis ck ON okk.collaboratorKpiId = ck.id
          LEFT JOIN scope_kpis sk ON okk.scopeKpiId = sk.id
