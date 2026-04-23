@@ -3,9 +3,14 @@ import { OKRObjective, OKRKeyResult, OKRCheckIn } from '../types'
 
 // ── Helpers ────────────────────────────────────────────────
 
-const calcKpiProgress = (actual: number, target: number, direction?: string): number => {
+const calcKpiProgress = (actual: number, target: number, direction?: string, startValue?: number): number => {
   if (target === 0) return 0
   if (direction === 'reduction') {
+    // Si tenemos el valor de inicio podemos normalizar: 0% al inicio, 100% al llegar a la meta
+    if (startValue !== undefined && startValue > target) {
+      return Math.min(100, Math.max(0, ((startValue - actual) / (startValue - target)) * 100))
+    }
+    // Sin startValue: ratio target/actual (empieza en un valor proporcional, llega a 100% en la meta)
     return actual <= 0 ? 0 : Math.min(100, Math.max(0, (target / actual) * 100))
   }
   if (direction === 'exact') {
@@ -31,7 +36,9 @@ export const calcKrProgress = (kr: OKRKeyResult & { linkedKpis?: { actual: numbe
     }
     const actual = Number(kr.kpiActual ?? 0)
     const target = Number(kr.kpiTarget ?? 0)
-    return calcKpiProgress(actual, target, 'growth')
+    const direction = (kr as any).kpiDirection ?? 'growth'
+    const startVal = direction === 'reduction' ? (kr.startValue ?? undefined) : undefined
+    return calcKpiProgress(actual, target, direction, startVal as number | undefined)
   }
   const start = kr.startValue ?? 0
   const target = kr.targetValue ?? 0
@@ -172,6 +179,7 @@ export const listObjectives = async (filters: {
        kr.*,
        c.name AS ownerName,
        k.name AS kpiName,
+       k.direction AS kpiDirection,
        ck.actual AS kpiActual,
        ck.target AS kpiTarget,
        sk.actual AS scopeActual,
@@ -186,16 +194,48 @@ export const listObjectives = async (filters: {
     ids
   )
 
+  // Batch-fetch linked KPIs para KRs kpi_linked
+  const krIds = (Array.isArray(krRows) ? krRows : []).map((r) => r.id)
+  const linkedByKrList = new Map<number, any[]>()
+  if (krIds.length > 0) {
+    try {
+      const [linkRows] = await pool.query<any[]>(
+        `SELECT okk.krId,
+           COALESCE(ck.actual, sk.actual) AS actual,
+           COALESCE(ck.target, sk.target) AS target,
+           COALESCE(kck.direction, ksk.direction) AS direction,
+           okk.weight AS kpiWeight
+         FROM okr_kr_kpis okk
+         LEFT JOIN collaborator_kpis ck ON okk.collaboratorKpiId = ck.id
+         LEFT JOIN scope_kpis sk ON okk.scopeKpiId = sk.id
+         LEFT JOIN kpis kck ON ck.kpiId = kck.id
+         LEFT JOIN kpis ksk ON sk.kpiId = ksk.id
+         WHERE okk.krId IN (${krIds.map(() => '?').join(',')})`,
+        krIds
+      )
+      for (const row of Array.isArray(linkRows) ? linkRows : []) {
+        const list = linkedByKrList.get(row.krId) ?? []
+        list.push({ actual: row.actual, target: row.target, direction: row.direction, kpiWeight: row.kpiWeight })
+        linkedByKrList.set(row.krId, list)
+      }
+    } catch {
+      // tabla okr_kr_kpis no existe aún
+    }
+  }
+
   const krsByObjective = new Map<number, OKRKeyResult[]>()
   for (const row of Array.isArray(krRows) ? krRows : []) {
+    const linkedKpis = linkedByKrList.get(row.id)
     const kr: OKRKeyResult = {
       ...row,
       kpiActual: row.kpiActual ?? row.scopeActual ?? null,
       kpiTarget: row.kpiTarget ?? row.scopeTarget ?? null,
+      linkedKpis,
       progressPercent: calcKrProgress({
         ...row,
         kpiActual: row.kpiActual ?? row.scopeActual,
         kpiTarget: row.kpiTarget ?? row.scopeTarget,
+        linkedKpis,
       }),
     }
     const list = krsByObjective.get(row.objectiveId) ?? []
