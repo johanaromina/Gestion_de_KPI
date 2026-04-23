@@ -113,6 +113,7 @@ export default function OKRDetalle() {
   const [expandedSources, setExpandedSources] = useState<Set<number>>(new Set())
   const [editingKrId, setEditingKrId] = useState<number | null>(null)
   const [krEditDraft, setKrEditDraft] = useState<KREditDraft | null>(null)
+  const [krEditError, setKrEditError] = useState<string | null>(null)
 
   const { data: objective, isLoading } = useQuery<Objective>(
     ['okr-objective', id],
@@ -269,6 +270,19 @@ export default function OKRDetalle() {
 
   const saveKrEdit = (krId: number) => {
     if (!krEditDraft) return
+    const w = Number(krEditDraft.weight)
+    if (w <= 0 || w > 1) {
+      setKrEditError('El peso del KR debe estar entre 0,01 y 1,00')
+      return
+    }
+    if (krEditDraft.krType === 'kpi_linked' && krEditDraft.kpiLinks.length > 1) {
+      const badLink = krEditDraft.kpiLinks.find((lk) => { const lw = Number(lk.weight ?? 1); return lw <= 0 || lw > 1 })
+      if (badLink) {
+        setKrEditError('El peso de cada KPI vinculado debe estar entre 0,01 y 1,00')
+        return
+      }
+    }
+    setKrEditError(null)
     updateKrMutation.mutate({
       krId,
       data: {
@@ -617,6 +631,7 @@ export default function OKRDetalle() {
                     />
                   </div>
 
+                  {krEditError && <div className="kr-edit-error">{krEditError}</div>}
                   <div className="kr-edit-actions">
                     <button
                       className="btn-primary"
@@ -625,7 +640,7 @@ export default function OKRDetalle() {
                     >
                       {updateKrMutation.isLoading ? 'Guardando...' : 'Guardar cambios'}
                     </button>
-                    <button className="btn-secondary" onClick={() => { setEditingKrId(null); setKrEditDraft(null) }}>
+                    <button className="btn-secondary" onClick={() => { setEditingKrId(null); setKrEditDraft(null); setKrEditError(null) }}>
                       Cancelar
                     </button>
                   </div>

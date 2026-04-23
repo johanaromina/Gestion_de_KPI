@@ -772,6 +772,16 @@
   margin-top: 4px;
 }
 
+.kr-edit-error {
+  grid-column: 1 / -1;
+  color: #dc2626;
+  font-size: 13px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 6px 12px;
+}
+
 .kr-type-toggle {
   display: flex;
   gap: 8px;

@@ -101,6 +101,9 @@ export default function ScopeKPIForm({
       if (!payload.name || !payload.kpiId || !payload.orgScopeId || !payload.periodId) {
         throw new Error('Completá nombre, KPI, área/equipo y período')
       }
+      if (payload.weight < 0 || payload.weight > 1) {
+        throw new Error('El peso debe estar entre 0 y 1,00')
+      }
       if (payload.sourceMode === 'mixed' && payload.mixedConfig) {
         const totalWeight = Number(payload.mixedConfig.directWeight || 0) + Number(payload.mixedConfig.aggregatedWeight || 0)
         if (totalWeight <= 0) {

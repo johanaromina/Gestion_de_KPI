@@ -274,6 +274,11 @@ export default function OKRCrear() {
     const newKrErrors: Record<string, string> = {}
     for (const kr of krs) {
       if (!kr.title.trim()) continue
+      const w = Number(kr.weight)
+      if (w <= 0 || w > 1) {
+        newKrErrors[kr.tempId] = 'El peso del KR debe estar entre 0,01 y 1,00'
+        continue
+      }
       if (kr.krType === 'simple') {
         const start = Number(kr.startValue)
         const target = Number(kr.targetValue)
@@ -281,6 +286,12 @@ export default function OKRCrear() {
           newKrErrors[kr.tempId] = 'La meta es requerida'
         } else if (target === start) {
           newKrErrors[kr.tempId] = `La meta no puede ser igual al valor inicial (${start})`
+        }
+      }
+      if (kr.krType === 'kpi_linked' && kr.kpiLinks.length > 1) {
+        const badLink = kr.kpiLinks.find((lk) => { const lw = Number(lk.weight ?? 1); return lw <= 0 || lw > 1 })
+        if (badLink) {
+          newKrErrors[kr.tempId] = 'El peso de cada KPI vinculado debe estar entre 0,01 y 1,00'
         }
       }
     }
