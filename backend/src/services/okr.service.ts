@@ -15,14 +15,19 @@ const calcKpiProgress = (actual: number, target: number, direction?: string): nu
   return Math.min(100, Math.max(0, (actual / target) * 100))
 }
 
-export const calcKrProgress = (kr: OKRKeyResult & { linkedKpis?: { actual: number | null; target: number | null; direction?: string }[] }): number => {
+export const calcKrProgress = (kr: OKRKeyResult & { linkedKpis?: { actual: number | null; target: number | null; direction?: string; kpiWeight?: number }[] }): number => {
   if (kr.krType === 'kpi_linked') {
     const links = kr.linkedKpis
     if (Array.isArray(links) && links.length > 0) {
-      const progresses = links.map((l) =>
-        calcKpiProgress(Number(l.actual ?? 0), Number(l.target ?? 0), l.direction ?? 'growth')
-      )
-      return Math.round(progresses.reduce((s, p) => s + p, 0) / progresses.length)
+      let weightedSum = 0
+      let totalWeight = 0
+      for (const l of links) {
+        const progress = calcKpiProgress(Number(l.actual ?? 0), Number(l.target ?? 0), l.direction ?? 'growth')
+        const w = Number(l.kpiWeight ?? 1)
+        weightedSum += progress * w
+        totalWeight += w
+      }
+      return totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0
     }
     const actual = Number(kr.kpiActual ?? 0)
     const target = Number(kr.kpiTarget ?? 0)
@@ -59,21 +64,25 @@ export const recalcObjectiveProgress = async (objectiveId: number): Promise<void
 
   // Cargar KPIs múltiples para KRs kpi_linked
   const krIds = krs.map((r) => r.id)
-  const linkedByKr = new Map<number, { actual: number | null; target: number | null }[]>()
+  const linkedByKr = new Map<number, { actual: number | null; target: number | null; direction?: string; kpiWeight?: number }[]>()
   try {
     const [kpiLinksRows] = await pool.query<any[]>(
       `SELECT okk.krId,
          COALESCE(ck.actual, sk.actual) AS actual,
-         COALESCE(ck.target, sk.target) AS target
+         COALESCE(ck.target, sk.target) AS target,
+         COALESCE(kck.direction, ksk.direction) AS direction,
+         okk.weight AS kpiWeight
        FROM okr_kr_kpis okk
        LEFT JOIN collaborator_kpis ck ON okk.collaboratorKpiId = ck.id
        LEFT JOIN scope_kpis sk ON okk.scopeKpiId = sk.id
+       LEFT JOIN kpis kck ON ck.kpiId = kck.id
+       LEFT JOIN kpis ksk ON sk.kpiId = ksk.id
        WHERE okk.krId IN (${krIds.map(() => '?').join(',')})`,
       krIds
     )
     for (const row of Array.isArray(kpiLinksRows) ? kpiLinksRows : []) {
       const list = linkedByKr.get(row.krId) ?? []
-      list.push({ actual: row.actual, target: row.target })
+      list.push({ actual: row.actual, target: row.target, direction: row.direction, kpiWeight: row.kpiWeight })
       linkedByKr.set(row.krId, list)
     }
   } catch {
@@ -286,7 +295,8 @@ export const listKeyResults = async (objectiveId: number): Promise<OKRKeyResult[
          COALESCE(kck.name, ksk.name, sk.name) AS kpiName,
          COALESCE(col.name, sc.name) AS sourceName,
          CASE WHEN okk.collaboratorKpiId IS NOT NULL THEN 'collaborator' ELSE 'scope' END AS type,
-         COALESCE(kck.direction, ksk.direction) AS direction
+         COALESCE(kck.direction, ksk.direction) AS direction,
+         okk.weight AS kpiWeight
        FROM okr_kr_kpis okk
        LEFT JOIN collaborator_kpis ck ON okk.collaboratorKpiId = ck.id
        LEFT JOIN scope_kpis sk ON okk.scopeKpiId = sk.id
@@ -328,27 +338,29 @@ export const listKeyResults = async (objectiveId: number): Promise<OKRKeyResult[
 
 // Acepta tanto el formato del frontend { type, id } como el legacy { collaboratorKpiId, scopeKpiId }
 type KpiLink =
-  | { type: 'collaborator' | 'scope'; id: number }
-  | { collaboratorKpiId?: number | null; scopeKpiId?: number | null }
+  | { type: 'collaborator' | 'scope'; id: number; weight?: number }
+  | { collaboratorKpiId?: number | null; scopeKpiId?: number | null; weight?: number }
 
-const normalizeKpiLink = (link: KpiLink): { collaboratorKpiId: number | null; scopeKpiId: number | null } => {
+const normalizeKpiLink = (link: KpiLink): { collaboratorKpiId: number | null; scopeKpiId: number | null; weight: number } => {
+  const weight = link.weight ?? 1
   if ('type' in link) {
     return {
       collaboratorKpiId: link.type === 'collaborator' ? link.id : null,
       scopeKpiId: link.type === 'scope' ? link.id : null,
+      weight,
     }
   }
-  return { collaboratorKpiId: link.collaboratorKpiId ?? null, scopeKpiId: link.scopeKpiId ?? null }
+  return { collaboratorKpiId: link.collaboratorKpiId ?? null, scopeKpiId: link.scopeKpiId ?? null, weight }
 }
 
 const syncKpiLinks = async (krId: number, kpiLinks: KpiLink[]): Promise<void> => {
   await pool.query(`DELETE FROM okr_kr_kpis WHERE krId = ?`, [krId])
   if (kpiLinks.length === 0) return
   for (const link of kpiLinks) {
-    const { collaboratorKpiId, scopeKpiId } = normalizeKpiLink(link)
+    const { collaboratorKpiId, scopeKpiId, weight } = normalizeKpiLink(link)
     await pool.query(
-      `INSERT INTO okr_kr_kpis (krId, collaboratorKpiId, scopeKpiId) VALUES (?, ?, ?)`,
-      [krId, collaboratorKpiId, scopeKpiId]
+      `INSERT INTO okr_kr_kpis (krId, collaboratorKpiId, scopeKpiId, weight) VALUES (?, ?, ?, ?)`,
+      [krId, collaboratorKpiId, scopeKpiId, weight]
     )
   }
   // Mantener legacy columns apuntando al primero para compatibilidad con recalc legado
@@ -704,7 +716,8 @@ export const getFullTree = async (): Promise<any[]> => {
                 COALESCE(ck.target, sk.target) AS target,
                 CASE WHEN okk.collaboratorKpiId IS NOT NULL THEN 'collaborator' ELSE 'scope' END AS type,
                 COALESCE(col.name, sc.name) AS sourceName,
-                COALESCE(kck.direction, ksk.direction) AS direction
+                COALESCE(kck.direction, ksk.direction) AS direction,
+                okk.weight AS kpiWeight
          FROM okr_kr_kpis okk
          LEFT JOIN collaborator_kpis ck ON okk.collaboratorKpiId = ck.id
          LEFT JOIN scope_kpis sk ON okk.scopeKpiId = sk.id
@@ -717,7 +730,7 @@ export const getFullTree = async (): Promise<any[]> => {
       )
       for (const row of Array.isArray(linkRows) ? linkRows : []) {
         const list = kpiLinksByKr.get(row.krId) ?? []
-        list.push({ kpiName: row.kpiName, actual: row.actual, target: row.target, type: row.type, sourceName: row.sourceName })
+        list.push({ kpiName: row.kpiName, actual: row.actual, target: row.target, type: row.type, sourceName: row.sourceName, direction: row.direction, kpiWeight: row.kpiWeight })
         kpiLinksByKr.set(row.krId, list)
       }
     } catch {

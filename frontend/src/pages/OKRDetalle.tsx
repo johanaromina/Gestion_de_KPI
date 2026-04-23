@@ -6,7 +6,7 @@ import './OKRDetalle.css'
 
 type KRStatus = 'not_started' | 'on_track' | 'at_risk' | 'behind' | 'completed'
 
-interface KpiLink { type: 'collaborator' | 'scope'; id: number; label: string }
+interface KpiLink { type: 'collaborator' | 'scope'; id: number; label: string; weight?: number }
 
 interface KREditDraft {
   title: string
@@ -237,7 +237,12 @@ export default function OKRDetalle() {
       startValue: String(kr.startValue ?? '0'),
       targetValue: String(kr.targetValue ?? ''),
       unit: kr.unit ?? '',
-      kpiLinks: kr.linkedKpis ?? [],
+      kpiLinks: (kr.linkedKpis ?? []).map((lk: any) => ({
+        type: lk.type as 'collaborator' | 'scope',
+        id: lk.collaboratorKpiId ?? lk.scopeKpiId ?? lk.id,
+        label: lk.kpiName ? `${lk.kpiName}${lk.sourceName ? ` — ${lk.sourceName}` : ''}` : (lk.label ?? `KPI #${lk.id}`),
+        weight: lk.kpiWeight ?? 1,
+      })),
       weight: String(kr.weight ?? '1'),
     })
   }
@@ -253,6 +258,12 @@ export default function OKRDetalle() {
   const removeKrKpiLink = (type: string, linkId: number) => {
     setKrEditDraft((prev) =>
       prev ? { ...prev, kpiLinks: prev.kpiLinks.filter((l) => !(l.type === type && l.id === linkId)) } : prev
+    )
+  }
+
+  const updateKrKpiLinkWeight = (type: string, linkId: number, weight: number) => {
+    setKrEditDraft((prev) =>
+      prev ? { ...prev, kpiLinks: prev.kpiLinks.map((l) => l.type === type && l.id === linkId ? { ...l, weight } : l) } : prev
     )
   }
 
@@ -547,6 +558,19 @@ export default function OKRDetalle() {
                           {krEditDraft.kpiLinks.map((lk) => (
                             <span key={`${lk.type}-${lk.id}`} className={`kpi-chip kpi-chip--${lk.type}`}>
                               {lk.label}
+                              {krEditDraft.kpiLinks.length > 1 && (
+                                <input
+                                  type="number"
+                                  className="kpi-chip-weight"
+                                  min="0.01"
+                                  max="1"
+                                  step="0.01"
+                                  title="Peso de este KPI en el cálculo del KR"
+                                  value={lk.weight ?? 1}
+                                  onChange={(e) => updateKrKpiLinkWeight(lk.type, lk.id, Number(e.target.value))}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              )}
                               <button type="button" className="kpi-chip-remove" onClick={() => removeKrKpiLink(lk.type, lk.id)}>×</button>
                             </span>
                           ))}

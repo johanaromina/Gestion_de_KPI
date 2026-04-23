@@ -12,7 +12,7 @@ interface Collaborator { id: number; name: string }
 interface CollaboratorKPI { id: number; kpiName: string; collaboratorName: string; target: number }
 interface ScopeKPI { id: number; name: string; orgScopeName: string; target: number }
 
-interface KpiLink { type: 'collaborator' | 'scope'; id: number; label: string }
+interface KpiLink { type: 'collaborator' | 'scope'; id: number; label: string; weight?: number }
 
 interface KRDraft {
   tempId: string
@@ -86,8 +86,9 @@ export default function OKRCrear() {
         unit: kr.unit ?? '',
         kpiLinks: (kr.linkedKpis ?? []).map((lk: any) => ({
           type: lk.type as 'collaborator' | 'scope',
-          id: lk.id,
-          label: lk.label ?? `KPI #${lk.id}`,
+          id: lk.collaboratorKpiId ?? lk.scopeKpiId ?? lk.id,
+          label: lk.kpiName ? `${lk.kpiName}${lk.sourceName ? ` — ${lk.sourceName}` : ''}` : (lk.label ?? `KPI #${lk.id}`),
+          weight: lk.kpiWeight ?? 1,
         })),
         weight: String(kr.weight ?? '1'),
       })))
@@ -159,6 +160,13 @@ export default function OKRCrear() {
     setKrs((prev) => prev.map((kr) =>
       kr.tempId !== tempId ? kr : { ...kr, kpiLinks: kr.kpiLinks.filter((l) => !(l.type === type && l.id === linkId)) }
     ))
+  }
+
+  const updateKpiLinkWeight = (tempId: string, type: string, linkId: number, weight: number) => {
+    setKrs((prev) => prev.map((kr) => {
+      if (kr.tempId !== tempId) return kr
+      return { ...kr, kpiLinks: kr.kpiLinks.map((l) => l.type === type && l.id === linkId ? { ...l, weight } : l) }
+    }))
   }
 
   const createMutation = useMutation(
@@ -493,6 +501,19 @@ export default function OKRCrear() {
                       {kr.kpiLinks.map((lk) => (
                         <span key={`${lk.type}-${lk.id}`} className={`kpi-chip kpi-chip--${lk.type}`}>
                           {lk.label}
+                          {kr.kpiLinks.length > 1 && (
+                            <input
+                              type="number"
+                              className="kpi-chip-weight"
+                              min="0.01"
+                              max="1"
+                              step="0.01"
+                              title="Peso de este KPI en el cálculo del KR"
+                              value={lk.weight ?? 1}
+                              onChange={(e) => updateKpiLinkWeight(kr.tempId, lk.type, lk.id, Number(e.target.value))}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          )}
                           <button type="button" className="kpi-chip-remove" onClick={() => removeKpiLink(kr.tempId, lk.type, lk.id)}>×</button>
                         </span>
                       ))}
