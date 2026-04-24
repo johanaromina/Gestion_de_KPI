@@ -619,8 +619,15 @@ export const getAlignmentTree = async (periodId: number): Promise<OKRObjective[]
  */
 export const recalcOKRsLinkedToCollaboratorKpi = async (collaboratorKpiId: number): Promise<void> => {
   const [rows] = await pool.query<any[]>(
-    `SELECT DISTINCT objectiveId FROM okr_key_results WHERE collaboratorKpiId = ?`,
-    [collaboratorKpiId]
+    `SELECT DISTINCT kr.objectiveId
+     FROM okr_key_results kr
+     WHERE kr.collaboratorKpiId = ?
+     UNION
+     SELECT DISTINCT kr.objectiveId
+     FROM okr_kr_kpis okk
+     JOIN okr_key_results kr ON kr.id = okk.krId
+     WHERE okk.collaboratorKpiId = ?`,
+    [collaboratorKpiId, collaboratorKpiId]
   )
   if (!Array.isArray(rows) || rows.length === 0) return
   for (const row of rows) {
@@ -635,8 +642,15 @@ export const recalcOKRsLinkedToCollaboratorKpi = async (collaboratorKpiId: numbe
  */
 export const recalcOKRsLinkedToScopeKpi = async (scopeKpiId: number): Promise<void> => {
   const [rows] = await pool.query<any[]>(
-    `SELECT DISTINCT objectiveId FROM okr_key_results WHERE scopeKpiId = ?`,
-    [scopeKpiId]
+    `SELECT DISTINCT kr.objectiveId
+     FROM okr_key_results kr
+     WHERE kr.scopeKpiId = ?
+     UNION
+     SELECT DISTINCT kr.objectiveId
+     FROM okr_kr_kpis okk
+     JOIN okr_key_results kr ON kr.id = okk.krId
+     WHERE okk.scopeKpiId = ?`,
+    [scopeKpiId, scopeKpiId]
   )
   if (!Array.isArray(rows) || rows.length === 0) return
   for (const row of rows) {
@@ -680,23 +694,54 @@ export const autoScoreKRStatuses = async (objectiveId: number): Promise<void> =>
     `SELECT kr.id, kr.krType, kr.status,
             kr.startValue, kr.targetValue, kr.currentValue, kr.weight,
             ck.actual AS kpiActual, ck.target AS kpiTarget,
-            sk.actual AS scopeActual, sk.target AS scopeTarget
+            sk.actual AS scopeActual, sk.target AS scopeTarget,
+            k.direction AS kpiDirection
      FROM okr_key_results kr
      LEFT JOIN collaborator_kpis ck ON kr.collaboratorKpiId = ck.id
      LEFT JOIN scope_kpis sk ON kr.scopeKpiId = sk.id
+     LEFT JOIN kpis k ON COALESCE(ck.kpiId, sk.kpiId) = k.id
      WHERE kr.objectiveId = ?`,
     [objectiveId]
   )
   if (!Array.isArray(krs) || krs.length === 0) return
 
+  // Batch-fetch linked KPIs para KRs multi-KPI
+  const krIds = krs.map((r) => r.id)
+  const linkedByKrScore = new Map<number, { actual: number | null; target: number | null; direction?: string; kpiWeight?: number }[]>()
+  try {
+    const [linkRows] = await pool.query<any[]>(
+      `SELECT okk.krId,
+         COALESCE(ck.actual, sk.actual) AS actual,
+         COALESCE(ck.target, sk.target) AS target,
+         COALESCE(kck.direction, ksk.direction) AS direction,
+         okk.weight AS kpiWeight
+       FROM okr_kr_kpis okk
+       LEFT JOIN collaborator_kpis ck ON okk.collaboratorKpiId = ck.id
+       LEFT JOIN scope_kpis sk ON okk.scopeKpiId = sk.id
+       LEFT JOIN kpis kck ON ck.kpiId = kck.id
+       LEFT JOIN kpis ksk ON sk.kpiId = ksk.id
+       WHERE okk.krId IN (${krIds.map(() => '?').join(',')})`,
+      krIds
+    )
+    for (const row of Array.isArray(linkRows) ? linkRows : []) {
+      const list = linkedByKrScore.get(row.krId) ?? []
+      list.push({ actual: row.actual, target: row.target, direction: row.direction, kpiWeight: row.kpiWeight })
+      linkedByKrScore.set(row.krId, list)
+    }
+  } catch {
+    // tabla okr_kr_kpis no existe aún
+  }
+
   for (const row of krs) {
     // No tocar KRs marcados manualmente como completados
     if (row.status === 'completed') continue
 
+    const linkedKpis = linkedByKrScore.get(row.id)
     const progress = calcKrProgress({
       ...row,
       kpiActual: row.kpiActual ?? row.scopeActual,
       kpiTarget: row.kpiTarget ?? row.scopeTarget,
+      linkedKpis,
     })
 
     let newStatus: string
