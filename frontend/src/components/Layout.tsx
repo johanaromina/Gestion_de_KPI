@@ -195,6 +195,10 @@ export default function Layout({ children }: LayoutProps) {
                 <span className="nav-icon" aria-hidden="true">&gt;</span>
                 Historico
               </Link>
+              <Link to="/analytics" className={`nav-item ${isActive('/analytics') ? 'active' : ''}`} onClick={handleNavClick}>
+                <span className="nav-icon" aria-hidden="true">&gt;</span>
+                Analítica
+              </Link>
               <Link to="/auditoria" className={`nav-item ${isActive('/auditoria') ? 'active' : ''}`} onClick={handleNavClick}>
                 <span className="nav-icon" aria-hidden="true">&gt;</span>
                 Auditoria

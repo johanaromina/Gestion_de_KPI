@@ -42,6 +42,7 @@ import OKRCrear from './pages/OKRCrear'
 import OKRAlineacion from './pages/OKRAlineacion'
 import OKRDetalle from './pages/OKRDetalle'
 import MiSemana from './pages/MiSemana'
+import Analytics from './pages/Analytics'
 import { isTokenExpired } from './hooks/useAuth'
 
 const queryClient = new QueryClient({
@@ -86,6 +87,14 @@ function App() {
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/register" element={<Register />} />
             <Route path="/" element={<HomeRoute />} />
+            <Route
+              path="/analytics"
+              element={
+                <RequireAuth>
+                  <Analytics />
+                </RequireAuth>
+              }
+            />
             <Route
               path="/tablero-ejecutivo"
               element={
