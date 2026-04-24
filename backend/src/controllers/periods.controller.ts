@@ -3,6 +3,7 @@ import { pool } from '../config/database'
 import { Period, SubPeriod } from '../types'
 import { calculateVariation, calculateWeightedResult } from '../utils/kpi-formulas'
 import { sendMail } from '../utils/mailer'
+import { copyPeriod } from '../services/copy-period.service.js'
 
 const normalizeNumber = (value: any) => {
   if (value === null || value === undefined) return null
@@ -424,5 +425,27 @@ export const deletePeriod = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Error deleting period:', error)
     res.status(500).json({ error: 'Error al eliminar período' })
+  }
+}
+
+export const copyPeriodHandler = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const { name, startDate, endDate, copyCollaboratorKpis, copyScopeKpis, copyOkrs } = req.body
+    if (!name || !startDate || !endDate) {
+      return res.status(400).json({ error: 'Nombre, fecha de inicio y fecha de fin son requeridos' })
+    }
+    const result = await copyPeriod(Number(id), {
+      name,
+      startDate,
+      endDate,
+      copyCollaboratorKpis: copyCollaboratorKpis !== false,
+      copyScopeKpis: copyScopeKpis !== false,
+      copyOkrs: copyOkrs !== false,
+    })
+    res.json(result)
+  } catch (error: any) {
+    console.error('Error copying period:', error)
+    res.status(500).json({ error: error.message || 'Error al copiar el período' })
   }
 }

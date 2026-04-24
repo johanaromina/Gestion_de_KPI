@@ -9,6 +9,7 @@ import {
   closePeriod,
   reopenPeriod,
   getPeriodSummary,
+  copyPeriodHandler,
 } from '../controllers/periods.controller'
 import { authenticate, authorize } from '../middleware/auth.middleware'
 
@@ -22,6 +23,7 @@ router.post('/', createPeriod)
 router.put('/:id', updatePeriod)
 router.post('/:id/close', closePeriod)
 router.post('/:id/reopen', authenticate, authorize('admin', 'director', 'manager'), reopenPeriod)
+router.post('/:id/copy', authenticate, authorize('admin', 'director', 'manager'), copyPeriodHandler)
 router.delete('/:id', deletePeriod)
 
 export default router

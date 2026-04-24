@@ -40,6 +40,7 @@ export const getCheckIns = async (req: AuthRequest, res: Response) => {
          ci.weekStart,
          ci.q1, ci.q2, ci.q3,
          ci.mood,
+         ci.note,
          ci.collaboratorKpiId,
          ck.kpiId,
          k.name AS kpiName,
@@ -50,6 +51,7 @@ export const getCheckIns = async (req: AuthRequest, res: Response) => {
        LEFT JOIN kpis k ON k.id = ck.kpiId
        WHERE ${whereClause}
        ORDER BY ci.weekStart DESC, ci.createdAt DESC`,
+
       params
     )
 
@@ -138,6 +140,26 @@ export const upsertCheckIn = async (req: AuthRequest, res: Response) => {
   } catch (err) {
     console.error('[check-ins] upsertCheckIn error:', err)
     res.status(500).json({ error: 'Error al guardar check-in' })
+  }
+}
+
+/* PATCH /api/check-ins/:id/note
+   Leaders/admins add or update their comment on a collaborator's check-in */
+export const addCheckInNote = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+    const { note } = req.body
+
+    const [rows] = await pool.query<any[]>('SELECT id FROM check_ins WHERE id = ?', [id])
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(404).json({ error: 'Check-in no encontrado' })
+    }
+
+    await pool.query('UPDATE check_ins SET note = ? WHERE id = ?', [note ?? null, id])
+    res.json({ success: true })
+  } catch (err) {
+    console.error('[check-ins] addCheckInNote error:', err)
+    res.status(500).json({ error: 'Error al guardar comentario' })
   }
 }
 

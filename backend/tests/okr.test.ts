@@ -133,6 +133,66 @@ describe('calcKrProgress — kpi_linked', () => {
       75
     )
   })
+
+  test('KPI de reducción arranca en 0% usando startValue', () => {
+    assert.equal(
+      calcKrProgress({
+        ...kr({ krType: 'kpi_linked', startValue: 1200, kpiActual: 1200, kpiTarget: 1000 }),
+        kpiDirection: 'reduction',
+      } as OKRKeyResult & { kpiDirection: 'reduction' }),
+      0
+    )
+  })
+
+  test('KPI de reducción calcula progreso intermedio usando startValue', () => {
+    assert.equal(
+      calcKrProgress({
+        ...kr({ krType: 'kpi_linked', startValue: 1200, kpiActual: 1100, kpiTarget: 1000 }),
+        kpiDirection: 'reduction',
+      } as OKRKeyResult & { kpiDirection: 'reduction' }),
+      50
+    )
+  })
+
+  test('KPI de reducción llega a 100% al alcanzar la meta', () => {
+    assert.equal(
+      calcKrProgress({
+        ...kr({ krType: 'kpi_linked', startValue: 1200, kpiActual: 1000, kpiTarget: 1000 }),
+        kpiDirection: 'reduction',
+      } as OKRKeyResult & { kpiDirection: 'reduction' }),
+      100
+    )
+  })
+
+  test('múltiples KPIs vinculados respetan el peso relativo', () => {
+    assert.equal(
+      calcKrProgress({
+        ...kr({ krType: 'kpi_linked' }),
+        linkedKpis: [
+          { actual: 50, target: 100, direction: 'growth', kpiWeight: 0.25 },
+          { actual: 100, target: 100, direction: 'growth', kpiWeight: 0.75 },
+        ],
+      } as OKRKeyResult & {
+        linkedKpis: { actual: number; target: number; direction: 'growth'; kpiWeight: number }[]
+      }),
+      88
+    )
+  })
+
+  test('múltiples KPIs vinculados combinan growth y reduction correctamente', () => {
+    assert.equal(
+      calcKrProgress({
+        ...kr({ krType: 'kpi_linked' }),
+        linkedKpis: [
+          { actual: 1200, target: 1000, direction: 'reduction', kpiWeight: 0.5 },
+          { actual: 80, target: 100, direction: 'growth', kpiWeight: 0.5 },
+        ],
+      } as OKRKeyResult & {
+        linkedKpis: { actual: number; target: number; direction: 'growth' | 'reduction'; kpiWeight: number }[]
+      }),
+      82
+    )
+  })
 })
 
 // ── Casos borde ───────────────────────────────────────────────────────────────

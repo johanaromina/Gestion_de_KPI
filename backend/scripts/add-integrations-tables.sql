@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS integration_templates (
 CREATE TABLE IF NOT EXISTS integration_targets (
   id INT AUTO_INCREMENT PRIMARY KEY,
   templateId INT NOT NULL,
-  scopeType ENUM('area', 'team', 'person', 'product') NOT NULL DEFAULT 'area',
+  scopeType ENUM('company','area','team','person','product','assignment','scope_kpi') NOT NULL DEFAULT 'area',
   scopeId VARCHAR(255) NOT NULL,
   orgScopeId INT NULL,
   params TEXT NULL,

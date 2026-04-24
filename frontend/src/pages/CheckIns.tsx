@@ -15,6 +15,7 @@ type CheckIn = {
   q2: string
   q3: string
   mood: number | null
+  note?: string | null
   kpiName?: string | null
   createdAt: string
 }
@@ -62,6 +63,8 @@ export default function CheckIns() {
   const [showForm, setShowForm] = useState(false)
   const [filterCollaborator, setFilterCollaborator] = useState<number | ''>('')
   const [filterWeeks, setFilterWeeks] = useState(8)
+  const [noteEditId, setNoteEditId] = useState<number | null>(null)
+  const [noteText, setNoteText] = useState('')
 
   const thisWeek = getMonday()
 
@@ -103,6 +106,19 @@ export default function CheckIns() {
     ['my-kpis-checkin', user?.id],
     async () => (await api.get(`/collaborator-kpis/collaborator/${user?.id}`)).data,
     { enabled: !!user?.id }
+  )
+
+  const noteMutation = useMutation(
+    async ({ id, note }: { id: number; note: string }) => {
+      await api.patch(`/check-ins/${id}/note`, { note })
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('check-ins')
+        queryClient.invalidateQueries('check-in-current')
+        setNoteEditId(null)
+      },
+    }
   )
 
   const saveMutation = useMutation(
@@ -261,6 +277,12 @@ export default function CheckIns() {
             <div className="checkin-qa-item"><span className="checkin-q">¿Obstáculos?</span><p className="checkin-a">{currentCheckIn!.q2}</p></div>
             <div className="checkin-qa-item"><span className="checkin-q">¿Foco siguiente semana?</span><p className="checkin-a">{currentCheckIn!.q3}</p></div>
           </div>
+          {currentCheckIn!.note && (
+            <div className="checkin-leader-note">
+              <span className="checkin-note-label">Comentario de tu líder</span>
+              <p className="checkin-a">{currentCheckIn!.note}</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -376,6 +398,50 @@ export default function CheckIns() {
                   <div className="checkin-qa-item"><span className="checkin-q">Obstáculos</span><p className="checkin-a">{ci.q2}</p></div>
                   <div className="checkin-qa-item"><span className="checkin-q">Foco próxima semana</span><p className="checkin-a">{ci.q3}</p></div>
                 </div>
+                {isCollaborator && ci.note && (
+                  <div className="checkin-leader-note">
+                    <span className="checkin-note-label">Comentario de tu líder</span>
+                    <p className="checkin-a">{ci.note}</p>
+                  </div>
+                )}
+                {!isCollaborator && (
+                  <div className="checkin-note-section">
+                    {noteEditId === ci.id ? (
+                      <div className="checkin-note-edit">
+                        <textarea
+                          value={noteText}
+                          onChange={(e) => setNoteText(e.target.value)}
+                          rows={2}
+                          placeholder="Agregar comentario para el colaborador..."
+                        />
+                        <div className="checkin-note-actions">
+                          <button className="btn-secondary btn-sm" onClick={() => setNoteEditId(null)}>
+                            Cancelar
+                          </button>
+                          <button
+                            className="btn-primary btn-sm"
+                            disabled={noteMutation.isLoading}
+                            onClick={() => noteMutation.mutate({ id: ci.id, note: noteText })}
+                          >
+                            {noteMutation.isLoading ? 'Guardando...' : 'Guardar'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="checkin-note-display">
+                        {ci.note && (
+                          <p className="checkin-note-text">{ci.note}</p>
+                        )}
+                        <button
+                          className="checkin-note-btn"
+                          onClick={() => { setNoteEditId(ci.id); setNoteText(ci.note ?? '') }}
+                        >
+                          {ci.note ? 'Editar comentario' : '+ Agregar comentario'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))
         )}

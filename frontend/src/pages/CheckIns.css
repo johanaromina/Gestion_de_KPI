@@ -383,6 +383,92 @@
   color: #1d4ed8;
 }
 
+/* Leader note — visible to collaborator */
+.checkin-leader-note {
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+}
+
+.checkin-note-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1d4ed8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+/* Leader note editor */
+.checkin-note-section {
+  margin-top: 14px;
+  border-top: 1px solid #f3f4f6;
+  padding-top: 12px;
+}
+
+.checkin-note-edit textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  color: #111827;
+  transition: border-color 0.15s;
+}
+
+.checkin-note-edit textarea:focus {
+  outline: none;
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12);
+}
+
+.checkin-note-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.checkin-note-display {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.checkin-note-text {
+  font-size: 13px;
+  color: #374151;
+  margin: 0;
+  line-height: 1.5;
+  font-style: italic;
+  white-space: pre-wrap;
+}
+
+.checkin-note-btn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: #f97316;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.checkin-note-btn:hover { text-decoration: underline; }
+
+.btn-sm {
+  padding: 5px 12px;
+  font-size: 12px;
+}
+
 @media (max-width: 600px) {
   .checkin-summary-row { grid-template-columns: 1fr auto; }
   .checkin-summary-bar-wrap, .checkin-summary-count { display: none; }

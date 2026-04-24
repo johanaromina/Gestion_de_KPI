@@ -37,6 +37,7 @@ import okrRoutes from './routes/okr.routes.js'
 import miSemanaRoutes from './routes/mi-semana.routes.js'
 import { startIntegrationsScheduler } from './utils/integrations-scheduler'
 import { runNotifications } from './utils/notifications'
+import { startOKRScheduler } from './utils/okr-scheduler.js'
 
 const app = express()
 const PORT = process.env.PORT || 5000
@@ -176,3 +177,4 @@ if (shouldNotify) {
 }
 
 startIntegrationsScheduler()
+startOKRScheduler()

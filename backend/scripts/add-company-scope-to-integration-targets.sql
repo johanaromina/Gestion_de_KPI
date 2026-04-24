@@ -3,4 +3,4 @@
 -- Dejalo solo para instalaciones antiguas que necesiten aplicar el cambio puntual.
 
 ALTER TABLE integration_targets
-  MODIFY COLUMN scopeType ENUM('company', 'area', 'team', 'person', 'product') NOT NULL DEFAULT 'area';
+  MODIFY COLUMN scopeType ENUM('company','area','team','person','product','assignment','scope_kpi') NOT NULL DEFAULT 'area';

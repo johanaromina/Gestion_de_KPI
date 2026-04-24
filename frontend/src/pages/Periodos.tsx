@@ -186,6 +186,9 @@ export default function Periodos() {
     tone: 'success' | 'warning'
   } | null>(null)
   const [calendarByPeriod, setCalendarByPeriod] = useState<Record<number, number | null>>({})
+  const [copyingPeriod, setCopyingPeriod] = useState<Period | null>(null)
+  const [copyForm, setCopyForm] = useState({ name: '', startDate: '', endDate: '', copyCollaboratorKpis: true, copyScopeKpis: true, copyOkrs: true })
+  const [copyResult, setCopyResult] = useState<{ copied: { collaboratorKpis: number; scopeKpis: number; objectives: number; keyResults: number } } | null>(null)
 
   const queryClient = useQueryClient()
   const dialog = useDialog()
@@ -298,6 +301,22 @@ export default function Periodos() {
       },
       onError: (error: any) => {
         void dialog.alert(error.response?.data?.error || 'No se pudo recalcular el resumen anual', { title: 'Error', variant: 'danger' })
+      },
+    }
+  )
+
+  const copyPeriodMutation = useMutation(
+    async () => {
+      const res = await api.post(`/periods/${copyingPeriod!.id}/copy`, copyForm)
+      return res.data
+    },
+    {
+      onSuccess: (data) => {
+        queryClient.invalidateQueries('periods')
+        setCopyResult(data)
+      },
+      onError: (error: any) => {
+        void dialog.alert(error.response?.data?.error || 'No se pudo copiar el período', { title: 'Error', variant: 'danger' })
       },
     }
   )
@@ -630,6 +649,26 @@ export default function Periodos() {
                           >
                             Eliminar
                           </button>
+                          {canConfig && (
+                            <button
+                              className="btn-text"
+                              onClick={() => {
+                                setCopyResult(null)
+                                setCopyForm({
+                                  name: `Copia de ${period.name}`,
+                                  startDate: '',
+                                  endDate: '',
+                                  copyCollaboratorKpis: true,
+                                  copyScopeKpis: true,
+                                  copyOkrs: true,
+                                })
+                                setCopyingPeriod(period)
+                              }}
+                              title="Copiar periodo"
+                            >
+                              Copiar
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -705,6 +744,115 @@ export default function Periodos() {
             setEditingSubPeriod(undefined)
           }}
         />
+      )}
+
+      {copyingPeriod && (
+        <div className="modal-overlay" onClick={() => !copyPeriodMutation.isLoading && setCopyingPeriod(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Copiar período</h2>
+              <button className="modal-close" onClick={() => setCopyingPeriod(null)} disabled={copyPeriodMutation.isLoading}>×</button>
+            </div>
+
+            {copyResult ? (
+              <div className="copy-result">
+                <div className="copy-result-icon">✓</div>
+                <h3>Período copiado correctamente</h3>
+                <ul className="copy-result-list">
+                  <li>KPIs individuales: <strong>{copyResult.copied.collaboratorKpis}</strong></li>
+                  <li>KPIs grupales: <strong>{copyResult.copied.scopeKpis}</strong></li>
+                  <li>Objetivos OKR: <strong>{copyResult.copied.objectives}</strong></li>
+                  <li>Key Results: <strong>{copyResult.copied.keyResults}</strong></li>
+                </ul>
+                <button className="btn-primary" onClick={() => setCopyingPeriod(null)}>Cerrar</button>
+              </div>
+            ) : (
+              <div className="modal-body">
+                <p className="copy-source-label">Copiando desde: <strong>{copyingPeriod.name}</strong></p>
+
+                <div className="form-group">
+                  <label>Nombre del nuevo período *</label>
+                  <input
+                    type="text"
+                    value={copyForm.name}
+                    onChange={(e) => setCopyForm((f) => ({ ...f, name: e.target.value }))}
+                    className="form-input"
+                  />
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Fecha inicio *</label>
+                    <input
+                      type="date"
+                      value={copyForm.startDate}
+                      onChange={(e) => setCopyForm((f) => ({ ...f, startDate: e.target.value }))}
+                      className="form-input"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Fecha fin *</label>
+                    <input
+                      type="date"
+                      value={copyForm.endDate}
+                      onChange={(e) => setCopyForm((f) => ({ ...f, endDate: e.target.value }))}
+                      className="form-input"
+                    />
+                  </div>
+                </div>
+
+                <div className="copy-options">
+                  <p className="copy-options-label">¿Qué copiar?</p>
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={copyForm.copyCollaboratorKpis}
+                      onChange={(e) => setCopyForm((f) => ({ ...f, copyCollaboratorKpis: e.target.checked }))}
+                    />
+                    KPIs individuales (con targets, sin actuals)
+                  </label>
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={copyForm.copyScopeKpis}
+                      onChange={(e) => setCopyForm((f) => ({ ...f, copyScopeKpis: e.target.checked }))}
+                    />
+                    KPIs grupales / macro KPIs (con targets, sin actuals)
+                  </label>
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={copyForm.copyOkrs}
+                      onChange={(e) => setCopyForm((f) => ({ ...f, copyOkrs: e.target.checked }))}
+                    />
+                    OKRs (objetivos y key results, sin progreso)
+                  </label>
+                </div>
+
+                <div className="modal-footer">
+                  <button
+                    className="btn-secondary"
+                    onClick={() => setCopyingPeriod(null)}
+                    disabled={copyPeriodMutation.isLoading}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    className="btn-primary"
+                    onClick={() => copyPeriodMutation.mutate()}
+                    disabled={
+                      copyPeriodMutation.isLoading ||
+                      !copyForm.name.trim() ||
+                      !copyForm.startDate ||
+                      !copyForm.endDate
+                    }
+                  >
+                    {copyPeriodMutation.isLoading ? 'Copiando...' : 'Copiar período'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   )
