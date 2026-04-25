@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import { buildNotificationSummary, runNotifications, sendSlackMessage } from '../utils/notifications'
+import { isMailConfigured, sendMail, verifyMailTransport } from '../utils/mailer'
 import { pool } from '../config/database'
 import { appEnv } from '../config/env'
 
@@ -90,6 +91,42 @@ export const deleteSlackConfig = async (_req: Request, res: Response) => {
     res.json({ ok: true })
   } catch (error: any) {
     res.status(500).json({ error: 'Error al eliminar configuración Slack' })
+  }
+}
+
+export const getEmailStatus = async (_req: Request, res: Response) => {
+  const configured = isMailConfigured()
+  res.json({
+    configured,
+    from: configured ? appEnv.smtpFrom : null,
+    host: configured ? appEnv.smtpHost : null,
+  })
+}
+
+export const testEmail = async (req: Request, res: Response) => {
+  if (!isMailConfigured()) {
+    return res.status(400).json({ error: 'SMTP no configurado. Agregá SMTP_HOST, SMTP_USER y SMTP_PASS en el .env del servidor.' })
+  }
+  try {
+    await verifyMailTransport()
+  } catch (err: any) {
+    return res.status(400).json({ error: `Conexión SMTP fallida: ${err?.message}` })
+  }
+  const user = (req as any).user
+  const to = user?.email
+  if (!to) {
+    return res.status(400).json({ error: 'Tu usuario no tiene email configurado.' })
+  }
+  try {
+    await sendMail({
+      to,
+      subject: 'KPI Manager — Email configurado correctamente',
+      html: `<h2>Conexión de email verificada</h2><p>Este mensaje confirma que KPI Manager puede enviar notificaciones a <strong>${to}</strong>.</p>`,
+      text: `Conexión de email verificada. KPI Manager puede enviar notificaciones a ${to}.`,
+    })
+    res.json({ ok: true, to })
+  } catch (err: any) {
+    res.status(500).json({ error: `Error al enviar: ${err?.message}` })
   }
 }
 

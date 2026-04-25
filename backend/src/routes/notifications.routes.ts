@@ -7,6 +7,8 @@ import {
   saveSlackConfig,
   deleteSlackConfig,
   testSlackConfig,
+  getEmailStatus,
+  testEmail,
 } from '../controllers/notifications.controller'
 
 const router = Router()
@@ -14,6 +16,10 @@ const router = Router()
 router.use(authenticate)
 router.get('/summary', requirePermission('config.manage', 'config.view'), getNotificationSummary)
 router.post('/run', requirePermission('config.manage'), triggerNotifications)
+
+// Email
+router.get('/email-status', requirePermission('config.manage', 'config.view'), getEmailStatus)
+router.post('/test-email', requirePermission('config.manage'), testEmail)
 
 // Slack
 router.get('/slack-config', requirePermission('config.manage', 'config.view'), getSlackConfig)

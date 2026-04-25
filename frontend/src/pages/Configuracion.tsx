@@ -198,6 +198,8 @@ export default function Configuracion() {
   const [integrationOpen, setIntegrationOpen] = useState(false)
   const [sheetsWizardOpen, setSheetsWizardOpen] = useState(false)
   const [slackWizardOpen, setSlackWizardOpen] = useState(false)
+  const [emailTestLoading, setEmailTestLoading] = useState(false)
+  const [emailTestResult, setEmailTestResult] = useState<{ ok?: boolean; to?: string; error?: string } | null>(null)
   const [setupGuideOpen, setSetupGuideOpen] = useState(false)
   const [setupGuideHydrated, setSetupGuideHydrated] = useState(false)
   const [templateFormError, setTemplateFormError] = useState('')
@@ -351,6 +353,11 @@ export default function Configuracion() {
         }
       },
     }
+  )
+
+  const { data: emailStatus } = useQuery<{ configured: boolean; from: string | null; host: string | null }>(
+    'email-status',
+    async () => (await api.get('/notifications/email-status')).data
   )
 
   const { data: authProfiles } = useQuery<AuthProfile[]>('auth-profiles', async () => {
@@ -2241,6 +2248,46 @@ export default function Configuracion() {
         <button className="btn-primary" onClick={() => setSlackWizardOpen(true)}>
           Configurar Slack →
         </button>
+      </div>
+
+      <div className="sheets-wizard-banner">
+        <div className="sheets-wizard-banner-text">
+          <span className="sheets-wizard-banner-icon">📧</span>
+          <div>
+            <strong>Notificaciones por email</strong>
+            {emailStatus?.configured ? (
+              <p>SMTP activo — enviando desde <strong>{emailStatus.from}</strong> vía <code>{emailStatus.host}</code></p>
+            ) : (
+              <p>Configurá <code>SMTP_HOST</code>, <code>SMTP_USER</code> y <code>SMTP_PASS</code> en el <code>.env</code> del servidor para activar alertas por email.</p>
+            )}
+            {emailTestResult?.ok && (
+              <p style={{ color: '#16a34a', marginTop: 6 }}>Email enviado a {emailTestResult.to}</p>
+            )}
+            {emailTestResult?.error && (
+              <p style={{ color: '#dc2626', marginTop: 6 }}>{emailTestResult.error}</p>
+            )}
+          </div>
+        </div>
+        {emailStatus?.configured && (
+          <button
+            className="btn-primary"
+            disabled={emailTestLoading}
+            onClick={async () => {
+              setEmailTestLoading(true)
+              setEmailTestResult(null)
+              try {
+                const res = await api.post('/notifications/test-email')
+                setEmailTestResult({ ok: true, to: res.data.to })
+              } catch (err: any) {
+                setEmailTestResult({ error: err?.response?.data?.error || 'Error al enviar email de prueba' })
+              } finally {
+                setEmailTestLoading(false)
+              }
+            }}
+          >
+            {emailTestLoading ? 'Enviando...' : 'Enviar email de prueba'}
+          </button>
+        )}
       </div>
 
       <button
