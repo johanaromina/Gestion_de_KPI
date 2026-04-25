@@ -113,9 +113,9 @@ export const testEmail = async (req: Request, res: Response) => {
     return res.status(400).json({ error: `Conexión SMTP fallida: ${err?.message}` })
   }
   const user = (req as any).user
-  const to = user?.email
+  const to = (req.body as any)?.to || user?.email
   if (!to) {
-    return res.status(400).json({ error: 'Tu usuario no tiene email configurado.' })
+    return res.status(400).json({ error: 'Ingresá un email de destino para la prueba.' })
   }
   try {
     await sendMail({

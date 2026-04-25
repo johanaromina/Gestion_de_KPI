@@ -200,6 +200,7 @@ export default function Configuracion() {
   const [slackWizardOpen, setSlackWizardOpen] = useState(false)
   const [emailTestLoading, setEmailTestLoading] = useState(false)
   const [emailTestResult, setEmailTestResult] = useState<{ ok?: boolean; to?: string; error?: string } | null>(null)
+  const [emailTestTo, setEmailTestTo] = useState('')
   const [setupGuideOpen, setSetupGuideOpen] = useState(false)
   const [setupGuideHydrated, setSetupGuideHydrated] = useState(false)
   const [templateFormError, setTemplateFormError] = useState('')
@@ -2269,24 +2270,33 @@ export default function Configuracion() {
           </div>
         </div>
         {emailStatus?.configured && (
-          <button
-            className="btn-primary"
-            disabled={emailTestLoading}
-            onClick={async () => {
-              setEmailTestLoading(true)
-              setEmailTestResult(null)
-              try {
-                const res = await api.post('/notifications/test-email')
-                setEmailTestResult({ ok: true, to: res.data.to })
-              } catch (err: any) {
-                setEmailTestResult({ error: err?.response?.data?.error || 'Error al enviar email de prueba' })
-              } finally {
-                setEmailTestLoading(false)
-              }
-            }}
-          >
-            {emailTestLoading ? 'Enviando...' : 'Enviar email de prueba'}
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+            <input
+              type="email"
+              placeholder="email de prueba"
+              value={emailTestTo}
+              onChange={(e) => setEmailTestTo(e.target.value)}
+              style={{ padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 13, minWidth: 200 }}
+            />
+            <button
+              className="btn-primary"
+              disabled={emailTestLoading || !emailTestTo}
+              onClick={async () => {
+                setEmailTestLoading(true)
+                setEmailTestResult(null)
+                try {
+                  const res = await api.post('/notifications/test-email', { to: emailTestTo })
+                  setEmailTestResult({ ok: true, to: res.data.to })
+                } catch (err: any) {
+                  setEmailTestResult({ error: err?.response?.data?.error || 'Error al enviar email de prueba' })
+                } finally {
+                  setEmailTestLoading(false)
+                }
+              }}
+            >
+              {emailTestLoading ? 'Enviando...' : 'Enviar email de prueba'}
+            </button>
+          </div>
         )}
       </div>
 
