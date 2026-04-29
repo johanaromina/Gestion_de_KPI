@@ -28,7 +28,7 @@ export const calculateVariationPercent = (
 
   switch (direction) {
     case 'reduction':
-      if (actualValue <= 0) return 0
+      if (actualValue <= 0) return 200
       return (targetValue / actualValue) * 100
     case 'exact': {
       const diff = Math.abs(actualValue - targetValue)

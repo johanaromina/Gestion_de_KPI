@@ -56,8 +56,8 @@ export function calculateVariation(
       // Reducción: (Target / Actual) * 100
       // Ejemplo: Target=100 (tiempo objetivo), Actual=80 (tiempo real) → 125%
       // Menor actual = mejor resultado (más alto el %)
-      // Si Actual = 0, retornar 0 para evitar división por cero
-      if (actualValue <= 0) return 0
+      // Si Actual = 0, es desempeño perfecto (cero de lo malo) → retornar 200 (se capea en display)
+      if (actualValue <= 0) return 200
       return (targetValue / actualValue) * 100
 
     case 'exact':
