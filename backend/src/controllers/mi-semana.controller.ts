@@ -55,8 +55,11 @@ export const getMiSemana = async (req: AuthRequest, res: Response) => {
       `SELECT
          ck.id,
          k.name           AS kpiName,
+         k.direction      AS kpiDirection,
+         k.type           AS kpiType,
          ck.actual,
          ck.target,
+         ck.variation,
          ck.weightedResult,
          ck.status,
          ck.periodId,

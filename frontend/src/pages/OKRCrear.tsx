@@ -35,7 +35,7 @@ const emptyKR = (): KRDraft => ({
   targetValue: '',
   unit: '',
   kpiLinks: [],
-  weight: '1',
+  weight: '100',
 })
 
 export default function OKRCrear() {
@@ -88,9 +88,9 @@ export default function OKRCrear() {
           type: lk.type as 'collaborator' | 'scope',
           id: lk.collaboratorKpiId ?? lk.scopeKpiId ?? lk.id,
           label: lk.kpiName ? `${lk.kpiName}${lk.sourceName ? ` — ${lk.sourceName}` : ''}` : (lk.label ?? `KPI #${lk.id}`),
-          weight: lk.kpiWeight ?? 1,
+          weight: Math.round((lk.kpiWeight ?? 1) * 100),
         })),
-        weight: String(kr.weight ?? '1'),
+        weight: String(Math.round((kr.weight ?? 1) * 100)),
       })))
     }
   }, [existingObjective])
@@ -144,8 +144,10 @@ export default function OKRCrear() {
     startValue: kr.krType === 'simple' ? Number(kr.startValue) : null,
     targetValue: kr.krType === 'simple' ? Number(kr.targetValue) : null,
     unit: kr.unit || null,
-    kpiLinks: kr.krType === 'kpi_linked' ? kr.kpiLinks : [],
-    weight: Number(kr.weight) || 1,
+    kpiLinks: kr.krType === 'kpi_linked'
+      ? kr.kpiLinks.map((lk) => ({ ...lk, weight: (Number(lk.weight ?? 100)) / 100 }))
+      : [],
+    weight: (Number(kr.weight) || 100) / 100,
   })
 
   const addKpiLink = (tempId: string, link: KpiLink) => {
@@ -275,8 +277,8 @@ export default function OKRCrear() {
     for (const kr of krs) {
       if (!kr.title.trim()) continue
       const w = Number(kr.weight)
-      if (w <= 0 || w > 1) {
-        newKrErrors[kr.tempId] = 'El peso del KR debe estar entre 0,01 y 1,00'
+      if (w <= 0 || w > 100) {
+        newKrErrors[kr.tempId] = 'El peso del KR debe estar entre 1 y 100 (%)'
         continue
       }
       if (kr.krType === 'simple') {
@@ -289,9 +291,9 @@ export default function OKRCrear() {
         }
       }
       if (kr.krType === 'kpi_linked' && kr.kpiLinks.length > 1) {
-        const badLink = kr.kpiLinks.find((lk) => { const lw = Number(lk.weight ?? 1); return lw <= 0 || lw > 1 })
+        const badLink = kr.kpiLinks.find((lk) => { const lw = Number(lk.weight ?? 100); return lw <= 0 || lw > 100 })
         if (badLink) {
-          newKrErrors[kr.tempId] = 'El peso de cada KPI vinculado debe estar entre 0,01 y 1,00'
+          newKrErrors[kr.tempId] = 'El peso de cada KPI vinculado debe estar entre 1 y 100 (%)'
         }
       }
     }
@@ -516,11 +518,11 @@ export default function OKRCrear() {
                             <input
                               type="number"
                               className="kpi-chip-weight"
-                              min="0.01"
-                              max="1"
-                              step="0.01"
-                              title="Peso de este KPI en el cálculo del KR"
-                              value={lk.weight ?? 1}
+                              min="1"
+                              max="100"
+                              step="1"
+                              title="Peso de este KPI en el cálculo del KR (%)"
+                              value={lk.weight ?? 100}
                               onChange={(e) => updateKpiLinkWeight(kr.tempId, lk.type, lk.id, Number(e.target.value))}
                               onClick={(e) => e.stopPropagation()}
                             />
@@ -562,19 +564,19 @@ export default function OKRCrear() {
               )}
 
               <div className="form-group form-group--small">
-                <label title="El peso indica cuánto contribuye este KR al progreso del objetivo. Escala de 0,01 a 1,00 (donde 1 = 100%). Todos los KRs juntos deberían sumar 1,00.">
-                  Peso relativo ⓘ
+                <label title="Porcentaje de peso de este KR en el objetivo. La suma de todos los KRs debe ser 100%.">
+                  Peso relativo (%) ⓘ
                 </label>
                 <input
                   type="number"
-                  min="0.01"
-                  max="1"
-                  step="0.01"
+                  min="1"
+                  max="100"
+                  step="1"
                   value={kr.weight}
                   onChange={(e) => updateKR(kr.tempId, 'weight', e.target.value)}
                 />
                 <small className="form-hint">
-                  Escala 0,01–1,00. La suma de todos los KRs debe ser 1,00 (100%).
+                  Ingresá el porcentaje (1–100). La suma de todos los KRs debe ser 100%.
                 </small>
               </div>
             </div>

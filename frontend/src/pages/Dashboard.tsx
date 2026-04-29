@@ -318,18 +318,24 @@ export default function Dashboard() {
 
     const monthly = collaboratorKPIs
       ?.filter((k) => k.subPeriodId !== null && k.subPeriodId !== undefined)
-      .reduce<Record<string, { name: string; weight: number; target: number; actual: number }>>(
+      .reduce<Record<string, { name: string; weight: number; target: number; actual: number; weightedVariation: number; variationWeight: number }>>(
         (acc, k) => {
           const key = k.subPeriodName || String(k.subPeriodId || 'Subperiodo')
           const weight = Number(k.subPeriodWeight ?? k.weight) || 0
           const target = Number(k.target) || 0
           const actual = Number(k.actual) || 0
+          const direction = resolveDirection((k as any).assignmentDirection, k.kpiDirection, k.kpiType)
+          const variation = k.variation ?? calculateVariationPercent(direction, target, k.actual ?? null)
           if (!acc[key]) {
-            acc[key] = { name: key, weight: 0, target: 0, actual: 0 }
+            acc[key] = { name: key, weight: 0, target: 0, actual: 0, weightedVariation: 0, variationWeight: 0 }
           }
           acc[key].weight += weight
           acc[key].target += target
           acc[key].actual += actual
+          if (variation !== null && weight > 0) {
+            acc[key].weightedVariation += variation * weight
+            acc[key].variationWeight += weight
+          }
           return acc
         },
         {}
@@ -1026,7 +1032,7 @@ export default function Dashboard() {
           <h2>Ponderacion y avances mensuales</h2>
           <div className="mini-grid">
             {collaboratorSummary.monthly.map((m) => {
-              const monthlyProgress = m.target ? (m.actual / m.target) * 100 : null
+              const monthlyProgress = m.variationWeight > 0 ? m.weightedVariation / m.variationWeight : null
               return (
                 <div key={m.name} className="mini-card">
                   <div className="mini-card-header">

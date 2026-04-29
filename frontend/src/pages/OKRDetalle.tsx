@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import api from '../services/api'
+import { resolveDirection, calculateVariationPercent } from '../utils/kpi'
 import './OKRDetalle.css'
 
 type KRStatus = 'not_started' | 'on_track' | 'at_risk' | 'behind' | 'completed'
@@ -26,6 +27,8 @@ interface DataSource {
   krStatus: KRStatus
   sourceType: 'scope_kpi' | 'collaborator_kpi' | null
   kpiName: string | null
+  kpiDirection?: string
+  kpiType?: string
   actual: number | null
   target: number | null
   sources: {
@@ -33,7 +36,10 @@ interface DataSource {
     sourceName: string
     actual: number | null
     target: number | null
+    variation?: number | null
     kpiName: string
+    kpiDirection?: string
+    kpiType?: string
     sourceStatus: string | null
   }[]
 }
@@ -225,6 +231,11 @@ export default function OKRDetalle() {
         queryClient.invalidateQueries(['okr-objective', id])
         setEditingKrId(null)
         setKrEditDraft(null)
+        setKrEditError(null)
+      },
+      onError: (err: any) => {
+        const msg = err?.response?.data?.error || 'Error al guardar el Key Result'
+        setKrEditError(msg)
       },
     }
   )
@@ -242,9 +253,9 @@ export default function OKRDetalle() {
         type: lk.type as 'collaborator' | 'scope',
         id: lk.collaboratorKpiId ?? lk.scopeKpiId ?? lk.id,
         label: lk.kpiName ? `${lk.kpiName}${lk.sourceName ? ` — ${lk.sourceName}` : ''}` : (lk.label ?? `KPI #${lk.id}`),
-        weight: lk.kpiWeight ?? 1,
+        weight: Math.round((lk.kpiWeight ?? 1) * 100),
       })),
-      weight: String(kr.weight ?? '1'),
+      weight: String(Math.round((kr.weight ?? 1) * 100)),
     })
   }
 
@@ -271,14 +282,14 @@ export default function OKRDetalle() {
   const saveKrEdit = (krId: number) => {
     if (!krEditDraft) return
     const w = Number(krEditDraft.weight)
-    if (w <= 0 || w > 1) {
-      setKrEditError('El peso del KR debe estar entre 0,01 y 1,00')
+    if (w <= 0 || w > 100) {
+      setKrEditError('El peso del KR debe estar entre 1 y 100 (%)')
       return
     }
     if (krEditDraft.krType === 'kpi_linked' && krEditDraft.kpiLinks.length > 1) {
-      const badLink = krEditDraft.kpiLinks.find((lk) => { const lw = Number(lk.weight ?? 1); return lw <= 0 || lw > 1 })
+      const badLink = krEditDraft.kpiLinks.find((lk) => { const lw = Number(lk.weight ?? 100); return lw <= 0 || lw > 100 })
       if (badLink) {
-        setKrEditError('El peso de cada KPI vinculado debe estar entre 0,01 y 1,00')
+        setKrEditError('El peso de cada KPI vinculado debe estar entre 1 y 100 (%)')
         return
       }
     }
@@ -291,8 +302,10 @@ export default function OKRDetalle() {
         startValue: krEditDraft.krType === 'simple' ? Number(krEditDraft.startValue) : null,
         targetValue: krEditDraft.krType === 'simple' ? Number(krEditDraft.targetValue) : null,
         unit: krEditDraft.unit || null,
-        kpiLinks: krEditDraft.krType === 'kpi_linked' ? krEditDraft.kpiLinks : [],
-        weight: Number(krEditDraft.weight) || 1,
+        kpiLinks: krEditDraft.krType === 'kpi_linked'
+          ? krEditDraft.kpiLinks.map((lk) => ({ ...lk, weight: (Number(lk.weight ?? 100)) / 100 }))
+          : [],
+        weight: w / 100,
       },
     })
   }
@@ -482,9 +495,9 @@ export default function OKRDetalle() {
                   </p>
                   <div className="datasource-list">
                     {ds.sources.map((src, i) => {
-                      const pct = src.target && src.target > 0
-                        ? Math.min(100, Math.round((Number(src.actual ?? 0) / Number(src.target)) * 100))
-                        : 0
+                      const direction = resolveDirection(undefined, src.kpiDirection, src.kpiType)
+                      const variation = src.variation ?? calculateVariationPercent(direction, src.target ?? 0, src.actual ?? null)
+                      const pct = Math.min(100, Math.max(0, Math.round(variation ?? 0)))
                       const color = pct >= 70 ? '#16a34a' : pct >= 40 ? '#d97706' : '#dc2626'
                       return (
                         <div key={i} className="datasource-row">
@@ -576,11 +589,11 @@ export default function OKRDetalle() {
                                 <input
                                   type="number"
                                   className="kpi-chip-weight"
-                                  min="0.01"
-                                  max="1"
-                                  step="0.01"
-                                  title="Peso de este KPI en el cálculo del KR"
-                                  value={lk.weight ?? 1}
+                                  min="1"
+                                  max="100"
+                                  step="1"
+                                  title="Peso de este KPI en el cálculo del KR (%)"
+                                  value={lk.weight ?? 100}
                                   onChange={(e) => updateKrKpiLinkWeight(lk.type, lk.id, Number(e.target.value))}
                                   onClick={(e) => e.stopPropagation()}
                                 />
@@ -621,11 +634,11 @@ export default function OKRDetalle() {
                   )}
 
                   <div className="kr-edit-field">
-                    <label title="Escala 0,01–1,00. La suma de todos los KRs del objetivo debe ser 1,00 (100%).">
-                      Peso relativo ⓘ
+                    <label title="Porcentaje de peso de este KR. La suma de todos los KRs del objetivo debe ser 100%.">
+                      Peso relativo (%) ⓘ
                     </label>
                     <input
-                      type="number" min="0.01" max="1" step="0.01"
+                      type="number" min="1" max="100" step="1"
                       value={krEditDraft.weight}
                       onChange={(e) => setKrEditDraft((p) => p ? { ...p, weight: e.target.value } : p)}
                     />

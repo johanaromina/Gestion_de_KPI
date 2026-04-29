@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
+import { resolveDirection, calculateVariationPercent } from '../utils/kpi'
 import './MiSemana.css'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -24,8 +25,11 @@ interface KRItem {
 interface KPIItem {
   id: number
   kpiName: string
+  kpiDirection?: string
+  kpiType?: string
   actual: number | null
   target: number | null
+  variation?: number | null
   weightedResult: number | null
   status: string
   periodName: string
@@ -52,7 +56,9 @@ const krProgress = (kr: KRItem): number => {
 
 const kpiProgress = (kpi: KPIItem): number => {
   if (!kpi.target || kpi.target <= 0) return 0
-  return Math.min(100, Math.max(0, ((kpi.actual ?? 0) / kpi.target) * 100))
+  const direction = resolveDirection(undefined, kpi.kpiDirection, kpi.kpiType)
+  const variation = kpi.variation ?? calculateVariationPercent(direction, kpi.target, kpi.actual ?? null)
+  return Math.min(100, Math.max(0, variation ?? 0))
 }
 
 const progressColor = (p: number) => {

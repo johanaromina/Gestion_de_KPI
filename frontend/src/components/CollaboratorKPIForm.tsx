@@ -4,6 +4,7 @@ import { useMutation, useQueryClient, useQuery } from 'react-query'
 import api from '../services/api'
 import { useAuth } from '../hooks/useAuth'
 import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
+import { resolveDirection, calculateVariationPercent } from '../utils/kpi'
 import { useDialog } from './Dialog'
 import './CollaboratorKPIForm.css'
 
@@ -539,7 +540,20 @@ export default function CollaboratorKPIForm({
   const planWeightTotal = planRows.reduce((acc, r) => acc + (Number(r.subPeriodWeight) || 0), 0)
   const planTargetTotal = planRows.reduce((acc, r) => acc + (Number(r.target) || 0), 0)
   const planActualTotal = planRows.reduce((acc, r) => acc + (Number(r.actual) || 0), 0)
-  const planProgressTotal = planTargetTotal > 0 ? (planActualTotal / planTargetTotal) * 100 : 0
+  const planProgressTotal = (() => {
+    const kpiDirection = resolveDirection(undefined, selectedKpi?.direction, selectedKpi?.type)
+    let weightedSum = 0
+    let weightSum = 0
+    for (const r of planRows) {
+      if (r.actual === '' || r.target === '' || !r.target) continue
+      const v = calculateVariationPercent(kpiDirection, Number(r.target), Number(r.actual))
+      if (v === null) continue
+      const w = Number(r.subPeriodWeight) || 0
+      weightedSum += v * w
+      weightSum += w
+    }
+    return weightSum > 0 ? weightedSum / weightSum : 0
+  })()
 
   const upsertPlanMutation = useMutation(
     async (items: PlanRow[]) => {
@@ -928,7 +942,11 @@ export default function CollaboratorKPIForm({
                       <td>{row.actual !== '' ? Number(row.actual).toFixed(2) : '-'}</td>
                       <td>
                         {row.target && row.actual !== ''
-                          ? `${((Number(row.actual) / Number(row.target)) * 100).toFixed(1)}%`
+                          ? (() => {
+                              const dir = resolveDirection(undefined, selectedKpi?.direction, selectedKpi?.type)
+                              const v = calculateVariationPercent(dir, Number(row.target), Number(row.actual))
+                              return v !== null ? `${Math.min(100, Math.max(0, v)).toFixed(1)}%` : '-'
+                            })()
                           : '-'}
                       </td>
                     </tr>

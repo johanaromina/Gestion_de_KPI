@@ -56,10 +56,12 @@ export const recalcObjectiveProgress = async (objectiveId: number): Promise<void
     `SELECT
        kr.id, kr.krType, kr.startValue, kr.targetValue, kr.currentValue, kr.weight,
        ck.actual AS kpiActual, ck.target AS kpiTarget,
-       sk.actual AS scopeActual, sk.target AS scopeTarget
+       sk.actual AS scopeActual, sk.target AS scopeTarget,
+       k.direction AS kpiDirection
      FROM okr_key_results kr
      LEFT JOIN collaborator_kpis ck ON kr.collaboratorKpiId = ck.id
      LEFT JOIN scope_kpis sk ON kr.scopeKpiId = sk.id
+     LEFT JOIN kpis k ON COALESCE(ck.kpiId, sk.kpiId) = k.id
      WHERE kr.objectiveId = ?`,
     [objectiveId]
   )

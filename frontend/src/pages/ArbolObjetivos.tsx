@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from 'react-query'
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
+import { resolveDirection, calculateVariationPercent } from '../utils/kpi'
 import './ArbolObjetivos.css'
 
 interface KpiLink {
@@ -10,6 +11,8 @@ interface KpiLink {
   target: number | null
   type: 'collaborator' | 'scope'
   sourceName: string | null
+  direction?: string
+  kpiWeight?: number
 }
 
 interface KeyResult {
@@ -298,9 +301,9 @@ export default function ArbolObjetivos() {
                                 {krOpen && hasKpis && (
                                   <div className="arbol-kpi-list">
                                     {kr.linkedKpis.map((lk, i) => {
-                                      const pct = lk.target && lk.target > 0
-                                        ? Math.min(100, Math.round(((lk.actual ?? 0) / lk.target) * 100))
-                                        : 0
+                                      const direction = resolveDirection(undefined, lk.direction, undefined)
+                                      const variation = calculateVariationPercent(direction, lk.target ?? 0, lk.actual ?? null)
+                                      const pct = Math.min(100, Math.max(0, Math.round(variation ?? 0)))
                                       return (
                                         <div key={i} className="arbol-kpi-row">
                                           <span className={`arbol-kpi-type-badge arbol-kpi-type-badge--${lk.type}`}>

@@ -194,19 +194,24 @@ export const getDataSources = async (req: AuthRequest, res: Response) => {
     // KRs del objetivo con sus vínculos a collaborator_kpi y scope_kpi
     const [krs] = await pool.query<any[]>(
       `SELECT
-         kr.id        AS krId,
-         kr.title     AS krTitle,
+         kr.id           AS krId,
+         kr.title        AS krTitle,
          kr.krType,
-         kr.status    AS krStatus,
+         kr.status       AS krStatus,
          kr.collaboratorKpiId,
          kr.scopeKpiId,
-         ck.actual    AS ckActual,
-         ck.target    AS ckTarget,
-         k1.name      AS ckKpiName,
-         col.name     AS ckCollaboratorName,
-         sk.actual    AS skActual,
-         sk.target    AS skTarget,
-         k2.name      AS skKpiName
+         ck.actual       AS ckActual,
+         ck.target       AS ckTarget,
+         ck.variation    AS ckVariation,
+         k1.name         AS ckKpiName,
+         k1.direction    AS ckKpiDirection,
+         k1.type         AS ckKpiType,
+         col.name        AS ckCollaboratorName,
+         sk.actual       AS skActual,
+         sk.target       AS skTarget,
+         k2.name         AS skKpiName,
+         k2.direction    AS skKpiDirection,
+         k2.type         AS skKpiType
        FROM okr_key_results kr
        LEFT JOIN collaborator_kpis ck ON kr.collaboratorKpiId = ck.id
        LEFT JOIN collaborators col ON ck.collaboratorId = col.id
@@ -238,7 +243,10 @@ export const getDataSources = async (req: AuthRequest, res: Response) => {
            col.name           AS sourceName,
            ck.actual          AS actual,
            ck.target          AS target,
+           ck.variation       AS variation,
            k.name             AS kpiName,
+           k.direction        AS kpiDirection,
+           k.type             AS kpiType,
            ck.status          AS sourceStatus
          FROM scope_kpi_links l
          JOIN collaborator_kpis ck ON l.collaboratorAssignmentId = ck.id
@@ -252,7 +260,10 @@ export const getDataSources = async (req: AuthRequest, res: Response) => {
            k.name             AS sourceName,
            sk.actual          AS actual,
            sk.target          AS target,
+           NULL               AS variation,
            k.name             AS kpiName,
+           k.direction        AS kpiDirection,
+           k.type             AS kpiType,
            sk.status          AS sourceStatus
          FROM scope_kpi_links l
          JOIN scope_kpis sk ON l.childScopeKpiId = sk.id
@@ -277,6 +288,8 @@ export const getDataSources = async (req: AuthRequest, res: Response) => {
           krStatus: kr.krStatus,
           sourceType: 'scope_kpi',
           kpiName: kr.skKpiName,
+          kpiDirection: kr.skKpiDirection,
+          kpiType: kr.skKpiType,
           actual: kr.skActual,
           target: kr.skTarget,
           sources: scopeSources.get(Number(kr.scopeKpiId)) ?? [],
@@ -290,6 +303,8 @@ export const getDataSources = async (req: AuthRequest, res: Response) => {
           krStatus: kr.krStatus,
           sourceType: 'collaborator_kpi',
           kpiName: kr.ckKpiName,
+          kpiDirection: kr.ckKpiDirection,
+          kpiType: kr.ckKpiType,
           actual: kr.ckActual,
           target: kr.ckTarget,
           sources: [
@@ -298,7 +313,10 @@ export const getDataSources = async (req: AuthRequest, res: Response) => {
               sourceName: kr.ckCollaboratorName,
               actual: kr.ckActual,
               target: kr.ckTarget,
+              variation: kr.ckVariation,
               kpiName: kr.ckKpiName,
+              kpiDirection: kr.ckKpiDirection,
+              kpiType: kr.ckKpiType,
               sourceStatus: null,
             },
           ],
