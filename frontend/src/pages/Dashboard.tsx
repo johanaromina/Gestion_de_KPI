@@ -257,9 +257,9 @@ export default function Dashboard() {
       const objectives: { progress: number }[] = Array.isArray(res.data) ? res.data : []
       const active = objectives.length
       const avgProgress = active > 0
-        ? Math.round(objectives.reduce((s, o) => s + (o.progress ?? 0), 0) / active)
+        ? Math.round(objectives.reduce((s, o) => s + (Number(o.progress) || 0), 0) / active)
         : 0
-      const atRisk = objectives.filter((o) => o.progress < 40).length
+      const atRisk = objectives.filter((o) => (Number(o.progress) || 0) < 40).length
       return { active, avgProgress, atRisk }
     },
     { retry: false }
