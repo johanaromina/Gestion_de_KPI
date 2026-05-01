@@ -37,7 +37,7 @@ export default function ScopeKPIForm({
     ownerLevel: scopeKpi?.ownerLevel || 'area',
     sourceMode: scopeKpi?.sourceMode || 'direct',
     target: scopeKpi?.target ?? 0,
-    weight: scopeKpi?.weight ?? 0,
+    weight: Math.round((scopeKpi?.weight ?? 0) * 100) || 0,
     status: scopeKpi?.status || 'draft',
     curationStatus: scopeKpi?.curationStatus || 'pending',
     actualValue: scopeKpi?.sourceMode === 'mixed' ? scopeKpi?.directActual ?? '' : scopeKpi?.actual ?? '',
@@ -85,7 +85,7 @@ export default function ScopeKPIForm({
         ownerLevel: formData.ownerLevel,
         sourceMode: formData.sourceMode,
         target: Number(formData.target),
-        weight: Number(formData.weight),
+        weight: Number(formData.weight) / 100,
         status: formData.status,
         curationStatus: formData.curationStatus,
         mixedConfig:
@@ -101,8 +101,8 @@ export default function ScopeKPIForm({
       if (!payload.name || !payload.kpiId || !payload.orgScopeId || !payload.periodId) {
         throw new Error('Completá nombre, KPI, área/equipo y período')
       }
-      if (payload.weight < 0.01 || payload.weight > 1) {
-        throw new Error('El peso debe estar entre 0,01 y 1,00')
+      if (payload.weight <= 0 || payload.weight > 1) {
+        throw new Error('El peso debe estar entre 1 y 100 (%)')
       }
       if (payload.sourceMode === 'mixed' && payload.mixedConfig) {
         const totalWeight = Number(payload.mixedConfig.directWeight || 0) + Number(payload.mixedConfig.aggregatedWeight || 0)
@@ -222,9 +222,9 @@ export default function ScopeKPIForm({
             Meta
             <input type="number" value={formData.target} onChange={(e) => setFormData((prev) => ({ ...prev, target: Number(e.target.value) }))} />
           </label>
-          <label title="Peso de este KPI dentro del área (0,01 a 1,00). La suma de todos los KPIs del área debería ser 1,00.">
-            Peso ⓘ
-            <input type="number" min="0.01" max="1" step="0.01" value={formData.weight} onChange={(e) => setFormData((prev) => ({ ...prev, weight: Number(e.target.value) }))} />
+          <label title="Peso de este KPI dentro del área (1–100%). La suma de todos los KPIs del área debería ser 100%.">
+            Peso (%) ⓘ
+            <input type="number" min="1" max="100" step="1" value={formData.weight} onChange={(e) => setFormData((prev) => ({ ...prev, weight: Number(e.target.value) }))} />
           </label>
           <label>
             Estado

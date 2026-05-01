@@ -11,7 +11,7 @@ const calcKpiProgress = (actual: number, target: number, direction?: string, sta
       return Math.min(100, Math.max(0, ((startValue - actual) / (startValue - target)) * 100))
     }
     // Sin startValue: ratio target/actual (empieza en un valor proporcional, llega a 100% en la meta)
-    return actual <= 0 ? 0 : Math.min(100, Math.max(0, (target / actual) * 100))
+    return actual <= 0 ? 100 : Math.min(100, Math.max(0, (target / actual) * 100))
   }
   if (direction === 'exact') {
     const diff = Math.abs(actual - target)
@@ -27,15 +27,18 @@ export const calcKrProgress = (kr: OKRKeyResult & { linkedKpis?: { actual: numbe
       let weightedSum = 0
       let totalWeight = 0
       for (const l of links) {
-        const progress = calcKpiProgress(Number(l.actual ?? 0), Number(l.target ?? 0), l.direction ?? 'growth')
+        if (l.actual === null || l.actual === undefined) continue
+        const progress = calcKpiProgress(Number(l.actual), Number(l.target ?? 0), l.direction ?? 'growth')
         const w = Number(l.kpiWeight ?? 1)
         weightedSum += progress * w
         totalWeight += w
       }
       return totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0
     }
-    const actual = Number(kr.kpiActual ?? 0)
-    const target = Number(kr.kpiTarget ?? 0)
+    const kpiActualRaw = (kr as any).kpiActual
+    if (kpiActualRaw === null || kpiActualRaw === undefined) return 0
+    const actual = Number(kpiActualRaw)
+    const target = Number((kr as any).kpiTarget ?? 0)
     const direction = (kr as any).kpiDirection ?? 'growth'
     const startVal = direction === 'reduction' ? (kr.startValue ?? undefined) : undefined
     return calcKpiProgress(actual, target, direction, startVal as number | undefined)
@@ -206,18 +209,22 @@ export const listObjectives = async (filters: {
            COALESCE(ck.actual, sk.actual) AS actual,
            COALESCE(ck.target, sk.target) AS target,
            COALESCE(kck.direction, ksk.direction) AS direction,
-           okk.weight AS kpiWeight
+           okk.weight AS kpiWeight,
+           COALESCE(kck.name, ksk.name) AS kpiName,
+           COALESCE(c.name, sc.name) AS sourceName
          FROM okr_kr_kpis okk
          LEFT JOIN collaborator_kpis ck ON okk.collaboratorKpiId = ck.id
          LEFT JOIN scope_kpis sk ON okk.scopeKpiId = sk.id
          LEFT JOIN kpis kck ON ck.kpiId = kck.id
          LEFT JOIN kpis ksk ON sk.kpiId = ksk.id
+         LEFT JOIN collaborators c ON ck.collaboratorId = c.id
+         LEFT JOIN org_scopes sc ON sk.orgScopeId = sc.id
          WHERE okk.krId IN (${krIds.map(() => '?').join(',')})`,
         krIds
       )
       for (const row of Array.isArray(linkRows) ? linkRows : []) {
         const list = linkedByKrList.get(row.krId) ?? []
-        list.push({ actual: row.actual, target: row.target, direction: row.direction, kpiWeight: row.kpiWeight })
+        list.push({ actual: row.actual, target: row.target, direction: row.direction, kpiWeight: row.kpiWeight, kpiName: row.kpiName, sourceName: row.sourceName })
         linkedByKrList.set(row.krId, list)
       }
     } catch {
@@ -398,6 +405,16 @@ const normalizeKpiLink = (link: KpiLink): { collaboratorKpiId: number | null; sc
 const syncKpiLinks = async (krId: number, kpiLinks: KpiLink[]): Promise<void> => {
   await pool.query(`DELETE FROM okr_kr_kpis WHERE krId = ?`, [krId])
   if (kpiLinks.length === 0) return
+  if (kpiLinks.length > 1) {
+    const totalWeight = kpiLinks.reduce((sum, lk) => sum + (lk.weight ?? 1), 0)
+    if (Math.abs(totalWeight - 1) > 0.005) {
+      throw new Error(`Los pesos de los KPIs deben sumar 100% (actualmente suman ${Math.round(totalWeight * 100)}%)`)
+    }
+    for (const lk of kpiLinks) {
+      const w = lk.weight ?? 1
+      if (w <= 0 || w > 1) throw new Error('El peso de cada KPI vinculado debe estar entre 1 y 100 (%)')
+    }
+  }
   // Deduplicar: si llega el mismo KPI dos veces, queda solo el último
   const seen = new Map<string, { collaboratorKpiId: number | null; scopeKpiId: number | null; weight: number }>()
   for (const link of kpiLinks) {
@@ -424,6 +441,14 @@ export const createKeyResult = async (
 ): Promise<number> => {
   const w = Number(data.weight ?? 1)
   if (w <= 0 || w > 1) throw new Error('El peso del KR debe estar entre 0,01 y 1,00')
+  const [existingKrs] = await pool.query<any[]>(
+    `SELECT weight FROM okr_key_results WHERE objectiveId = ?`,
+    [data.objectiveId]
+  )
+  const existingTotal = (Array.isArray(existingKrs) ? existingKrs : []).reduce((s, r) => s + Number(r.weight ?? 0), 0)
+  if (existingKrs && (existingKrs as any[]).length > 0 && Math.abs(existingTotal + w - 1) > 0.005) {
+    throw new Error(`La suma de los pesos de los KRs debe ser 100% (actualmente ${Math.round(existingTotal * 100)}%, agregando ${Math.round(w * 100)}%)`)
+  }
   const [result] = await pool.query<any>(
     `INSERT INTO okr_key_results
        (objectiveId, title, krType, startValue, targetValue, currentValue, unit,
@@ -455,6 +480,17 @@ export const updateKeyResult = async (
   if (data.weight !== undefined) {
     const w = Number(data.weight)
     if (w <= 0 || w > 1) throw new Error('El peso del KR debe estar entre 0,01 y 1,00')
+    const [sibling] = await pool.query<any[]>(
+      `SELECT kr.objectiveId, SUM(other.weight) AS othersTotal
+       FROM okr_key_results kr
+       JOIN okr_key_results other ON other.objectiveId = kr.objectiveId AND other.id != kr.id
+       WHERE kr.id = ?
+       GROUP BY kr.objectiveId`,
+      [id]
+    )
+    if (Array.isArray(sibling) && sibling[0] && Math.abs(Number(sibling[0].othersTotal ?? 0) + w - 1) > 0.005) {
+      throw new Error(`La suma de los pesos de los KRs debe ser 100% (actualmente: ${Math.round((Number(sibling[0].othersTotal ?? 0) + w) * 100)}%)`)
+    }
   }
   const fields: string[] = []
   const params: any[] = []

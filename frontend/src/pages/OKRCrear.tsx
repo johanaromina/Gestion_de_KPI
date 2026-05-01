@@ -87,7 +87,11 @@ export default function OKRCrear() {
         kpiLinks: (kr.linkedKpis ?? []).map((lk: any) => ({
           type: lk.type as 'collaborator' | 'scope',
           id: lk.collaboratorKpiId ?? lk.scopeKpiId ?? lk.id,
-          label: lk.kpiName ? `${lk.kpiName}${lk.sourceName ? ` — ${lk.sourceName}` : ''}` : (lk.label ?? `KPI #${lk.id}`),
+          label: lk.kpiName
+            ? `${lk.kpiName}${lk.sourceName ? ` — ${lk.sourceName}` : ''}`
+            : lk.sourceName
+              ? `KPI — ${lk.sourceName}`
+              : `KPI #${lk.collaboratorKpiId ?? lk.scopeKpiId ?? lk.id}`,
           weight: Math.round((lk.kpiWeight ?? 1) * 100),
         })),
         weight: String(Math.round((kr.weight ?? 1) * 100)),
@@ -294,6 +298,11 @@ export default function OKRCrear() {
         const badLink = kr.kpiLinks.find((lk) => { const lw = Number(lk.weight ?? 100); return lw <= 0 || lw > 100 })
         if (badLink) {
           newKrErrors[kr.tempId] = 'El peso de cada KPI vinculado debe estar entre 1 y 100 (%)'
+        } else {
+          const totalKpiWeight = kr.kpiLinks.reduce((sum, lk) => sum + Number(lk.weight ?? 100), 0)
+          if (Math.abs(totalKpiWeight - 100) > 0.5) {
+            newKrErrors[kr.tempId] = `Los pesos de los KPIs deben sumar 100% (actualmente suman ${totalKpiWeight}%)`
+          }
         }
       }
     }
@@ -301,6 +310,15 @@ export default function OKRCrear() {
       setKrErrors(newKrErrors)
       setError('Corregí los errores en los Key Results')
       return
+    }
+
+    const validKrs = krs.filter((kr) => kr.title.trim())
+    if (validKrs.length > 1) {
+      const totalKrWeight = validKrs.reduce((sum, kr) => sum + Number(kr.weight ?? 0), 0)
+      if (Math.abs(totalKrWeight - 100) > 0.5) {
+        setError(`La suma de los pesos de los KRs debe ser 100% (actualmente: ${totalKrWeight.toFixed(0)}%)`)
+        return
+      }
     }
 
     if (isEdit) {
@@ -515,17 +533,19 @@ export default function OKRCrear() {
                         <span key={`${lk.type}-${lk.id}`} className={`kpi-chip kpi-chip--${lk.type}`}>
                           {lk.label}
                           {kr.kpiLinks.length > 1 && (
-                            <input
-                              type="number"
-                              className="kpi-chip-weight"
-                              min="1"
-                              max="100"
-                              step="1"
-                              title="Peso de este KPI en el cálculo del KR (%)"
-                              value={lk.weight ?? 100}
-                              onChange={(e) => updateKpiLinkWeight(kr.tempId, lk.type, lk.id, Number(e.target.value))}
-                              onClick={(e) => e.stopPropagation()}
-                            />
+                            <span className="kpi-chip-weight-wrap">
+                              <span className="kpi-chip-weight-label">Peso %</span>
+                              <input
+                                type="number"
+                                className="kpi-chip-weight"
+                                min="1"
+                                max="100"
+                                step="1"
+                                value={lk.weight ?? 100}
+                                onChange={(e) => updateKpiLinkWeight(kr.tempId, lk.type, lk.id, Number(e.target.value))}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </span>
                           )}
                           <button type="button" className="kpi-chip-remove" onClick={() => removeKpiLink(kr.tempId, lk.type, lk.id)}>×</button>
                         </span>
@@ -585,14 +605,14 @@ export default function OKRCrear() {
           {/* Resumen de pesos */}
           {krs.filter((kr) => kr.title.trim()).length > 1 && (() => {
             const total = krs.filter((kr) => kr.title.trim()).reduce((sum, kr) => sum + (Number(kr.weight) || 0), 0)
-            const isOver = total > 1.001
-            const isUnder = total < 0.999
+            const isOver = total > 100.5
+            const isUnder = total < 99.5
             const isExact = !isOver && !isUnder
             return (
               <div className={`kr-weight-summary ${isOver ? 'kr-weight-summary--over' : isExact ? 'kr-weight-summary--ok' : ''}`}>
-                <span>Suma de pesos: <strong>{total.toFixed(2)}</strong> / 1,00</span>
-                {isOver && <span className="kr-weight-warning"> ⚠ La suma supera 1,00 — reducí algún peso.</span>}
-                {isUnder && <span className="kr-weight-warning"> · Podés distribuir el resto ({(1 - total).toFixed(2)}) entre los KRs.</span>}
+                <span>Suma de pesos: <strong>{total.toFixed(0)}%</strong> / 100%</span>
+                {isOver && <span className="kr-weight-warning"> ⚠ La suma supera 100% — reducí algún peso.</span>}
+                {isUnder && <span className="kr-weight-warning"> · Falta distribuir {(100 - total).toFixed(0)}% entre los KRs.</span>}
                 {isExact && <span className="kr-weight-ok"> ✓ Distribución completa</span>}
               </div>
             )

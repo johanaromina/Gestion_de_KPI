@@ -7,7 +7,17 @@ import './OKRDetalle.css'
 
 type KRStatus = 'not_started' | 'on_track' | 'at_risk' | 'behind' | 'completed'
 
-interface KpiLink { type: 'collaborator' | 'scope'; id: number; label: string; weight?: number }
+interface KpiLink {
+  type: 'collaborator' | 'scope'
+  id: number
+  label: string
+  weight?: number
+  kpiName?: string | null
+  actual?: number | null
+  target?: number | null
+  sourceName?: string | null
+  kpiWeight?: number | null
+}
 
 interface KREditDraft {
   title: string
@@ -252,7 +262,11 @@ export default function OKRDetalle() {
       kpiLinks: (kr.linkedKpis ?? []).map((lk: any) => ({
         type: lk.type as 'collaborator' | 'scope',
         id: lk.collaboratorKpiId ?? lk.scopeKpiId ?? lk.id,
-        label: lk.kpiName ? `${lk.kpiName}${lk.sourceName ? ` — ${lk.sourceName}` : ''}` : (lk.label ?? `KPI #${lk.id}`),
+        label: lk.kpiName
+          ? `${lk.kpiName}${lk.sourceName ? ` — ${lk.sourceName}` : ''}`
+          : lk.sourceName
+            ? `KPI — ${lk.sourceName}`
+            : `KPI #${lk.collaboratorKpiId ?? lk.scopeKpiId ?? lk.id}`,
         weight: Math.round((lk.kpiWeight ?? 1) * 100),
       })),
       weight: String(Math.round((kr.weight ?? 1) * 100)),
@@ -290,6 +304,21 @@ export default function OKRDetalle() {
       const badLink = krEditDraft.kpiLinks.find((lk) => { const lw = Number(lk.weight ?? 100); return lw <= 0 || lw > 100 })
       if (badLink) {
         setKrEditError('El peso de cada KPI vinculado debe estar entre 1 y 100 (%)')
+        return
+      }
+      const totalKpiWeight = krEditDraft.kpiLinks.reduce((sum, lk) => sum + Number(lk.weight ?? 100), 0)
+      if (Math.abs(totalKpiWeight - 100) > 0.5) {
+        setKrEditError(`Los pesos de los KPIs deben sumar 100% (actualmente suman ${totalKpiWeight}%)`)
+        return
+      }
+    }
+    if (objective?.keyResults && objective.keyResults.length > 1) {
+      const othersWeight = objective.keyResults
+        .filter((kr: any) => kr.id !== krId)
+        .reduce((sum: number, kr: any) => sum + Math.round((kr.weight ?? 1) * 100), 0)
+      const totalKrWeight = othersWeight + w
+      if (Math.abs(totalKrWeight - 100) > 0.5) {
+        setKrEditError(`La suma de los pesos de los KRs debe ser 100% (actualmente: ${totalKrWeight.toFixed(0)}%)`)
         return
       }
     }
@@ -449,9 +478,26 @@ export default function OKRDetalle() {
 
             <div className="okr-kr-values-row">
               {kr.krType === 'kpi_linked' ? (
-                <span className="okr-kr-linked-badge">
-                  KPI vinculado: {kr.kpiName ?? 'KPI'} — actual: {kr.kpiActual ?? '—'} / meta: {kr.kpiTarget ?? '—'}
-                </span>
+                <div className="okr-kr-linked-kpis">
+                  {(kr.linkedKpis && kr.linkedKpis.length > 0)
+                    ? (kr.linkedKpis as any[]).map((lk: any, i: number) => (
+                        <span key={i} className="okr-kr-linked-badge">
+                          {lk.kpiName ?? 'KPI'}
+                          {lk.sourceName ? ` — ${lk.sourceName}` : ''}
+                          {': '}
+                          {lk.actual ?? '—'} / {lk.target ?? '—'}
+                          {(kr.linkedKpis as any[]).length > 1 && lk.kpiWeight
+                            ? ` (${Math.round(lk.kpiWeight * 100)}%)`
+                            : ''}
+                        </span>
+                      ))
+                    : (
+                        <span className="okr-kr-linked-badge">
+                          KPI: {kr.kpiName ?? '—'} — actual: {kr.kpiActual ?? '—'} / meta: {kr.kpiTarget ?? '—'}
+                        </span>
+                      )
+                  }
+                </div>
               ) : (
                 <span className="okr-kr-value-text">
                   {kr.currentValue ?? kr.startValue ?? 0} / {kr.targetValue ?? 0}{kr.unit ? ` ${kr.unit}` : ''}
@@ -586,17 +632,19 @@ export default function OKRDetalle() {
                             <span key={`${lk.type}-${lk.id}`} className={`kpi-chip kpi-chip--${lk.type}`}>
                               {lk.label}
                               {krEditDraft.kpiLinks.length > 1 && (
-                                <input
-                                  type="number"
-                                  className="kpi-chip-weight"
-                                  min="1"
-                                  max="100"
-                                  step="1"
-                                  title="Peso de este KPI en el cálculo del KR (%)"
-                                  value={lk.weight ?? 100}
-                                  onChange={(e) => updateKrKpiLinkWeight(lk.type, lk.id, Number(e.target.value))}
-                                  onClick={(e) => e.stopPropagation()}
-                                />
+                                <span className="kpi-chip-weight-wrap">
+                                  <span className="kpi-chip-weight-label">Peso %</span>
+                                  <input
+                                    type="number"
+                                    className="kpi-chip-weight"
+                                    min="1"
+                                    max="100"
+                                    step="1"
+                                    value={lk.weight ?? 100}
+                                    onChange={(e) => updateKrKpiLinkWeight(lk.type, lk.id, Number(e.target.value))}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                </span>
                               )}
                               <button type="button" className="kpi-chip-remove" onClick={() => removeKrKpiLink(lk.type, lk.id)}>×</button>
                             </span>

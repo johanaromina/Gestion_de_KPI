@@ -17,6 +17,7 @@ interface KeyResult {
   kpiName?: string | null
   kpiActual?: number | null
   kpiTarget?: number | null
+  linkedKpis?: Array<{ kpiName?: string | null; sourceName?: string | null; actual?: number | null; target?: number | null; kpiWeight?: number | null }>
   weight: number
   status: KRStatus
   progressPercent: number
@@ -227,7 +228,18 @@ export default function OKRBoard() {
                     </div>
                     <div className="okr-kr-values">
                       {kr.krType === 'kpi_linked' ? (
-                        <span className="okr-kr-linked-badge">KPI: {kr.kpiName ?? 'vinculado'}</span>
+                        <div className="okr-kr-linked-kpis">
+                          {(kr.linkedKpis && kr.linkedKpis.length > 0)
+                            ? kr.linkedKpis.map((lk, i) => (
+                                <span key={i} className="okr-kr-linked-badge">
+                                  {lk.kpiName ?? 'KPI'}{lk.sourceName ? ` — ${lk.sourceName}` : ''}{': '}
+                                  {lk.actual ?? '—'} / {lk.target ?? '—'}
+                                  {kr.linkedKpis!.length > 1 && lk.kpiWeight ? ` (${Math.round(lk.kpiWeight * 100)}%)` : ''}
+                                </span>
+                              ))
+                            : <span className="okr-kr-linked-badge">KPI: {kr.kpiName ?? '—'} — {kr.kpiActual ?? '—'} / {kr.kpiTarget ?? '—'}</span>
+                          }
+                        </div>
                       ) : (
                         <span>
                           {kr.currentValue ?? kr.startValue ?? 0} / {kr.targetValue ?? 0}

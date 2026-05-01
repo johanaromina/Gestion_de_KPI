@@ -84,12 +84,12 @@ export const getKeyResults = async (req: AuthRequest, res: Response) => {
 export const createKeyResult = async (req: AuthRequest, res: Response) => {
   try {
     const objectiveId = Number(req.params.objectiveId)
-    const { title, description, krType, startValue, targetValue, currentValue, unit, collaboratorKpiId, scopeKpiId, weight, ownerId, sortOrder } = req.body
+    const { title, description, krType, startValue, targetValue, currentValue, unit, collaboratorKpiId, scopeKpiId, weight, ownerId, sortOrder, kpiLinks } = req.body
     if (!title) return res.status(400).json({ error: 'title es requerido' })
 
     const id = await okrService.createKeyResult({
       objectiveId, title, description, krType, startValue, targetValue,
-      currentValue, unit, collaboratorKpiId, scopeKpiId, weight, ownerId, sortOrder,
+      currentValue, unit, collaboratorKpiId, scopeKpiId, weight, ownerId, sortOrder, kpiLinks,
     })
     const krs = await okrService.listKeyResults(objectiveId)
     res.status(201).json(krs.find((k) => k.id === id))
@@ -191,7 +191,7 @@ export const getDataSources = async (req: AuthRequest, res: Response) => {
   try {
     const objectiveId = Number(req.params.id)
 
-    // KRs del objetivo con sus vínculos a collaborator_kpi y scope_kpi
+    // KRs del objetivo — incluye legacy columns como fallback para datos viejos
     const [krs] = await pool.query<any[]>(
       `SELECT
          kr.id           AS krId,
@@ -227,113 +227,114 @@ export const getDataSources = async (req: AuthRequest, res: Response) => {
       return res.json([])
     }
 
-    // Para los KRs vinculados a scope_kpi, traer sus fuentes (collaborator_kpis hijos)
-    const scopeKpiIds = krs
-      .filter((r) => r.scopeKpiId)
-      .map((r) => Number(r.scopeKpiId))
+    const krIds = krs.map((r) => r.krId)
 
-    const scopeSources = new Map<number, any[]>()
-
-    if (scopeKpiIds.length > 0) {
-      const placeholders = scopeKpiIds.map(() => '?').join(', ')
+    // Leer todos los KPI links desde okr_kr_kpis (fuente primaria)
+    const kpiLinksMap = new Map<number, any[]>()
+    try {
       const [linkRows] = await pool.query<any[]>(
         `SELECT
-           l.scopeKpiId       AS scopeKpiId,
-           'collaborator'     AS sourceType,
-           col.name           AS sourceName,
-           ck.actual          AS actual,
-           ck.target          AS target,
-           ck.variation       AS variation,
-           k.name             AS kpiName,
-           k.direction        AS kpiDirection,
-           k.type             AS kpiType,
-           ck.status          AS sourceStatus
+           okk.krId, okk.collaboratorKpiId, okk.scopeKpiId,
+           ck.actual AS ckActual, ck.target AS ckTarget, ck.variation AS ckVariation,
+           k1.name AS ckKpiName, k1.direction AS ckKpiDirection, k1.type AS ckKpiType,
+           col.name AS ckCollaboratorName,
+           sk.actual AS skActual, sk.target AS skTarget,
+           k2.name AS skKpiName, k2.direction AS skKpiDirection, k2.type AS skKpiType
+         FROM okr_kr_kpis okk
+         LEFT JOIN collaborator_kpis ck ON okk.collaboratorKpiId = ck.id
+         LEFT JOIN collaborators col ON ck.collaboratorId = col.id
+         LEFT JOIN kpis k1 ON ck.kpiId = k1.id
+         LEFT JOIN scope_kpis sk ON okk.scopeKpiId = sk.id
+         LEFT JOIN kpis k2 ON sk.kpiId = k2.id
+         WHERE okk.krId IN (${krIds.map(() => '?').join(',')})`,
+        krIds
+      )
+      for (const row of Array.isArray(linkRows) ? linkRows : []) {
+        const list = kpiLinksMap.get(row.krId) ?? []
+        list.push(row)
+        kpiLinksMap.set(row.krId, list)
+      }
+    } catch { /* tabla okr_kr_kpis no existe — se usa legacy */ }
+
+    // Recolectar todos los scopeKpiIds para traer sus fuentes hijas
+    const allScopeKpiIds = new Set<number>()
+    for (const links of kpiLinksMap.values()) {
+      for (const lk of links) { if (lk.scopeKpiId) allScopeKpiIds.add(Number(lk.scopeKpiId)) }
+    }
+    // También legacy
+    for (const kr of krs) { if (kr.scopeKpiId && !kpiLinksMap.has(kr.krId)) allScopeKpiIds.add(Number(kr.scopeKpiId)) }
+
+    const scopeSources = new Map<number, any[]>()
+    if (allScopeKpiIds.size > 0) {
+      const ids = [...allScopeKpiIds]
+      const ph = ids.map(() => '?').join(', ')
+      const [linkRows] = await pool.query<any[]>(
+        `SELECT l.scopeKpiId, 'collaborator' AS sourceType, col.name AS sourceName,
+           ck.actual, ck.target, ck.variation, k.name AS kpiName, k.direction AS kpiDirection, k.type AS kpiType, ck.status AS sourceStatus
          FROM scope_kpi_links l
          JOIN collaborator_kpis ck ON l.collaboratorAssignmentId = ck.id
          JOIN collaborators col ON ck.collaboratorId = col.id
          JOIN kpis k ON ck.kpiId = k.id
-         WHERE l.childType = 'collaborator' AND l.scopeKpiId IN (${placeholders})
+         WHERE l.childType = 'collaborator' AND l.scopeKpiId IN (${ph})
          UNION ALL
-         SELECT
-           l.scopeKpiId       AS scopeKpiId,
-           'scope'            AS sourceType,
-           k.name             AS sourceName,
-           sk.actual          AS actual,
-           sk.target          AS target,
-           NULL               AS variation,
-           k.name             AS kpiName,
-           k.direction        AS kpiDirection,
-           k.type             AS kpiType,
-           sk.status          AS sourceStatus
+         SELECT l.scopeKpiId, 'scope' AS sourceType, k.name AS sourceName,
+           sk.actual, sk.target, NULL AS variation, k.name AS kpiName, k.direction AS kpiDirection, k.type AS kpiType, sk.status AS sourceStatus
          FROM scope_kpi_links l
          JOIN scope_kpis sk ON l.childScopeKpiId = sk.id
          JOIN kpis k ON sk.kpiId = k.id
-         WHERE l.childType = 'scope' AND l.scopeKpiId IN (${placeholders})`,
-        [...scopeKpiIds, ...scopeKpiIds]
+         WHERE l.childType = 'scope' AND l.scopeKpiId IN (${ph})`,
+        [...ids, ...ids]
       )
-
-      for (const row of linkRows || []) {
-        const id = Number(row.scopeKpiId)
-        if (!scopeSources.has(id)) scopeSources.set(id, [])
-        scopeSources.get(id)!.push(row)
+      for (const row of linkRows ?? []) {
+        const sid = Number(row.scopeKpiId)
+        if (!scopeSources.has(sid)) scopeSources.set(sid, [])
+        scopeSources.get(sid)!.push(row)
       }
     }
 
     const result = krs.map((kr) => {
-      if (kr.krType === 'kpi_linked' && kr.scopeKpiId) {
-        return {
-          krId: kr.krId,
-          krTitle: kr.krTitle,
-          krType: kr.krType,
-          krStatus: kr.krStatus,
-          sourceType: 'scope_kpi',
-          kpiName: kr.skKpiName,
-          kpiDirection: kr.skKpiDirection,
-          kpiType: kr.skKpiType,
-          actual: kr.skActual,
-          target: kr.skTarget,
-          sources: scopeSources.get(Number(kr.scopeKpiId)) ?? [],
+      if (kr.krType !== 'kpi_linked') {
+        return { krId: kr.krId, krTitle: kr.krTitle, krType: kr.krType, krStatus: kr.krStatus, sourceType: null, kpiName: null, actual: null, target: null, sources: [] }
+      }
+
+      const links = kpiLinksMap.get(kr.krId)
+
+      // Usar okr_kr_kpis si hay links; si no, caer en columnas legacy
+      if (links && links.length > 0) {
+        const allSources: any[] = []
+        let primaryKpiName: string | null = null
+        let primaryActual: number | null = null
+        let primaryTarget: number | null = null
+        let primarySourceType: string | null = null
+        let primaryDirection: string | undefined
+        let primaryType: string | undefined
+
+        for (const lk of links) {
+          if (lk.scopeKpiId) {
+            if (!primaryKpiName) {
+              primaryKpiName = lk.skKpiName; primaryActual = lk.skActual; primaryTarget = lk.skTarget
+              primarySourceType = 'scope_kpi'; primaryDirection = lk.skKpiDirection; primaryType = lk.skKpiType
+            }
+            allSources.push(...(scopeSources.get(Number(lk.scopeKpiId)) ?? []))
+          } else if (lk.collaboratorKpiId) {
+            if (!primaryKpiName) {
+              primaryKpiName = lk.ckKpiName; primaryActual = lk.ckActual; primaryTarget = lk.ckTarget
+              primarySourceType = 'collaborator_kpi'; primaryDirection = lk.ckKpiDirection; primaryType = lk.ckKpiType
+            }
+            allSources.push({ sourceType: 'collaborator', sourceName: lk.ckCollaboratorName, actual: lk.ckActual, target: lk.ckTarget, variation: lk.ckVariation, kpiName: lk.ckKpiName, kpiDirection: lk.ckKpiDirection, kpiType: lk.ckKpiType, sourceStatus: null })
+          }
         }
+        return { krId: kr.krId, krTitle: kr.krTitle, krType: kr.krType, krStatus: kr.krStatus, sourceType: primarySourceType, kpiName: primaryKpiName, kpiDirection: primaryDirection, kpiType: primaryType, actual: primaryActual, target: primaryTarget, sources: allSources }
       }
-      if (kr.krType === 'kpi_linked' && kr.collaboratorKpiId) {
-        return {
-          krId: kr.krId,
-          krTitle: kr.krTitle,
-          krType: kr.krType,
-          krStatus: kr.krStatus,
-          sourceType: 'collaborator_kpi',
-          kpiName: kr.ckKpiName,
-          kpiDirection: kr.ckKpiDirection,
-          kpiType: kr.ckKpiType,
-          actual: kr.ckActual,
-          target: kr.ckTarget,
-          sources: [
-            {
-              sourceType: 'collaborator',
-              sourceName: kr.ckCollaboratorName,
-              actual: kr.ckActual,
-              target: kr.ckTarget,
-              variation: kr.ckVariation,
-              kpiName: kr.ckKpiName,
-              kpiDirection: kr.ckKpiDirection,
-              kpiType: kr.ckKpiType,
-              sourceStatus: null,
-            },
-          ],
-        }
+
+      // Legacy fallback
+      if (kr.scopeKpiId) {
+        return { krId: kr.krId, krTitle: kr.krTitle, krType: kr.krType, krStatus: kr.krStatus, sourceType: 'scope_kpi', kpiName: kr.skKpiName, kpiDirection: kr.skKpiDirection, kpiType: kr.skKpiType, actual: kr.skActual, target: kr.skTarget, sources: scopeSources.get(Number(kr.scopeKpiId)) ?? [] }
       }
-      // KR simple — no tiene fuente de datos externa
-      return {
-        krId: kr.krId,
-        krTitle: kr.krTitle,
-        krType: kr.krType,
-        krStatus: kr.krStatus,
-        sourceType: null,
-        kpiName: null,
-        actual: null,
-        target: null,
-        sources: [],
+      if (kr.collaboratorKpiId) {
+        return { krId: kr.krId, krTitle: kr.krTitle, krType: kr.krType, krStatus: kr.krStatus, sourceType: 'collaborator_kpi', kpiName: kr.ckKpiName, kpiDirection: kr.ckKpiDirection, kpiType: kr.ckKpiType, actual: kr.ckActual, target: kr.ckTarget, sources: [{ sourceType: 'collaborator', sourceName: kr.ckCollaboratorName, actual: kr.ckActual, target: kr.ckTarget, variation: kr.ckVariation, kpiName: kr.ckKpiName, kpiDirection: kr.ckKpiDirection, kpiType: kr.ckKpiType, sourceStatus: null }] }
       }
+      return { krId: kr.krId, krTitle: kr.krTitle, krType: kr.krType, krStatus: kr.krStatus, sourceType: null, kpiName: null, actual: null, target: null, sources: [] }
     })
 
     res.json(result)
