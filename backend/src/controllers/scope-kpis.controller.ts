@@ -9,7 +9,7 @@ import {
   reopenScopeKPIRecord,
   updateScopeKPIRecord,
 } from '../services/scope-kpi.service'
-import { recalculateScopeKPI } from '../services/scope-kpi-aggregation.service'
+import { recalculateScopeKPI, recalcParentScopeKPIs } from '../services/scope-kpi-aggregation.service'
 import { hydrateScopeKpiMixedFields } from '../services/scope-kpi-mixed.service'
 import { recalcOKRsLinkedToScopeKpi } from '../services/okr.service'
 
@@ -250,6 +250,11 @@ export const recalculateScopeKPIController = async (req: Request, res: Response)
     recalcOKRsLinkedToScopeKpi(scopeKpiId).catch((err) =>
       console.error('[OKR propagation] scopeKpi→OKR:', err)
     )
+    recalcParentScopeKPIs(scopeKpiId, (sid) =>
+      recalcOKRsLinkedToScopeKpi(sid).catch((err) =>
+        console.error('[scopeKpi] parent cascade→OKR:', err)
+      )
+    ).catch((err) => console.error('[scopeKpi] parent scopeKpi cascade:', err))
 
     res.json({ message: 'Scope KPI recalculado correctamente', ...result })
   } catch (error: any) {
@@ -391,6 +396,14 @@ export const createScopeMeasurement = async (scopeKpiId: number, value: number, 
   )
   const measurementId = (result as any).insertId as number
   await applyMeasurementToScopeKPI(scopeKpiId, value, mode, measurementId)
+  recalcParentScopeKPIs(scopeKpiId, (sid) =>
+    recalcOKRsLinkedToScopeKpi(sid).catch((err) =>
+      console.error('[scopeKpi] parent cascade→OKR:', err)
+    )
+  ).catch((err) => console.error('[scopeKpi] parent scopeKpi cascade:', err))
+  recalcOKRsLinkedToScopeKpi(scopeKpiId).catch((err) =>
+    console.error('[scopeKpi] scopeKpi→OKR propagation:', err)
+  )
   return measurementId
 }
 

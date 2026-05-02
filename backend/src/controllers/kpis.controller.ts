@@ -6,6 +6,15 @@ import {
   calculateWeightedResult,
   validateFormula,
 } from '../utils/kpi-formulas'
+import { recalculateScopeKPI } from '../services/scope-kpi-aggregation.service'
+import { computeScopeKpiMetrics } from '../services/scope-kpi-mixed.service'
+import { AuthRequest } from '../middleware/auth.middleware'
+import { recalcOKRsLinkedToScopeKpi } from '../services/okr.service'
+
+const isConfigUser = (req: Request) => {
+  const user = (req as AuthRequest).user
+  return !!(user?.hasSuperpowers || user?.permissions?.includes('config.manage'))
+}
 
 const ensureKPIPeriodsTable = async () => {
   await pool.query(`
@@ -131,6 +140,7 @@ export const getKPIById = async (req: Request, res: Response) => {
 }
 
 export const createKPI = async (req: Request, res: Response) => {
+  if (!isConfigUser(req)) return res.status(403).json({ error: 'Sin autorización para crear definiciones KPI' })
   try {
     const {
       name,
@@ -253,6 +263,7 @@ export const createKPI = async (req: Request, res: Response) => {
 }
 
 export const updateKPI = async (req: Request, res: Response) => {
+  if (!isConfigUser(req)) return res.status(403).json({ error: 'Sin autorización para editar definiciones KPI' })
   try {
     const { id } = req.params
     const {
@@ -374,6 +385,70 @@ export const updateKPI = async (req: Request, res: Response) => {
       conn.release()
     }
 
+    // Recalcular scope KPIs afectados por el cambio de definición KPI
+    ;(async () => {
+      try {
+        // 1. scope_kpis cuyo propio kpiId es este — recalcular variation/weightedResult desde actual existente
+        const [directRows] = await pool.query<any[]>(
+          `SELECT id, target, weight, actual FROM scope_kpis WHERE kpiId = ? AND actual IS NOT NULL`,
+          [id]
+        )
+        const directIds: number[] = []
+        for (const row of Array.isArray(directRows) ? directRows : []) {
+          const { variation, weightedResult } = await computeScopeKpiMetrics({
+            kpiId: Number(id),
+            target: Number(row.target ?? 0),
+            weight: Number(row.weight ?? 0),
+            actual: Number(row.actual),
+          })
+          await pool.query(
+            `UPDATE scope_kpis SET variation = ?, weightedResult = ? WHERE id = ?`,
+            [variation, weightedResult, row.id]
+          )
+          directIds.push(row.id)
+        }
+
+        // 2. scope_kpis que agregan collaborator_kpis de este KPI como hijos
+        const [linkedRows] = await pool.query<any[]>(
+          `SELECT DISTINCT l.scopeKpiId
+           FROM scope_kpi_links l
+           JOIN collaborator_kpis ck ON l.collaboratorAssignmentId = ck.id
+           WHERE ck.kpiId = ?`,
+          [id]
+        )
+        for (const row of Array.isArray(linkedRows) ? linkedRows : []) {
+          await recalculateScopeKPI(row.scopeKpiId)
+          recalcOKRsLinkedToScopeKpi(row.scopeKpiId).catch((err) =>
+            console.error('[OKR propagation] KPI update→scopeKpi→OKR:', err)
+          )
+        }
+
+        // 3. scope→scope cascada BFS: sube por la cadena hasta no haber más padres
+        const visited = new Set<number>([...directIds, ...(Array.isArray(linkedRows) ? linkedRows : []).map((r: any) => r.scopeKpiId)])
+        let frontier: number[] = [...directIds, ...(Array.isArray(linkedRows) ? linkedRows : []).map((r: any) => r.scopeKpiId)]
+        while (frontier.length > 0) {
+          const ph = frontier.map(() => '?').join(',')
+          const [parentRows] = await pool.query<any[]>(
+            `SELECT DISTINCT scopeKpiId FROM scope_kpi_links WHERE childScopeKpiId IN (${ph})`,
+            frontier
+          )
+          frontier = []
+          for (const row of Array.isArray(parentRows) ? parentRows : []) {
+            if (!visited.has(row.scopeKpiId)) {
+              visited.add(row.scopeKpiId)
+              frontier.push(row.scopeKpiId)
+              await recalculateScopeKPI(row.scopeKpiId)
+              recalcOKRsLinkedToScopeKpi(row.scopeKpiId).catch((err) =>
+                console.error('[OKR propagation] KPI update→scopeKpi→OKR:', err)
+              )
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[scope propagation] KPI update→scopeKpi:', err)
+      }
+    })()
+
     res.json({ message: 'KPI actualizado correctamente' })
   } catch (error: any) {
     console.error('Error updating KPI:', error)
@@ -382,6 +457,7 @@ export const updateKPI = async (req: Request, res: Response) => {
 }
 
 export const deleteKPI = async (req: Request, res: Response) => {
+  if (!isConfigUser(req)) return res.status(403).json({ error: 'Sin autorización para eliminar definiciones KPI' })
   try {
     const { id } = req.params
 

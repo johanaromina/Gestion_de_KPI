@@ -1,6 +1,10 @@
 import { pool } from '../config/database'
 import { calculateVariation, calculateWeightedResult } from './kpi-formulas'
 import { applyMeasurementToScopeKPI } from '../services/scope-kpi.service'
+import { applyMeasurementToCollaboratorAssignment } from '../services/measurement-application.service'
+import { recalcOKRsLinkedToCollaboratorKpi, recalcOKRsLinkedToScopeKpi } from '../services/okr.service'
+import { recalcScopeKPIsLinkedToAssignment } from '../controllers/collaborator-kpis.controller'
+import { recalcParentScopeKPIs } from '../services/scope-kpi-aggregation.service'
 import { mergeParams, parseAuthConfig, parseJson, resolveConnectorAdapter, resolvePeriodParams } from '../integrations/adapters'
 import { AuthProfileRow, TargetRow, TemplateRow } from '../integrations/types'
 
@@ -174,13 +178,12 @@ const createMeasurementFromRun = async (
     }
   }
   if (!targetValue || targetValue <= 0) return
-  const variation = calculateVariation(kpiDirection, targetValue, value, customFormula)
-  const weightedResult = calculateWeightedResult(variation, weightValue)
-  await pool.query(
-    `UPDATE collaborator_kpis
-     SET actual = ?, variation = ?, weightedResult = ?, inputMode = ?, lastMeasurementId = ?
-     WHERE id = ?`,
-    [value, variation, weightedResult, 'auto', measurementId, assignmentId]
+  await applyMeasurementToCollaboratorAssignment(assignmentId, value, 'auto', measurementId)
+  recalcScopeKPIsLinkedToAssignment(assignmentId).catch((err) =>
+    console.error('[integrations] scope propagation:', err)
+  )
+  recalcOKRsLinkedToCollaboratorKpi(assignmentId).catch((err) =>
+    console.error('[integrations] OKR propagation:', err)
   )
 }
 
@@ -201,6 +204,14 @@ const createScopeMeasurementFromRun = async (
   )
   const measurementId = (result as any).insertId as number
   await applyMeasurementToScopeKPI(scopeKpiId, value, 'auto', measurementId)
+  recalcParentScopeKPIs(scopeKpiId, (sid) =>
+    recalcOKRsLinkedToScopeKpi(sid).catch((err) =>
+      console.error('[integrations] parent scopeKpi→OKR propagation:', err)
+    )
+  ).catch((err) => console.error('[integrations] parent scopeKpi cascade:', err))
+  recalcOKRsLinkedToScopeKpi(scopeKpiId).catch((err) =>
+    console.error('[integrations] scopeKpi→OKR propagation:', err)
+  )
 }
 
 const resolveSubPeriodId = async (

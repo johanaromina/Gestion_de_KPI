@@ -6,8 +6,11 @@ import {
   updateKPI,
   deleteKPI,
 } from '../controllers/kpis.controller'
+import { authenticate } from '../middleware/auth.middleware'
 
 const router = Router()
+
+router.use(authenticate)
 
 router.get('/', getKPIs)
 router.get('/:id', getKPIById)

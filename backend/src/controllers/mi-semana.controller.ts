@@ -1,9 +1,9 @@
 import { Response } from 'express'
 import { pool } from '../config/database'
 import { AuthRequest } from '../middleware/auth.middleware'
-import { recalcOKRsLinkedToCollaboratorKpi, autoScoreKRStatuses } from '../services/okr.service'
+import { recalcOKRsLinkedToCollaboratorKpi, autoScoreKRStatuses, recalcObjectiveProgress } from '../services/okr.service'
 import { applyMeasurementToCollaboratorAssignment } from '../services/measurement-application.service'
-import { recalcSummaryAssignment } from '../controllers/collaborator-kpis.controller'
+import { recalcSummaryAssignment, recalcScopeKPIsLinkedToAssignment } from '../controllers/collaborator-kpis.controller'
 
 /**
  * GET /api/mi-semana
@@ -148,6 +148,7 @@ export const updateKRValue = async (req: AuthRequest, res: Response) => {
 
     // Recalcular progreso del objetivo
     await autoScoreKRStatuses(krRows[0].objectiveId)
+    await recalcObjectiveProgress(krRows[0].objectiveId)
 
     // Re-leer el KR actualizado
     const [updated] = await pool.query<any[]>(
@@ -231,7 +232,10 @@ export const updateKPIActual = async (req: AuthRequest, res: Response) => {
 
     await recalcSummaryAssignment(collaboratorId, ck.kpiId, ck.periodId)
 
-    // Propagar a OKRs vinculados
+    // Propagar a scope KPIs padres y luego a OKRs
+    recalcScopeKPIsLinkedToAssignment(kpiId).catch((err) =>
+      console.error('[MiSemana] scope propagation:', err)
+    )
     recalcOKRsLinkedToCollaboratorKpi(kpiId).catch((err) =>
       console.error('[MiSemana] OKR propagation:', err)
     )

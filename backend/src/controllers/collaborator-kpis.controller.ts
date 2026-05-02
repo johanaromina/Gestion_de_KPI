@@ -5,7 +5,42 @@ import { calculateVariation, calculateWeightedResult } from '../utils/kpi-formul
 import { AuthRequest } from '../middleware/auth.middleware'
 import { closeKpiRecord, ensureAssignmentEditable, reopenKpiRecord } from '../services/kpi-assignment-shared.service'
 import { applyMeasurementToCollaboratorAssignment } from '../services/measurement-application.service'
-import { recalcOKRsLinkedToCollaboratorKpi } from '../services/okr.service'
+import { recalcOKRsLinkedToCollaboratorKpi, recalcOKRsLinkedToScopeKpi } from '../services/okr.service'
+import { recalculateScopeKPI } from '../services/scope-kpi-aggregation.service'
+
+export const recalcScopeKPIsLinkedToAssignment = async (assignmentId: number) => {
+  try {
+    const [seedRows] = await pool.query<any[]>(
+      `SELECT DISTINCT scopeKpiId FROM scope_kpi_links WHERE collaboratorAssignmentId = ?`,
+      [assignmentId]
+    )
+    const seedIds = (Array.isArray(seedRows) ? seedRows : []).map((r) => r.scopeKpiId as number)
+
+    // BFS up the scope→scope chain
+    const visited = new Set<number>()
+    let frontier = seedIds
+    while (frontier.length > 0) {
+      for (const sid of frontier) {
+        if (visited.has(sid)) continue
+        visited.add(sid)
+        await recalculateScopeKPI(sid)
+        recalcOKRsLinkedToScopeKpi(sid).catch((err) =>
+          console.error('[scope propagation] scopeKpi→OKR:', err)
+        )
+      }
+      const ph = frontier.map(() => '?').join(',')
+      const [parentRows] = await pool.query<any[]>(
+        `SELECT DISTINCT scopeKpiId FROM scope_kpi_links WHERE childScopeKpiId IN (${ph})`,
+        frontier
+      )
+      frontier = (Array.isArray(parentRows) ? parentRows : [])
+        .map((r) => r.scopeKpiId as number)
+        .filter((sid) => !visited.has(sid))
+    }
+  } catch (err) {
+    console.error('[scope propagation] collaboratorKpi→scopeKpi:', err)
+  }
+}
 
 const canEditAssignment = async (user: AuthRequest['user'], collaboratorId: number) => {
   // Solo usuarios con permisos de configuración (o superpoderes) pueden modificar datos
@@ -699,7 +734,7 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
 
     if (actual !== undefined) {
       const [ckDataRows] = await pool.query<any[]>(
-        `SELECT ck.target, ck.weight, k.type, k.direction 
+        `SELECT ck.target, ck.weight, k.type, k.direction, k.formula
          FROM collaborator_kpis ck
          JOIN kpis k ON ck.kpiId = k.id
          WHERE ck.id = ?`,
@@ -710,6 +745,7 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
         const kpiDirection = resolveDirection(ckDataRows[0].direction, ckDataRows[0].type)
         const currentTarget = Number(target ?? ckDataRows[0].target ?? 0)
         const currentWeight = Number(weight ?? ckDataRows[0].weight ?? 0)
+        const customFormula = ckDataRows[0].formula || undefined
 
         if (!currentTarget || currentTarget <= 0) {
           return res.status(400).json({
@@ -718,7 +754,7 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
           })
         }
 
-        const variation = calculateVariation(kpiDirection, currentTarget, actual)
+        const variation = calculateVariation(kpiDirection, currentTarget, actual, customFormula)
         const weightedResult = calculateWeightedResult(variation, currentWeight)
 
         updateQuery += `, actual = ?, variation = ?, weightedResult = ?`
@@ -761,6 +797,12 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
 
     if (actual !== undefined && collaboratorId && kpiId && periodId) {
       await recalcSummaryAssignment(collaboratorId, kpiId, periodId)
+      recalcScopeKPIsLinkedToAssignment(Number(id)).catch((err) =>
+        console.error('[scope propagation] PUT collaboratorKpi→scopeKpi:', err)
+      )
+      recalcOKRsLinkedToCollaboratorKpi(Number(id)).catch((err) =>
+        console.error('[OKR propagation] PUT collaboratorKpi→OKR:', err)
+      )
     }
 
     res.json({ message: 'Asignación actualizada correctamente' })
@@ -851,16 +893,24 @@ export const updateActualValue = async (req: Request, res: Response) => {
 
     await recalcSummaryAssignment(ckRows[0].collaboratorId, kpiId, periodId)
 
-    // Propagar hacia OKRs que usan este collaborator_kpi como fuente de datos
+    // Propagar hacia scope KPIs padres y luego a OKRs
+    recalcScopeKPIsLinkedToAssignment(Number(id)).catch((err) =>
+      console.error('[scope propagation] collaboratorKpi→scopeKpi:', err)
+    )
     recalcOKRsLinkedToCollaboratorKpi(Number(id)).catch((err) =>
       console.error('[OKR propagation] collaboratorKpi→OKR:', err)
     )
 
+    const [savedRows] = await pool.query<any[]>(
+      `SELECT actual, variation, weightedResult FROM collaborator_kpis WHERE id = ?`,
+      [id]
+    )
+    const saved = Array.isArray(savedRows) ? savedRows[0] : {}
     res.json({
       message: 'Valor actualizado correctamente',
-      actual,
-      variation: calculateVariation(resolveDirection(direction, type), currentTarget, actual),
-      weightedResult: calculateWeightedResult(calculateVariation(resolveDirection(direction, type), currentTarget, actual), currentWeight),
+      actual: saved?.actual ?? actual,
+      variation: saved?.variation ?? null,
+      weightedResult: saved?.weightedResult ?? null,
     })
   } catch (error: any) {
     console.error('Error updating actual value:', error)

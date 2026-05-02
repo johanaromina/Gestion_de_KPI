@@ -656,17 +656,30 @@ export const getAlignmentTree = async (periodId: number): Promise<OKRObjective[]
  * vinculado a un collaborator_kpi específico.
  */
 export const recalcOKRsLinkedToCollaboratorKpi = async (collaboratorKpiId: number): Promise<void> => {
-  const [rows] = await pool.query<any[]>(
-    `SELECT DISTINCT kr.objectiveId
-     FROM okr_key_results kr
-     WHERE kr.collaboratorKpiId = ?
-     UNION
-     SELECT DISTINCT kr.objectiveId
-     FROM okr_kr_kpis okk
-     JOIN okr_key_results kr ON kr.id = okk.krId
-     WHERE okk.collaboratorKpiId = ?`,
-    [collaboratorKpiId, collaboratorKpiId]
-  )
+  let rows: any[] = []
+  try {
+    const [queryRows] = await pool.query<any[]>(
+      `SELECT DISTINCT kr.objectiveId
+       FROM okr_key_results kr
+       WHERE kr.collaboratorKpiId = ?
+       UNION
+       SELECT DISTINCT kr.objectiveId
+       FROM okr_kr_kpis okk
+       JOIN okr_key_results kr ON kr.id = okk.krId
+       WHERE okk.collaboratorKpiId = ?`,
+      [collaboratorKpiId, collaboratorKpiId]
+    )
+    rows = Array.isArray(queryRows) ? queryRows : []
+  } catch {
+    // tabla okr_kr_kpis no existe aún — caer al vínculo legacy
+    const [legacyRows] = await pool.query<any[]>(
+      `SELECT DISTINCT kr.objectiveId
+       FROM okr_key_results kr
+       WHERE kr.collaboratorKpiId = ?`,
+      [collaboratorKpiId]
+    )
+    rows = Array.isArray(legacyRows) ? legacyRows : []
+  }
   if (!Array.isArray(rows) || rows.length === 0) return
   for (const row of rows) {
     await recalcObjectiveProgress(row.objectiveId)
@@ -679,17 +692,30 @@ export const recalcOKRsLinkedToCollaboratorKpi = async (collaboratorKpiId: numbe
  * vinculado a un scope_kpi específico.
  */
 export const recalcOKRsLinkedToScopeKpi = async (scopeKpiId: number): Promise<void> => {
-  const [rows] = await pool.query<any[]>(
-    `SELECT DISTINCT kr.objectiveId
-     FROM okr_key_results kr
-     WHERE kr.scopeKpiId = ?
-     UNION
-     SELECT DISTINCT kr.objectiveId
-     FROM okr_kr_kpis okk
-     JOIN okr_key_results kr ON kr.id = okk.krId
-     WHERE okk.scopeKpiId = ?`,
-    [scopeKpiId, scopeKpiId]
-  )
+  let rows: any[] = []
+  try {
+    const [queryRows] = await pool.query<any[]>(
+      `SELECT DISTINCT kr.objectiveId
+       FROM okr_key_results kr
+       WHERE kr.scopeKpiId = ?
+       UNION
+       SELECT DISTINCT kr.objectiveId
+       FROM okr_kr_kpis okk
+       JOIN okr_key_results kr ON kr.id = okk.krId
+       WHERE okk.scopeKpiId = ?`,
+      [scopeKpiId, scopeKpiId]
+    )
+    rows = Array.isArray(queryRows) ? queryRows : []
+  } catch {
+    // tabla okr_kr_kpis no existe aún — caer al vínculo legacy
+    const [legacyRows] = await pool.query<any[]>(
+      `SELECT DISTINCT kr.objectiveId
+       FROM okr_key_results kr
+       WHERE kr.scopeKpiId = ?`,
+      [scopeKpiId]
+    )
+    rows = Array.isArray(legacyRows) ? legacyRows : []
+  }
   if (!Array.isArray(rows) || rows.length === 0) return
   for (const row of rows) {
     await recalcObjectiveProgress(row.objectiveId)

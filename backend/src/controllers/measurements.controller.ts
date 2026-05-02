@@ -6,6 +6,9 @@ import {
   applyMeasurementToScopeKpi,
   ensureSingleMeasurementOwner,
 } from '../services/measurement-application.service'
+import { recalcOKRsLinkedToCollaboratorKpi, recalcOKRsLinkedToScopeKpi } from '../services/okr.service'
+import { recalcScopeKPIsLinkedToAssignment } from '../controllers/collaborator-kpis.controller'
+import { recalcParentScopeKPIs } from '../services/scope-kpi-aggregation.service'
 
 export const getMeasurements = async (req: Request, res: Response) => {
   try {
@@ -155,9 +158,23 @@ export const createMeasurement = async (req: Request, res: Response) => {
 
     if ((status || 'draft') === 'approved' && assignmentId) {
       await applyMeasurementToCollaboratorAssignment(assignmentId, Number(value), mode || 'manual', measurementId, criteriaVersionId)
+      recalcScopeKPIsLinkedToAssignment(Number(assignmentId)).catch((err) =>
+        console.error('[measurements] scope propagation:', err)
+      )
+      recalcOKRsLinkedToCollaboratorKpi(Number(assignmentId)).catch((err) =>
+        console.error('[measurements] OKR propagation:', err)
+      )
     }
     if ((status || 'draft') === 'approved' && scopeKpiId) {
       await applyMeasurementToScopeKpi(Number(scopeKpiId), Number(value), mode || 'manual', measurementId)
+      recalcParentScopeKPIs(Number(scopeKpiId), (sid) =>
+        recalcOKRsLinkedToScopeKpi(sid).catch((err) =>
+          console.error('[measurements] parent scopeKpi→OKR propagation:', err)
+        )
+      ).catch((err) => console.error('[measurements] parent scopeKpi cascade:', err))
+      recalcOKRsLinkedToScopeKpi(Number(scopeKpiId)).catch((err) =>
+        console.error('[measurements] scopeKpi→OKR propagation:', err)
+      )
     }
 
     res.status(201).json({ id: measurementId, warning })
@@ -228,6 +245,12 @@ export const approveMeasurement = async (req: Request, res: Response) => {
         measurement.id,
         measurement.criteriaVersionId
       )
+      recalcScopeKPIsLinkedToAssignment(Number(measurement.assignmentId)).catch((err) =>
+        console.error('[approveMeasurement] scope propagation:', err)
+      )
+      recalcOKRsLinkedToCollaboratorKpi(Number(measurement.assignmentId)).catch((err) =>
+        console.error('[approveMeasurement] OKR propagation:', err)
+      )
     }
     if (measurement.scopeKpiId) {
       await applyMeasurementToScopeKpi(
@@ -235,6 +258,14 @@ export const approveMeasurement = async (req: Request, res: Response) => {
         Number(measurement.value),
         measurement.mode || 'manual',
         measurement.id
+      )
+      recalcParentScopeKPIs(Number(measurement.scopeKpiId), (sid) =>
+        recalcOKRsLinkedToScopeKpi(sid).catch((err) =>
+          console.error('[approveMeasurement] parent scopeKpi→OKR propagation:', err)
+        )
+      ).catch((err) => console.error('[approveMeasurement] parent scopeKpi cascade:', err))
+      recalcOKRsLinkedToScopeKpi(Number(measurement.scopeKpiId)).catch((err) =>
+        console.error('[approveMeasurement] scopeKpi→OKR propagation:', err)
       )
     }
 

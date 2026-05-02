@@ -9,6 +9,8 @@ const TSX_PKG = require.resolve('tsx/package.json')
 const TSX_CLI = join(dirname(TSX_PKG), 'dist', 'cli.mjs')
 const PORT = process.env.SMOKE_PORT || '5051'
 const BASE_URL = `http://localhost:${PORT}`
+const SMOKE_EMAIL = process.env.SMOKE_EMAIL || 'admin@empresa.demo'
+const SMOKE_PASSWORD = process.env.SMOKE_PASSWORD || 'Admin1234!'
 const SMOKE_JWT_SECRET = process.env.JWT_SECRET || 'smoke-test-jwt-secret'
 const SMOKE_AUTH_ENCRYPTION_KEY =
   process.env.AUTH_ENCRYPTION_KEY || process.env.JWT_SECRET || 'smoke-test-auth-encryption-key'
@@ -130,8 +132,8 @@ const main = async () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: 'admin@empresa.demo',
-        password: 'Johana1409',
+        email: SMOKE_EMAIL,
+        password: SMOKE_PASSWORD,
       }),
     })
 
@@ -147,7 +149,7 @@ const main = async () => {
     const me = await requestJson<JsonRecord>('/api/auth/me', {
       headers: authHeaders,
     })
-    assert(me.email === 'admin@empresa.demo', 'El endpoint /auth/me devolvio un usuario inesperado')
+    assert(me.email === SMOKE_EMAIL, 'El endpoint /auth/me devolvio un usuario inesperado')
     log('Auth/me OK')
 
     const collaboratorAssignments = await requestJson<any[]>('/api/collaborator-kpis?periodId=1', {

@@ -23,6 +23,30 @@ const computeAggregate = (
   }
 }
 
+type LinkEntry = { value: number; weight: number; method: string }
+
+// Aplica el aggregationMethod de cada link respetando su grupo.
+// Si todos los links tienen el mismo método, el resultado es idéntico al computeAggregate original.
+// Si hay métodos mezclados, cada grupo se calcula por separado y los resultados se suman.
+const computeAggregatePerLink = (links: LinkEntry[]): number => {
+  if (links.length === 0) return 0
+  const VALID_METHODS = ['sum', 'avg', 'weighted_avg']
+  const normalize = (m: string) => (VALID_METHODS.includes(m) ? m : 'weighted_avg')
+  const methods = new Set(links.map((l) => normalize(l.method)))
+  if (methods.size === 1) {
+    const [method] = methods
+    return computeAggregate(method, links.map((l) => l.value), links.map((l) => l.weight))
+  }
+  let total = 0
+  for (const method of VALID_METHODS) {
+    const group = links.filter((l) => normalize(l.method) === method)
+    if (group.length > 0) {
+      total += computeAggregate(method, group.map((l) => l.value), group.map((l) => l.weight))
+    }
+  }
+  return total
+}
+
 export const recalculateScopeKPI = async (scopeKpiId: number, triggeredBy?: number | null) => {
   const scopeKpi = await getScopeKPIByIdOrThrow(scopeKpiId)
   const [linkRows] = await pool.query<any[]>(
@@ -39,18 +63,18 @@ export const recalculateScopeKPI = async (scopeKpiId: number, triggeredBy?: numb
     [scopeKpiId]
   )
 
-  const values: number[] = []
-  const weights: number[] = []
+  const linkEntries: LinkEntry[] = []
   const snapshot = []
-  let lastMethod = 'weighted_avg'
 
   for (const link of Array.isArray(linkRows) ? linkRows : []) {
     const value =
       link.childType === 'collaborator' ? safeNumber(link.collaboratorActual) : safeNumber(link.scopeActual)
     if (value === null) continue
-    values.push(value)
-    weights.push(safeNumber(link.contributionWeight) ?? safeNumber(link.collaboratorWeight) ?? safeNumber(link.scopeWeight) ?? 0)
-    lastMethod = ['sum', 'avg', 'weighted_avg'].includes(link.aggregationMethod) ? link.aggregationMethod : lastMethod
+    linkEntries.push({
+      value,
+      weight: safeNumber(link.contributionWeight) ?? safeNumber(link.collaboratorWeight) ?? safeNumber(link.scopeWeight) ?? 0,
+      method: link.aggregationMethod ?? 'weighted_avg',
+    })
     snapshot.push({
       linkId: link.id,
       childType: link.childType,
@@ -63,8 +87,8 @@ export const recalculateScopeKPI = async (scopeKpiId: number, triggeredBy?: numb
   }
 
   const aggregatedValue =
-    values.length > 0
-      ? computeAggregate(lastMethod, values, weights)
+    linkEntries.length > 0
+      ? computeAggregatePerLink(linkEntries)
       : safeNumber(scopeKpi.sourceMode === 'mixed' ? scopeKpi.aggregatedActual : scopeKpi.actual) ?? 0
   const finalActualPreview = computeScopeKpiActual({
     sourceMode: scopeKpi.sourceMode,
@@ -91,7 +115,7 @@ export const recalculateScopeKPI = async (scopeKpiId: number, triggeredBy?: numb
         children: snapshot,
       }),
       aggregatedValue,
-      values.length > 0
+      linkEntries.length > 0
         ? scopeKpi.sourceMode === 'mixed'
           ? 'Recalculo mixed completado'
           : 'Recalculo completado'
@@ -117,3 +141,29 @@ export const recalculateScopeKPI = async (scopeKpiId: number, triggeredBy?: numb
 }
 
 export const recalculateMacroKPI = recalculateScopeKPI
+
+// BFS hacia arriba en la cadena scope→scope.
+// Recalcula todos los scope KPIs padre del scopeKpiId recibido y propaga a OKRs.
+export const recalcParentScopeKPIs = async (
+  scopeKpiId: number,
+  onOkrPropagation?: (sid: number) => void
+) => {
+  const visited = new Set<number>([scopeKpiId])
+  let frontier = [scopeKpiId]
+  while (frontier.length > 0) {
+    const ph = frontier.map(() => '?').join(',')
+    const [parentRows] = await pool.query<any[]>(
+      `SELECT DISTINCT scopeKpiId FROM scope_kpi_links WHERE childScopeKpiId IN (${ph})`,
+      frontier
+    )
+    frontier = []
+    for (const row of Array.isArray(parentRows) ? parentRows : []) {
+      if (!visited.has(row.scopeKpiId)) {
+        visited.add(row.scopeKpiId)
+        frontier.push(row.scopeKpiId)
+        await recalculateScopeKPI(row.scopeKpiId)
+        onOkrPropagation?.(row.scopeKpiId)
+      }
+    }
+  }
+}
