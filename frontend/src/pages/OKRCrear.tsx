@@ -175,6 +175,14 @@ export default function OKRCrear() {
     }))
   }
 
+  const getKrWeightWarning = (drafts: KRDraft[]) => {
+    const validKrs = drafts.filter((kr) => kr.title.trim())
+    if (validKrs.length <= 1) return null
+    const totalKrWeight = validKrs.reduce((sum, kr) => sum + Number(kr.weight ?? 0), 0)
+    if (Math.abs(totalKrWeight - 100) <= 0.5) return null
+    return `Advertencia: la suma de los pesos de los KRs es ${totalKrWeight.toFixed(0)}%. Se va a guardar igual, pero se recomienda dejarla en 100% cuando termines de redistribuirlos.`
+  }
+
   const createMutation = useMutation(
     async () => {
       const objRes = await api.post('/okr', {
@@ -267,7 +275,7 @@ export default function OKRCrear() {
 
   const isSubmitting = createMutation.isLoading || editMutation.isLoading
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setKrErrors({})
@@ -312,13 +320,9 @@ export default function OKRCrear() {
       return
     }
 
-    const validKrs = krs.filter((kr) => kr.title.trim())
-    if (validKrs.length > 1) {
-      const totalKrWeight = validKrs.reduce((sum, kr) => sum + Number(kr.weight ?? 0), 0)
-      if (Math.abs(totalKrWeight - 100) > 0.5) {
-        setError(`La suma de los pesos de los KRs debe ser 100% (actualmente: ${totalKrWeight.toFixed(0)}%)`)
-        return
-      }
+    const krWeightWarning = getKrWeightWarning(krs)
+    if (krWeightWarning) {
+      await dialog.alert(krWeightWarning, { title: 'Advertencia de pesos', variant: 'warning' })
     }
 
     if (isEdit) {
@@ -584,7 +588,7 @@ export default function OKRCrear() {
               )}
 
               <div className="form-group form-group--small">
-                <label title="Porcentaje de peso de este KR en el objetivo. La suma de todos los KRs debe ser 100%.">
+                <label title="Porcentaje de peso de este KR en el objetivo. Se recomienda que la suma de todos los KRs sea 100%.">
                   Peso relativo (%) ⓘ
                 </label>
                 <input
@@ -596,7 +600,7 @@ export default function OKRCrear() {
                   onChange={(e) => updateKR(kr.tempId, 'weight', e.target.value)}
                 />
                 <small className="form-hint">
-                  Ingresá el porcentaje (1–100). La suma de todos los KRs debe ser 100%.
+                  Ingresá el porcentaje (1–100). Idealmente la suma total de KRs debería quedar en 100%.
                 </small>
               </div>
             </div>

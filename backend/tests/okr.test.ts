@@ -241,6 +241,15 @@ describe('calcObjectiveProgress — promedio ponderado', () => {
     assert.equal(calcObjectiveProgress(krs), 75)
   })
 
+  test('normaliza correctamente aunque los pesos no sumen 100%', () => {
+    const krs = [
+      kr({ startValue: 0, targetValue: 100, currentValue: 20, weight: 0.2 }), // 20%
+      kr({ startValue: 0, targetValue: 100, currentValue: 80, weight: 0.6 }), // 80%
+    ]
+    // (20*0.2 + 80*0.6) / (0.2+0.6) = 52/0.8 = 65%
+    assert.equal(calcObjectiveProgress(krs), 65)
+  })
+
   test('redondea al entero más cercano', () => {
     const krs = [
       kr({ startValue: 0, targetValue: 3, currentValue: 1, weight: 1 }), // 33.33%

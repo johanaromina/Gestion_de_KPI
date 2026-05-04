@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import api from '../services/api'
+import { useDialog } from '../components/Dialog'
 import { resolveDirection, calculateVariationPercent } from '../utils/kpi'
 import './OKRDetalle.css'
 
@@ -118,6 +119,7 @@ export default function OKRDetalle() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const dialog = useDialog()
 
   const [selectedKR, setSelectedKR] = useState<number | null>(null)
   const [checkInValue, setCheckInValue] = useState('')
@@ -293,7 +295,17 @@ export default function OKRDetalle() {
     )
   }
 
-  const saveKrEdit = (krId: number) => {
+  const getKrWeightWarning = (krId: number, nextWeight: number) => {
+    if (!objective?.keyResults || objective.keyResults.length <= 1) return null
+    const othersWeight = objective.keyResults
+      .filter((kr: any) => kr.id !== krId)
+      .reduce((sum: number, kr: any) => sum + Math.round((kr.weight ?? 1) * 100), 0)
+    const totalKrWeight = othersWeight + nextWeight
+    if (Math.abs(totalKrWeight - 100) <= 0.5) return null
+    return `Advertencia: la suma de los pesos de los KRs es ${totalKrWeight.toFixed(0)}%. Se va a guardar igual, pero se recomienda dejarla en 100% cuando termines de redistribuirlos.`
+  }
+
+  const saveKrEdit = async (krId: number) => {
     if (!krEditDraft) return
     const w = Number(krEditDraft.weight)
     if (w <= 0 || w > 100) {
@@ -312,15 +324,9 @@ export default function OKRDetalle() {
         return
       }
     }
-    if (objective?.keyResults && objective.keyResults.length > 1) {
-      const othersWeight = objective.keyResults
-        .filter((kr: any) => kr.id !== krId)
-        .reduce((sum: number, kr: any) => sum + Math.round((kr.weight ?? 1) * 100), 0)
-      const totalKrWeight = othersWeight + w
-      if (Math.abs(totalKrWeight - 100) > 0.5) {
-        setKrEditError(`La suma de los pesos de los KRs debe ser 100% (actualmente: ${totalKrWeight.toFixed(0)}%)`)
-        return
-      }
+    const krWeightWarning = getKrWeightWarning(krId, w)
+    if (krWeightWarning) {
+      await dialog.alert(krWeightWarning, { title: 'Advertencia de pesos', variant: 'warning' })
     }
     setKrEditError(null)
     updateKrMutation.mutate({
@@ -682,7 +688,7 @@ export default function OKRDetalle() {
                   )}
 
                   <div className="kr-edit-field">
-                    <label title="Porcentaje de peso de este KR. La suma de todos los KRs del objetivo debe ser 100%.">
+                    <label title="Porcentaje de peso de este KR. Se recomienda que la suma de todos los KRs del objetivo sea 100%.">
                       Peso relativo (%) ⓘ
                     </label>
                     <input

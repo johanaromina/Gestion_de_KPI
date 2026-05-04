@@ -441,14 +441,6 @@ export const createKeyResult = async (
 ): Promise<number> => {
   const w = Number(data.weight ?? 1)
   if (w <= 0 || w > 1) throw new Error('El peso del KR debe estar entre 0,01 y 1,00')
-  const [existingKrs] = await pool.query<any[]>(
-    `SELECT weight FROM okr_key_results WHERE objectiveId = ?`,
-    [data.objectiveId]
-  )
-  const existingTotal = (Array.isArray(existingKrs) ? existingKrs : []).reduce((s, r) => s + Number(r.weight ?? 0), 0)
-  if (existingKrs && (existingKrs as any[]).length > 0 && Math.abs(existingTotal + w - 1) > 0.005) {
-    throw new Error(`La suma de los pesos de los KRs debe ser 100% (actualmente ${Math.round(existingTotal * 100)}%, agregando ${Math.round(w * 100)}%)`)
-  }
   const [result] = await pool.query<any>(
     `INSERT INTO okr_key_results
        (objectiveId, title, krType, startValue, targetValue, currentValue, unit,
@@ -480,17 +472,6 @@ export const updateKeyResult = async (
   if (data.weight !== undefined) {
     const w = Number(data.weight)
     if (w <= 0 || w > 1) throw new Error('El peso del KR debe estar entre 0,01 y 1,00')
-    const [sibling] = await pool.query<any[]>(
-      `SELECT kr.objectiveId, SUM(other.weight) AS othersTotal
-       FROM okr_key_results kr
-       JOIN okr_key_results other ON other.objectiveId = kr.objectiveId AND other.id != kr.id
-       WHERE kr.id = ?
-       GROUP BY kr.objectiveId`,
-      [id]
-    )
-    if (Array.isArray(sibling) && sibling[0] && Math.abs(Number(sibling[0].othersTotal ?? 0) + w - 1) > 0.005) {
-      throw new Error(`La suma de los pesos de los KRs debe ser 100% (actualmente: ${Math.round((Number(sibling[0].othersTotal ?? 0) + w) * 100)}%)`)
-    }
   }
   const fields: string[] = []
   const params: any[] = []
