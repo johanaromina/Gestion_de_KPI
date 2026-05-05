@@ -289,15 +289,16 @@ export const createObjective = async (
 
 export const updateObjective = async (
   id: number,
-  data: Partial<Pick<OKRObjective, 'title' | 'description' | 'parentId' | 'orgScopeId' | 'status'>>
+  data: Partial<Pick<OKRObjective, 'title' | 'description' | 'parentId' | 'orgScopeId' | 'ownerId' | 'status'>>
 ): Promise<void> => {
   const fields: string[] = []
   const params: any[] = []
 
   if (data.title !== undefined) { fields.push('title = ?'); params.push(data.title) }
-
+  if (data.description !== undefined) { fields.push('description = ?'); params.push(data.description) }
   if (data.parentId !== undefined) { fields.push('parentId = ?'); params.push(data.parentId) }
   if (data.orgScopeId !== undefined) { fields.push('orgScopeId = ?'); params.push(data.orgScopeId) }
+  if (data.ownerId !== undefined) { fields.push('ownerId = ?'); params.push(data.ownerId) }
   if (data.status !== undefined) { fields.push('status = ?'); params.push(data.status) }
 
   if (fields.length === 0) return

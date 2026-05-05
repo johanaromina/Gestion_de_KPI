@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from 'react-query'
 import api from '../services/api'
 import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
@@ -18,17 +18,40 @@ interface PeriodFormProps {
   onSuccess?: () => void
 }
 
+const toDateInputValue = (value?: string | Date | null): string => {
+  if (!value) return ''
+  if (typeof value === 'string') {
+    const match = value.match(/^(\d{4}-\d{2}-\d{2})/)
+    if (match) return match[1]
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return ''
+    return `${parsed.getUTCFullYear()}-${String(parsed.getUTCMonth() + 1).padStart(2, '0')}-${String(parsed.getUTCDate()).padStart(2, '0')}`
+  }
+  if (Number.isNaN(value.getTime())) return ''
+  return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, '0')}-${String(value.getUTCDate()).padStart(2, '0')}`
+}
+
 export default function PeriodForm({ period, onClose, onSuccess }: PeriodFormProps) {
   const [formData, setFormData] = useState<Period>({
     name: period?.name || '',
-    startDate: period?.startDate || '',
-    endDate: period?.endDate || '',
+    startDate: toDateInputValue(period?.startDate),
+    endDate: toDateInputValue(period?.endDate),
     status: period?.status || 'open',
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const queryClient = useQueryClient()
+
+  useEffect(() => {
+    setFormData({
+      name: period?.name || '',
+      startDate: toDateInputValue(period?.startDate),
+      endDate: toDateInputValue(period?.endDate),
+      status: period?.status || 'open',
+    })
+    setErrors({})
+  }, [period])
 
   const createMutation = useMutation(
     async (data: Period) => {

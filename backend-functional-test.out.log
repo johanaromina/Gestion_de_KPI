@@ -1,0 +1,17 @@
+🚀 Server running on port 5000
+📡 Health check: http://localhost:5000/api/health
+
+📋 API Endpoints:
+   POST   /api/auth/login
+   GET    /api/auth/me
+   GET    /api/collaborators
+   GET    /api/periods
+   GET    /api/kpis
+   GET    /api/collaborator-kpis
+   GET    /api/collaborator-kpis/collaborator/:id
+
+🔌 Testing database connection...
+Database connected successfully
+✅ Database connection successful
+
+Database connected successfully

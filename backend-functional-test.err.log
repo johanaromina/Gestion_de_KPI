@@ -1,0 +1,2 @@
+??  ADVERTENCIA: JWT_SECRET no esta configurado. Usando clave por defecto (solo para desarrollo).
+??  En produccion, configura JWT_SECRET en el archivo .env

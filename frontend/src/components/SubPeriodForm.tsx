@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from 'react-query'
 import api from '../services/api'
 import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
@@ -22,6 +22,19 @@ interface SubPeriodFormProps {
   onSuccess?: () => void
 }
 
+const toDateInputValue = (value?: string | Date | null): string => {
+  if (!value) return ''
+  if (typeof value === 'string') {
+    const match = value.match(/^(\d{4}-\d{2}-\d{2})/)
+    if (match) return match[1]
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return ''
+    return `${parsed.getUTCFullYear()}-${String(parsed.getUTCMonth() + 1).padStart(2, '0')}-${String(parsed.getUTCDate()).padStart(2, '0')}`
+  }
+  if (Number.isNaN(value.getTime())) return ''
+  return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, '0')}-${String(value.getUTCDate()).padStart(2, '0')}`
+}
+
 export default function SubPeriodForm({
   periodId,
   calendarProfileId,
@@ -33,14 +46,26 @@ export default function SubPeriodForm({
     periodId: subPeriod?.periodId || periodId,
     calendarProfileId: subPeriod?.calendarProfileId ?? calendarProfileId ?? null,
     name: subPeriod?.name || '',
-    startDate: subPeriod?.startDate || '',
-    endDate: subPeriod?.endDate || '',
+    startDate: toDateInputValue(subPeriod?.startDate),
+    endDate: toDateInputValue(subPeriod?.endDate),
     weight: subPeriod?.weight || 0,
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const queryClient = useQueryClient()
+
+  useEffect(() => {
+    setFormData({
+      periodId: subPeriod?.periodId || periodId,
+      calendarProfileId: subPeriod?.calendarProfileId ?? calendarProfileId ?? null,
+      name: subPeriod?.name || '',
+      startDate: toDateInputValue(subPeriod?.startDate),
+      endDate: toDateInputValue(subPeriod?.endDate),
+      weight: subPeriod?.weight || 0,
+    })
+    setErrors({})
+  }, [subPeriod, periodId, calendarProfileId])
 
   const createMutation = useMutation(
     async (data: SubPeriod) => {

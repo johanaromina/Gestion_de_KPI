@@ -229,6 +229,7 @@ export default function OKRCrear() {
         title,
         description: description || null,
         orgScopeId: orgScopeId ? Number(orgScopeId) : null,
+        ownerId: Number(ownerId),
         parentId: parentId ? Number(parentId) : null,
         status,
       })
