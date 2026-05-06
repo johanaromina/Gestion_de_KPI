@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import {
   closeScopeKPI,
+  copyScopeKPI,
   createScopeKPI,
   createScopeKPILink,
   deleteScopeKPI,
@@ -29,6 +30,7 @@ router.get('/:id/aggregation-runs', getScopeKPIAggregationRuns)
 router.put('/:id', updateScopeKPI)
 router.delete('/:id', deleteScopeKPI)
 router.post('/:id/recalculate', recalculateScopeKPIController)
+router.post('/:id/copy', copyScopeKPI)
 router.post('/:id/close', closeScopeKPI)
 router.post('/:id/reopen', reopenScopeKPI)
 router.get('/:id/links', getScopeKPILinks)

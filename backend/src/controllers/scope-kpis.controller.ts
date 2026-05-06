@@ -215,6 +215,172 @@ export const deleteScopeKPI = async (req: Request, res: Response) => {
   }
 }
 
+export const copyScopeKPI = async (req: Request, res: Response) => {
+  try {
+    if (!isConfigUser(req)) {
+      return res.status(403).json({ error: 'No autorizado' })
+    }
+
+    const sourceId = Number(req.params.id)
+    const { targetScopeIds, copyLinks = false } = req.body
+
+    if (!Array.isArray(targetScopeIds) || targetScopeIds.length === 0) {
+      return res.status(400).json({ error: 'targetScopeIds debe ser un array no vacío' })
+    }
+
+    const source = await getScopeKPIByIdOrThrow(sourceId)
+    const normalizedTargetScopeIds = Array.from(
+      new Set(
+        targetScopeIds
+          .map((rawId: unknown) => Number(rawId))
+          .filter((scopeId) => Number.isFinite(scopeId) && scopeId > 0)
+      )
+    )
+    if (normalizedTargetScopeIds.length === 0) {
+      return res.status(400).json({ error: 'targetScopeIds no contiene IDs válidos' })
+    }
+
+    const [scopeRows] = await pool.query<any[]>(
+      `SELECT id, name, type
+       FROM org_scopes
+       WHERE id IN (${buildPlaceholders(normalizedTargetScopeIds.length + 1)})`,
+      [Number(source.orgScopeId), ...normalizedTargetScopeIds]
+    )
+    const scopeById = new Map((Array.isArray(scopeRows) ? scopeRows : []).map((row) => [Number(row.id), row]))
+    const sourceScope = scopeById.get(Number(source.orgScopeId))
+    if (!sourceScope) {
+      return res.status(404).json({ error: 'Scope origen no encontrado' })
+    }
+
+    // Only copy scope→scope links; collaborator links belong to the other team's assignments
+    let links: any[] = []
+    if (copyLinks) {
+      const [linkRows] = await pool.query<any[]>(
+        `SELECT l.*,
+                skChild.kpiId AS childKpiId,
+                skChild.orgScopeId AS childOrgScopeId,
+                skChild.periodId AS childPeriodId,
+                skChild.subPeriodId AS childSubPeriodId
+         FROM scope_kpi_links l
+         JOIN scope_kpis skChild ON skChild.id = l.childScopeKpiId
+         WHERE l.scopeKpiId = ? AND l.childType = 'scope'
+         ORDER BY l.sortOrder, l.id`,
+        [sourceId]
+      )
+      links = Array.isArray(linkRows) ? linkRows : []
+    }
+
+    const childLinkTargetCache = new Map<string, number | null>()
+    const results: {
+      orgScopeId: number
+      status: 'created' | 'skipped'
+      newId?: number
+      reason?: string
+      copiedLinksCount?: number
+      skippedLinksCount?: number
+    }[] = []
+
+    for (const rawScopeId of normalizedTargetScopeIds) {
+      const orgScopeId = Number(rawScopeId)
+      if (orgScopeId === source.orgScopeId) {
+        results.push({ orgScopeId, status: 'skipped', reason: 'Es el equipo origen' })
+        continue
+      }
+
+      const targetScope = scopeById.get(orgScopeId)
+      if (!targetScope) {
+        results.push({ orgScopeId, status: 'skipped', reason: 'El scope destino no existe' })
+        continue
+      }
+
+      if (targetScope.type !== sourceScope.type) {
+        results.push({ orgScopeId, status: 'skipped', reason: 'El destino no es del mismo tipo que el origen' })
+        continue
+      }
+
+      const [existing] = await pool.query<any[]>(
+        `SELECT id FROM scope_kpis
+         WHERE kpiId = ? AND orgScopeId = ? AND periodId = ?
+            AND (subPeriodId <=> ?)`,
+        [source.kpiId, orgScopeId, source.periodId, source.subPeriodId ?? null]
+      )
+        if (Array.isArray(existing) && existing.length > 0) {
+          results.push({ orgScopeId, status: 'skipped', reason: 'Ya existe un KPI grupal con esa combinación' })
+          continue
+        }
+
+      const newId = await createScopeKPIRecord({
+        name: source.name,
+        description: source.description ?? null,
+        kpiId: source.kpiId,
+        orgScopeId,
+        periodId: source.periodId,
+        subPeriodId: source.subPeriodId ?? null,
+        ownerLevel: source.ownerLevel,
+        sourceMode: source.sourceMode,
+        mixedConfig: source.mixedConfig ?? null,
+        target: source.target,
+        weight: source.weight,
+        status: 'draft',
+        inputMode: source.inputMode || 'manual',
+        curationStatus: 'pending',
+      })
+
+      let copiedLinksCount = 0
+      let skippedLinksCount = 0
+
+      if (copyLinks && links.length > 0) {
+        for (const link of links) {
+          // Solo se remapean hijos scope que pertenecen al mismo ámbito que el origen.
+          // Si apuntan a otro scope, no hay equivalencia segura para el nuevo destino.
+          if (Number(link.childOrgScopeId) !== Number(source.orgScopeId)) {
+            skippedLinksCount += 1
+            continue
+          }
+
+          const cacheKey = [link.childKpiId, orgScopeId, link.childPeriodId, link.childSubPeriodId ?? 'null'].join(':')
+          let targetChildScopeKpiId = childLinkTargetCache.get(cacheKey)
+
+          if (targetChildScopeKpiId === undefined) {
+            const [targetChildRows] = await pool.query<any[]>(
+              `SELECT id
+               FROM scope_kpis
+               WHERE kpiId = ? AND orgScopeId = ? AND periodId = ?
+                 AND (subPeriodId <=> ?)
+               LIMIT 1`,
+              [link.childKpiId, orgScopeId, link.childPeriodId, link.childSubPeriodId ?? null]
+            )
+            targetChildScopeKpiId = Array.isArray(targetChildRows) && targetChildRows[0]
+              ? Number(targetChildRows[0].id)
+              : null
+            childLinkTargetCache.set(cacheKey, targetChildScopeKpiId)
+          }
+
+          if (!targetChildScopeKpiId) {
+            skippedLinksCount += 1
+            continue
+          }
+
+          await pool.query(
+            `INSERT INTO scope_kpi_links
+             (scopeKpiId, childType, childScopeKpiId, contributionWeight, aggregationMethod, sortOrder)
+             VALUES (?, 'scope', ?, ?, ?, ?)`,
+            [newId, targetChildScopeKpiId, link.contributionWeight ?? null, link.aggregationMethod || 'weighted_avg', link.sortOrder || 0]
+          )
+          copiedLinksCount += 1
+        }
+      }
+
+      results.push({ orgScopeId, status: 'created', newId, copiedLinksCount, skippedLinksCount })
+    }
+
+    res.status(201).json({ results })
+  } catch (error: any) {
+    console.error('Error copying scope KPI:', error)
+    res.status(error?.message === 'Scope KPI no encontrado' ? 404 : 500).json({ error: error?.message || 'Error al copiar KPI grupal' })
+  }
+}
+
 export const closeScopeKPI = async (req: Request, res: Response) => {
   try {
     if (!isConfigUser(req)) {

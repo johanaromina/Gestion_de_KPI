@@ -5,6 +5,7 @@ import api from '../services/api'
 import ScopeKPIForm from '../components/ScopeKPIForm'
 import ScopeKPIDetailModal from '../components/ScopeKPIDetailModal'
 import ScopeKPILinksForm from '../components/ScopeKPILinksForm'
+import CopyScopeKPIModal from '../components/CopyScopeKPIModal'
 import { ScopeKPI } from '../types'
 import './Asignaciones.css'
 
@@ -18,6 +19,7 @@ export default function AsignacionesScope() {
   const [showForm, setShowForm] = useState(false)
   const [linksScopeKpi, setLinksScopeKpi] = useState<ScopeKPI | null>(null)
   const [detailScopeKpi, setDetailScopeKpi] = useState<ScopeKPI | null>(null)
+  const [copyingScopeKpi, setCopyingScopeKpi] = useState<ScopeKPI | null>(null)
 
   const { data: periods } = useQuery('periods', async () => (await api.get('/periods')).data)
   const { data: orgScopes } = useQuery('org-scopes', async () => (await api.get('/org-scopes')).data)
@@ -182,6 +184,9 @@ export default function AsignacionesScope() {
                       <button type="button" className="action-button approve" onClick={() => setLinksScopeKpi(item)}>
                         Links
                       </button>
+                      <button type="button" className="action-button edit" onClick={() => setCopyingScopeKpi(item)}>
+                        Copiar
+                      </button>
                       <button type="button" className="action-button view" onClick={() => actionMutation.mutate({ id: item.id, action: 'recalculate' })}>
                         Recalcular
                       </button>
@@ -225,6 +230,12 @@ export default function AsignacionesScope() {
           scopeKpiId={detailScopeKpi.id}
           initialScopeKpi={detailScopeKpi}
           onClose={() => setDetailScopeKpi(null)}
+        />
+      )}
+      {copyingScopeKpi && (
+        <CopyScopeKPIModal
+          scopeKpi={copyingScopeKpi}
+          onClose={() => setCopyingScopeKpi(null)}
         />
       )}
     </div>
