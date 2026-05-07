@@ -27,14 +27,61 @@ Mario López,,Analista,collaborator,Ventas Sur`
 
 // ── Parser CSV simple ────────────────────────────────────────────────────────
 
+function detectCsvDelimiter(headerLine: string) {
+  const counts = [
+    { delimiter: ',', count: (headerLine.match(/,/g) || []).length },
+    { delimiter: ';', count: (headerLine.match(/;/g) || []).length },
+    { delimiter: '\t', count: (headerLine.match(/\t/g) || []).length },
+  ]
+  return counts.sort((a, b) => b.count - a.count)[0]?.count ? counts.sort((a, b) => b.count - a.count)[0].delimiter : ','
+}
+
+function splitCsvLine(line: string, delimiter: string): string[] {
+  const cells: string[] = []
+  let current = ''
+  let inQuotes = false
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"'
+        i++
+      } else {
+        inQuotes = !inQuotes
+      }
+      continue
+    }
+
+    if (char === delimiter && !inQuotes) {
+      cells.push(current.trim())
+      current = ''
+      continue
+    }
+
+    current += char
+  }
+
+  cells.push(current.trim())
+  return cells
+}
+
 function parseCsv(text: string): string[][] {
-  return text
+  const normalized = text
+    .replace(/^\uFEFF/, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+
+  const lines = normalized
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
-    .map((line) =>
-      line.split(',').map((cell) => cell.trim().replace(/^"|"$/g, ''))
-    )
+
+  if (lines.length === 0) return []
+
+  const delimiter = detectCsvDelimiter(lines[0])
+  return lines.map((line) => splitCsvLine(line, delimiter))
 }
 
 function downloadTemplate(content: string, filename: string) {
@@ -209,6 +256,7 @@ export default function ImportarDatos() {
         <div className="import-section">
           <div className="import-info-box">
             <p><strong>Formato esperado:</strong> archivo CSV con columnas <code>nombre, tipo, area_padre</code></p>
+            <p>Separador aceptado: coma (<code>,</code>) o punto y coma (<code>;</code>).</p>
             <p>Tipos válidos: <code>company</code> · <code>area</code> · <code>team</code> · <code>business_unit</code></p>
             <p>Dejá <code>area_padre</code> vacío para los nodos raíz. El orden no importa: el sistema resuelve la jerarquía.</p>
             <button className="btn-download-template" onClick={() => downloadTemplate(AREA_TEMPLATE, 'plantilla_areas.csv')}>
