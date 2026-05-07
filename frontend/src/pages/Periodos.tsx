@@ -11,6 +11,26 @@ import { useAuth } from '../hooks/useAuth'
 import { useDialog } from '../components/Dialog'
 import './Periodos.css'
 
+const toCalendarDate = (value?: string | Date | null): Date | null => {
+  if (!value) return null
+  if (typeof value === 'string') {
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/)
+    if (match) {
+      return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+    }
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return null
+    return new Date(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate())
+  }
+  if (Number.isNaN(value.getTime())) return null
+  return new Date(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate())
+}
+
+const formatCalendarDate = (value?: string | Date | null) => {
+  const parsed = toCalendarDate(value)
+  return parsed ? format(parsed, 'dd MMM yyyy') : '—'
+}
+
 function SubPeriodsSection({
   period,
   expanded,
@@ -117,8 +137,8 @@ function SubPeriodsSection({
             {data.map((subPeriod) => (
               <tr key={subPeriod.id}>
                 <td>{subPeriod.name}</td>
-                <td>{format(new Date(subPeriod.startDate), 'dd MMM yyyy')}</td>
-                <td>{format(new Date(subPeriod.endDate), 'dd MMM yyyy')}</td>
+                <td>{formatCalendarDate(subPeriod.startDate)}</td>
+                <td>{formatCalendarDate(subPeriod.endDate)}</td>
                 <td>{subPeriod.weight ? `${subPeriod.weight}%` : '-'}</td>
                 <td>{getStatusBadge(subPeriod.status)}</td>
                 <td className="row-actions">
@@ -427,13 +447,13 @@ export default function Periodos() {
         !searchTerm || period.name.toLowerCase().includes(searchTerm.toLowerCase())
       const matchesStatus = !filterStatus || period.status === filterStatus
 
-      const start = new Date(period.startDate).getTime()
-      const end = new Date(period.endDate).getTime()
-      const filterStart = filterStartDate ? new Date(filterStartDate).getTime() : null
-      const filterEnd = filterEndDate ? new Date(filterEndDate).getTime() : null
+      const start = toCalendarDate(period.startDate)?.getTime() ?? null
+      const end = toCalendarDate(period.endDate)?.getTime() ?? null
+      const filterStart = filterStartDate ? toCalendarDate(filterStartDate)?.getTime() ?? null : null
+      const filterEnd = filterEndDate ? toCalendarDate(filterEndDate)?.getTime() ?? null : null
 
-      const matchesStart = filterStart ? start >= filterStart : true
-      const matchesEnd = filterEnd ? end <= filterEnd : true
+      const matchesStart = filterStart !== null && start !== null ? start >= filterStart : true
+      const matchesEnd = filterEnd !== null && end !== null ? end <= filterEnd : true
 
       return matchesSearch && matchesStatus && matchesStart && matchesEnd
     })
@@ -572,8 +592,8 @@ export default function Periodos() {
                         <div className="period-info">
                           <h3 className="period-name">{period.name}</h3>
                           <div className="period-dates">
-                            {format(new Date(period.startDate), 'dd MMM yyyy')} —{' '}
-                            {format(new Date(period.endDate), 'dd MMM yyyy')}
+                            {formatCalendarDate(period.startDate)} —{' '}
+                            {formatCalendarDate(period.endDate)}
                           </div>
                           <div className="period-meta">
                             <span className="meta-pill">Estado: {getStatusBadge(period.status)}</span>
