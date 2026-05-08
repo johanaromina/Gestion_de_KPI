@@ -268,6 +268,11 @@
   margin: 0 0 4px;
 }
 
+.import-result-note {
+  margin-top: 10px;
+  font-weight: 600;
+}
+
 .import-result ul {
   margin: 6px 0 0 16px;
   padding: 0;

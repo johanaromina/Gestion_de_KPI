@@ -9,6 +9,8 @@ type AreaRow = { name: string; type: string; parentName: string; _errors?: strin
 type ColabRow = { name: string; email: string; position: string; role: string; areaName: string; _errors?: string[] }
 
 type ImportError = { row: number; message: string }
+type ImportResult = { total: number; created: number; errors: ImportError[] }
+type ImportResponse = { total?: number; created?: number; errors?: ImportError[]; _submittedCount?: number }
 
 const AREA_TYPES = ['company', 'area', 'team', 'business_unit']
 const AREA_TYPE_LABEL: Record<string, string> = { company: 'Empresa', area: 'Área', team: 'Equipo', business_unit: 'Unidad de negocio' }
@@ -94,6 +96,18 @@ function downloadTemplate(content: string, filename: string) {
   URL.revokeObjectURL(url)
 }
 
+function buildImportResult(total: number, data?: ImportResponse | null): ImportResult {
+  return {
+    total,
+    created: Number(data?.created || 0),
+    errors: Array.isArray(data?.errors) ? data.errors : [],
+  }
+}
+
+function getRejectedCount(result: ImportResult) {
+  return Math.max(result.total - result.created, result.errors.length)
+}
+
 // ── Componente principal ─────────────────────────────────────────────────────
 
 export default function ImportarDatos() {
@@ -101,12 +115,12 @@ export default function ImportarDatos() {
 
   // Areas
   const [areaRows, setAreaRows] = useState<AreaRow[]>([])
-  const [areaResult, setAreaResult] = useState<{ created: number; errors: ImportError[] } | null>(null)
+  const [areaResult, setAreaResult] = useState<ImportResult | null>(null)
   const areaInputRef = useRef<HTMLInputElement>(null)
 
   // Colaboradores
   const [colabRows, setColabRows] = useState<ColabRow[]>([])
-  const [colabResult, setColabResult] = useState<{ created: number; errors: ImportError[] } | null>(null)
+  const [colabResult, setColabResult] = useState<ImportResult | null>(null)
   const colabInputRef = useRef<HTMLInputElement>(null)
 
   // ── Parsear CSV de áreas ──────────────────────────────────────────────────
@@ -186,39 +200,49 @@ export default function ImportarDatos() {
 
   const importAreasMutation = useMutation(
     async () => {
+      const submittedCount = areaRows.length
       const res = await api.post('/org-scopes/import', {
         rows: areaRows.map(({ name, type, parentName }) => ({ name, type: type || 'area', parentName: parentName || undefined })),
       })
-      return res.data
+      return { ...res.data, _submittedCount: submittedCount }
     },
     {
-      onSuccess: (data) => {
-        setAreaResult(data)
-        if (data.created > 0) setAreaRows([])
+      onSuccess: (data: ImportResponse) => {
+        const result = buildImportResult(Number(data?._submittedCount || data?.total || areaRows.length), data)
+        setAreaResult(result)
+        if (result.created > 0) setAreaRows([])
       },
       onError: (err: any) => {
-        setAreaResult({ created: 0, errors: [{ row: 0, message: err?.response?.data?.error || 'Error al importar' }] })
+        setAreaResult(buildImportResult(areaRows.length, {
+          created: 0,
+          errors: [{ row: 0, message: err?.response?.data?.error || 'Error al importar' }],
+        }))
       },
     }
   )
 
   const importColabMutation = useMutation(
     async () => {
+      const submittedCount = colabRows.length
       const res = await api.post('/collaborators/import', {
         rows: colabRows.map(({ name, email, position, role, areaName }) => ({
           name, email: email || undefined, position: position || undefined,
           role: role || 'collaborator', areaName: areaName || undefined,
         })),
       })
-      return res.data
+      return { ...res.data, _submittedCount: submittedCount }
     },
     {
-      onSuccess: (data) => {
-        setColabResult(data)
-        if (data.created > 0) setColabRows([])
+      onSuccess: (data: ImportResponse) => {
+        const result = buildImportResult(Number(data?._submittedCount || data?.total || colabRows.length), data)
+        setColabResult(result)
+        if (result.created > 0) setColabRows([])
       },
       onError: (err: any) => {
-        setColabResult({ created: 0, errors: [{ row: 0, message: err?.response?.data?.error || 'Error al importar' }] })
+        setColabResult(buildImportResult(colabRows.length, {
+          created: 0,
+          errors: [{ row: 0, message: err?.response?.data?.error || 'Error al importar' }],
+        }))
       },
     }
   )
@@ -327,8 +351,17 @@ export default function ImportarDatos() {
 
           {areaResult && (
             <div className={`import-result ${areaResult.created > 0 ? 'import-result--success' : 'import-result--partial'}`}>
-              {areaResult.created > 0 && (
-                <p>✅ <strong>{areaResult.created} área{areaResult.created !== 1 ? 's' : ''}</strong> importada{areaResult.created !== 1 ? 's' : ''} correctamente.</p>
+              <p>
+                Resultado: se importaron <strong>{areaResult.created}</strong> de <strong>{areaResult.total}</strong> área
+                {areaResult.total !== 1 ? 's' : ''}.
+              </p>
+              {getRejectedCount(areaResult) > 0 ? (
+                <p>
+                  Quedaron <strong>{getRejectedCount(areaResult)}</strong> fila
+                  {getRejectedCount(areaResult) !== 1 ? 's' : ''} sin importar.
+                </p>
+              ) : (
+                <p>Todo el archivo fue importado correctamente.</p>
               )}
               {areaResult.errors.length > 0 && (
                 <>
@@ -339,6 +372,11 @@ export default function ImportarDatos() {
                     ))}
                   </ul>
                 </>
+              )}
+              {areaResult.created > 0 && areaResult.errors.length > 0 && (
+                <p className="import-result-note">
+                  Las filas válidas ya fueron creadas. Revisá solo las rechazadas antes de volver a importar.
+                </p>
               )}
             </div>
           )}
@@ -421,8 +459,17 @@ export default function ImportarDatos() {
 
           {colabResult && (
             <div className={`import-result ${colabResult.created > 0 ? 'import-result--success' : 'import-result--partial'}`}>
-              {colabResult.created > 0 && (
-                <p>✅ <strong>{colabResult.created} colaborador{colabResult.created !== 1 ? 'es' : ''}</strong> importado{colabResult.created !== 1 ? 's' : ''} correctamente.</p>
+              <p>
+                Resultado: se importaron <strong>{colabResult.created}</strong> de <strong>{colabResult.total}</strong> colaborador
+                {colabResult.total !== 1 ? 'es' : ''}.
+              </p>
+              {getRejectedCount(colabResult) > 0 ? (
+                <p>
+                  Quedaron <strong>{getRejectedCount(colabResult)}</strong> fila
+                  {getRejectedCount(colabResult) !== 1 ? 's' : ''} sin importar.
+                </p>
+              ) : (
+                <p>Todo el archivo fue importado correctamente.</p>
               )}
               {colabResult.errors.length > 0 && (
                 <>
@@ -433,6 +480,11 @@ export default function ImportarDatos() {
                     ))}
                   </ul>
                 </>
+              )}
+              {colabResult.created > 0 && colabResult.errors.length > 0 && (
+                <p className="import-result-note">
+                  Los colaboradores válidos ya fueron creados. Revisá solo las filas rechazadas antes de reimportar.
+                </p>
               )}
             </div>
           )}

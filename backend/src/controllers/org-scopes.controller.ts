@@ -10,6 +10,9 @@ const parseJson = (value: any) => {
   }
 }
 
+const buildOrgScopeImportKey = (name: string, type: string, parentId: number | null) =>
+  `${String(type || 'area').trim().toLowerCase()}::${Number(parentId || 0)}::${String(name || '').trim().toLowerCase()}`
+
 export const listOrgScopes = async (_req: Request, res: Response) => {
   try {
     const [rows] = await pool.query<any[]>(
@@ -108,9 +111,16 @@ export const importOrgScopes = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'No hay filas para importar' })
 
     // Cargar scopes existentes para resolver parentName
-    const [existing] = await pool.query<any[]>('SELECT id, name FROM org_scopes')
+    const [existing] = await pool.query<any[]>('SELECT id, name, type, parentId FROM org_scopes')
     const byName = new Map<string, number>()
-    for (const s of existing as any[]) byName.set(s.name.trim().toLowerCase(), s.id)
+    const existingKeys = new Set<string>()
+    for (const s of existing as any[]) {
+      const normalizedName = s.name.trim().toLowerCase()
+      if (!byName.has(normalizedName)) {
+        byName.set(normalizedName, s.id)
+      }
+      existingKeys.add(buildOrgScopeImportKey(normalizedName, s.type || 'area', s.parentId ?? null))
+    }
 
     const created: number[] = []
     const errors: { row: number; message: string }[] = []
@@ -125,6 +135,8 @@ export const importOrgScopes = async (req: Request, res: Response) => {
           errors.push({ row: item.rowIndex, message: 'Nombre vacío' })
           continue
         }
+        const normalizedName = item.name.trim().toLowerCase()
+        const scopeType = String(item.type || 'area').trim().toLowerCase()
         let parentId: number | null = null
         if (item.parentName?.trim()) {
           const key = item.parentName.trim().toLowerCase()
@@ -135,18 +147,27 @@ export const importOrgScopes = async (req: Request, res: Response) => {
             continue
           }
         }
+        const duplicateKey = buildOrgScopeImportKey(normalizedName, scopeType, parentId)
+        if (existingKeys.has(duplicateKey)) {
+          errors.push({
+            row: item.rowIndex,
+            message: `La unidad "${item.name.trim()}" ya existe con el mismo tipo y padre`,
+          })
+          continue
+        }
         const [r] = await pool.query(
           `INSERT INTO org_scopes (name, type, parentId, active) VALUES (?, ?, ?, 1)`,
-          [item.name.trim(), item.type || 'area', parentId]
+          [item.name.trim(), scopeType, parentId]
         ) as any[]
         const newId = (r as any).insertId
-        byName.set(item.name.trim().toLowerCase(), newId)
+        byName.set(normalizedName, newId)
+        existingKeys.add(duplicateKey)
         created.push(item.rowIndex)
       }
       if (pass === 0) pending.splice(0, pending.length, ...remaining)
     }
 
-    return res.status(201).json({ created: created.length, errors })
+    return res.status(201).json({ total: rows.length, created: created.length, errors })
   } catch (error: any) {
     console.error('Error importando org scopes:', error)
     return res.status(500).json({ error: error?.message || 'Error al importar áreas' })

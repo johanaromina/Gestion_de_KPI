@@ -159,6 +159,17 @@ type CalendarProfile = {
 }
 
 const SETUP_GUIDE_STORAGE_KEY = 'configuracion.setupGuide.hidden'
+const ORG_SCOPE_TYPE_LABELS: Record<string, string> = {
+  company: 'Empresa',
+  area: 'Área',
+  team: 'Equipo',
+  business_unit: 'Unidad de negocio',
+  person: 'Persona',
+  product: 'Producto',
+}
+
+const getOrgScopeTypeLabel = (type?: string) =>
+  ORG_SCOPE_TYPE_LABELS[String(type || '').trim().toLowerCase()] || type || 'Sin tipo'
 
 export default function Configuracion() {
   const { user } = useAuth()
@@ -258,6 +269,8 @@ export default function Configuracion() {
     metadataText: '',
     active: true,
   })
+  const [scopeSearch, setScopeSearch] = useState('')
+  const [scopeTypeFilter, setScopeTypeFilter] = useState('all')
   const [scopeAdvancedOpen, setScopeAdvancedOpen] = useState(false)
   const [scopeMappingSourceType, setScopeMappingSourceType] = useState(DEFAULT_MAPPING_SOURCE_TYPE)
   const [scopeExternalKeysBySourceType, setScopeExternalKeysBySourceType] = useState<Record<string, string>>({
@@ -460,6 +473,34 @@ export default function Configuracion() {
     orgScopes?.forEach((scope) => map.set(scope.id, scope))
     return map
   }, [orgScopes])
+
+  const scopeTypeOptions = useMemo(() => {
+    const uniqueTypes = Array.from(new Set((orgScopes || []).map((scope) => String(scope.type || '').trim()).filter(Boolean)))
+    return uniqueTypes.sort((a, b) => getOrgScopeTypeLabel(a).localeCompare(getOrgScopeTypeLabel(b), 'es'))
+  }, [orgScopes])
+
+  const filteredOrgScopes = useMemo(() => {
+    if (!orgScopes) return []
+    const normalizedSearch = normalizeExternalMatchKey(scopeSearch)
+
+    return orgScopes.filter((scope) => {
+      const matchesType = scopeTypeFilter === 'all' || String(scope.type) === scopeTypeFilter
+      if (!matchesType) return false
+      if (!normalizedSearch) return true
+
+      const parentName = scope.parentId ? scopeById.get(Number(scope.parentId))?.name || '' : ''
+      const searchTokens = [
+        scope.name,
+        scope.type,
+        getOrgScopeTypeLabel(scope.type),
+        parentName,
+      ]
+        .map((value) => normalizeExternalMatchKey(value))
+        .join(' ')
+
+      return searchTokens.includes(normalizedSearch)
+    })
+  }, [orgScopes, scopeById, scopeSearch, scopeTypeFilter])
 
   const collaboratorById = useMemo(() => {
     const map = new Map<number, Collaborator>()
@@ -2909,39 +2950,71 @@ export default function Configuracion() {
               className="btn-primary"
               onClick={() => {
                 setEditingScope(null)
-                  setScopeForm({
-                    name: '',
-                    type: 'area',
-                    parentId: '',
-                    calendarProfileId: '',
-                    metadataText: '',
-                    active: true,
-                  })
-                  setScopeExternalKeysBySourceType({ [DEFAULT_MAPPING_SOURCE_TYPE]: '' })
-                  setScopeMappingSourceType(DEFAULT_MAPPING_SOURCE_TYPE)
-                  setScopeAdvancedOpen(false)
-                  setShowScopeModal(true)
-                }}
+                setScopeForm({
+                  name: '',
+                  type: 'area',
+                  parentId: '',
+                  calendarProfileId: '',
+                  metadataText: '',
+                  active: true,
+                })
+                setScopeExternalKeysBySourceType({ [DEFAULT_MAPPING_SOURCE_TYPE]: '' })
+                setScopeMappingSourceType(DEFAULT_MAPPING_SOURCE_TYPE)
+                setScopeAdvancedOpen(false)
+                setShowScopeModal(true)
+              }}
             >
               Nueva unidad
             </button>
+          </div>
+          <div className="config-table-toolbar">
+            <div className="config-table-filters">
+              <div className="form-group">
+                <label htmlFor="scope-search">Buscar unidad</label>
+                <input
+                  id="scope-search"
+                  type="text"
+                  value={scopeSearch}
+                  onChange={(e) => setScopeSearch(e.target.value)}
+                  placeholder="Nombre, tipo o unidad padre"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="scope-type-filter">Tipo</label>
+                <select
+                  id="scope-type-filter"
+                  value={scopeTypeFilter}
+                  onChange={(e) => setScopeTypeFilter(e.target.value)}
+                >
+                  <option value="all">Todos</option>
+                  {scopeTypeOptions.map((type) => (
+                    <option key={type} value={type}>
+                      {getOrgScopeTypeLabel(type)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="config-table-toolbar-meta">
+              Mostrando {filteredOrgScopes.length} de {orgScopes?.length || 0} unidades
+            </div>
           </div>
           <table className="config-table">
             <thead>
               <tr>
                 <th>Nombre</th>
                 <th>Tipo</th>
-                <th>Parent</th>
+                <th>Unidad padre</th>
                 <th>Estado</th>
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {orgScopes?.map((scope) => (
+              {filteredOrgScopes.map((scope) => (
                 <tr key={scope.id}>
                   <td>{scope.name}</td>
-                  <td>{scope.type}</td>
-                  <td>{scope.parentId || '-'}</td>
+                  <td>{getOrgScopeTypeLabel(scope.type)}</td>
+                  <td>{scope.parentId ? scopeById.get(Number(scope.parentId))?.name || `#${scope.parentId}` : '—'}</td>
                   <td>
                     <span className={`status-pill ${scope.active ? 'ok' : 'review'}`}>
                       {scope.active ? 'Activo' : 'Inactivo'}
@@ -2952,22 +3025,23 @@ export default function Configuracion() {
                       <button
                         className="btn-secondary"
                         onClick={() => {
-                        setEditingScope(scope)
-                        setScopeForm({
-                          name: scope.name || '',
-                          type: scope.type || 'area',
-                          parentId: scope.parentId ? String(scope.parentId) : '',
-                          calendarProfileId: scope.calendarProfileId ? String(scope.calendarProfileId) : '',
-                          metadataText: scope.metadata ? JSON.stringify(scope.metadata, null, 2) : '',
-                          active: Boolean(scope.active),
-                        })
-                        setScopeExternalKeysBySourceType(getEntityExternalKeysBySourceType('org_scope', scope.id))
-                        setScopeMappingSourceType(DEFAULT_MAPPING_SOURCE_TYPE)
-                        // Si ya tiene metadata o alias externos, mostramos la sección avanzada abierta
-                        const hasAdvancedData = !!(scope.metadata || getEntityExternalKeysBySourceType('org_scope', scope.id)[DEFAULT_MAPPING_SOURCE_TYPE])
-                        setScopeAdvancedOpen(hasAdvancedData)
-                        setShowScopeModal(true)
-                      }}
+                          setEditingScope(scope)
+                          setScopeForm({
+                            name: scope.name || '',
+                            type: scope.type || 'area',
+                            parentId: scope.parentId ? String(scope.parentId) : '',
+                            calendarProfileId: scope.calendarProfileId ? String(scope.calendarProfileId) : '',
+                            metadataText: scope.metadata ? JSON.stringify(scope.metadata, null, 2) : '',
+                            active: Boolean(scope.active),
+                          })
+                          setScopeExternalKeysBySourceType(getEntityExternalKeysBySourceType('org_scope', scope.id))
+                          setScopeMappingSourceType(DEFAULT_MAPPING_SOURCE_TYPE)
+                          const hasAdvancedData = !!(
+                            scope.metadata || getEntityExternalKeysBySourceType('org_scope', scope.id)[DEFAULT_MAPPING_SOURCE_TYPE]
+                          )
+                          setScopeAdvancedOpen(hasAdvancedData)
+                          setShowScopeModal(true)
+                        }}
                       >
                         Editar
                       </button>
@@ -2975,8 +3049,8 @@ export default function Configuracion() {
                         className="btn-secondary danger"
                         onClick={async () => {
                           const ok = await dialog.confirm(
-                            `¿Eliminar la unidad "${scope.name}"? Esta acción no se puede deshacer.`,
-                            { title: 'Eliminar unidad', confirmLabel: 'Eliminar', variant: 'danger' }
+                            `¿Seguro que querés eliminar la unidad "${scope.name}" (${getOrgScopeTypeLabel(scope.type)})? Esta acción no se puede deshacer.`,
+                            { title: 'Confirmar eliminación', confirmLabel: 'Eliminar', variant: 'danger' }
                           )
                           if (ok) deleteScope.mutate(scope)
                         }}
@@ -2988,6 +3062,13 @@ export default function Configuracion() {
                   </td>
                 </tr>
               ))}
+              {orgScopes && orgScopes.length > 0 && filteredOrgScopes.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="empty-row">
+                    No hay unidades que coincidan con los filtros actuales.
+                  </td>
+                </tr>
+              )}
               {(!orgScopes || orgScopes.length === 0) && (
                 <tr>
                   <td colSpan={5} className="empty-row">

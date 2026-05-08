@@ -592,7 +592,7 @@ export const importCollaborators = async (req: Request, res: Response) => {
       created.push(newId)
     }
 
-    return res.status(201).json({ created: created.length, errors })
+    return res.status(201).json({ total: rows.length, created: created.length, errors })
   } catch (error: any) {
     console.error('Error importando colaboradores:', error)
     return res.status(500).json({ error: error?.message || 'Error al importar colaboradores' })
