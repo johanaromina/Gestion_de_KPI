@@ -4,6 +4,7 @@ import { CollaboratorKPI, KPIDirection, KPIType } from '../types'
 import { calculateVariation, calculateWeightedResult } from '../utils/kpi-formulas'
 import { AuthRequest } from '../middleware/auth.middleware'
 import { closeKpiRecord, ensureAssignmentEditable, reopenKpiRecord } from '../services/kpi-assignment-shared.service'
+import { getActualValueValidationError } from '../services/kpi-actual-validation.service'
 import { applyMeasurementToCollaboratorAssignment } from '../services/measurement-application.service'
 import { recalcOKRsLinkedToCollaboratorKpi, recalcOKRsLinkedToScopeKpi } from '../services/okr.service'
 import { recalculateScopeKPI } from '../services/scope-kpi-aggregation.service'
@@ -742,10 +743,21 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
       )
 
       if (Array.isArray(ckDataRows) && ckDataRows.length > 0) {
+        const actualValidationError = getActualValueValidationError({
+          actual: Number(actual),
+          direction: ckDataRows[0].direction,
+          type: ckDataRows[0].type,
+          formula: ckDataRows[0].formula,
+        })
+        if (actualValidationError) {
+          return res.status(400).json({ error: actualValidationError })
+        }
+
         const kpiDirection = resolveDirection(ckDataRows[0].direction, ckDataRows[0].type)
         const currentTarget = Number(target ?? ckDataRows[0].target ?? 0)
         const currentWeight = Number(weight ?? ckDataRows[0].weight ?? 0)
         const customFormula = ckDataRows[0].formula || undefined
+        const actualValue = Number(actual)
 
         if (!currentTarget || currentTarget <= 0) {
           return res.status(400).json({
@@ -754,14 +766,14 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
           })
         }
 
-        const variation = calculateVariation(kpiDirection, currentTarget, actual, customFormula)
+        const variation = calculateVariation(kpiDirection, currentTarget, actualValue, customFormula)
         const weightedResult = calculateWeightedResult(variation, currentWeight)
 
         updateQuery += `, actual = ?, variation = ?, weightedResult = ?`
-        params.push(actual, variation, weightedResult)
+        params.push(actualValue, variation, weightedResult)
       } else {
         updateQuery += `, actual = ?`
-        params.push(actual)
+        params.push(Number(actual))
       }
     }
 
@@ -853,16 +865,26 @@ export const updateActualValue = async (req: Request, res: Response) => {
     const periodId = ckRows[0].periodId
 
     const [ckDataRows] = await pool.query<any[]>(
-      `SELECT ck.target, ck.weight, k.type, k.direction 
+      `SELECT ck.target, ck.weight, k.type, k.direction, k.formula
        FROM collaborator_kpis ck
        JOIN kpis k ON ck.kpiId = k.id
        WHERE ck.id = ?`,
       [id]
     )
 
-    const { target, weight, type, direction } = ckDataRows[0]
+    const { target, weight, type, direction, formula } = ckDataRows[0]
     const currentTarget = Number(target ?? 0)
     const currentWeight = Number(weight ?? 0)
+    const actualValidationError = getActualValueValidationError({
+      actual: Number(actual),
+      direction,
+      type,
+      formula,
+    })
+    if (actualValidationError) {
+      return res.status(400).json({ error: actualValidationError })
+    }
+    const actualValue = Number(actual)
 
     if (!currentTarget || currentTarget <= 0) {
       return res.status(400).json({
@@ -876,19 +898,19 @@ export const updateActualValue = async (req: Request, res: Response) => {
       `INSERT INTO kpi_measurements
        (assignmentId, periodId, value, mode, status, capturedBy, criteriaVersionId)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id,
-        periodId,
-        actual,
-        ckRows[0].inputMode || 'manual',
-        'approved',
-        userId,
-        ckRows[0].activeCriteriaVersionId || null,
-      ]
+       [
+         id,
+         periodId,
+         actualValue,
+         ckRows[0].inputMode || 'manual',
+         'approved',
+         userId,
+         ckRows[0].activeCriteriaVersionId || null,
+       ]
     )
     const measurementId = (measurementResult as any)?.insertId
     if (measurementId) {
-      await applyMeasurementToCollaboratorAssignment(Number(id), Number(actual), ckRows[0].inputMode || 'manual', measurementId, ckRows[0].activeCriteriaVersionId || null)
+      await applyMeasurementToCollaboratorAssignment(Number(id), actualValue, ckRows[0].inputMode || 'manual', measurementId, ckRows[0].activeCriteriaVersionId || null)
     }
 
     await recalcSummaryAssignment(ckRows[0].collaboratorId, kpiId, periodId)
@@ -1015,11 +1037,22 @@ export const proposeCollaboratorKPI = async (req: Request, res: Response) => {
       const [kpiRows] = await pool.query<any[]>('SELECT type, direction, formula FROM kpis WHERE id = ?', [assignment.kpiId])
 
       if (Array.isArray(kpiRows) && kpiRows.length > 0) {
+        const actualValidationError = getActualValueValidationError({
+          actual: Number(actual),
+          direction: kpiRows[0].direction,
+          type: kpiRows[0].type,
+          formula: kpiRows[0].formula,
+        })
+        if (actualValidationError) {
+          return res.status(400).json({ error: actualValidationError })
+        }
+
         const kpiDirection = resolveDirection(kpiRows[0].direction, kpiRows[0].type)
         const customFormula = kpiRows[0].formula || undefined
 
         const targetValue = Number(assignment.target ?? 0)
         const weightValue = Number(assignment.weight ?? 0)
+        const actualValue = Number(actual)
 
         if (!targetValue || targetValue <= 0) {
           return res.status(400).json({
@@ -1028,14 +1061,14 @@ export const proposeCollaboratorKPI = async (req: Request, res: Response) => {
           })
         }
 
-        const variation = calculateVariation(kpiDirection, targetValue, actual, customFormula)
+        const variation = calculateVariation(kpiDirection, targetValue, actualValue, customFormula)
         const weightedResult = calculateWeightedResult(variation, weightValue)
 
-        updateData.actual = actual
+        updateData.actual = actualValue
         updateData.variation = variation
         updateData.weightedResult = weightedResult
       } else {
-        updateData.actual = actual
+        updateData.actual = Number(actual)
       }
     }
 

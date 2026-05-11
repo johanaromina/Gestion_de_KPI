@@ -42,6 +42,15 @@ export const calculateVariationPercent = (
   }
 }
 
+export const supportsNegativeActual = (
+  direction?: string | null,
+  formula?: string | null,
+  type?: string | null
+) => {
+  if (formula && formula.trim()) return true
+  return resolveDirection(undefined, direction ?? undefined, type ?? undefined) !== 'reduction'
+}
+
 export const calculateWeightedImpact = (
   variation: number | null,
   kpiWeight?: number | null,

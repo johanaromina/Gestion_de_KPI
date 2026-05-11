@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { pool } from '../config/database'
 import { AuthRequest } from '../middleware/auth.middleware'
+import { getActualValueValidationError } from '../services/kpi-actual-validation.service'
 import {
   applyMeasurementToCollaboratorAssignment,
   applyMeasurementToScopeKpi,
@@ -9,6 +10,34 @@ import {
 import { recalcOKRsLinkedToCollaboratorKpi, recalcOKRsLinkedToScopeKpi } from '../services/okr.service'
 import { recalcScopeKPIsLinkedToAssignment } from '../controllers/collaborator-kpis.controller'
 import { recalcParentScopeKPIs } from '../services/scope-kpi-aggregation.service'
+
+const getMeasurementKpiConfig = async (assignmentId?: number | null, scopeKpiId?: number | null) => {
+  if (assignmentId) {
+    const [rows] = await pool.query<any[]>(
+      `SELECT k.type, k.direction, k.formula
+       FROM collaborator_kpis ck
+       JOIN kpis k ON k.id = ck.kpiId
+       WHERE ck.id = ?
+       LIMIT 1`,
+      [assignmentId]
+    )
+    return Array.isArray(rows) && rows.length > 0 ? rows[0] : null
+  }
+
+  if (scopeKpiId) {
+    const [rows] = await pool.query<any[]>(
+      `SELECT k.type, k.direction, k.formula
+       FROM scope_kpis sk
+       JOIN kpis k ON k.id = sk.kpiId
+       WHERE sk.id = ?
+       LIMIT 1`,
+      [scopeKpiId]
+    )
+    return Array.isArray(rows) && rows.length > 0 ? rows[0] : null
+  }
+
+  return null
+}
 
 export const getMeasurements = async (req: Request, res: Response) => {
   try {
@@ -74,6 +103,19 @@ export const createMeasurement = async (req: Request, res: Response) => {
     }
     if (value === undefined) {
       return res.status(400).json({ error: 'value es requerido' })
+    }
+    const normalizedValue = Number(value)
+    const kpiConfig = await getMeasurementKpiConfig(assignmentId, scopeKpiId)
+    const actualValidationError = kpiConfig
+      ? getActualValueValidationError({
+          actual: normalizedValue,
+          direction: kpiConfig.direction,
+          type: kpiConfig.type,
+          formula: kpiConfig.formula,
+        })
+      : null
+    if (actualValidationError) {
+      return res.status(400).json({ error: actualValidationError })
     }
 
     const userId = (req as AuthRequest).user?.id || null
@@ -142,7 +184,7 @@ export const createMeasurement = async (req: Request, res: Response) => {
         scopeKpiId || null,
         periodId || null,
         subPeriodId || null,
-        value,
+        normalizedValue,
         mode || 'manual',
         status || 'draft',
         userId,
@@ -157,7 +199,7 @@ export const createMeasurement = async (req: Request, res: Response) => {
     const measurementId = insertResult.insertId
 
     if ((status || 'draft') === 'approved' && assignmentId) {
-      await applyMeasurementToCollaboratorAssignment(assignmentId, Number(value), mode || 'manual', measurementId, criteriaVersionId)
+      await applyMeasurementToCollaboratorAssignment(assignmentId, normalizedValue, mode || 'manual', measurementId, criteriaVersionId)
       recalcScopeKPIsLinkedToAssignment(Number(assignmentId)).catch((err) =>
         console.error('[measurements] scope propagation:', err)
       )
@@ -166,7 +208,7 @@ export const createMeasurement = async (req: Request, res: Response) => {
       )
     }
     if ((status || 'draft') === 'approved' && scopeKpiId) {
-      await applyMeasurementToScopeKpi(Number(scopeKpiId), Number(value), mode || 'manual', measurementId)
+      await applyMeasurementToScopeKpi(Number(scopeKpiId), normalizedValue, mode || 'manual', measurementId)
       recalcParentScopeKPIs(Number(scopeKpiId), (sid) =>
         recalcOKRsLinkedToScopeKpi(sid).catch((err) =>
           console.error('[measurements] parent scopeKpi→OKR propagation:', err)
@@ -197,6 +239,19 @@ export const approveMeasurement = async (req: Request, res: Response) => {
     }
 
     const measurement = rows[0]
+    const normalizedValue = Number(measurement.value)
+    const kpiConfig = await getMeasurementKpiConfig(measurement.assignmentId, measurement.scopeKpiId)
+    const actualValidationError = kpiConfig
+      ? getActualValueValidationError({
+          actual: normalizedValue,
+          direction: kpiConfig.direction,
+          type: kpiConfig.type,
+          formula: kpiConfig.formula,
+        })
+      : null
+    if (actualValidationError) {
+      return res.status(400).json({ error: actualValidationError })
+    }
 
     let warning: string | null = null
     if (measurement.assignmentId) {
@@ -240,7 +295,7 @@ export const approveMeasurement = async (req: Request, res: Response) => {
     if (measurement.assignmentId) {
       await applyMeasurementToCollaboratorAssignment(
         measurement.assignmentId,
-        Number(measurement.value),
+        normalizedValue,
         measurement.mode || 'manual',
         measurement.id,
         measurement.criteriaVersionId
@@ -255,7 +310,7 @@ export const approveMeasurement = async (req: Request, res: Response) => {
     if (measurement.scopeKpiId) {
       await applyMeasurementToScopeKpi(
         measurement.scopeKpiId,
-        Number(measurement.value),
+        normalizedValue,
         measurement.mode || 'manual',
         measurement.id
       )

@@ -4,7 +4,7 @@ import { useMutation, useQueryClient, useQuery } from 'react-query'
 import api from '../services/api'
 import { useAuth } from '../hooks/useAuth'
 import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
-import { resolveDirection, calculateVariationPercent } from '../utils/kpi'
+import { resolveDirection, calculateVariationPercent, supportsNegativeActual } from '../utils/kpi'
 import { useDialog } from './Dialog'
 import './CollaboratorKPIForm.css'
 
@@ -177,6 +177,11 @@ export default function CollaboratorKPIForm({
     if (!kpis || !formData.kpiId) return null
     return kpis.find((k: any) => k.id === formData.kpiId) || null
   }, [kpis, formData.kpiId])
+  const negativeActualAllowed = supportsNegativeActual(
+    selectedKpi?.direction,
+    selectedKpi?.formula,
+    selectedKpi?.type
+  )
 
   const scopeWeightForSelection = useMemo(() => {
     if (!selectedKpi || !selectedScopeId) return null
@@ -444,8 +449,8 @@ export default function CollaboratorKPIForm({
     if (assignment?.id) {
       if (actualValue === null || Number.isNaN(actualValue)) {
         newErrors.actual = 'Ingresa el valor actual'
-      } else if (actualValue < 0) {
-        newErrors.actual = 'El valor actual no puede ser negativo'
+      } else if (actualValue < 0 && !negativeActualAllowed) {
+        newErrors.actual = 'Este KPI no admite valores negativos en el alcance'
       }
     }
 
@@ -1165,7 +1170,6 @@ export default function CollaboratorKPIForm({
             <input
               type="number"
               id="actual"
-              min="0"
               step="0.01"
               value={formData.actual ?? ''}
               onChange={(e) =>
@@ -1180,7 +1184,9 @@ export default function CollaboratorKPIForm({
             />
             {errors.actual && <span className="error-message">{errors.actual}</span>}
             <small className="form-hint">
-              Actualiza aquí el valor alcanzado mes a mes. Target y ponderación no se editan al actualizar.
+              {negativeActualAllowed
+                ? 'Este KPI admite valores negativos en el alcance. Target y ponderación no se editan al actualizar.'
+                : 'Actualiza aquí el valor alcanzado mes a mes. Target y ponderación no se editan al actualizar.'}
             </small>
           </div>
 
