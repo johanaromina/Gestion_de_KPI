@@ -6,8 +6,9 @@ RUN npm ci
 
 FROM deps AS build
 COPY tsconfig.json ./
+COPY tsconfig.build.json ./
 COPY src ./src
-RUN npm run build
+RUN node ./node_modules/typescript/bin/tsc -p tsconfig.build.json
 
 FROM node:20-alpine AS runtime
 WORKDIR /app

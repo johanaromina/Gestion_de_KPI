@@ -23,6 +23,7 @@ services:
       start_period: 20s
 
   backend:
+    image: ${BACKEND_IMAGE:-kpimanager/backend:shared}
     build:
       context: ./backend
     restart: unless-stopped
