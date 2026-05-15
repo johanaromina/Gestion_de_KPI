@@ -2,6 +2,7 @@ import { Response } from 'express'
 import { AuthRequest } from '../middleware/auth.middleware'
 import { pool } from '../config/database'
 import * as okrService from '../services/okr.service'
+import { logger } from '../utils/logger'
 
 // ── Objectives ─────────────────────────────────────────────
 
@@ -17,7 +18,7 @@ export const getObjectives = async (req: AuthRequest, res: Response) => {
     })
     res.json(objectives)
   } catch (error) {
-    console.error('[OKR] getObjectives:', error)
+    logger.error('[OKR] getObjectives:', error)
     res.status(500).json({ error: 'Error al obtener objetivos' })
   }
 }
@@ -28,7 +29,7 @@ export const getObjective = async (req: AuthRequest, res: Response) => {
     if (!objective) return res.status(404).json({ error: 'Objetivo no encontrado' })
     res.json(objective)
   } catch (error) {
-    console.error('[OKR] getObjective:', error)
+    logger.error('[OKR] getObjective:', error)
     res.status(500).json({ error: 'Error al obtener objetivo' })
   }
 }
@@ -43,7 +44,7 @@ export const createObjective = async (req: AuthRequest, res: Response) => {
     const created = await okrService.getObjectiveById(id)
     res.status(201).json(created)
   } catch (error) {
-    console.error('[OKR] createObjective:', error)
+    logger.error('[OKR] createObjective:', error)
     res.status(500).json({ error: 'Error al crear objetivo' })
   }
 }
@@ -54,7 +55,7 @@ export const updateObjective = async (req: AuthRequest, res: Response) => {
     const updated = await okrService.getObjectiveById(Number(req.params.id))
     res.json(updated)
   } catch (error) {
-    console.error('[OKR] updateObjective:', error)
+    logger.error('[OKR] updateObjective:', error)
     res.status(500).json({ error: 'Error al actualizar objetivo' })
   }
 }
@@ -64,7 +65,7 @@ export const deleteObjective = async (req: AuthRequest, res: Response) => {
     await okrService.deleteObjective(Number(req.params.id))
     res.json({ success: true })
   } catch (error) {
-    console.error('[OKR] deleteObjective:', error)
+    logger.error('[OKR] deleteObjective:', error)
     res.status(500).json({ error: 'Error al eliminar objetivo' })
   }
 }
@@ -76,7 +77,7 @@ export const getKeyResults = async (req: AuthRequest, res: Response) => {
     const krs = await okrService.listKeyResults(Number(req.params.objectiveId))
     res.json(krs)
   } catch (error) {
-    console.error('[OKR] getKeyResults:', error)
+    logger.error('[OKR] getKeyResults:', error)
     res.status(500).json({ error: 'Error al obtener key results' })
   }
 }
@@ -94,7 +95,7 @@ export const createKeyResult = async (req: AuthRequest, res: Response) => {
     const krs = await okrService.listKeyResults(objectiveId)
     res.status(201).json(krs.find((k) => k.id === id))
   } catch (error: any) {
-    console.error('[OKR] createKeyResult:', error)
+    logger.error('[OKR] createKeyResult:', error)
     const detail = error?.sqlMessage || error?.message || null
     res.status(500).json({ error: detail ? `Error al crear key result: ${detail}` : 'Error al crear key result' })
   }
@@ -105,7 +106,7 @@ export const updateKeyResult = async (req: AuthRequest, res: Response) => {
     await okrService.updateKeyResult(Number(req.params.krId), req.body)
     res.json({ success: true })
   } catch (error) {
-    console.error('[OKR] updateKeyResult:', error)
+    logger.error('[OKR] updateKeyResult:', error)
     res.status(500).json({ error: 'Error al actualizar key result' })
   }
 }
@@ -115,7 +116,7 @@ export const deleteKeyResult = async (req: AuthRequest, res: Response) => {
     await okrService.deleteKeyResult(Number(req.params.krId))
     res.json({ success: true })
   } catch (error) {
-    console.error('[OKR] deleteKeyResult:', error)
+    logger.error('[OKR] deleteKeyResult:', error)
     res.status(500).json({ error: 'Error al eliminar key result' })
   }
 }
@@ -127,7 +128,7 @@ export const getCheckIns = async (req: AuthRequest, res: Response) => {
     const checkIns = await okrService.listCheckIns(Number(req.params.krId))
     res.json(checkIns)
   } catch (error) {
-    console.error('[OKR] getCheckIns:', error)
+    logger.error('[OKR] getCheckIns:', error)
     res.status(500).json({ error: 'Error al obtener check-ins' })
   }
 }
@@ -146,7 +147,7 @@ export const createCheckIn = async (req: AuthRequest, res: Response) => {
     const checkIns = await okrService.listCheckIns(keyResultId)
     res.status(201).json(checkIns.find((c) => c.id === id))
   } catch (error) {
-    console.error('[OKR] createCheckIn:', error)
+    logger.error('[OKR] createCheckIn:', error)
     res.status(500).json({ error: 'Error al crear check-in' })
   }
 }
@@ -158,7 +159,7 @@ export const getTreeLinks = async (req: AuthRequest, res: Response) => {
     const links = await okrService.getTreeLinksForObjective(Number(req.params.id))
     res.json(links)
   } catch (error) {
-    console.error('[OKR] getTreeLinks:', error)
+    logger.error('[OKR] getTreeLinks:', error)
     res.status(500).json({ error: 'Error al obtener vinculos con arbol' })
   }
 }
@@ -170,7 +171,7 @@ export const addTreeLink = async (req: AuthRequest, res: Response) => {
     await okrService.linkToObjectiveTree(Number(req.params.id), Number(objectiveTreeId))
     res.json({ success: true })
   } catch (error) {
-    console.error('[OKR] addTreeLink:', error)
+    logger.error('[OKR] addTreeLink:', error)
     res.status(500).json({ error: 'Error al vincular con arbol' })
   }
 }
@@ -180,7 +181,7 @@ export const removeTreeLink = async (req: AuthRequest, res: Response) => {
     await okrService.unlinkFromObjectiveTree(Number(req.params.id), Number(req.params.treeId))
     res.json({ success: true })
   } catch (error) {
-    console.error('[OKR] removeTreeLink:', error)
+    logger.error('[OKR] removeTreeLink:', error)
     res.status(500).json({ error: 'Error al desvincular del arbol' })
   }
 }
@@ -339,7 +340,7 @@ export const getDataSources = async (req: AuthRequest, res: Response) => {
 
     res.json(result)
   } catch (error) {
-    console.error('[OKR] getDataSources:', error)
+    logger.error('[OKR] getDataSources:', error)
     res.status(500).json({ error: 'Error al obtener fuentes de datos' })
   }
 }
@@ -353,7 +354,7 @@ export const getAlignmentTree = async (req: AuthRequest, res: Response) => {
     const tree = await okrService.getAlignmentTree(Number(periodId))
     res.json(tree)
   } catch (error) {
-    console.error('[OKR] getAlignmentTree:', error)
+    logger.error('[OKR] getAlignmentTree:', error)
     res.status(500).json({ error: 'Error al obtener árbol de alineación' })
   }
 }
@@ -363,7 +364,7 @@ export const getFullTree = async (_req: AuthRequest, res: Response) => {
     const tree = await okrService.getFullTree()
     res.json(tree)
   } catch (error) {
-    console.error('[OKR] getFullTree:', error)
+    logger.error('[OKR] getFullTree:', error)
     res.status(500).json({ error: 'Error al obtener árbol completo de OKRs' })
   }
 }

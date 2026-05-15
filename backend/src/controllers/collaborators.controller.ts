@@ -7,6 +7,7 @@ import { logAudit } from '../utils/audit'
 import { AuthRequest } from '../middleware/auth.middleware'
 import { appEnv } from '../config/env'
 import { sendMail } from '../utils/mailer'
+import { logger } from '../utils/logger'
 
 type CollaboratorRow = Collaborator & RowDataPacket
 
@@ -35,7 +36,6 @@ const canEditCollaborator = (
   const targetArea = (collaboratorArea || '').trim().toLowerCase()
 
   if (['manager', 'leader'].includes(role)) {
-    if (!targetArea && userArea) return true
     return userArea && targetArea ? userArea === targetArea : false
   }
 
@@ -69,13 +69,14 @@ const wouldCreateCycle = async (collaboratorId: number, newManagerId: number): P
 export const getCollaborators = async (req: Request, res: Response) => {
   try {
     const includeInactive = req.query.includeInactive === 'true'
+    const safeColumns = 'id, name, email, position, area, orgScopeId, managerId, role, status, mfaEnabled, inviteToken, inviteTokenExpiresAt, createdAt, updatedAt'
     const query = includeInactive
-      ? 'SELECT * FROM collaborators ORDER BY name ASC'
-      : "SELECT * FROM collaborators WHERE status = 'active' ORDER BY name ASC"
+      ? `SELECT ${safeColumns} FROM collaborators ORDER BY name ASC`
+      : `SELECT ${safeColumns} FROM collaborators WHERE status = 'active' ORDER BY name ASC`
     const [rows] = await pool.query<CollaboratorRow[]>(query)
     res.json(rows as Collaborator[])
   } catch (error: any) {
-    console.error('Error fetching collaborators:', error)
+    logger.error('Error fetching collaborators:', error)
     res.status(500).json({ error: 'Error al obtener colaboradores' })
   }
 }
@@ -83,8 +84,9 @@ export const getCollaborators = async (req: Request, res: Response) => {
 export const getCollaboratorById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
+    const safeColumns = 'id, name, email, position, area, orgScopeId, managerId, role, status, mfaEnabled, inviteToken, inviteTokenExpiresAt, createdAt, updatedAt'
     const [rows] = await pool.query<CollaboratorRow[]>(
-      'SELECT * FROM collaborators WHERE id = ?',
+      `SELECT ${safeColumns} FROM collaborators WHERE id = ?`,
       [id]
     )
 
@@ -94,7 +96,7 @@ export const getCollaboratorById = async (req: Request, res: Response) => {
 
     res.json(rows[0])
   } catch (error: any) {
-    console.error('Error fetching collaborator:', error)
+    logger.error('Error fetching collaborator:', error)
     res.status(500).json({ error: 'Error al obtener colaborador' })
   }
 }
@@ -179,7 +181,7 @@ export const createCollaborator = async (req: Request, res: Response) => {
           text: `Hola ${name}, activá tu cuenta en KPI Manager: ${inviteLink} (vence en 72 horas)`,
         })
       } catch (mailError: any) {
-        console.error('Error sending welcome invite email:', mailError)
+        logger.error('Error sending welcome invite email:', mailError)
       }
     }
 
@@ -219,7 +221,7 @@ export const createCollaborator = async (req: Request, res: Response) => {
       mfaEnabled: mfaEnabled ? 1 : 0,
     })
   } catch (error: any) {
-    console.error('Error creating collaborator:', error)
+    logger.error('Error creating collaborator:', error)
     res.status(500).json({ error: 'Error al crear colaborador' })
   }
 }
@@ -229,7 +231,6 @@ export const updateCollaborator = async (req: Request, res: Response) => {
     const { id } = req.params
     const { name, position, area, orgScopeId, managerId, role, email, mfaEnabled } = req.body
     const user = (req as AuthRequest).user
-    console.log('updateCollaborator user:', user)
     const normalizedEmail = email ? String(email).trim().toLowerCase() : null
 
     const [oldRows] = await pool.query<CollaboratorRow[]>(
@@ -317,7 +318,7 @@ export const updateCollaborator = async (req: Request, res: Response) => {
 
     res.json({ message: 'Colaborador actualizado correctamente' })
   } catch (error: any) {
-    console.error('Error updating collaborator:', error)
+    logger.error('Error updating collaborator:', error)
     res.status(500).json({ error: 'Error al actualizar colaborador' })
   }
 }
@@ -357,7 +358,7 @@ export const deleteCollaborator = async (req: Request, res: Response) => {
 
     res.json({ message: 'Colaborador eliminado correctamente' })
   } catch (error: any) {
-    console.error('Error deleting collaborator:', error)
+    logger.error('Error deleting collaborator:', error)
     res.status(500).json({ error: 'Error al eliminar colaborador' })
   }
 }
@@ -418,7 +419,7 @@ export const deactivateCollaborator = async (req: Request, res: Response) => {
 
     res.json({ message: 'Colaborador marcado como inactivo' })
   } catch (error: any) {
-    console.error('Error deactivating collaborator:', error)
+    logger.error('Error deactivating collaborator:', error)
     res.status(500).json({ error: 'Error al desactivar colaborador' })
   }
 }
@@ -482,7 +483,7 @@ export const changeCollaboratorRole = async (req: Request, res: Response) => {
 
     res.json({ message: 'Rol actualizado correctamente' })
   } catch (error: any) {
-    console.error('Error changing collaborator role:', error)
+    logger.error('Error changing collaborator role:', error)
     res.status(500).json({ error: 'Error al cambiar rol de colaborador' })
   }
 }
@@ -496,13 +497,19 @@ export const getCollaboratorEvents = async (req: Request, res: Response) => {
     )
     res.json(rows)
   } catch (error: any) {
-    console.error('Error fetching collaborator events:', error)
+    logger.error('Error fetching collaborator events:', error)
     res.status(500).json({ error: 'Error al obtener eventos del colaborador' })
   }
 }
 
 export const resendInvite = async (req: Request, res: Response) => {
   try {
+    const caller = (req as AuthRequest).user
+    const callerRole = (caller?.role || '').trim().toLowerCase()
+    if (!['admin', 'director', 'manager', 'leader'].includes(callerRole)) {
+      return res.status(403).json({ error: 'No tenés permiso para reenviar invitaciones' })
+    }
+
     const { id } = req.params
     const [rows] = await pool.query<any[]>('SELECT * FROM collaborators WHERE id = ?', [Number(id)])
     const collaborator = rows?.[0]
@@ -529,18 +536,25 @@ export const resendInvite = async (req: Request, res: Response) => {
     })
     res.json({ message: 'Invitación reenviada correctamente' })
   } catch (error: any) {
-    console.error('Error in resendInvite:', error)
+    logger.error('Error in resendInvite:', error)
     res.status(500).json({ error: 'Error al reenviar invitación' })
   }
 }
 
 export const importCollaborators = async (req: Request, res: Response) => {
   try {
+    const caller = (req as AuthRequest).user
+    const callerRole = (caller?.role || '').trim().toLowerCase()
+    const ALLOWED_IMPORT_ROLES = ['admin', 'director', 'manager', 'leader']
+    if (!ALLOWED_IMPORT_ROLES.includes(callerRole)) {
+      return res.status(403).json({ error: 'No tenés permiso para importar colaboradores' })
+    }
+
     const rows: { name: string; email?: string; position?: string; role?: string; areaName?: string }[] = req.body?.rows
     if (!Array.isArray(rows) || rows.length === 0)
       return res.status(400).json({ error: 'No hay filas para importar' })
 
-    const VALID_ROLES = ['admin', 'director', 'leader', 'collaborator']
+    const VALID_ROLES = ['admin', 'director', 'manager', 'leader', 'collaborator']
 
     // Cargar scopes para resolver areaName → orgScopeId
     const [scopeRows] = await pool.query<any[]>('SELECT id, name FROM org_scopes WHERE active = 1')
@@ -594,7 +608,7 @@ export const importCollaborators = async (req: Request, res: Response) => {
 
     return res.status(201).json({ total: rows.length, created: created.length, errors })
   } catch (error: any) {
-    console.error('Error importando colaboradores:', error)
+    logger.error('Error importando colaboradores:', error)
     return res.status(500).json({ error: error?.message || 'Error al importar colaboradores' })
   }
 }

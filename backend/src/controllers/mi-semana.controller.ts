@@ -3,7 +3,9 @@ import { pool } from '../config/database'
 import { AuthRequest } from '../middleware/auth.middleware'
 import { recalcOKRsLinkedToCollaboratorKpi, autoScoreKRStatuses, recalcObjectiveProgress } from '../services/okr.service'
 import { applyMeasurementToCollaboratorAssignment } from '../services/measurement-application.service'
-import { recalcSummaryAssignment, recalcScopeKPIsLinkedToAssignment } from '../controllers/collaborator-kpis.controller'
+import { recalcSummaryAssignment } from '../controllers/collaborator-kpis.controller'
+import { recalcScopeKPIsLinkedToAssignment } from '../services/scope-kpi-propagation.service'
+import { logger } from '../utils/logger'
 
 /**
  * GET /api/mi-semana
@@ -99,7 +101,7 @@ export const getMiSemana = async (req: AuthRequest, res: Response) => {
       weekStart,
     })
   } catch (error) {
-    console.error('[MiSemana] getMiSemana:', error)
+    logger.error('[MiSemana] getMiSemana:', error)
     res.status(500).json({ error: 'Error al obtener datos de la semana' })
   }
 }
@@ -166,7 +168,7 @@ export const updateKRValue = async (req: AuthRequest, res: Response) => {
 
     res.json({ success: true, kr: Array.isArray(updated) ? updated[0] : null })
   } catch (error) {
-    console.error('[MiSemana] updateKRValue:', error)
+    logger.error('[MiSemana] updateKRValue:', error)
     res.status(500).json({ error: 'Error al actualizar KR' })
   }
 }
@@ -234,10 +236,10 @@ export const updateKPIActual = async (req: AuthRequest, res: Response) => {
 
     // Propagar a scope KPIs padres y luego a OKRs
     recalcScopeKPIsLinkedToAssignment(kpiId).catch((err) =>
-      console.error('[MiSemana] scope propagation:', err)
+      logger.error('[MiSemana] scope propagation:', err)
     )
     recalcOKRsLinkedToCollaboratorKpi(kpiId).catch((err) =>
-      console.error('[MiSemana] OKR propagation:', err)
+      logger.error('[MiSemana] OKR propagation:', err)
     )
 
     // Leer valor actualizado
@@ -249,7 +251,7 @@ export const updateKPIActual = async (req: AuthRequest, res: Response) => {
 
     res.json({ success: true, actual: updated?.actual, weightedResult: updated?.weightedResult })
   } catch (error) {
-    console.error('[MiSemana] updateKPIActual:', error)
+    logger.error('[MiSemana] updateKPIActual:', error)
     res.status(500).json({ error: 'Error al actualizar KPI' })
   }
 }

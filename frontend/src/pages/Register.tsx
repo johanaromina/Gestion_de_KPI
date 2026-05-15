@@ -2,7 +2,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
-import { storeAuthToken } from '../utils/authStorage'
 import { selfRegisterEnabled } from '../config/runtime'
 import './Login.css'
 
@@ -36,8 +35,7 @@ export default function Register() {
 
     setLoading(true)
     try {
-      const response = await api.post('/auth/register', { companyName, adminName, email, password })
-      storeAuthToken(response.data.token, true)
+      await api.post('/auth/register', { companyName, adminName, email, password })
       navigate('/')
     } catch (err: any) {
       setError(err.response?.data?.error || 'Error al crear la cuenta. Intentá más tarde.')

@@ -2,7 +2,10 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { useQueryClient } from 'react-query'
 import { useAuth } from '../hooks/useAuth'
+import api from '../services/api'
 import './Layout.css'
+
+const PUBLIC_PATHS = ['/login', '/register', '/reset-password', '/sso/callback', '/landing']
 
 interface LayoutProps {
   children: React.ReactNode
@@ -12,7 +15,7 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { user, canConfig, isCollaborator } = useAuth()
+  const { user, canConfig, isCollaborator, isLoading } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const isActive = (path: string) =>
@@ -20,8 +23,8 @@ export default function Layout({ children }: LayoutProps) {
 
   const handleNavClick = () => setSidebarOpen(false)
 
-  const handleLogout = () => {
-    localStorage.removeItem('token')
+  const handleLogout = async () => {
+    try { await api.post('/auth/logout') } catch { /* ignore */ }
     queryClient.clear()
     navigate('/login', { replace: true })
   }
@@ -55,8 +58,9 @@ export default function Layout({ children }: LayoutProps) {
     }
   }, [isCollaborator, location.pathname, navigate])
 
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token')
-  const isPublicPage = location.pathname === '/login' || (location.pathname === '/' && !token)
+  const isPublicPage =
+    PUBLIC_PATHS.some((p) => location.pathname.startsWith(p)) ||
+    (location.pathname === '/' && !user && !isLoading)
 
   if (isPublicPage) {
     return <>{children}</>

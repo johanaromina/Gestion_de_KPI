@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { pool } from '../config/database'
 import { calculateVariation } from '../utils/kpi-formulas'
 import { KPIDirection } from '../types'
+import { logger } from '../utils/logger'
 
 const resolveDirection = (direction?: string | null): KPIDirection => {
   if (direction === 'growth' || direction === 'reduction' || direction === 'exact') return direction
@@ -173,7 +174,7 @@ export const getReductionKPIs = async (req: Request, res: Response) => {
 
     res.json(Object.values(grouped))
   } catch (error: any) {
-    console.error('Error fetching reduction KPIs:', error)
+    logger.error('Error fetching reduction KPIs:', error)
     res.status(500).json({ error: 'Error al obtener KPIs de reducción' })
   }
 }
@@ -317,7 +318,7 @@ export const getReductionStatistics = async (req: Request, res: Response) => {
 
     res.json(statistics)
   } catch (error: any) {
-    console.error('Error fetching reduction statistics:', error)
+    logger.error('Error fetching reduction statistics:', error)
     res.status(500).json({ error: 'Error al obtener estadísticas de reducción' })
   }
 }
@@ -382,7 +383,7 @@ export const getReductionEvolution = async (req: Request, res: Response) => {
 
     res.json(evolution)
   } catch (error: any) {
-    console.error('Error fetching reduction evolution:', error)
+    logger.error('Error fetching reduction evolution:', error)
     res.status(500).json({ error: 'Error al obtener evolución de reducción' })
   }
 }

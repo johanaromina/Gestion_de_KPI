@@ -493,6 +493,19 @@
   text-align: center;
 }
 
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px 0;
+}
+
+.pagination-info {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #6b7280);
+}
+
 .empty-icon {
   font-size: 64px;
   margin-bottom: 16px;

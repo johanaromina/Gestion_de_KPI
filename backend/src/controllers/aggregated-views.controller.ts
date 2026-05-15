@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { pool } from '../config/database'
 import { calculateVariation } from '../utils/kpi-formulas'
 import { KPIDirection, KPIType } from '../types'
+import { logger } from '../utils/logger'
 
 // Función auxiliar para calcular estadísticas
 function calculateStatistics(results: number[]): {
@@ -143,7 +144,7 @@ export const getAggregatedByDirection = async (req: Request, res: Response) => {
       aggregatedData,
     })
   } catch (error: any) {
-    console.error('Error fetching aggregated by direction:', error)
+    logger.error('Error fetching aggregated by direction:', error)
     res.status(500).json({ error: 'Error al obtener datos agregados' })
   }
 }
@@ -208,7 +209,7 @@ export const getAggregatedByManagement = async (
       aggregatedData,
     })
   } catch (error: any) {
-    console.error('Error fetching aggregated by management:', error)
+    logger.error('Error fetching aggregated by management:', error)
     res.status(500).json({ error: 'Error al obtener datos agregados' })
   }
 }
@@ -273,7 +274,7 @@ export const getAggregatedByLeadership = async (
       aggregatedData,
     })
   } catch (error: any) {
-    console.error('Error fetching aggregated by leadership:', error)
+    logger.error('Error fetching aggregated by leadership:', error)
     res.status(500).json({ error: 'Error al obtener datos agregados' })
   }
 }
@@ -328,7 +329,7 @@ export const getAggregatedByArea = async (req: Request, res: Response) => {
       aggregatedData,
     })
   } catch (error: any) {
-    console.error('Error fetching aggregated by area:', error)
+    logger.error('Error fetching aggregated by area:', error)
     res.status(500).json({ error: 'Error al obtener datos agregados' })
   }
 }

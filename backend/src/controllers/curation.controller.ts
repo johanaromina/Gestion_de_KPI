@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { pool } from '../config/database'
 import { AuthRequest } from '../middleware/auth.middleware'
+import { logger } from '../utils/logger'
 
 export const getCurationItems = async (req: Request, res: Response) => {
   try {
@@ -94,7 +95,7 @@ export const getCurationItems = async (req: Request, res: Response) => {
     const [rows] = await pool.query(query, params)
     res.json(rows)
   } catch (error: any) {
-    console.error('Error fetching curation items:', error)
+    logger.error('Error fetching curation items:', error)
     res.status(500).json({ error: 'Error al obtener curaduría' })
   }
 }
@@ -127,7 +128,7 @@ export const createCriteriaVersion = async (req: Request, res: Response) => {
     const insertResult = result as any
     res.status(201).json({ id: insertResult.insertId })
   } catch (error: any) {
-    console.error('Error creating criteria version:', error)
+    logger.error('Error creating criteria version:', error)
     res.status(500).json({ error: 'Error al crear versión de criterio' })
   }
 }
@@ -164,7 +165,7 @@ export const approveCriteriaVersion = async (req: Request, res: Response) => {
 
     res.json({ message: 'Criterio aprobado correctamente' })
   } catch (error: any) {
-    console.error('Error approving criteria version:', error)
+    logger.error('Error approving criteria version:', error)
     res.status(500).json({ error: 'Error al aprobar criterio' })
   }
 }
@@ -201,7 +202,7 @@ export const rejectCriteriaVersion = async (req: Request, res: Response) => {
 
     res.json({ message: 'Criterio rechazado correctamente' })
   } catch (error: any) {
-    console.error('Error rejecting criteria version:', error)
+    logger.error('Error rejecting criteria version:', error)
     res.status(500).json({ error: 'Error al rechazar criterio' })
   }
 }
@@ -238,7 +239,7 @@ export const requestCriteriaChanges = async (req: Request, res: Response) => {
 
     res.json({ message: 'Cambios solicitados correctamente' })
   } catch (error: any) {
-    console.error('Error requesting criteria changes:', error)
+    logger.error('Error requesting criteria changes:', error)
     res.status(500).json({ error: 'Error al solicitar cambios' })
   }
 }

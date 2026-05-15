@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { pool } from '../config/database'
 import { AuthRequest } from '../middleware/auth.middleware'
 import { hydrateScopeKpiMixedFields } from '../services/scope-kpi-mixed.service'
+import { logger } from '../utils/logger'
 
 const toFiniteNumber = (value: any) => {
   const num = Number(value)
@@ -275,7 +276,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       averageCompliance: Number(averageCompliance),
     })
   } catch (error: any) {
-    console.error('Error getting dashboard stats:', error)
+    logger.error('Error getting dashboard stats:', error)
     res.status(500).json({ error: 'Error al obtener estadísticas del dashboard' })
   }
 }
@@ -312,7 +313,7 @@ export const getAreaStats = async (req: Request, res: Response) => {
 
     res.json(stats)
   } catch (error: any) {
-    console.error('Error getting area stats:', error)
+    logger.error('Error getting area stats:', error)
     res.status(500).json({ error: 'Error al obtener estadísticas por área' })
   }
 }
@@ -374,7 +375,7 @@ export const getTeamStats = async (req: Request, res: Response) => {
       teamPendingKPIs: Number(result.teamPendingKPIs || 0),
     })
   } catch (error: any) {
-    console.error('Error getting team stats:', error)
+    logger.error('Error getting team stats:', error)
     res.status(500).json({ error: 'Error al obtener estadísticas del equipo' })
   }
 }
@@ -418,7 +419,7 @@ export const getMyKPIs = async (req: Request, res: Response) => {
 
     res.json(kpis)
   } catch (error: any) {
-    console.error('Error getting my KPIs:', error)
+    logger.error('Error getting my KPIs:', error)
     res.status(500).json({ error: 'Error al obtener tus KPIs' })
   }
 }
@@ -488,7 +489,7 @@ export const getTeamKPIs = async (req: Request, res: Response) => {
 
     res.json(kpis)
   } catch (error: any) {
-    console.error('Error getting team KPIs:', error)
+    logger.error('Error getting team KPIs:', error)
     res.status(500).json({ error: 'Error al obtener KPIs del equipo' })
   }
 }
@@ -522,7 +523,7 @@ export const getComplianceByPeriod = async (req: Request, res: Response) => {
 
     res.json(data)
   } catch (error: any) {
-    console.error('Error getting compliance by period:', error)
+    logger.error('Error getting compliance by period:', error)
     res.status(500).json({ error: 'Error al obtener cumplimiento por período' })
   }
 }
@@ -625,7 +626,7 @@ export const getExecutiveTree = async (req: Request, res: Response) => {
       companies,
     })
   } catch (error: any) {
-    console.error('Error getting executive tree:', error)
+    logger.error('Error getting executive tree:', error)
     res.status(500).json({ error: 'Error al obtener tablero ejecutivo' })
   }
 }
@@ -767,7 +768,7 @@ export const getExecutiveTrends = async (req: Request, res: Response) => {
       subPeriodSeries,
     })
   } catch (error: any) {
-    console.error('Error getting executive trends:', error)
+    logger.error('Error getting executive trends:', error)
     res.status(500).json({ error: 'Error al obtener tendencias ejecutivas' })
   }
 }

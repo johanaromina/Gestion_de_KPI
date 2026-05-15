@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { getAuditLogs, getAuditHistory } from '../utils/audit'
 import { EntityType, AuditAction } from '../utils/audit'
+import { logger } from '../utils/logger'
 
 /**
  * Obtiene el historial de auditoría con filtros
@@ -61,7 +62,7 @@ export const getAuditLogsController = async (req: Request, res: Response) => {
       offset: filters.offset || null,
     })
   } catch (error: any) {
-    console.error('Error fetching audit logs:', error)
+    logger.error('Error fetching audit logs:', error)
     res.status(500).json({ error: 'Error al obtener logs de auditoría' })
   }
 }
@@ -86,7 +87,7 @@ export const getEntityAuditHistory = async (req: Request, res: Response) => {
 
     res.json(history)
   } catch (error: any) {
-    console.error('Error fetching entity audit history:', error)
+    logger.error('Error fetching entity audit history:', error)
     res.status(500).json({ error: 'Error al obtener historial de auditoría' })
   }
 }

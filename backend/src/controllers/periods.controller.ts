@@ -4,6 +4,7 @@ import { Period, SubPeriod } from '../types'
 import { calculateVariation, calculateWeightedResult } from '../utils/kpi-formulas'
 import { sendMail } from '../utils/mailer'
 import { copyPeriod } from '../services/copy-period.service.js'
+import { logger } from '../utils/logger'
 
 const normalizeNumber = (value: any) => {
   if (value === null || value === undefined) return null
@@ -152,7 +153,7 @@ export const getPeriods = async (req: Request, res: Response) => {
     )
     res.json(rows)
   } catch (error: any) {
-    console.error('Error fetching periods:', error)
+    logger.error('Error fetching periods:', error)
     res.status(500).json({ error: 'Error al obtener períodos' })
   }
 }
@@ -171,7 +172,7 @@ export const getPeriodById = async (req: Request, res: Response) => {
 
     res.json(rows[0])
   } catch (error: any) {
-    console.error('Error fetching period:', error)
+    logger.error('Error fetching period:', error)
     res.status(500).json({ error: 'Error al obtener período' })
   }
 }
@@ -190,7 +191,7 @@ export const getSubPeriodsByPeriod = async (req: Request, res: Response) => {
     const [rows] = await pool.query<SubPeriod[]>(query, params)
     res.json(rows)
   } catch (error: any) {
-    console.error('Error fetching sub-periods:', error)
+    logger.error('Error fetching sub-periods:', error)
     res.status(500).json({ error: 'Error al obtener subperíodos' })
   }
 }
@@ -218,7 +219,7 @@ export const createPeriod = async (req: Request, res: Response) => {
       status: status || 'open',
     })
   } catch (error: any) {
-    console.error('Error creating period:', error)
+    logger.error('Error creating period:', error)
     res.status(500).json({ error: 'Error al crear período' })
   }
 }
@@ -237,7 +238,7 @@ export const updatePeriod = async (req: Request, res: Response) => {
 
     res.json({ message: 'Período actualizado correctamente' })
   } catch (error: any) {
-    console.error('Error updating period:', error)
+    logger.error('Error updating period:', error)
     res.status(500).json({ error: 'Error al actualizar período' })
   }
 }
@@ -334,7 +335,7 @@ export const closePeriod = async (req: Request, res: Response) => {
       // ignore rollback errors
     }
     conn.release()
-    console.error('Error closing period:', error)
+    logger.error('Error closing period:', error)
     res.status(500).json({ error: 'Error al cerrar período' })
   }
 }
@@ -363,7 +364,7 @@ export const getPeriodSummary = async (req: Request, res: Response) => {
 
     res.json({ summaries, items })
   } catch (error: any) {
-    console.error('Error fetching period summary:', error)
+    logger.error('Error fetching period summary:', error)
     res.status(500).json({ error: 'Error al obtener resumen anual' })
   }
 }
@@ -410,7 +411,7 @@ export const reopenPeriod = async (req: Request, res: Response) => {
 
     res.json({ message: 'Período reabierto correctamente' })
   } catch (error: any) {
-    console.error('Error reopening period:', error)
+    logger.error('Error reopening period:', error)
     res.status(500).json({ error: 'Error al reabrir período' })
   }
 }
@@ -423,7 +424,7 @@ export const deletePeriod = async (req: Request, res: Response) => {
 
     res.json({ message: 'Período eliminado correctamente' })
   } catch (error: any) {
-    console.error('Error deleting period:', error)
+    logger.error('Error deleting period:', error)
     res.status(500).json({ error: 'Error al eliminar período' })
   }
 }
@@ -445,7 +446,7 @@ export const copyPeriodHandler = async (req: Request, res: Response) => {
     })
     res.json(result)
   } catch (error: any) {
-    console.error('Error copying period:', error)
+    logger.error('Error copying period:', error)
     res.status(500).json({ error: error.message || 'Error al copiar el período' })
   }
 }

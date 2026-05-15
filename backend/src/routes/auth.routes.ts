@@ -2,6 +2,7 @@ import { Router } from 'express'
 import {
   changePassword,
   login,
+  logout,
   register,
   getCurrentUser,
   requestPasswordReset,
@@ -27,9 +28,10 @@ router.post('/sso/exchange', ssoRateLimiter, exchangeSsoCode)
 router.post('/login', loginRateLimiter, login)
 router.post('/mfa/verify', mfaRateLimiter, verifyMfa)
 router.post('/request-password-reset', passwordResetRateLimiter, requestPasswordReset)
-router.post('/reset-password', resetPassword)
+router.post('/reset-password', passwordResetRateLimiter, resetPassword)
 router.post('/change-password', authenticate, changePassword)
 router.post('/register', registerRateLimiter, register)
+router.post('/logout', logout)
 router.get('/me', authenticate, getCurrentUser)
 
 export default router

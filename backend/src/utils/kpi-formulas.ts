@@ -1,4 +1,5 @@
 import { KPIDirection, KPIType } from '../types'
+import { logger } from '../utils/logger'
 
 /**
  * Calcula la variación (porcentaje de cumplimiento) según el tipo de KPI
@@ -38,7 +39,7 @@ export function calculateVariation(
     try {
       return evaluateCustomFormula(customFormula, { target: targetValue, actual: actualValue })
     } catch (error) {
-      console.error('Error evaluando fórmula personalizada:', error)
+      logger.error('Error evaluando fórmula personalizada:', error)
       // Fallback a fórmula por defecto según tipo
     }
   }
@@ -74,55 +75,136 @@ export function calculateVariation(
   }
 }
 
-/**
- * Evalúa una fórmula personalizada con variables
- * @param formula Fórmula en formato string (ej: "(actual / target) * 100")
- * @param variables Objeto con variables disponibles (target, actual)
- * @returns Resultado numérico de la fórmula
- */
+// ─── Safe formula evaluator (recursive descent parser — no eval/Function) ────
+
+type FormulaToken =
+  | { type: 'num'; value: number }
+  | { type: 'var'; name: 'target' | 'actual' }
+  | { type: 'op'; value: '+' | '-' | '*' | '/' }
+  | { type: 'lparen' }
+  | { type: 'rparen' }
+  | { type: 'comma' }
+  | { type: 'func'; name: 'abs' | 'max' | 'min' }
+
+function tokenizeFormula(formula: string): FormulaToken[] {
+  const tokens: FormulaToken[] = []
+  let i = 0
+  while (i < formula.length) {
+    const ch = formula[i]
+    if (/\s/.test(ch)) { i++; continue }
+    if (/\d/.test(ch) || (ch === '.' && /\d/.test(formula[i + 1] ?? ''))) {
+      let num = ''
+      while (i < formula.length && /[\d.]/.test(formula[i])) num += formula[i++]
+      tokens.push({ type: 'num', value: parseFloat(num) })
+      continue
+    }
+    if (ch === '+' || ch === '-' || ch === '*' || ch === '/') {
+      tokens.push({ type: 'op', value: ch })
+      i++; continue
+    }
+    if (ch === '(') { tokens.push({ type: 'lparen' }); i++; continue }
+    if (ch === ')') { tokens.push({ type: 'rparen' }); i++; continue }
+    if (ch === ',') { tokens.push({ type: 'comma' }); i++; continue }
+    if (/[a-zA-Z]/.test(ch)) {
+      let word = ''
+      while (i < formula.length && /[a-zA-Z.0-9_]/.test(formula[i])) word += formula[i++]
+      if (word === 'target' || word === 'actual') {
+        tokens.push({ type: 'var', name: word })
+      } else if (word === 'Math.abs') {
+        tokens.push({ type: 'func', name: 'abs' })
+      } else if (word === 'Math.max') {
+        tokens.push({ type: 'func', name: 'max' })
+      } else if (word === 'Math.min') {
+        tokens.push({ type: 'func', name: 'min' })
+      } else {
+        throw new Error(`Identificador no permitido: ${word}`)
+      }
+      continue
+    }
+    throw new Error(`Carácter no permitido en fórmula: ${ch}`)
+  }
+  return tokens
+}
+
+class FormulaParser {
+  pos = 0
+  constructor(private tokens: FormulaToken[], private vars: { target: number; actual: number }) {}
+
+  parseExpression(): number {
+    let left = this.parseTerm()
+    while (this.pos < this.tokens.length) {
+      const tok = this.tokens[this.pos]
+      if (tok.type === 'op' && (tok.value === '+' || tok.value === '-')) {
+        this.pos++
+        const right = this.parseTerm()
+        left = tok.value === '+' ? left + right : left - right
+      } else break
+    }
+    return left
+  }
+
+  private parseTerm(): number {
+    let left = this.parseFactor()
+    while (this.pos < this.tokens.length) {
+      const tok = this.tokens[this.pos]
+      if (tok.type === 'op' && (tok.value === '*' || tok.value === '/')) {
+        this.pos++
+        const right = this.parseFactor()
+        if (tok.value === '/' && right === 0) throw new Error('División por cero')
+        left = tok.value === '*' ? left * right : left / right
+      } else break
+    }
+    return left
+  }
+
+  private parseFactor(): number {
+    if (this.pos >= this.tokens.length) throw new Error('Fórmula incompleta')
+    const tok = this.tokens[this.pos]
+    if (tok.type === 'op' && tok.value === '-') {
+      this.pos++
+      return -this.parseFactor()
+    }
+    if (tok.type === 'lparen') {
+      this.pos++
+      const val = this.parseExpression()
+      if (this.pos >= this.tokens.length || this.tokens[this.pos].type !== 'rparen')
+        throw new Error('Paréntesis sin cerrar')
+      this.pos++
+      return val
+    }
+    if (tok.type === 'num') { this.pos++; return tok.value }
+    if (tok.type === 'var') { this.pos++; return this.vars[tok.name] }
+    if (tok.type === 'func') {
+      this.pos++
+      if (this.pos >= this.tokens.length || this.tokens[this.pos].type !== 'lparen')
+        throw new Error(`Se esperaba '(' después de ${tok.name}`)
+      this.pos++
+      const args: number[] = [this.parseExpression()]
+      while (this.pos < this.tokens.length && this.tokens[this.pos].type === 'comma') {
+        this.pos++
+        args.push(this.parseExpression())
+      }
+      if (this.pos >= this.tokens.length || this.tokens[this.pos].type !== 'rparen')
+        throw new Error('Paréntesis sin cerrar en función')
+      this.pos++
+      if (tok.name === 'abs') return Math.abs(args[0])
+      if (tok.name === 'max') return Math.max(...args)
+      return Math.min(...args)
+    }
+    throw new Error(`Token inesperado en posición ${this.pos}`)
+  }
+}
+
 function evaluateCustomFormula(
   formula: string,
   variables: { target: number; actual: number }
 ): number {
-  // Validar que la fórmula contenga solo caracteres seguros
-  // Permitimos: números, operadores, paréntesis, espacios, y funciones Math permitidas
-  const allowedFunctions = ['Math.abs', 'Math.max', 'Math.min']
-  let sanitizedFormula = formula.trim()
-
-  // Verificar que solo contenga caracteres permitidos
-  const safePattern = /^[a-zA-Z0-9+\-*/().\s]+$/
-  if (!safePattern.test(sanitizedFormula)) {
-    throw new Error('Fórmula contiene caracteres no permitidos')
-  }
-
-  // Verificar que solo use funciones Math permitidas
-  const mathFunctionPattern = /Math\.\w+/g
-  const mathFunctions = sanitizedFormula.match(mathFunctionPattern) || []
-  for (const func of mathFunctions) {
-    if (!allowedFunctions.includes(func)) {
-      throw new Error(`Función no permitida: ${func}`)
-    }
-  }
-
-  try {
-    // Evaluar la fórmula de forma segura
-    // Nota: En producción, considerar usar una librería de evaluación de expresiones más segura
-    // Inyectamos las variables y funciones Math permitidas en el contexto
-    const result = Function(
-      `"use strict"; 
-       const target = ${variables.target};
-       const actual = ${variables.actual};
-       return (${sanitizedFormula})`
-    )()
-    
-    if (typeof result !== 'number' || isNaN(result) || !isFinite(result)) {
-      throw new Error('El resultado de la fórmula no es un número válido')
-    }
-
-    return result
-  } catch (error: any) {
-    throw new Error(`Error al evaluar fórmula: ${error.message || error}`)
-  }
+  const tokens = tokenizeFormula(formula.trim())
+  const parser = new FormulaParser(tokens, variables)
+  const result = parser.parseExpression()
+  if (parser.pos !== tokens.length) throw new Error('Tokens inesperados al final de la fórmula')
+  if (!Number.isFinite(result)) throw new Error('La fórmula produjo un valor no finito')
+  return result
 }
 
 /**

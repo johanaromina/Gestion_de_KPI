@@ -1,4 +1,5 @@
 import { pool } from '../config/database'
+import { logger } from '../utils/logger'
 
 export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE'
 export type EntityType =
@@ -71,7 +72,7 @@ export async function logAudit(
     )
   } catch (error) {
     // No fallar la operación principal si falla la auditoría
-    console.error('Error logging audit:', error)
+    logger.error('Error logging audit:', error)
   }
 }
 
@@ -121,7 +122,7 @@ export async function getAuditHistory(
       createdAt: new Date(row.createdAt),
     }))
   } catch (error) {
-    console.error('Error fetching audit history:', error)
+    logger.error('Error fetching audit history:', error)
     return []
   }
 }
@@ -204,7 +205,7 @@ export async function getAuditLogs(filters: {
 
     return { logs, total }
   } catch (error) {
-    console.error('Error fetching audit logs:', error)
+    logger.error('Error fetching audit logs:', error)
     return { logs: [], total: 0 }
   }
 }

@@ -6,42 +6,11 @@ import { AuthRequest } from '../middleware/auth.middleware'
 import { closeKpiRecord, ensureAssignmentEditable, reopenKpiRecord } from '../services/kpi-assignment-shared.service'
 import { getActualValueValidationError } from '../services/kpi-actual-validation.service'
 import { applyMeasurementToCollaboratorAssignment } from '../services/measurement-application.service'
-import { recalcOKRsLinkedToCollaboratorKpi, recalcOKRsLinkedToScopeKpi } from '../services/okr.service'
+import { recalcOKRsLinkedToCollaboratorKpi } from '../services/okr.service'
 import { recalculateScopeKPI } from '../services/scope-kpi-aggregation.service'
-
-export const recalcScopeKPIsLinkedToAssignment = async (assignmentId: number) => {
-  try {
-    const [seedRows] = await pool.query<any[]>(
-      `SELECT DISTINCT scopeKpiId FROM scope_kpi_links WHERE collaboratorAssignmentId = ?`,
-      [assignmentId]
-    )
-    const seedIds = (Array.isArray(seedRows) ? seedRows : []).map((r) => r.scopeKpiId as number)
-
-    // BFS up the scope→scope chain
-    const visited = new Set<number>()
-    let frontier = seedIds
-    while (frontier.length > 0) {
-      for (const sid of frontier) {
-        if (visited.has(sid)) continue
-        visited.add(sid)
-        await recalculateScopeKPI(sid)
-        recalcOKRsLinkedToScopeKpi(sid).catch((err) =>
-          console.error('[scope propagation] scopeKpi→OKR:', err)
-        )
-      }
-      const ph = frontier.map(() => '?').join(',')
-      const [parentRows] = await pool.query<any[]>(
-        `SELECT DISTINCT scopeKpiId FROM scope_kpi_links WHERE childScopeKpiId IN (${ph})`,
-        frontier
-      )
-      frontier = (Array.isArray(parentRows) ? parentRows : [])
-        .map((r) => r.scopeKpiId as number)
-        .filter((sid) => !visited.has(sid))
-    }
-  } catch (err) {
-    console.error('[scope propagation] collaboratorKpi→scopeKpi:', err)
-  }
-}
+import { logger } from '../utils/logger'
+import { recalcScopeKPIsLinkedToAssignment } from '../services/scope-kpi-propagation.service'
+export { recalcScopeKPIsLinkedToAssignment } from '../services/scope-kpi-propagation.service'
 
 const canEditAssignment = async (user: AuthRequest['user'], collaboratorId: number) => {
   // Solo usuarios con permisos de configuración (o superpoderes) pueden modificar datos
@@ -58,6 +27,77 @@ const resolveDirection = (direction?: string | null, type?: string | null): KPID
   if (type === 'growth' || type === 'reduction' || type === 'exact') return type
   if (type === 'sla') return 'reduction'
   return 'growth'
+}
+
+const normalizeOptionalText = (value: any): string | null => {
+  if (value === undefined || value === null) return null
+  const normalized = String(value).trim()
+  return normalized ? normalized : null
+}
+
+const resolveCriteriaVersionStatus = (
+  value: any,
+  fallback: 'pending' | 'in_review' | 'approved' | 'rejected' = 'pending'
+): 'pending' | 'in_review' | 'approved' | 'rejected' => {
+  return value === 'pending' || value === 'in_review' || value === 'approved' || value === 'rejected'
+    ? value
+    : fallback
+}
+
+const hasCriteriaVersionPayload = (payload: {
+  dataSource?: any
+  sourceConfig?: any
+  criteriaText?: any
+  evidenceUrl?: any
+}) =>
+  [
+    normalizeOptionalText(payload.dataSource),
+    normalizeOptionalText(payload.sourceConfig),
+    normalizeOptionalText(payload.criteriaText),
+    normalizeOptionalText(payload.evidenceUrl),
+  ].some((value) => value !== null)
+
+const createAssignmentCriteriaVersion = async (options: {
+  assignmentId: number
+  dataSource?: any
+  sourceConfig?: any
+  criteriaText?: any
+  evidenceUrl?: any
+  status?: any
+  userId?: number | null
+}) => {
+  const dataSource = normalizeOptionalText(options.dataSource)
+  const sourceConfig = normalizeOptionalText(options.sourceConfig)
+  const criteriaText = normalizeOptionalText(options.criteriaText)
+  const evidenceUrl = normalizeOptionalText(options.evidenceUrl)
+  const status = resolveCriteriaVersionStatus(options.status, 'pending')
+
+  const [result] = await pool.query(
+    `INSERT INTO kpi_criteria_versions
+     (assignmentId, dataSource, sourceConfig, criteriaText, evidenceUrl, status, createdBy)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      options.assignmentId,
+      dataSource,
+      sourceConfig,
+      criteriaText,
+      evidenceUrl,
+      status,
+      options.userId || null,
+    ]
+  )
+
+  const criteriaVersionId = Number((result as any)?.insertId || 0)
+  if (criteriaVersionId > 0 && status === 'approved') {
+    await pool.query(
+      `UPDATE collaborator_kpis
+       SET activeCriteriaVersionId = ?
+       WHERE id = ?`,
+      [criteriaVersionId, options.assignmentId]
+    )
+  }
+
+  return criteriaVersionId
 }
 
 const getDefaultCalendarProfileId = async (): Promise<number | null> => {
@@ -266,6 +306,7 @@ export const getCollaboratorKPIs = async (req: Request, res: Response) => {
               sp.name as subPeriodName,
               sp.weight as subPeriodWeight,
               COALESCE(cv_active.criteriaText, cv_latest.criteriaText, k.criteria) as criteriaText,
+              COALESCE(cv_active.evidenceUrl, cv_latest.evidenceUrl) as evidenceUrl,
               COALESCE(cv_active.createdAt, cv_latest.createdAt) as criteriaUpdatedAt,
               COALESCE(cv_active.dataSource, cv_latest.dataSource, ck.dataSource) as dataSource,
               COALESCE(cv_active.sourceConfig, cv_latest.sourceConfig, ck.sourceConfig) as sourceConfig,
@@ -289,7 +330,7 @@ export const getCollaboratorKPIs = async (req: Request, res: Response) => {
     )
     res.json(rows)
   } catch (error: any) {
-    console.error('Error fetching collaborator KPIs:', error)
+    logger.error('Error fetching collaborator KPIs:', error)
     res.status(500).json({ error: 'Error al obtener asignaciones' })
   }
 }
@@ -305,6 +346,7 @@ export const getCollaboratorKPIById = async (req: Request, res: Response) => {
               k.description as kpiDescription,
               k.criteria as kpiCriteria,
               COALESCE(cv_active.criteriaText, cv_latest.criteriaText, k.criteria) as criteriaText,
+              COALESCE(cv_active.evidenceUrl, cv_latest.evidenceUrl) as evidenceUrl,
               COALESCE(cv_active.createdAt, cv_latest.createdAt) as criteriaUpdatedAt,
               COALESCE(cv_active.dataSource, cv_latest.dataSource, ck.dataSource) as dataSource,
               COALESCE(cv_active.sourceConfig, cv_latest.sourceConfig, ck.sourceConfig) as sourceConfig,
@@ -333,7 +375,7 @@ export const getCollaboratorKPIById = async (req: Request, res: Response) => {
 
     res.json(rows[0])
   } catch (error: any) {
-    console.error('Error fetching collaborator KPI:', error)
+    logger.error('Error fetching collaborator KPI:', error)
     res.status(500).json({ error: 'Error al obtener asignación' })
   }
 }
@@ -354,6 +396,7 @@ export const getCollaboratorKPIsByCollaborator = async (req: Request, res: Respo
                         sp.name as subPeriodName,
                         sp.weight as subPeriodWeight,
                         COALESCE(cv_active.criteriaText, cv_latest.criteriaText, k.criteria) as criteriaText,
+                        COALESCE(cv_active.evidenceUrl, cv_latest.evidenceUrl) as evidenceUrl,
                         COALESCE(cv_active.createdAt, cv_latest.createdAt) as criteriaUpdatedAt,
                         COALESCE(cv_active.dataSource, cv_latest.dataSource, ck.dataSource) as dataSource,
                         COALESCE(cv_active.sourceConfig, cv_latest.sourceConfig, ck.sourceConfig) as sourceConfig,
@@ -386,7 +429,7 @@ export const getCollaboratorKPIsByCollaborator = async (req: Request, res: Respo
     const [rows] = await pool.query<CollaboratorKPI[]>(query, params)
     res.json(rows)
   } catch (error: any) {
-    console.error('Error fetching collaborator KPIs:', error)
+    logger.error('Error fetching collaborator KPIs:', error)
     res.status(500).json({ error: 'Error al obtener asignaciones' })
   }
 }
@@ -405,6 +448,7 @@ export const getCollaboratorKPIsByPeriod = async (req: Request, res: Response) =
               sp.name as subPeriodName,
               sp.weight as subPeriodWeight,
               COALESCE(cv_active.criteriaText, cv_latest.criteriaText, k.criteria) as criteriaText,
+              COALESCE(cv_active.evidenceUrl, cv_latest.evidenceUrl) as evidenceUrl,
               COALESCE(cv_active.createdAt, cv_latest.createdAt) as criteriaUpdatedAt,
               COALESCE(cv_active.dataSource, cv_latest.dataSource, ck.dataSource) as dataSource,
               COALESCE(cv_active.sourceConfig, cv_latest.sourceConfig, ck.sourceConfig) as sourceConfig,
@@ -429,7 +473,7 @@ export const getCollaboratorKPIsByPeriod = async (req: Request, res: Response) =
     )
     res.json(rows)
   } catch (error: any) {
-    console.error('Error fetching collaborator KPIs:', error)
+    logger.error('Error fetching collaborator KPIs:', error)
     res.status(500).json({ error: 'Error al obtener asignaciones' })
   }
 }
@@ -538,21 +582,16 @@ export const createCollaboratorKPI = async (req: Request, res: Response) => {
     const insertResult = result as any
     const assignmentId = insertResult.insertId
 
-    if (criteriaText || dataSource || sourceConfig) {
-      await pool.query(
-        `INSERT INTO kpi_criteria_versions
-         (assignmentId, dataSource, sourceConfig, criteriaText, evidenceUrl, status, createdBy)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [
-          assignmentId,
-          dataSource || null,
-          sourceConfig || null,
-          criteriaText || null,
-          evidenceUrl || null,
-          curationStatus === 'in_review' ? 'in_review' : 'pending',
-          (req as AuthRequest).user?.id || null,
-        ]
-      )
+    if (hasCriteriaVersionPayload({ criteriaText, dataSource, sourceConfig, evidenceUrl })) {
+      await createAssignmentCriteriaVersion({
+        assignmentId,
+        dataSource,
+        sourceConfig,
+        criteriaText,
+        evidenceUrl,
+        status: curationStatus,
+        userId: (req as AuthRequest).user?.id || null,
+      })
     }
 
     res.status(201).json({
@@ -573,7 +612,7 @@ export const createCollaboratorKPI = async (req: Request, res: Response) => {
           'Ya existe una asignación para este colaborador, KPI, período y subperíodo. Edítala en lugar de crearla nuevamente.',
       })
     }
-    console.error('Error creating collaborator KPI:', error)
+    logger.error('Error creating collaborator KPI:', error)
     res.status(500).json({ error: 'Error al crear asignación' })
   }
 }
@@ -782,22 +821,17 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
 
     await pool.query(updateQuery, params)
 
-    if (createCriteriaVersion && (criteriaText || dataSource || sourceConfig)) {
-      const criteriaStatus = curationStatus || 'in_review'
-      await pool.query(
-        `INSERT INTO kpi_criteria_versions
-         (assignmentId, dataSource, sourceConfig, criteriaText, evidenceUrl, status, createdBy)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [
-          id,
-          dataSource || null,
-          sourceConfig || null,
-          criteriaText || null,
-          evidenceUrl || null,
-          criteriaStatus,
-          (req as AuthRequest).user?.id || null,
-        ]
-      )
+    if (createCriteriaVersion && hasCriteriaVersionPayload({ criteriaText, dataSource, sourceConfig, evidenceUrl })) {
+      const criteriaStatus = resolveCriteriaVersionStatus(curationStatus, 'in_review')
+      await createAssignmentCriteriaVersion({
+        assignmentId: Number(id),
+        dataSource,
+        sourceConfig,
+        criteriaText,
+        evidenceUrl,
+        status: criteriaStatus,
+        userId: (req as AuthRequest).user?.id || null,
+      })
 
       if (!curationStatus) {
         await pool.query(
@@ -810,16 +844,16 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
     if (actual !== undefined && collaboratorId && kpiId && periodId) {
       await recalcSummaryAssignment(collaboratorId, kpiId, periodId)
       recalcScopeKPIsLinkedToAssignment(Number(id)).catch((err) =>
-        console.error('[scope propagation] PUT collaboratorKpi→scopeKpi:', err)
+        logger.error('[scope propagation] PUT collaboratorKpi→scopeKpi:', err)
       )
       recalcOKRsLinkedToCollaboratorKpi(Number(id)).catch((err) =>
-        console.error('[OKR propagation] PUT collaboratorKpi→OKR:', err)
+        logger.error('[OKR propagation] PUT collaboratorKpi→OKR:', err)
       )
     }
 
     res.json({ message: 'Asignación actualizada correctamente' })
   } catch (error: any) {
-    console.error('Error updating collaborator KPI:', error)
+    logger.error('Error updating collaborator KPI:', error)
     res.status(500).json({ error: 'Error al actualizar asignación' })
   }
 }
@@ -917,10 +951,10 @@ export const updateActualValue = async (req: Request, res: Response) => {
 
     // Propagar hacia scope KPIs padres y luego a OKRs
     recalcScopeKPIsLinkedToAssignment(Number(id)).catch((err) =>
-      console.error('[scope propagation] collaboratorKpi→scopeKpi:', err)
+      logger.error('[scope propagation] collaboratorKpi→scopeKpi:', err)
     )
     recalcOKRsLinkedToCollaboratorKpi(Number(id)).catch((err) =>
-      console.error('[OKR propagation] collaboratorKpi→OKR:', err)
+      logger.error('[OKR propagation] collaboratorKpi→OKR:', err)
     )
 
     const [savedRows] = await pool.query<any[]>(
@@ -935,7 +969,7 @@ export const updateActualValue = async (req: Request, res: Response) => {
       weightedResult: saved?.weightedResult ?? null,
     })
   } catch (error: any) {
-    console.error('Error updating actual value:', error)
+    logger.error('Error updating actual value:', error)
     res.status(500).json({ error: 'Error al actualizar valor' })
   }
 }
@@ -963,7 +997,7 @@ export const closeCollaboratorKPI = async (req: Request, res: Response) => {
 
     res.json({ message: 'Asignación cerrada correctamente' })
   } catch (error: any) {
-    console.error('Error closing collaborator KPI:', error)
+    logger.error('Error closing collaborator KPI:', error)
     res.status(500).json({ error: 'Error al cerrar asignación' })
   }
 }
@@ -993,7 +1027,7 @@ export const reopenCollaboratorKPI = async (req: Request, res: Response) => {
 
     res.json({ message: 'Asignación reabierta correctamente' })
   } catch (error: any) {
-    console.error('Error reopening collaborator KPI:', error)
+    logger.error('Error reopening collaborator KPI:', error)
     res.status(500).json({ error: 'Error al reabrir asignación' })
   }
 }
@@ -1102,7 +1136,7 @@ export const proposeCollaboratorKPI = async (req: Request, res: Response) => {
 
     res.json({ message: 'Valores propuestos correctamente' })
   } catch (error: any) {
-    console.error('Error proposing collaborator KPI:', error)
+    logger.error('Error proposing collaborator KPI:', error)
     res.status(500).json({ error: 'Error al proponer valores' })
   }
 }
@@ -1182,7 +1216,7 @@ export const approveCollaboratorKPI = async (req: Request, res: Response) => {
 
     res.json({ message: 'Asignación aprobada correctamente' })
   } catch (error: any) {
-    console.error('Error approving collaborator KPI:', error)
+    logger.error('Error approving collaborator KPI:', error)
     res.status(500).json({ error: 'Error al aprobar asignación' })
   }
 }
@@ -1240,7 +1274,7 @@ export const rejectCollaboratorKPI = async (req: Request, res: Response) => {
 
     res.json({ message: 'Asignación rechazada correctamente' })
   } catch (error: any) {
-    console.error('Error rejecting collaborator KPI:', error)
+    logger.error('Error rejecting collaborator KPI:', error)
     res.status(500).json({ error: 'Error al rechazar asignación' })
   }
 }
@@ -1277,7 +1311,7 @@ export const closePeriodAssignments = async (req: Request, res: Response) => {
       affectedRows: updateResult.affectedRows,
     })
   } catch (error: any) {
-    console.error('Error closing period assignments:', error)
+    logger.error('Error closing period assignments:', error)
     res.status(500).json({ error: 'Error al cerrar parrillas' })
   }
 }
@@ -1317,7 +1351,7 @@ export const deleteCollaboratorKPI = async (req: Request, res: Response) => {
 
     res.json({ message: 'Asignación eliminada correctamente' })
   } catch (error: any) {
-    console.error('Error deleting collaborator KPI:', error)
+    logger.error('Error deleting collaborator KPI:', error)
     res.status(500).json({ error: 'Error al eliminar asignación' })
   }
 }
@@ -1566,7 +1600,7 @@ export const generateBaseGrids = async (req: Request, res: Response) => {
       },
     })
   } catch (error: any) {
-    console.error('Error generating base grids:', error)
+    logger.error('Error generating base grids:', error)
     res.status(500).json({ error: 'Error al generar parrillas base' })
   }
 }
@@ -1599,7 +1633,7 @@ export const getMonthlyPlan = async (req: Request, res: Response) => {
 
     res.json(rows)
   } catch (error: any) {
-    console.error('Error fetching monthly plan:', error)
+    logger.error('Error fetching monthly plan:', error)
     res.status(500).json({ error: 'Error al obtener el plan mensual' })
   }
 }
@@ -1731,7 +1765,7 @@ export const upsertMonthlyPlan = async (req: Request, res: Response) => {
 
     res.json({ message: 'Plan mensual actualizado' })
   } catch (error: any) {
-    console.error('Error upserting monthly plan:', error)
+    logger.error('Error upserting monthly plan:', error)
     res.status(500).json({ error: 'Error al actualizar plan mensual' })
   }
 }
@@ -1866,7 +1900,7 @@ export const getConsolidatedByCollaborator = async (req: Request, res: Response)
       subPeriods,
     })
   } catch (error: any) {
-    console.error('Error fetching consolidated data:', error)
+    logger.error('Error fetching consolidated data:', error)
     res.status(500).json({ error: 'Error al obtener consolidado' })
   }
 }
@@ -1877,7 +1911,20 @@ export const bulkCreateCollaboratorKPIs = async (req: AuthRequest, res: Response
       return res.status(403).json({ error: 'Sin permisos para crear asignaciones' })
     }
 
-    const { kpiId, periodId, collaboratorIds, target, weight, dataSource, inputMode } = req.body
+    const {
+      kpiId,
+      periodId,
+      collaboratorIds,
+      target,
+      weight,
+      status,
+      curationStatus,
+      dataSource,
+      sourceConfig,
+      inputMode,
+      criteriaText,
+      evidenceUrl,
+    } = req.body
 
     if (!kpiId || !periodId || !Array.isArray(collaboratorIds) || collaboratorIds.length === 0) {
       return res.status(400).json({ error: 'Faltan campos requeridos: kpiId, periodId, collaboratorIds' })
@@ -1897,22 +1944,43 @@ export const bulkCreateCollaboratorKPIs = async (req: AuthRequest, res: Response
 
     const toCreate = collaboratorIds.filter((id: number) => !alreadyAssigned.has(Number(id)))
     const created: number[] = []
+    const shouldCreateCriteriaVersion = hasCriteriaVersionPayload({
+      dataSource,
+      sourceConfig,
+      criteriaText,
+      evidenceUrl,
+    })
 
     for (const collaboratorId of toCreate) {
       const calendarProfileId = await resolveCalendarProfileId({ collaboratorId: Number(collaboratorId) })
       const [result] = await pool.query(
         `INSERT INTO collaborator_kpis
-         (collaboratorId, kpiId, periodId, calendarProfileId, subPeriodId, target, weight, status, curationStatus, dataSource, inputMode)
-         VALUES (?, ?, ?, ?, NULL, ?, ?, 'draft', 'pending', ?, ?)`,
+         (collaboratorId, kpiId, periodId, calendarProfileId, subPeriodId, target, weight, status, curationStatus, dataSource, sourceConfig, inputMode)
+         VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)`,
         [
           Number(collaboratorId), kpiId, periodId,
           calendarProfileId,
           Number(target), Number(weight) || 0,
-          dataSource || null,
+          status || 'draft',
+          curationStatus || 'pending',
+          normalizeOptionalText(dataSource),
+          normalizeOptionalText(sourceConfig),
           inputMode || 'manual',
         ]
       )
-      created.push((result as any).insertId)
+      const assignmentId = Number((result as any).insertId)
+      if (shouldCreateCriteriaVersion) {
+        await createAssignmentCriteriaVersion({
+          assignmentId,
+          dataSource,
+          sourceConfig,
+          criteriaText,
+          evidenceUrl,
+          status: curationStatus,
+          userId: req.user?.id || null,
+        })
+      }
+      created.push(assignmentId)
     }
 
     return res.status(201).json({
@@ -1922,7 +1990,7 @@ export const bulkCreateCollaboratorKPIs = async (req: AuthRequest, res: Response
       skippedCollaboratorIds: Array.from(alreadyAssigned),
     })
   } catch (error: any) {
-    console.error('[CollaboratorKPI] bulkCreate:', error)
+    logger.error('[CollaboratorKPI] bulkCreate:', error)
     return res.status(500).json({ error: 'Error al crear asignaciones masivas' })
   }
 }

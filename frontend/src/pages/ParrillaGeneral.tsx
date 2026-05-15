@@ -51,7 +51,7 @@ export default function ParrillaGeneral() {
       const res = await api.get(url)
       return res.data
     },
-    { enabled: canView }
+    { enabled: canView && (!!selectedPeriodId || !!selectedCollaboratorId) }
   )
 
   const summaryRows = useMemo(
@@ -210,7 +210,12 @@ export default function ParrillaGeneral() {
       </div>
 
       <div className="table-container">
-        {isLoading ? (
+        {!selectedPeriodId && !selectedCollaboratorId ? (
+          <div className="empty-state">
+            <h3>Seleccioná un período o colaborador</h3>
+            <p>Elegí un período o colaborador en los filtros de arriba para ver los datos.</p>
+          </div>
+        ) : isLoading ? (
           <div className="loading">Cargando…</div>
         ) : filtered.length === 0 ? (
           <div className="empty-state">

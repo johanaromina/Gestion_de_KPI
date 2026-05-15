@@ -3,6 +3,7 @@ import { pool } from '../config/database'
 import { SubPeriod } from '../types'
 import { sendMail } from '../utils/mailer'
 import { AuthRequest } from '../middleware/auth.middleware'
+import { logger } from '../utils/logger'
 
 const normalizeDate = (value: any): string | null => {
   if (!value) return null
@@ -50,7 +51,7 @@ export const getSubPeriods = async (req: Request, res: Response) => {
     const [rows] = await pool.query<SubPeriod[]>(query, params)
     res.json(rows)
   } catch (error: any) {
-    console.error('Error fetching sub-periods:', error)
+    logger.error('Error fetching sub-periods:', error)
     res.status(500).json({ error: 'Error al obtener subperíodos' })
   }
 }
@@ -69,7 +70,7 @@ export const getSubPeriodById = async (req: Request, res: Response) => {
 
     res.json(rows[0])
   } catch (error: any) {
-    console.error('Error fetching sub-period:', error)
+    logger.error('Error fetching sub-period:', error)
     res.status(500).json({ error: 'Error al obtener subperíodo' })
   }
 }
@@ -151,7 +152,7 @@ export const createSubPeriod = async (req: Request, res: Response) => {
       weight: weight || null,
     })
   } catch (error: any) {
-    console.error('Error creating sub-period:', error)
+    logger.error('Error creating sub-period:', error)
     res.status(500).json({ error: 'Error al crear subperíodo' })
   }
 }
@@ -191,7 +192,7 @@ export const updateSubPeriod = async (req: Request, res: Response) => {
 
     res.json({ message: 'Subperíodo actualizado correctamente' })
   } catch (error: any) {
-    console.error('Error updating sub-period:', error)
+    logger.error('Error updating sub-period:', error)
     res.status(500).json({ error: 'Error al actualizar subperíodo' })
   }
 }
@@ -218,7 +219,7 @@ export const deleteSubPeriod = async (req: Request, res: Response) => {
 
     res.json({ message: 'Subperíodo eliminado correctamente' })
   } catch (error: any) {
-    console.error('Error deleting sub-period:', error)
+    logger.error('Error deleting sub-period:', error)
     res.status(500).json({ error: 'Error al eliminar subperíodo' })
   }
 }
@@ -360,7 +361,7 @@ export const closeSubPeriod = async (req: Request, res: Response) => {
 
     res.json({ message: 'Subperíodo cerrado y emails enviados', sent: sentCount })
   } catch (error: any) {
-    console.error('Error closing sub-period:', error)
+    logger.error('Error closing sub-period:', error)
     res.status(500).json({ error: 'Error al cerrar subperíodo' })
   }
 }

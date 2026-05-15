@@ -43,7 +43,7 @@ import OKRAlineacion from './pages/OKRAlineacion'
 import OKRDetalle from './pages/OKRDetalle'
 import MiSemana from './pages/MiSemana'
 import Analytics from './pages/Analytics'
-import { isTokenExpired } from './hooks/useAuth'
+import { useAuth } from './hooks/useAuth'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -55,23 +55,16 @@ const queryClient = new QueryClient({
 })
 
 const RequireAuth = ({ children }: { children: JSX.Element }) => {
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token')
-  const expired = isTokenExpired(token)
-
-  if (!token || expired) {
-    if (expired) {
-      localStorage.removeItem('token')
-      sessionStorage.removeItem('token')
-    }
-    return <Navigate to="/login" replace />
-  }
+  const { user, isLoading, error } = useAuth()
+  if (isLoading) return null
+  if (!user || error) return <Navigate to="/login" replace />
   return children
 }
 
 const HomeRoute = () => {
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token')
-  const expired = isTokenExpired(token)
-  if (token && !expired) return <Dashboard />
+  const { user, isLoading } = useAuth()
+  if (isLoading) return null
+  if (user) return <Dashboard />
   return <Landing />
 }
 

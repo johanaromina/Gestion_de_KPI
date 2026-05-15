@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { z } from 'zod'
 import { appEnv } from '../config/env'
 import { isMailConfigured, sendMail } from '../utils/mailer'
+import { logger } from '../utils/logger'
 
 const demoRequestSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -73,7 +74,7 @@ export const submitDemoRequest = async (req: Request, res: Response) => {
       })
     }
 
-    console.log('[contact] demo request received without automatic delivery:', {
+    logger.info('[contact] demo request received without automatic delivery:', {
       ...payload,
       origin,
       at: new Date().toISOString(),
@@ -84,7 +85,7 @@ export const submitDemoRequest = async (req: Request, res: Response) => {
       delivery: 'manual',
     })
   } catch (error) {
-    console.error('Error submitting demo request:', error)
+    logger.error('Error submitting demo request:', error)
     return res.status(500).json({
       error: 'No pudimos enviar la solicitud. Intentá nuevamente o usá los canales directos de contacto.',
     })

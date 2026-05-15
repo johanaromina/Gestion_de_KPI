@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { pool } from '../config/database'
 import { AuthRequest } from '../middleware/auth.middleware'
+import { logger } from '../utils/logger'
 
 const userCanManageConfig = (req: Request) => {
   const user = (req as AuthRequest).user
@@ -75,7 +76,7 @@ export const listPermissions = async (_req: Request, res: Response) => {
     const [rows] = await pool.query<any[]>('SELECT id, code, description FROM permissions ORDER BY code ASC')
     res.json(rows)
   } catch (error) {
-    console.error('Error listing permissions:', error)
+    logger.error('Error listing permissions:', error)
     res.status(500).json({ error: 'Error al obtener permisos' })
   }
 }
@@ -104,7 +105,7 @@ export const listRoles = async (req: Request, res: Response) => {
 
     res.json(payload)
   } catch (error) {
-    console.error('Error listing roles:', error)
+    logger.error('Error listing roles:', error)
     res.status(500).json({ error: 'Error al obtener roles' })
   }
 }
@@ -136,7 +137,7 @@ export const assignRoleToCollaborator = async (req: Request, res: Response) => {
 
     res.json({ message: 'Rol asignado', roleCode })
   } catch (error) {
-    console.error('Error assigning role:', error)
+    logger.error('Error assigning role:', error)
     res.status(500).json({ error: 'Error al asignar rol' })
   }
 }
@@ -154,7 +155,7 @@ export const getCollaboratorPermissions = async (req: Request, res: Response) =>
     const codes = Array.isArray(rows) ? rows.map((r) => r.code) : []
     res.json({ collaboratorId: Number(collaboratorId), permissions: codes })
   } catch (error) {
-    console.error('Error fetching collaborator permissions:', error)
+    logger.error('Error fetching collaborator permissions:', error)
     res.status(500).json({ error: 'Error al obtener permisos del colaborador' })
   }
 }
@@ -189,7 +190,7 @@ export const updateCollaboratorPermissions = async (req: Request, res: Response)
 
     res.json({ message: 'Permisos actualizados', permissions: permissions })
   } catch (error) {
-    console.error('Error updating collaborator permissions:', error)
+    logger.error('Error updating collaborator permissions:', error)
     res.status(500).json({ error: 'Error al actualizar permisos' })
   }
 }
@@ -207,7 +208,7 @@ export const toggleSuperpowers = async (req: Request, res: Response) => {
     ])
     res.json({ message: 'Superpoderes actualizados', hasSuperpowers })
   } catch (error) {
-    console.error('Error toggling superpowers:', error)
+    logger.error('Error toggling superpowers:', error)
     res.status(500).json({ error: 'Error al actualizar superpoderes' })
   }
 }

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import { pool } from '../config/database'
+import { logger } from '../utils/logger'
 
 const normalizeExternalKey = (value: any) =>
   String(value ?? '')
@@ -150,7 +151,7 @@ export const listDataSourceMappings = async (req: Request, res: Response) => {
         : []
     )
   } catch (error: any) {
-    console.error('Error listing data source mappings:', error)
+    logger.error('Error listing data source mappings:', error)
     res.status(500).json({ error: 'Error al obtener data source mappings' })
   }
 }
@@ -165,7 +166,7 @@ export const syncDataSourceMappings = async (req: Request, res: Response) => {
     res.json({ message: 'Mappings sincronizados', count })
   } catch (error: any) {
     await connection.rollback()
-    console.error('Error syncing data source mappings:', error)
+    logger.error('Error syncing data source mappings:', error)
     const message = error?.message || 'Error al sincronizar data source mappings'
     const status = message === 'Entidad no encontrada para el mapping' ? 404 : 400
     res.status(status).json({ error: message })
@@ -200,7 +201,7 @@ export const bulkSyncDataSourceMappings = async (req: Request, res: Response) =>
     })
   } catch (error: any) {
     await connection.rollback()
-    console.error('Error bulk syncing data source mappings:', error)
+    logger.error('Error bulk syncing data source mappings:', error)
     const message = error?.message || 'Error al sincronizar data source mappings'
     const status = message === 'Entidad no encontrada para el mapping' ? 404 : 400
     res.status(status).json({ error: message })

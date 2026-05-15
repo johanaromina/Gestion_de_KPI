@@ -1,6 +1,7 @@
 import { Response } from 'express'
 import { pool } from '../config/database'
 import { AuthRequest } from '../middleware/auth.middleware'
+import { logger } from '../utils/logger'
 
 /* GET /api/check-ins
    Leaders/admins get their team's check-ins; collaborators get their own.
@@ -57,7 +58,7 @@ export const getCheckIns = async (req: AuthRequest, res: Response) => {
 
     res.json(rows)
   } catch (err) {
-    console.error('[check-ins] getCheckIns error:', err)
+    logger.error('[check-ins] getCheckIns error:', err)
     res.status(500).json({ error: 'Error al obtener check-ins' })
   }
 }
@@ -87,7 +88,7 @@ export const getCurrentWeekCheckIn = async (req: AuthRequest, res: Response) => 
 
     res.json(Array.isArray(rows) && rows.length > 0 ? rows[0] : null)
   } catch (err) {
-    console.error('[check-ins] getCurrentWeekCheckIn error:', err)
+    logger.error('[check-ins] getCurrentWeekCheckIn error:', err)
     res.status(500).json({ error: 'Error al obtener check-in de la semana' })
   }
 }
@@ -138,7 +139,7 @@ export const upsertCheckIn = async (req: AuthRequest, res: Response) => {
 
     res.status(201).json(Array.isArray(rows) ? rows[0] : {})
   } catch (err) {
-    console.error('[check-ins] upsertCheckIn error:', err)
+    logger.error('[check-ins] upsertCheckIn error:', err)
     res.status(500).json({ error: 'Error al guardar check-in' })
   }
 }
@@ -158,7 +159,7 @@ export const addCheckInNote = async (req: AuthRequest, res: Response) => {
     await pool.query('UPDATE check_ins SET note = ? WHERE id = ?', [note ?? null, id])
     res.json({ success: true })
   } catch (err) {
-    console.error('[check-ins] addCheckInNote error:', err)
+    logger.error('[check-ins] addCheckInNote error:', err)
     res.status(500).json({ error: 'Error al guardar comentario' })
   }
 }
@@ -185,7 +186,7 @@ export const getTeamCheckInSummary = async (req: AuthRequest, res: Response) => 
 
     res.json(rows)
   } catch (err) {
-    console.error('[check-ins] getTeamCheckInSummary error:', err)
+    logger.error('[check-ins] getTeamCheckInSummary error:', err)
     res.status(500).json({ error: 'Error al obtener resumen del equipo' })
   }
 }

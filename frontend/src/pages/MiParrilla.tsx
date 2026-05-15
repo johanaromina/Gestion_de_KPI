@@ -66,6 +66,7 @@ export default function MiParrilla() {
     },
     {
       enabled: !!resolvedId,
+      staleTime: 3 * 60 * 1000,
     }
   )
 
@@ -77,6 +78,7 @@ export default function MiParrilla() {
     },
     {
       enabled: !!resolvedId,
+      staleTime: 2 * 60 * 1000,
     }
   )
 

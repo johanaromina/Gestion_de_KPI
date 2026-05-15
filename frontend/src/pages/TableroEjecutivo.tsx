@@ -557,7 +557,7 @@ export default function TableroEjecutivo() {
           },
         })
       ).data,
-    { retry: false }
+    { retry: false, staleTime: 2 * 60 * 1000 }
   )
 
   const { data: subPeriods } = useQuery<SubPeriod[]>(

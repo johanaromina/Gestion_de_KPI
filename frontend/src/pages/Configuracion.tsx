@@ -305,7 +305,7 @@ export default function Configuracion() {
   const { data: scopeKpis } = useQuery<any[]>('config-scope-kpis', async () => {
     const res = await api.get('/scope-kpis')
     return res.data
-  })
+  }, { enabled: activeIntegrationTab === 'targets' })
 
   const { data: orgScopes } = useQuery<any[]>('org-scopes', async () => {
     const res = await api.get('/org-scopes')

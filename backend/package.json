@@ -32,8 +32,10 @@
     "smoke:prod": "tsx scripts/smoke-prod.ts"
   },
   "dependencies": {
+    "@types/cookie-parser": "^1.4.10",
     "@types/pdfkit": "^0.17.4",
     "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "exceljs": "^4.4.0",

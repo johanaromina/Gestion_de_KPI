@@ -1,6 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
+import cookieParser from 'cookie-parser'
 import { testConnection } from './config/database.js'
 import { appEnv } from './config/env.js'
 
@@ -38,6 +39,7 @@ import miSemanaRoutes from './routes/mi-semana.routes.js'
 import { startIntegrationsScheduler } from './utils/integrations-scheduler'
 import { runNotifications } from './utils/notifications'
 import { startOKRScheduler } from './utils/okr-scheduler.js'
+import { logger } from './utils/logger'
 
 const app = express()
 const PORT = process.env.PORT || 5000
@@ -73,6 +75,7 @@ app.use(
     credentials: true,
   })
 )
+app.use(cookieParser())
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
@@ -135,28 +138,28 @@ app.use('/api/mi-semana', miSemanaRoutes)
 
 // Start server
 app.listen(PORT, async () => {
-  console.log(`🚀 Server running on port ${PORT}`)
-  console.log(`📡 Health check: http://localhost:${PORT}/api/health`)
-  console.log(`\n📋 API Endpoints:`)
-  console.log(`   POST   /api/auth/login`)
-  console.log(`   GET    /api/auth/me`)
-  console.log(`   GET    /api/collaborators`)
-  console.log(`   GET    /api/periods`)
-  console.log(`   GET    /api/kpis`)
-  console.log(`   GET    /api/collaborator-kpis`)
-  console.log(`   GET    /api/collaborator-kpis/collaborator/:id`)
+  logger.info(`🚀 Server running on port ${PORT}`)
+  logger.info(`📡 Health check: http://localhost:${PORT}/api/health`)
+  logger.info(`\n📋 API Endpoints:`)
+  logger.info(`   POST   /api/auth/login`)
+  logger.info(`   GET    /api/auth/me`)
+  logger.info(`   GET    /api/collaborators`)
+  logger.info(`   GET    /api/periods`)
+  logger.info(`   GET    /api/kpis`)
+  logger.info(`   GET    /api/collaborator-kpis`)
+  logger.info(`   GET    /api/collaborator-kpis/collaborator/:id`)
   
   // Test database connection
-  console.log('\n🔌 Testing database connection...')
+  logger.info('\n🔌 Testing database connection...')
   const connected = await testConnection()
   if (connected) {
-    console.log('✅ Database connection successful\n')
+    logger.info('✅ Database connection successful\n')
   } else {
-    console.log('❌ Database connection failed\n')
-    console.log('💡 Make sure to:')
-    console.log('   1. Create a .env file in the backend folder')
-    console.log('   2. Configure your MySQL credentials')
-    console.log('   3. Run the database setup script: npm run setup:db')
+    logger.info('❌ Database connection failed\n')
+    logger.info('💡 Make sure to:')
+    logger.info('   1. Create a .env file in the backend folder')
+    logger.info('   2. Configure your MySQL credentials')
+    logger.info('   3. Run the database setup script: npm run setup:db')
   }
 })
 
@@ -167,12 +170,12 @@ const notifyOnStart = (process.env.NOTIFY_RUN_ON_START || 'false').toLowerCase()
 if (shouldNotify) {
   if (notifyOnStart) {
     setTimeout(() => {
-      runNotifications().catch((error) => console.error('[notifications] error:', error))
+      runNotifications().catch((error) => logger.error('[notifications] error:', error))
     }, 5000)
   }
 
   setInterval(() => {
-    runNotifications().catch((error) => console.error('[notifications] error:', error))
+    runNotifications().catch((error) => logger.error('[notifications] error:', error))
   }, NOTIFY_INTERVAL_MIN * 60 * 1000)
 }
 

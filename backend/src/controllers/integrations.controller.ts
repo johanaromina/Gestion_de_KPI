@@ -6,6 +6,7 @@ import { runTemplateQueued } from '../utils/integrations-runner'
 import { decryptSecret, encryptSecret } from '../utils/crypto'
 import { resolveConnectorAdapter } from '../integrations/adapters'
 import { appEnv } from '../config/env'
+import { logger } from '../utils/logger'
 
 type IntegrationRow = {
   id: number
@@ -299,7 +300,7 @@ export const testIntegrationJql = async (req: Request, res: Response) => {
     const total = await jiraSearch(endpoint, authType, authConfig || {}, jql)
     res.json({ total })
   } catch (error: any) {
-    console.error('Error testing integration JQL:', error)
+    logger.error('Error testing integration JQL:', error)
     res.status(500).json({ error: 'Error al probar JQL' })
   }
 }
@@ -315,7 +316,7 @@ export const listAuthProfiles = async (_req: Request, res: Response) => {
       : []
     res.json(data)
   } catch (error: any) {
-    console.error('Error fetching auth profiles:', error)
+    logger.error('Error fetching auth profiles:', error)
     res.status(500).json({ error: 'Error al obtener auth profiles' })
   }
 }
@@ -340,7 +341,7 @@ export const createAuthProfile = async (req: Request, res: Response) => {
     const insertResult = result as any
     res.status(201).json({ id: insertResult.insertId })
   } catch (error: any) {
-    console.error('Error creating auth profile:', error)
+    logger.error('Error creating auth profile:', error)
     res.status(500).json({ error: 'Error al crear auth profile' })
   }
 }
@@ -362,7 +363,7 @@ export const updateAuthProfile = async (req: Request, res: Response) => {
     )
     res.json({ message: 'Auth profile actualizado' })
   } catch (error: any) {
-    console.error('Error updating auth profile:', error)
+    logger.error('Error updating auth profile:', error)
     res.status(500).json({ error: 'Error al actualizar auth profile' })
   }
 }
@@ -377,7 +378,7 @@ export const listTemplates = async (_req: Request, res: Response) => {
     )
     res.json(rows)
   } catch (error: any) {
-    console.error('Error fetching templates:', error)
+    logger.error('Error fetching templates:', error)
     res.status(500).json({ error: 'Error al obtener plantillas' })
   }
 }
@@ -425,7 +426,7 @@ export const createTemplate = async (req: Request, res: Response) => {
     const insertResult = result as any
     res.status(201).json({ id: insertResult.insertId })
   } catch (error: any) {
-    console.error('Error creating template:', error)
+    logger.error('Error creating template:', error)
     res.status(500).json({ error: 'Error al crear plantilla' })
   }
 }
@@ -471,7 +472,7 @@ export const updateTemplate = async (req: Request, res: Response) => {
     )
     res.json({ message: 'Plantilla actualizada' })
   } catch (error: any) {
-    console.error('Error updating template:', error)
+    logger.error('Error updating template:', error)
     res.status(500).json({ error: 'Error al actualizar plantilla' })
   }
 }
@@ -513,7 +514,7 @@ export const listTargets = async (req: Request, res: Response) => {
       : []
     res.json(data)
   } catch (error: any) {
-    console.error('Error fetching targets:', error)
+    logger.error('Error fetching targets:', error)
     res.status(500).json({ error: 'Error al obtener targets' })
   }
 }
@@ -553,7 +554,7 @@ export const createTarget = async (req: Request, res: Response) => {
     const insertResult = result as any
     res.status(201).json({ id: insertResult.insertId })
   } catch (error: any) {
-    console.error('Error creating target:', error)
+    logger.error('Error creating target:', error)
     res.status(400).json({ error: error?.message || 'Error al crear target' })
   }
 }
@@ -591,7 +592,7 @@ export const updateTarget = async (req: Request, res: Response) => {
     )
     res.json({ message: 'Target actualizado' })
   } catch (error: any) {
-    console.error('Error updating target:', error)
+    logger.error('Error updating target:', error)
     res.status(400).json({ error: error?.message || 'Error al actualizar target' })
   }
 }
@@ -627,7 +628,7 @@ export const listTemplateRuns = async (req: Request, res: Response) => {
       : []
     res.json(data)
   } catch (error: any) {
-    console.error('Error fetching template runs:', error)
+    logger.error('Error fetching template runs:', error)
     res.status(500).json({ error: 'Error al obtener ejecuciones' })
   }
 }
@@ -638,7 +639,7 @@ export const archiveRun = async (req: Request, res: Response) => {
     await pool.query(`UPDATE integration_template_runs SET archived = 1 WHERE id = ?`, [id])
     res.json({ message: 'Run archivado' })
   } catch (error: any) {
-    console.error('Error archiving run:', error)
+    logger.error('Error archiving run:', error)
     res.status(500).json({ error: 'Error al archivar run' })
   }
 }
@@ -649,7 +650,7 @@ export const deleteRun = async (req: Request, res: Response) => {
     await pool.query(`DELETE FROM integration_template_runs WHERE id = ?`, [id])
     res.json({ message: 'Run eliminado' })
   } catch (error: any) {
-    console.error('Error deleting run:', error)
+    logger.error('Error deleting run:', error)
     res.status(500).json({ error: 'Error al eliminar run' })
   }
 }
@@ -673,7 +674,7 @@ export const archiveRuns = async (req: Request, res: Response) => {
     const [result] = await pool.query(query, params)
     res.json({ message: 'Runs archivados', result })
   } catch (error: any) {
-    console.error('Error archiving runs:', error)
+    logger.error('Error archiving runs:', error)
     res.status(500).json({ error: 'Error al archivar runs' })
   }
 }
@@ -697,7 +698,7 @@ export const deleteRuns = async (req: Request, res: Response) => {
     const [result] = await pool.query(query, params)
     res.json({ message: 'Runs eliminados', result })
   } catch (error: any) {
-    console.error('Error deleting runs:', error)
+    logger.error('Error deleting runs:', error)
     res.status(500).json({ error: 'Error al eliminar runs' })
   }
 }
@@ -927,7 +928,7 @@ export const testTemplate = async (req: Request, res: Response) => {
       raw: allowRaw ? { tests: testsTotal, stories: storiesTotal } : undefined,
     })
   } catch (error: any) {
-    console.error('Error testing template:', error)
+    logger.error('Error testing template:', error)
     res.status(500).json({ error: error?.message || 'Error al probar template' })
   }
 }
@@ -947,7 +948,7 @@ export const getNextCronRun = async (req: Request, res: Response) => {
     task.stop()
     res.json({ nextRun: next ? next.toISOString() : null })
   } catch (error: any) {
-    console.error('Error computing cron next run:', error)
+    logger.error('Error computing cron next run:', error)
     res.status(500).json({ error: 'Error al calcular próxima ejecución' })
   }
 }
@@ -965,7 +966,7 @@ export const listIntegrations = async (_req: Request, res: Response) => {
       : []
     res.json(data)
   } catch (error: any) {
-    console.error('Error fetching integrations:', error)
+    logger.error('Error fetching integrations:', error)
     res.status(500).json({ error: 'Error al obtener integraciones' })
   }
 }
@@ -986,7 +987,7 @@ export const getIntegrationById = async (req: Request, res: Response) => {
       authConfig: row.authConfig ? parseAuthConfig(row.authConfig) : null,
     })
   } catch (error: any) {
-    console.error('Error fetching integration:', error)
+    logger.error('Error fetching integration:', error)
     res.status(500).json({ error: 'Error al obtener integración' })
   }
 }
@@ -1021,7 +1022,7 @@ export const createIntegration = async (req: Request, res: Response) => {
     const insertResult = result as any
     res.status(201).json({ id: insertResult.insertId })
   } catch (error: any) {
-    console.error('Error creating integration:', error)
+    logger.error('Error creating integration:', error)
     res.status(500).json({ error: 'Error al crear integración' })
   }
 }
@@ -1054,7 +1055,7 @@ export const updateIntegration = async (req: Request, res: Response) => {
 
     res.json({ message: 'Integración actualizada' })
   } catch (error: any) {
-    console.error('Error updating integration:', error)
+    logger.error('Error updating integration:', error)
     res.status(500).json({ error: 'Error al actualizar integración' })
   }
 }
@@ -1069,7 +1070,7 @@ export const updateIntegrationStatus = async (req: Request, res: Response) => {
     await pool.query(`UPDATE integrations SET status = ? WHERE id = ?`, [status, id])
     res.json({ message: 'Estado actualizado' })
   } catch (error: any) {
-    console.error('Error updating integration status:', error)
+    logger.error('Error updating integration status:', error)
     res.status(500).json({ error: 'Error al actualizar estado' })
   }
 }
@@ -1080,7 +1081,7 @@ export const runIntegration = async (_req: Request, res: Response) => {
       error: 'Endpoint de integraciones legacy deshabilitado. Usa /integrations/templates/:id/run',
     })
   } catch (error: any) {
-    console.error('Error running integration:', error)
+    logger.error('Error running integration:', error)
     res.status(500).json({ error: 'Error al ejecutar integración' })
   }
 }
@@ -1109,7 +1110,7 @@ export const listIntegrationRuns = async (req: Request, res: Response) => {
       : []
     res.json(data)
   } catch (error: any) {
-    console.error('Error fetching integration runs:', error)
+    logger.error('Error fetching integration runs:', error)
     res.status(500).json({ error: 'Error al obtener ejecuciones' })
   }
 }
@@ -1303,7 +1304,7 @@ export const sheetsWizard = async (req: AuthRequest, res: Response) => {
 
     return res.status(201).json({ authProfileId, templateId, targetId, name: wizardName })
   } catch (error: any) {
-    console.error('Sheets wizard error:', error)
+    logger.error('Sheets wizard error:', error)
     return res.status(500).json({ error: error?.message || 'Error al crear la integración' })
   }
 }

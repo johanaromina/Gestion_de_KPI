@@ -2,6 +2,7 @@ import { pool } from '../config/database'
 import { sendMail } from './mailer'
 import { appEnv } from '../config/env'
 import crypto from 'crypto'
+import { logger } from '../utils/logger'
 
 const NOTIFY_WINDOW_DAYS = parseInt(process.env.NOTIFY_WINDOW_DAYS || '7')
 const NOTIFY_ENABLED = (process.env.NOTIFY_ENABLED || 'true').toLowerCase() === 'true'
@@ -384,7 +385,7 @@ export async function runNotifications() {
       const blocks = buildSlackBlocks(summary)
       await sendSlackMessage(slackUrl, newEvents.join('\n'), blocks)
     } catch (err: any) {
-      console.error('Error enviando notificación Slack:', err?.message)
+      logger.error('Error enviando notificación Slack:', err?.message)
     }
   }
 

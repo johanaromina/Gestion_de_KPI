@@ -106,6 +106,7 @@ export interface CollaboratorKPI {
   dataSourceName?: string
   sourceConfig?: string
   criteriaText?: string
+  evidenceUrl?: string
   criteriaVersion?: string
   criteriaUpdatedAt?: string
   criteriaUpdatedBy?: string

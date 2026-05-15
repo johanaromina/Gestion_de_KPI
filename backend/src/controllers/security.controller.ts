@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { pool } from '../config/database'
 import { AuthRequest } from '../middleware/auth.middleware'
 import { logAudit } from '../utils/audit'
+import { logger } from '../utils/logger'
 
 const canManageSecurity = (req: Request) => {
   const user = (req as AuthRequest).user
@@ -63,7 +64,7 @@ export const listRoles = async (req: Request, res: Response) => {
       }))
     )
   } catch (error) {
-    console.error('Error listing roles:', error)
+    logger.error('Error listing roles:', error)
     res.status(500).json({ error: 'Error al obtener roles' })
   }
 }
@@ -105,7 +106,7 @@ export const createRole = async (req: Request, res: Response) => {
 
     res.json({ message: 'Rol creado', roleId })
   } catch (error) {
-    console.error('Error creating role:', error)
+    logger.error('Error creating role:', error)
     res.status(500).json({ error: 'Error al crear rol' })
   }
 }
@@ -177,7 +178,7 @@ export const updateRole = async (req: Request, res: Response) => {
 
     res.json({ message: 'Rol actualizado' })
   } catch (error) {
-    console.error('Error updating role:', error)
+    logger.error('Error updating role:', error)
     res.status(500).json({ error: 'Error al actualizar rol' })
   }
 }
@@ -221,7 +222,7 @@ export const cloneRole = async (req: Request, res: Response) => {
 
     res.json({ message: 'Rol clonado', roleId: newRoleId })
   } catch (error) {
-    console.error('Error cloning role:', error)
+    logger.error('Error cloning role:', error)
     res.status(500).json({ error: 'Error al clonar rol' })
   }
 }
@@ -257,7 +258,7 @@ export const deleteRole = async (req: Request, res: Response) => {
 
     res.json({ message: 'Rol eliminado' })
   } catch (error) {
-    console.error('Error deleting role:', error)
+    logger.error('Error deleting role:', error)
     res.status(500).json({ error: 'Error al eliminar rol' })
   }
 }
@@ -275,7 +276,7 @@ export const listScopeRoles = async (req: Request, res: Response) => {
     )
     res.json(rows)
   } catch (error) {
-    console.error('Error listing scope roles:', error)
+    logger.error('Error listing scope roles:', error)
     res.status(500).json({ error: 'Error al obtener roles por scope' })
   }
 }
@@ -318,7 +319,7 @@ export const assignScopeRole = async (req: Request, res: Response) => {
     )
     res.json({ message: 'Rol asignado al scope' })
   } catch (error) {
-    console.error('Error assigning scope role:', error)
+    logger.error('Error assigning scope role:', error)
     res.status(500).json({ error: 'Error al asignar rol al scope' })
   }
 }
@@ -340,7 +341,7 @@ export const listUserRoles = async (req: Request, res: Response) => {
     )
     res.json(rows)
   } catch (error) {
-    console.error('Error listing user roles:', error)
+    logger.error('Error listing user roles:', error)
     res.status(500).json({ error: 'Error al obtener roles por usuario' })
   }
 }
@@ -383,7 +384,7 @@ export const assignUserRole = async (req: Request, res: Response) => {
     )
     res.json({ message: 'Rol asignado al usuario' })
   } catch (error) {
-    console.error('Error assigning user role:', error)
+    logger.error('Error assigning user role:', error)
     res.status(500).json({ error: 'Error al asignar rol al usuario' })
   }
 }
@@ -401,7 +402,7 @@ export const listUserOverrides = async (req: Request, res: Response) => {
     )
     res.json({ collaboratorId: Number(collaboratorId), permissions: rows?.map((r: any) => r.code) || [] })
   } catch (error) {
-    console.error('Error listing user overrides:', error)
+    logger.error('Error listing user overrides:', error)
     res.status(500).json({ error: 'Error al obtener permisos del usuario' })
   }
 }
@@ -440,7 +441,7 @@ export const updateUserOverrides = async (req: Request, res: Response) => {
     )
     res.json({ message: 'Overrides actualizados', permissions })
   } catch (error) {
-    console.error('Error updating user overrides:', error)
+    logger.error('Error updating user overrides:', error)
     res.status(500).json({ error: 'Error al actualizar permisos' })
   }
 }
@@ -467,7 +468,7 @@ export const resetUserOverrides = async (req: Request, res: Response) => {
     )
     res.json({ message: 'Overrides eliminados' })
   } catch (error) {
-    console.error('Error resetting user overrides:', error)
+    logger.error('Error resetting user overrides:', error)
     res.status(500).json({ error: 'Error al limpiar overrides' })
   }
 }

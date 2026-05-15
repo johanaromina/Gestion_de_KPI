@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { pool } from '../config/database'
 import { ObjectiveTree, KPI, ScopeKPI } from '../types'
 import { hydrateScopeKpiMixedFields } from '../services/scope-kpi-mixed.service'
+import { logger } from '../utils/logger'
 
 const parseIdArray = (value: any) =>
   Array.from(
@@ -233,7 +234,7 @@ export const getObjectiveTrees = async (_req: Request, res: Response) => {
 
     res.json(objectivesWithRelations)
   } catch (error: any) {
-    console.error('Error fetching objective trees:', error)
+    logger.error('Error fetching objective trees:', error)
     res.status(500).json({ error: 'Error al obtener árbol de objetivos' })
   }
 }
@@ -259,7 +260,7 @@ export const getObjectiveTreeById = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     const message = error?.message || 'Error al obtener objetivo'
-    console.error('Error fetching objective tree:', error)
+    logger.error('Error fetching objective tree:', error)
     res.status(message === 'Objetivo no encontrado' ? 404 : 500).json({ error: message })
   }
 }
@@ -272,7 +273,7 @@ export const getObjectiveTreeScopeKpis = async (req: Request, res: Response) => 
     res.json(scopeKpisByObjective.get(id) || [])
   } catch (error: any) {
     const message = error?.message || 'Error al obtener Scope KPIs del objetivo'
-    console.error('Error fetching objective tree scope KPIs:', error)
+    logger.error('Error fetching objective tree scope KPIs:', error)
     res.status(message === 'Objetivo no encontrado' ? 404 : 500).json({ error: message })
   }
 }
@@ -303,7 +304,7 @@ export const getObjectiveTreeDrilldown = async (req: Request, res: Response) => 
     })
   } catch (error: any) {
     const message = error?.message || 'Error al obtener drill-down del objetivo'
-    console.error('Error fetching objective tree drilldown:', error)
+    logger.error('Error fetching objective tree drilldown:', error)
     res.status(message === 'Objetivo no encontrado' ? 404 : 500).json({ error: message })
   }
 }
@@ -341,7 +342,7 @@ export const createObjectiveTree = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     await connection.rollback()
-    console.error('Error creating objective tree:', error)
+    logger.error('Error creating objective tree:', error)
     res.status(500).json({ error: 'Error al crear objetivo' })
   } finally {
     connection.release()
@@ -370,7 +371,7 @@ export const updateObjectiveTree = async (req: Request, res: Response) => {
     res.json({ message: 'Objetivo actualizado correctamente' })
   } catch (error: any) {
     await connection.rollback()
-    console.error('Error updating objective tree:', error)
+    logger.error('Error updating objective tree:', error)
     res.status(500).json({ error: 'Error al actualizar objetivo' })
   } finally {
     connection.release()
@@ -398,7 +399,7 @@ export const syncObjectiveTreeScopeKpis = async (req: Request, res: Response) =>
   } catch (error: any) {
     await connection.rollback()
     const message = error?.message || 'Error al sincronizar Scope KPIs del objetivo'
-    console.error('Error syncing objective tree scope KPIs:', error)
+    logger.error('Error syncing objective tree scope KPIs:', error)
     res.status(message === 'Objetivo no encontrado' ? 404 : 500).json({ error: message })
   } finally {
     connection.release()
@@ -412,7 +413,7 @@ export const getOKRsForObjectiveTree = async (req: Request, res: Response) => {
     const okrs = await fetchOKRs(Number(id))
     res.json(okrs)
   } catch (error: any) {
-    console.error('Error fetching OKRs for objective tree:', error)
+    logger.error('Error fetching OKRs for objective tree:', error)
     res.status(500).json({ error: 'Error al obtener OKRs vinculados' })
   }
 }
@@ -423,7 +424,7 @@ export const deleteObjectiveTree = async (req: Request, res: Response) => {
     await pool.query('DELETE FROM objective_trees WHERE id = ?', [id])
     res.json({ message: 'Objetivo eliminado correctamente' })
   } catch (error: any) {
-    console.error('Error deleting objective tree:', error)
+    logger.error('Error deleting objective tree:', error)
     res.status(500).json({ error: 'Error al eliminar objetivo' })
   }
 }

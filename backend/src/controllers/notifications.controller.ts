@@ -3,6 +3,7 @@ import { buildNotificationSummary, runNotifications, sendSlackMessage } from '..
 import { isMailConfigured, sendMail, verifyMailTransport } from '../utils/mailer'
 import { pool } from '../config/database'
 import { appEnv } from '../config/env'
+import { logger } from '../utils/logger'
 
 const ensureAppConfigTable = async () => {
   await pool.query(`
@@ -31,7 +32,7 @@ export const getNotificationSummary = async (_req: Request, res: Response) => {
       },
     })
   } catch (error: any) {
-    console.error('Error getting notification summary:', error)
+    logger.error('Error getting notification summary:', error)
     res.status(500).json({ error: 'Error al obtener notificaciones' })
   }
 }
@@ -41,7 +42,7 @@ export const triggerNotifications = async (_req: Request, res: Response) => {
     await runNotifications()
     res.json({ message: 'Notificaciones ejecutadas' })
   } catch (error: any) {
-    console.error('Error running notifications:', error)
+    logger.error('Error running notifications:', error)
     res.status(500).json({ error: 'Error al ejecutar notificaciones' })
   }
 }

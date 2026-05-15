@@ -6,13 +6,25 @@ import {
   exchangeSsoHandoffCode,
   listEnabledSsoProviders,
 } from '../services/sso.service'
+import { logger } from '../utils/logger'
+
+const setAuthCookie = (res: Response, token: string, rememberMe?: boolean) => {
+  const maxAge = rememberMe ? 30 * 24 * 60 * 60 * 1000 : undefined
+  res.cookie('auth_token', token, {
+    httpOnly: true,
+    secure: appEnv.isProduction,
+    sameSite: appEnv.isProduction ? 'strict' : 'lax',
+    path: '/',
+    ...(maxAge !== undefined ? { maxAge } : {}),
+  })
+}
 
 export const getSsoProviders = async (req: Request, res: Response) => {
   try {
     const providers = await listEnabledSsoProviders()
     res.json(providers)
   } catch (error: any) {
-    console.error('Error listing SSO providers:', error)
+    logger.error('Error listing SSO providers:', error)
     res.status(500).json({ error: 'Error al obtener providers SSO' })
   }
 }
@@ -30,7 +42,7 @@ export const startSso = async (req: Request, res: Response) => {
       redirectUrl: result.redirectUrl,
     })
   } catch (error: any) {
-    console.error('Error starting SSO:', error)
+    logger.error('Error starting SSO:', error)
     res.status(400).json({ error: error?.message || 'Error al iniciar SSO' })
   }
 }
@@ -50,7 +62,7 @@ export const handleSsoCallback = async (req: Request, res: Response) => {
       `${appEnv.frontendBaseUrl}/sso/callback?code=${encodeURIComponent(handoffCode)}`
     )
   } catch (error: any) {
-    console.error('Error in SSO callback:', error)
+    logger.error('Error in SSO callback:', error)
     const message = encodeURIComponent(error?.message || 'Error al procesar SSO')
     return res.redirect(`${appEnv.frontendBaseUrl}/sso/callback?error=${message}`)
   }
@@ -64,9 +76,10 @@ export const exchangeSsoCode = async (req: Request, res: Response) => {
     }
 
     const session = await exchangeSsoHandoffCode(String(code), !!rememberMe)
-    res.json(session)
+    setAuthCookie(res, session.token, !!rememberMe)
+    res.json({ user: session.user })
   } catch (error: any) {
-    console.error('Error exchanging SSO code:', error)
+    logger.error('Error exchanging SSO code:', error)
     res.status(400).json({ error: error?.message || 'Error al intercambiar codigo SSO' })
   }
 }

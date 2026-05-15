@@ -20,13 +20,15 @@ export const authenticate = (
   next: NextFunction
 ) => {
   try {
+    // httpOnly cookie takes priority; Authorization header is the fallback for API clients
+    const cookieToken = (req as any).cookies?.auth_token as string | undefined
     const authHeader = req.headers.authorization
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined
+    const token = cookieToken || bearerToken
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!token) {
       return res.status(401).json({ error: 'Token no proporcionado' })
     }
-
-    const token = authHeader.substring(7)
 
     const decoded = jwt.verify(token, appEnv.jwtSecret) as any
 

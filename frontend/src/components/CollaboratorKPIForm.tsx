@@ -317,6 +317,14 @@ export default function CollaboratorKPIForm({
   const updateMutation = useMutation(
     async (data: CollaboratorKPI) => {
       if (!assignment?.id) throw new Error('Falta ID de asignación')
+      const hasCriteriaPayload = [data.criteriaText, data.dataSource, data.sourceConfig, data.evidenceUrl].some(
+        (value) => String(value || '').trim().length > 0
+      )
+      const shouldCreateCriteriaVersion = Boolean(data.createCriteriaVersion || (criteriaDirty && hasCriteriaPayload))
+      const nextCurationStatus =
+        shouldCreateCriteriaVersion && !canCurate
+          ? 'in_review'
+          : data.curationStatus
       const payload = {
         collaboratorId: assignment.collaboratorId,
         kpiId: assignment.kpiId,
@@ -333,9 +341,9 @@ export default function CollaboratorKPIForm({
         criteriaText: data.criteriaText,
         evidenceUrl: data.evidenceUrl,
         curatorAssignee: data.curatorAssignee,
-        curationStatus: data.curationStatus,
+        curationStatus: nextCurationStatus,
         inputMode: data.inputMode,
-        createCriteriaVersion: data.createCriteriaVersion,
+        createCriteriaVersion: shouldCreateCriteriaVersion,
       }
       const response = await api.put(`/collaborator-kpis/${assignment.id}`, payload)
       return response.data

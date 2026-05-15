@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import { pool } from '../config/database'
+import { logger } from '../utils/logger'
 
 export const listCalendarProfiles = async (_req: Request, res: Response) => {
   try {
@@ -8,7 +9,7 @@ export const listCalendarProfiles = async (_req: Request, res: Response) => {
     )
     res.json(rows || [])
   } catch (error: any) {
-    console.error('Error fetching calendar profiles:', error)
+    logger.error('Error fetching calendar profiles:', error)
     res.status(500).json({ error: 'Error al obtener calendarios' })
   }
 }
@@ -27,7 +28,7 @@ export const createCalendarProfile = async (req: Request, res: Response) => {
     const insertResult = result as any
     res.status(201).json({ id: insertResult.insertId })
   } catch (error: any) {
-    console.error('Error creating calendar profile:', error)
+    logger.error('Error creating calendar profile:', error)
     res.status(500).json({ error: 'Error al crear calendario' })
   }
 }
@@ -44,7 +45,7 @@ export const updateCalendarProfile = async (req: Request, res: Response) => {
     )
     res.json({ message: 'Calendario actualizado' })
   } catch (error: any) {
-    console.error('Error updating calendar profile:', error)
+    logger.error('Error updating calendar profile:', error)
     res.status(500).json({ error: 'Error al actualizar calendario' })
   }
 }
@@ -80,7 +81,7 @@ export const deleteCalendarProfile = async (req: Request, res: Response) => {
     await pool.query(`DELETE FROM calendar_profiles WHERE id = ?`, [id])
     res.json({ message: 'Calendario eliminado' })
   } catch (error: any) {
-    console.error('Error deleting calendar profile:', error)
+    logger.error('Error deleting calendar profile:', error)
     res.status(500).json({ error: 'Error al eliminar calendario' })
   }
 }

@@ -1,13 +1,14 @@
 import { Request, Response } from 'express'
 import { pool } from '../config/database'
 import { Area } from '../types'
+import { logger } from '../utils/logger'
 
 export const getAreas = async (_req: Request, res: Response) => {
   try {
     const [rows] = await pool.query<Area[]>('SELECT * FROM areas ORDER BY name ASC')
     res.json(rows)
   } catch (error: any) {
-    console.error('Error fetching areas:', error)
+    logger.error('Error fetching areas:', error)
     res.status(500).json({ error: 'Error al obtener áreas' })
   }
 }
@@ -32,7 +33,7 @@ export const createArea = async (req: Request, res: Response) => {
       parentId: parentId || null,
     })
   } catch (error: any) {
-    console.error('Error creating area:', error)
+    logger.error('Error creating area:', error)
     res.status(500).json({ error: 'Error al crear área' })
   }
 }
@@ -53,7 +54,7 @@ export const updateArea = async (req: Request, res: Response) => {
 
     res.json({ message: 'Área actualizada correctamente' })
   } catch (error: any) {
-    console.error('Error updating area:', error)
+    logger.error('Error updating area:', error)
     res.status(500).json({ error: 'Error al actualizar área' })
   }
 }
@@ -64,7 +65,7 @@ export const deleteArea = async (req: Request, res: Response) => {
     await pool.query('DELETE FROM areas WHERE id = ?', [id])
     res.json({ message: 'Área eliminada correctamente' })
   } catch (error: any) {
-    console.error('Error deleting area:', error)
+    logger.error('Error deleting area:', error)
     res.status(500).json({ error: 'Error al eliminar área' })
   }
 }

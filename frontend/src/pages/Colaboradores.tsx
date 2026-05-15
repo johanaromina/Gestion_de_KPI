@@ -50,6 +50,7 @@ export default function Colaboradores() {
     {
       retry: false,
       keepPreviousData: true,
+      staleTime: 3 * 60 * 1000,
     }
   )
 
@@ -128,10 +129,13 @@ export default function Colaboradores() {
     }
   }
 
+  const managerMap = new Map<number, string>(
+    collaborators?.map((c) => [c.id, c.name]) ?? []
+  )
+
   const getManagerName = (managerId?: number): string => {
     if (!managerId) return '-'
-    const manager = collaborators?.find((c) => c.id === managerId)
-    return manager ? manager.name : `ID: ${managerId}`
+    return managerMap.get(managerId) ?? `ID: ${managerId}`
   }
 
   const roleLabel: Record<string, string> = {
@@ -149,7 +153,7 @@ export default function Colaboradores() {
     const matchesSearch =
       !searchTerm || safeName.includes(safeSearch) || safePosition.includes(safeSearch)
 
-    const matchesArea = !filterArea || collaborator.area === filterArea
+    const matchesArea = !filterArea || (collaborator.area || '').toLowerCase() === filterArea.toLowerCase()
     const matchesRole = !filterRole || collaborator.role === filterRole
 
     return matchesSearch && matchesArea && matchesRole

@@ -1,6 +1,7 @@
 import cron from 'node-cron'
 import { pool } from '../config/database'
 import { runTemplateQueued } from './integrations-runner'
+import { logger } from '../utils/logger'
 
 type IntegrationSchedule = {
   id: number
@@ -20,7 +21,7 @@ const refreshSchedules = async () => {
     rows = Array.isArray(result) ? result : []
   } catch (error: any) {
     if (error?.code !== 'ER_NO_SUCH_TABLE') {
-      console.error('[integrations] error loading schedules:', error)
+      logger.error('[integrations] error loading schedules:', error)
     }
     return
   }
@@ -46,7 +47,7 @@ const refreshSchedules = async () => {
       })
       tasks.set(integration.id, { schedule: integration.schedule, task })
     } else {
-      console.warn(`[integrations] Cron inválido para ${integration.id}: ${integration.schedule}`)
+      logger.warn(`[integrations] Cron inválido para ${integration.id}: ${integration.schedule}`)
     }
   }
 

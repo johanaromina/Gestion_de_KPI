@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import { pool } from '../config/database'
+import { logger } from '../utils/logger'
 
 export const validateConsistency = async (req: Request, res: Response) => {
   try {
@@ -138,7 +139,7 @@ export const validateConsistency = async (req: Request, res: Response) => {
       },
     })
   } catch (error: any) {
-    console.error('Error validating consistency:', error)
+    logger.error('Error validating consistency:', error)
     res.status(500).json({ error: 'Error al validar consistencia' })
   }
 }
@@ -195,7 +196,7 @@ export const validatePeriodConsistency = async (req: Request, res: Response) => 
       },
     })
   } catch (error: any) {
-    console.error('Error validating period consistency:', error)
+    logger.error('Error validating period consistency:', error)
     res.status(500).json({ error: 'Error al validar consistencia del período' })
   }
 }

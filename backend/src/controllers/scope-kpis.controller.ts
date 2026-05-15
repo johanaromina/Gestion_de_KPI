@@ -12,6 +12,7 @@ import {
 import { recalculateScopeKPI, recalcParentScopeKPIs } from '../services/scope-kpi-aggregation.service'
 import { hydrateScopeKpiMixedFields } from '../services/scope-kpi-mixed.service'
 import { recalcOKRsLinkedToScopeKpi } from '../services/okr.service'
+import { logger } from '../utils/logger'
 
 const isConfigUser = (req: Request) => {
   const user = (req as AuthRequest).user
@@ -106,7 +107,7 @@ export const getScopeKPIs = async (req: Request, res: Response) => {
     const [rows] = await pool.query<any[]>(query, params)
     res.json(await attachObjectivesToScopeKpis(Array.isArray(rows) ? rows : []))
   } catch (error: any) {
-    console.error('Error fetching scope KPIs:', error)
+    logger.error('Error fetching scope KPIs:', error)
     res.status(500).json({ error: 'Error al obtener Scope KPIs' })
   }
 }
@@ -129,7 +130,7 @@ export const getScopeKPIObjectives = async (req: Request, res: Response) => {
     res.json(objectivesMap.get(scopeKpiId) || [])
   } catch (error: any) {
     const message = error?.message || 'Error al obtener objetivos del Scope KPI'
-    console.error('Error fetching scope KPI objectives:', error)
+    logger.error('Error fetching scope KPI objectives:', error)
     res.status(message === 'Scope KPI no encontrado' ? 404 : 500).json({ error: message })
   }
 }
@@ -171,7 +172,7 @@ export const getScopeKPIAggregationRuns = async (req: Request, res: Response) =>
     res.json(hydratedRows)
   } catch (error: any) {
     const message = error?.message || 'Error al obtener corridas de agregación del Scope KPI'
-    console.error('Error fetching scope KPI aggregation runs:', error)
+    logger.error('Error fetching scope KPI aggregation runs:', error)
     res.status(message === 'Scope KPI no encontrado' ? 404 : 500).json({ error: message })
   }
 }
@@ -184,7 +185,7 @@ export const createScopeKPI = async (req: Request, res: Response) => {
     const id = await createScopeKPIRecord(req.body)
     res.status(201).json({ id })
   } catch (error: any) {
-    console.error('Error creating scope KPI:', error)
+    logger.error('Error creating scope KPI:', error)
     res.status(400).json({ error: error?.message || 'Error al crear Scope KPI' })
   }
 }
@@ -197,7 +198,7 @@ export const updateScopeKPI = async (req: Request, res: Response) => {
     await updateScopeKPIRecord(Number(req.params.id), req.body)
     res.json({ message: 'Scope KPI actualizado correctamente' })
   } catch (error: any) {
-    console.error('Error updating scope KPI:', error)
+    logger.error('Error updating scope KPI:', error)
     res.status(400).json({ error: error?.message || 'Error al actualizar Scope KPI' })
   }
 }
@@ -210,7 +211,7 @@ export const deleteScopeKPI = async (req: Request, res: Response) => {
     await pool.query(`DELETE FROM scope_kpis WHERE id = ?`, [req.params.id])
     res.json({ message: 'Scope KPI eliminado correctamente' })
   } catch (error: any) {
-    console.error('Error deleting scope KPI:', error)
+    logger.error('Error deleting scope KPI:', error)
     res.status(500).json({ error: 'Error al eliminar Scope KPI' })
   }
 }
@@ -376,7 +377,7 @@ export const copyScopeKPI = async (req: Request, res: Response) => {
 
     res.status(201).json({ results })
   } catch (error: any) {
-    console.error('Error copying scope KPI:', error)
+    logger.error('Error copying scope KPI:', error)
     res.status(error?.message === 'Scope KPI no encontrado' ? 404 : 500).json({ error: error?.message || 'Error al copiar KPI grupal' })
   }
 }
@@ -389,7 +390,7 @@ export const closeScopeKPI = async (req: Request, res: Response) => {
     await closeScopeKPIRecord(Number(req.params.id))
     res.json({ message: 'Scope KPI cerrado correctamente' })
   } catch (error: any) {
-    console.error('Error closing scope KPI:', error)
+    logger.error('Error closing scope KPI:', error)
     res.status(500).json({ error: 'Error al cerrar Scope KPI' })
   }
 }
@@ -402,7 +403,7 @@ export const reopenScopeKPI = async (req: Request, res: Response) => {
     await reopenScopeKPIRecord(Number(req.params.id))
     res.json({ message: 'Scope KPI reabierto correctamente' })
   } catch (error: any) {
-    console.error('Error reopening scope KPI:', error)
+    logger.error('Error reopening scope KPI:', error)
     res.status(500).json({ error: 'Error al reabrir Scope KPI' })
   }
 }
@@ -414,17 +415,17 @@ export const recalculateScopeKPIController = async (req: Request, res: Response)
 
     // Propagar hacia OKRs que usan este scope_kpi como fuente de datos
     recalcOKRsLinkedToScopeKpi(scopeKpiId).catch((err) =>
-      console.error('[OKR propagation] scopeKpi→OKR:', err)
+      logger.error('[OKR propagation] scopeKpi→OKR:', err)
     )
     recalcParentScopeKPIs(scopeKpiId, (sid) =>
       recalcOKRsLinkedToScopeKpi(sid).catch((err) =>
-        console.error('[scopeKpi] parent cascade→OKR:', err)
+        logger.error('[scopeKpi] parent cascade→OKR:', err)
       )
-    ).catch((err) => console.error('[scopeKpi] parent scopeKpi cascade:', err))
+    ).catch((err) => logger.error('[scopeKpi] parent scopeKpi cascade:', err))
 
     res.json({ message: 'Scope KPI recalculado correctamente', ...result })
   } catch (error: any) {
-    console.error('Error recalculating scope KPI:', error)
+    logger.error('Error recalculating scope KPI:', error)
     res.status(400).json({ error: error?.message || 'Error al recalcular Scope KPI' })
   }
 }
@@ -448,7 +449,7 @@ export const getScopeKPILinks = async (req: Request, res: Response) => {
     )
     res.json(rows)
   } catch (error: any) {
-    console.error('Error fetching scope KPI links:', error)
+    logger.error('Error fetching scope KPI links:', error)
     res.status(500).json({ error: 'Error al obtener links del Scope KPI' })
   }
 }
@@ -492,7 +493,7 @@ export const createScopeKPILink = async (req: Request, res: Response) => {
     )
     res.status(201).json({ id: (result as any).insertId })
   } catch (error: any) {
-    console.error('Error creating scope KPI link:', error)
+    logger.error('Error creating scope KPI link:', error)
     res.status(500).json({ error: 'Error al crear link del Scope KPI' })
   }
 }
@@ -533,7 +534,7 @@ export const updateScopeKPILink = async (req: Request, res: Response) => {
     )
     res.json({ message: 'Link actualizado correctamente' })
   } catch (error: any) {
-    console.error('Error updating scope KPI link:', error)
+    logger.error('Error updating scope KPI link:', error)
     res.status(500).json({ error: 'Error al actualizar link del Scope KPI' })
   }
 }
@@ -546,7 +547,7 @@ export const deleteScopeKPILink = async (req: Request, res: Response) => {
     await pool.query(`DELETE FROM scope_kpi_links WHERE id = ?`, [req.params.linkId])
     res.json({ message: 'Link eliminado correctamente' })
   } catch (error: any) {
-    console.error('Error deleting scope KPI link:', error)
+    logger.error('Error deleting scope KPI link:', error)
     res.status(500).json({ error: 'Error al eliminar link del Scope KPI' })
   }
 }
@@ -564,11 +565,11 @@ export const createScopeMeasurement = async (scopeKpiId: number, value: number, 
   await applyMeasurementToScopeKPI(scopeKpiId, value, mode, measurementId)
   recalcParentScopeKPIs(scopeKpiId, (sid) =>
     recalcOKRsLinkedToScopeKpi(sid).catch((err) =>
-      console.error('[scopeKpi] parent cascade→OKR:', err)
+      logger.error('[scopeKpi] parent cascade→OKR:', err)
     )
-  ).catch((err) => console.error('[scopeKpi] parent scopeKpi cascade:', err))
+  ).catch((err) => logger.error('[scopeKpi] parent scopeKpi cascade:', err))
   recalcOKRsLinkedToScopeKpi(scopeKpiId).catch((err) =>
-    console.error('[scopeKpi] scopeKpi→OKR propagation:', err)
+    logger.error('[scopeKpi] scopeKpi→OKR propagation:', err)
   )
   return measurementId
 }

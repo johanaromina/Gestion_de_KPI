@@ -8,8 +8,9 @@ import {
   ensureSingleMeasurementOwner,
 } from '../services/measurement-application.service'
 import { recalcOKRsLinkedToCollaboratorKpi, recalcOKRsLinkedToScopeKpi } from '../services/okr.service'
-import { recalcScopeKPIsLinkedToAssignment } from '../controllers/collaborator-kpis.controller'
+import { recalcScopeKPIsLinkedToAssignment } from '../services/scope-kpi-propagation.service'
 import { recalcParentScopeKPIs } from '../services/scope-kpi-aggregation.service'
+import { logger } from '../utils/logger'
 
 const getMeasurementKpiConfig = async (assignmentId?: number | null, scopeKpiId?: number | null) => {
   if (assignmentId) {
@@ -75,7 +76,7 @@ export const getMeasurements = async (req: Request, res: Response) => {
     const [rows] = await pool.query(query, params)
     res.json(rows)
   } catch (error: any) {
-    console.error('Error fetching measurements:', error)
+    logger.error('Error fetching measurements:', error)
     res.status(500).json({ error: 'Error al obtener mediciones' })
   }
 }
@@ -201,27 +202,27 @@ export const createMeasurement = async (req: Request, res: Response) => {
     if ((status || 'draft') === 'approved' && assignmentId) {
       await applyMeasurementToCollaboratorAssignment(assignmentId, normalizedValue, mode || 'manual', measurementId, criteriaVersionId)
       recalcScopeKPIsLinkedToAssignment(Number(assignmentId)).catch((err) =>
-        console.error('[measurements] scope propagation:', err)
+        logger.error('[measurements] scope propagation:', err)
       )
       recalcOKRsLinkedToCollaboratorKpi(Number(assignmentId)).catch((err) =>
-        console.error('[measurements] OKR propagation:', err)
+        logger.error('[measurements] OKR propagation:', err)
       )
     }
     if ((status || 'draft') === 'approved' && scopeKpiId) {
       await applyMeasurementToScopeKpi(Number(scopeKpiId), normalizedValue, mode || 'manual', measurementId)
       recalcParentScopeKPIs(Number(scopeKpiId), (sid) =>
         recalcOKRsLinkedToScopeKpi(sid).catch((err) =>
-          console.error('[measurements] parent scopeKpi→OKR propagation:', err)
+          logger.error('[measurements] parent scopeKpi→OKR propagation:', err)
         )
-      ).catch((err) => console.error('[measurements] parent scopeKpi cascade:', err))
+      ).catch((err) => logger.error('[measurements] parent scopeKpi cascade:', err))
       recalcOKRsLinkedToScopeKpi(Number(scopeKpiId)).catch((err) =>
-        console.error('[measurements] scopeKpi→OKR propagation:', err)
+        logger.error('[measurements] scopeKpi→OKR propagation:', err)
       )
     }
 
     res.status(201).json({ id: measurementId, warning })
   } catch (error: any) {
-    console.error('Error creating measurement:', error)
+    logger.error('Error creating measurement:', error)
     res.status(500).json({ error: 'Error al crear medición' })
   }
 }
@@ -301,10 +302,10 @@ export const approveMeasurement = async (req: Request, res: Response) => {
         measurement.criteriaVersionId
       )
       recalcScopeKPIsLinkedToAssignment(Number(measurement.assignmentId)).catch((err) =>
-        console.error('[approveMeasurement] scope propagation:', err)
+        logger.error('[approveMeasurement] scope propagation:', err)
       )
       recalcOKRsLinkedToCollaboratorKpi(Number(measurement.assignmentId)).catch((err) =>
-        console.error('[approveMeasurement] OKR propagation:', err)
+        logger.error('[approveMeasurement] OKR propagation:', err)
       )
     }
     if (measurement.scopeKpiId) {
@@ -316,17 +317,17 @@ export const approveMeasurement = async (req: Request, res: Response) => {
       )
       recalcParentScopeKPIs(Number(measurement.scopeKpiId), (sid) =>
         recalcOKRsLinkedToScopeKpi(sid).catch((err) =>
-          console.error('[approveMeasurement] parent scopeKpi→OKR propagation:', err)
+          logger.error('[approveMeasurement] parent scopeKpi→OKR propagation:', err)
         )
-      ).catch((err) => console.error('[approveMeasurement] parent scopeKpi cascade:', err))
+      ).catch((err) => logger.error('[approveMeasurement] parent scopeKpi cascade:', err))
       recalcOKRsLinkedToScopeKpi(Number(measurement.scopeKpiId)).catch((err) =>
-        console.error('[approveMeasurement] scopeKpi→OKR propagation:', err)
+        logger.error('[approveMeasurement] scopeKpi→OKR propagation:', err)
       )
     }
 
     res.json({ message: 'Medición aprobada correctamente', warning })
   } catch (error: any) {
-    console.error('Error approving measurement:', error)
+    logger.error('Error approving measurement:', error)
     res.status(500).json({ error: 'Error al aprobar medición' })
   }
 }
@@ -337,7 +338,7 @@ export const rejectMeasurement = async (req: Request, res: Response) => {
     await pool.query(`UPDATE kpi_measurements SET status = ? WHERE id = ?`, ['rejected', id])
     res.json({ message: 'Medición rechazada correctamente' })
   } catch (error: any) {
-    console.error('Error rejecting measurement:', error)
+    logger.error('Error rejecting measurement:', error)
     res.status(500).json({ error: 'Error al rechazar medición' })
   }
 }

@@ -6,12 +6,23 @@ import { pool } from '../config/database'
 import { appEnv } from '../config/env'
 import { sendMail } from '../utils/mailer'
 import { getEffectivePermissions } from '../utils/permissions'
-import { buildTokenPayload, issueAuthToken } from '../services/auth-session.service'
+import { buildTokenPayload, getSessionExpiry, issueAuthToken } from '../services/auth-session.service'
 import { AuthRequest } from '../middleware/auth.middleware'
+import { logger } from '../utils/logger'
 
-if (!appEnv.isProduction && !process.env.JWT_SECRET) {
-  console.warn('??  ADVERTENCIA: JWT_SECRET no esta configurado. Usando clave por defecto (solo para desarrollo).')
-  console.warn('??  En produccion, configura JWT_SECRET en el archivo .env')
+const setAuthCookie = (res: Response, token: string, rememberMe?: boolean) => {
+  const maxAge = rememberMe ? 30 * 24 * 60 * 60 * 1000 : undefined
+  res.cookie('auth_token', token, {
+    httpOnly: true,
+    secure: appEnv.isProduction,
+    sameSite: appEnv.isProduction ? 'strict' : 'lax',
+    path: '/',
+    ...(maxAge !== undefined ? { maxAge } : {}),
+  })
+}
+
+const clearAuthCookie = (res: Response) => {
+  res.clearCookie('auth_token', { path: '/', httpOnly: true, secure: appEnv.isProduction, sameSite: appEnv.isProduction ? 'strict' : 'lax' })
 }
 
 interface User {
@@ -89,13 +100,11 @@ export const login = async (req: Request, res: Response) => {
     }
 
     const token = issueAuthToken(collaborator, permissions, rememberMe)
+    setAuthCookie(res, token, rememberMe)
 
-    return res.json({
-      token,
-      user: buildTokenPayload(collaborator, permissions),
-    })
+    return res.json({ user: buildTokenPayload(collaborator, permissions) })
   } catch (error: any) {
-    console.error('Error in login:', error)
+    logger.error('[auth] login', error)
     res.status(500).json({ error: 'Error al iniciar sesion' })
   }
 }
@@ -148,13 +157,11 @@ export const verifyMfa = async (req: Request, res: Response) => {
     const permissions = await getEffectivePermissions(collaborator.id)
 
     const authToken = issueAuthToken(collaborator, permissions, rememberMe)
+    setAuthCookie(res, authToken, rememberMe)
 
-    return res.json({
-      token: authToken,
-      user: buildTokenPayload(collaborator, permissions),
-    })
+    return res.json({ user: buildTokenPayload(collaborator, permissions) })
   } catch (error: any) {
-    console.error('Error verifying mfa:', error)
+    logger.error('[auth] mfa', error)
     res.status(500).json({ error: 'Error al verificar codigo' })
   }
 }
@@ -174,12 +181,12 @@ export const requestPasswordReset = async (req: Request, res: Response) => {
     )
 
     if (!Array.isArray(rows) || rows.length === 0) {
-      console.log('[auth] reset request: email not found', normalizedEmail)
+      logger.info('[auth] reset request: email not found', normalizedEmail)
       return res.json({ message: 'Si el email existe, enviaremos instrucciones.' })
     }
 
     const collaborator = rows[0]
-    console.log('[auth] reset request: sending to', collaborator.email)
+    logger.info('[auth] reset request: sending to', collaborator.email)
     const rawToken = crypto.randomBytes(32).toString('hex')
     const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex')
     const expiresAt = new Date(Date.now() + appEnv.resetTtlMin * 60 * 1000)
@@ -200,11 +207,11 @@ export const requestPasswordReset = async (req: Request, res: Response) => {
         text: `Restablece tu contrasena: ${resetLink} (vence en ${appEnv.resetTtlMin} minutos).`,
     })
 
-    console.log('[auth] reset request: email sent', collaborator.email)
+    logger.info('[auth] reset request: email sent', collaborator.email)
 
     return res.json({ message: 'Si el email existe, enviaremos instrucciones.' })
   } catch (error: any) {
-    console.error('Error in requestPasswordReset:', error)
+    logger.error('[auth] requestPasswordReset', error)
     res.status(500).json({ error: 'Error al solicitar recuperacion' })
   }
 }
@@ -244,7 +251,7 @@ export const resetPassword = async (req: Request, res: Response) => {
 
     res.json({ message: 'Contrasena actualizada correctamente' })
   } catch (error: any) {
-    console.error('Error in resetPassword:', error)
+    logger.error('[auth] resetPassword', error)
     res.status(500).json({ error: 'Error al restablecer contrasena' })
   }
 }
@@ -302,66 +309,80 @@ export const changePassword = async (req: Request, res: Response) => {
 
     return res.json({ message: 'Contrasena actualizada correctamente' })
   } catch (error: any) {
-    console.error('Error in changePassword:', error)
+    logger.error('[auth] changePassword', error)
     return res.status(500).json({ error: 'Error al cambiar la contrasena' })
   }
 }
 
+export const logout = (_req: Request, res: Response) => {
+  clearAuthCookie(res)
+  res.json({ message: 'Sesion cerrada' })
+}
+
 export const register = async (req: Request, res: Response) => {
+  if (!appEnv.selfRegisterEnabled) {
+    return res.status(403).json({
+      error: 'El registro autonomo esta deshabilitado en esta instancia. El alta inicial se realiza por despliegue/bootstrap del cliente.',
+    })
+  }
+
+  const { companyName, adminName, email, password } = req.body
+  const normalizedEmail = email ? String(email).trim().toLowerCase() : ''
+
+  if (!companyName || !adminName || !normalizedEmail || !password) {
+    return res.status(400).json({ error: 'Todos los campos son requeridos' })
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(normalizedEmail)) {
+    return res.status(400).json({ error: 'Email inválido' })
+  }
+
+  if (String(password).length < 8) {
+    return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' })
+  }
+
+  const conn = await pool.getConnection()
   try {
-    if (!appEnv.selfRegisterEnabled) {
-      return res.status(403).json({
-        error: 'El registro autonomo esta deshabilitado en esta instancia. El alta inicial se realiza por despliegue/bootstrap del cliente.',
-      })
-    }
+    await conn.beginTransaction()
 
-    const { companyName, adminName, email, password } = req.body
-    const normalizedEmail = email ? String(email).trim().toLowerCase() : ''
-
-    if (!companyName || !adminName || !normalizedEmail || !password) {
-      return res.status(400).json({ error: 'Todos los campos son requeridos' })
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(normalizedEmail)) {
-      return res.status(400).json({ error: 'Email inválido' })
-    }
-
-    if (String(password).length < 8) {
-      return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' })
-    }
-
-    const [existing] = await pool.query<any[]>(
+    const [existing] = await conn.query<any[]>(
       'SELECT id FROM collaborators WHERE email = ?',
       [normalizedEmail]
     )
     if (Array.isArray(existing) && existing.length > 0) {
+      await conn.rollback()
+      conn.release()
       return res.status(400).json({ error: 'Ya existe una cuenta con ese email' })
     }
 
-    const [companyResult] = await pool.query<any>(
+    const [companyResult] = await conn.query<any>(
       `INSERT INTO org_scopes (name, type, parentId, metadata, active) VALUES (?, 'company', NULL, ?, 1)`,
       [String(companyName).trim(), JSON.stringify({ code: 'COMPANY', aliases: ['company'] })]
     )
     const companyScopeId = Number(companyResult.insertId)
 
-    await pool.query(
+    await conn.query(
       `INSERT INTO org_scopes (name, type, parentId, metadata, active) VALUES ('General', 'area', ?, NULL, 1)`,
       [companyScopeId]
     )
 
     const passwordHash = await bcrypt.hash(String(password), 10)
-    const [adminResult] = await pool.query<any>(
+    const [adminResult] = await conn.query<any>(
       `INSERT INTO collaborators (name, position, area, orgScopeId, managerId, role, status, email, passwordHash, mfaEnabled, hasSuperpowers)
        VALUES (?, 'Administrador', ?, ?, NULL, 'admin', 'active', ?, ?, 0, 1)`,
       [String(adminName).trim(), String(companyName).trim(), companyScopeId, normalizedEmail, passwordHash]
     )
     const adminId = Number(adminResult.insertId)
 
+    await conn.commit()
+    conn.release()
+
     const permissions = await getEffectivePermissions(adminId)
     const [adminRows] = await pool.query<any[]>('SELECT * FROM collaborators WHERE id = ?', [adminId])
     const adminCollaborator = adminRows[0]
     const token = issueAuthToken(adminCollaborator, permissions, true)
+    setAuthCookie(res, token, true)
 
     try {
       await sendMail({
@@ -375,11 +396,10 @@ export const register = async (req: Request, res: Response) => {
         text: `Bienvenido/a a KPI Manager. Tu empresa ${String(companyName).trim()} fue registrada. Ingresá en: ${appEnv.appBaseUrl}/login`,
       })
     } catch (mailErr) {
-      console.error('[register] Error enviando email de bienvenida:', mailErr)
+      logger.error('[auth] register welcome email', mailErr)
     }
 
     return res.status(201).json({
-      token,
       user: {
         id: adminId,
         name: String(adminName).trim(),
@@ -389,8 +409,10 @@ export const register = async (req: Request, res: Response) => {
       },
     })
   } catch (error: any) {
-    console.error('Error in register:', error)
-    res.status(500).json({ error: 'Error al registrar la empresa' })
+    await conn.rollback().catch(() => {})
+    conn.release()
+    logger.error('Error in register:', error)
+    return res.status(500).json({ error: 'Error al registrar la empresa' })
   }
 }
 
@@ -415,7 +437,7 @@ export const getCurrentUser = async (req: Request, res: Response) => {
       ...buildTokenPayload(collaborator, permissions),
     } as User)
   } catch (error: any) {
-    console.error('Error getting current user:', error)
+    logger.error('[auth] getCurrentUser', error)
     res.status(500).json({ error: 'Error al obtener usuario' })
   }
 }

@@ -4,6 +4,7 @@ import PDFDocument from 'pdfkit'
 import ExcelJS from 'exceljs'
 import { calculateVariation } from '../utils/kpi-formulas'
 import { KPIDirection, KPIType } from '../types'
+import { logger } from '../utils/logger'
 
 // ── Colores OKR ───────────────────────────────────────────────
 const OKR_BLUE  = '#2563eb'
@@ -231,7 +232,7 @@ export const exportParrillaPDF = async (req: Request, res: Response) => {
     // Finalizar documento
     doc.end()
   } catch (error: any) {
-    console.error('Error exporting PDF:', error)
+    logger.error('Error exporting PDF:', error)
     if (!res.headersSent) {
       res.status(500).json({ error: 'Error al exportar PDF' })
     }
@@ -445,7 +446,7 @@ export const exportParrillaExcel = async (req: Request, res: Response) => {
     await workbook.xlsx.write(res)
     res.end()
   } catch (error: any) {
-    console.error('Error exporting Excel:', error)
+    logger.error('Error exporting Excel:', error)
     if (!res.headersSent) {
       res.status(500).json({ error: 'Error al exportar Excel' })
     }
@@ -644,7 +645,7 @@ export const exportOKRObjectivePDF = async (req: Request, res: Response) => {
 
     doc.end()
   } catch (error: any) {
-    console.error('Error exporting OKR PDF:', error)
+    logger.error('Error exporting OKR PDF:', error)
     if (!res.headersSent) res.status(500).json({ error: 'Error al exportar PDF' })
   }
 }
@@ -750,7 +751,7 @@ export const exportOKRObjectiveExcel = async (req: Request, res: Response) => {
     await workbook.xlsx.write(res)
     res.end()
   } catch (error: any) {
-    console.error('Error exporting OKR Excel:', error)
+    logger.error('Error exporting OKR Excel:', error)
     if (!res.headersSent) res.status(500).json({ error: 'Error al exportar Excel' })
   }
 }
@@ -843,7 +844,7 @@ export const exportOKRPeriodPDF = async (req: Request, res: Response) => {
 
     doc.end()
   } catch (error: any) {
-    console.error('Error exporting OKR period PDF:', error)
+    logger.error('Error exporting OKR period PDF:', error)
     if (!res.headersSent) res.status(500).json({ error: 'Error al exportar PDF' })
   }
 }
@@ -962,7 +963,7 @@ export const exportOKRPeriodExcel = async (req: Request, res: Response) => {
     await workbook.xlsx.write(res)
     res.end()
   } catch (error: any) {
-    console.error('Error exporting OKR period Excel:', error)
+    logger.error('Error exporting OKR period Excel:', error)
     if (!res.headersSent) res.status(500).json({ error: 'Error al exportar Excel' })
   }
 }

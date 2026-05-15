@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import { pool } from '../config/database'
+import { logger } from '../utils/logger'
 
 const parseJson = (value: any) => {
   if (!value) return null
@@ -26,7 +27,7 @@ export const listOrgScopes = async (_req: Request, res: Response) => {
       : []
     res.json(data)
   } catch (error: any) {
-    console.error('Error fetching org scopes:', error)
+    logger.error('Error fetching org scopes:', error)
     res.status(500).json({ error: 'Error al obtener scopes' })
   }
 }
@@ -52,7 +53,7 @@ export const createOrgScope = async (req: Request, res: Response) => {
     const insertResult = result as any
     res.status(201).json({ id: insertResult.insertId })
   } catch (error: any) {
-    console.error('Error creating org scope:', error)
+    logger.error('Error creating org scope:', error)
     res.status(500).json({ error: 'Error al crear scope' })
   }
 }
@@ -99,7 +100,7 @@ export const updateOrgScope = async (req: Request, res: Response) => {
     )
     res.json({ message: 'Scope actualizado', warning })
   } catch (error: any) {
-    console.error('Error updating org scope:', error)
+    logger.error('Error updating org scope:', error)
     res.status(500).json({ error: 'Error al actualizar scope' })
   }
 }
@@ -169,7 +170,7 @@ export const importOrgScopes = async (req: Request, res: Response) => {
 
     return res.status(201).json({ total: rows.length, created: created.length, errors })
   } catch (error: any) {
-    console.error('Error importando org scopes:', error)
+    logger.error('Error importando org scopes:', error)
     return res.status(500).json({ error: error?.message || 'Error al importar áreas' })
   }
 }
@@ -224,7 +225,7 @@ export const deleteOrgScope = async (req: Request, res: Response) => {
     await pool.query('DELETE FROM org_scopes WHERE id = ?', [id])
     res.json({ message: 'Scope eliminado' })
   } catch (error: any) {
-    console.error('Error deleting org scope:', error)
+    logger.error('Error deleting org scope:', error)
     res.status(500).json({ error: 'Error al eliminar scope' })
   }
 }

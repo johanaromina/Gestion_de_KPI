@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
-import { persistSsoRememberMe, storeAuthToken } from '../utils/authStorage'
+import { persistSsoRememberMe } from '../utils/authStorage'
 import { selfRegisterEnabled } from '../config/runtime'
 import './Login.css'
 
@@ -63,8 +63,6 @@ export default function Login() {
         return
       }
 
-      const { token } = response.data
-      storeAuthToken(token, rememberMe)
       navigate('/')
     } catch (err: any) {
       setError(err.response?.data?.error || 'Error al iniciar sesion')
@@ -78,13 +76,11 @@ export default function Login() {
     setError(null)
     setLoading(true)
     try {
-      const response = await api.post('/auth/mfa/verify', {
+      await api.post('/auth/mfa/verify', {
         token: mfaToken,
         code: mfaCode,
         rememberMe,
       })
-      const { token } = response.data
-      storeAuthToken(token, rememberMe)
       navigate('/')
     } catch (err: any) {
       setError(err.response?.data?.error || 'Error al verificar codigo')

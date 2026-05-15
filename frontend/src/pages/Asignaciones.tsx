@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import api from '../services/api'
@@ -19,6 +19,14 @@ const toNumber = (value: any): number | null => {
   return Number.isFinite(n) ? n : null
 }
 
+const roleLabel: Record<string, string> = {
+  collaborator: 'Colaborador',
+  leader: 'Líder',
+  manager: 'Gerente',
+  director: 'Director',
+  admin: 'Administrador',
+}
+
 export default function Asignaciones() {
   const [showForm, setShowForm] = useState(false)
   const [editingAssignment, setEditingAssignment] = useState<CollaboratorKPI | undefined>(undefined)
@@ -26,6 +34,7 @@ export default function Asignaciones() {
   const [selectedCollaboratorId, setSelectedCollaboratorId] = useState<number | null>(null)
   const [selectedKPIId, setSelectedKPIId] = useState<number | null>(null)
   const [selectedScopeId, setSelectedScopeId] = useState<number | null>(null)
+  const [selectedRole, setSelectedRole] = useState('')
   const [selectedSubPeriodId, setSelectedSubPeriodId] = useState<number | null>(null)
   const [showMonthly, setShowMonthly] = useState(true)
   const [compactView, setCompactView] = useState(false)
@@ -42,6 +51,8 @@ export default function Asignaciones() {
     assignment: CollaboratorKPI
     action: 'approve' | 'reject'
   } | null>(null)
+  const [currentPage, setCurrentPage] = useState(0)
+  const PAGE_SIZE = 50
 
   const navigate = useNavigate()
   const dialog = useDialog()
@@ -138,7 +149,7 @@ export default function Asignaciones() {
       const response = await api.get(url)
       return response.data
     },
-    { enabled: true }
+    { enabled: !!selectedPeriodId || !!selectedCollaboratorId }
   )
 
   const deleteMutation = useMutation(
@@ -312,15 +323,66 @@ export default function Asignaciones() {
     .map((scope: any) => ({ ...scope, label: buildScopeLabel(scope) }))
     .sort((a: any, b: any) => String(a.label).localeCompare(String(b.label)))
 
-  const selectedScope = selectedScopeId ? orgScopesById.get(selectedScopeId) : null
-  const selectedScopeName = selectedScope?.name || ''
+  const selectedScopeDescendantIds = useMemo(() => {
+    if (!selectedScopeId) return new Set<number>()
+    const result = new Set<number>([selectedScopeId])
+    const queue = [selectedScopeId]
+    while (queue.length > 0) {
+      const parentId = queue.shift()!
+      ;(orgScopes || [])
+        .filter((scope: any) => Number(scope.parentId) === Number(parentId))
+        .forEach((scope: any) => {
+          if (!result.has(scope.id)) {
+            result.add(scope.id)
+            queue.push(scope.id)
+          }
+        })
+    }
+    return result
+  }, [selectedScopeId, orgScopes])
 
-  const collaboratorsInScope = selectedScopeId
-    ? collaborators?.filter(
-        (c: any) =>
-          c.orgScopeId === selectedScopeId || (!c.orgScopeId && c.area === selectedScopeName)
+  const selectedScopeDescendantNames = useMemo(() => {
+    if (!selectedScopeId) return new Set<string>()
+    return new Set(
+      Array.from(selectedScopeDescendantIds)
+        .map((id) => orgScopesById.get(id)?.name)
+        .filter(Boolean)
+    )
+  }, [selectedScopeId, selectedScopeDescendantIds, orgScopesById])
+
+  const availableRoles = useMemo<string[]>(() =>
+    Array.from(
+      new Set<string>(
+        (collaborators || [])
+          .map((c: any) => String(c.role || ''))
+          .filter(Boolean)
       )
-    : collaborators
+    ).sort((a, b) => String(roleLabel[a] || a).localeCompare(String(roleLabel[b] || b)))
+  , [collaborators])
+
+  const collaboratorMatchesScope = (collaborator: any) => {
+    if (!selectedScopeId) return true
+    if (collaborator.orgScopeId) return selectedScopeDescendantIds.has(collaborator.orgScopeId)
+    return selectedScopeDescendantNames.has(collaborator.area)
+  }
+
+  const collaboratorsInFilters = useMemo(
+    () =>
+      (collaborators || []).filter((collaborator: any) => {
+        if (!collaboratorMatchesScope(collaborator)) return false
+        if (selectedRole && collaborator.role !== selectedRole) return false
+        return true
+      }),
+    [collaborators, selectedRole, selectedScopeId, selectedScopeDescendantIds, selectedScopeDescendantNames]
+  )
+
+  useEffect(() => {
+    if (!selectedCollaboratorId) return
+    const collaboratorStillVisible = collaboratorsInFilters.some((c: any) => c.id === selectedCollaboratorId)
+    if (!collaboratorStillVisible) {
+      setSelectedCollaboratorId(null)
+    }
+  }, [selectedCollaboratorId, collaboratorsInFilters])
 
   // Filtro local
   const filteredAssignments = assignments?.filter((assignment) => {
@@ -334,11 +396,14 @@ export default function Asignaciones() {
         : (assignment as any).subPeriodId === selectedSubPeriodId
     const matchesShowMonthly = showMonthly || (assignment as any).subPeriodId === null
     const matchesScope = (() => {
-      if (!selectedScopeId) return true
       const collaborator = collaborators?.find((c: any) => c.id === assignment.collaboratorId)
       if (!collaborator) return false
-      if (collaborator.orgScopeId) return collaborator.orgScopeId === selectedScopeId
-      return collaborator.area === selectedScopeName
+      return collaboratorMatchesScope(collaborator)
+    })()
+    const matchesRole = (() => {
+      if (!selectedRole) return true
+      const collaborator = collaborators?.find((c: any) => c.id === assignment.collaboratorId)
+      return collaborator?.role === selectedRole
     })()
     const matchesSearch =
       !searchTerm ||
@@ -354,11 +419,20 @@ export default function Asignaciones() {
       matchesPeriod &&
       matchesKPI &&
       matchesScope &&
+      matchesRole &&
       matchesSearch &&
       matchesSubPeriod &&
       matchesShowMonthly
     )
   })
+
+  useEffect(() => {
+    setCurrentPage(0)
+  }, [selectedPeriodId, selectedCollaboratorId, selectedKPIId, selectedScopeId, selectedRole, selectedSubPeriodId, searchTerm, showMonthly])
+
+  const totalFiltered = filteredAssignments?.length ?? 0
+  const totalPages = Math.ceil(totalFiltered / PAGE_SIZE)
+  const paginatedAssignments = filteredAssignments?.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE)
 
   const getTotalWeightByCollaborator = (collaboratorId: number, periodId: number): number => {
     if (!assignments) return 0
@@ -472,7 +546,7 @@ export default function Asignaciones() {
             className="filter-select"
           >
             <option value="">Todos</option>
-            {collaboratorsInScope?.map((collaborator: any) => (
+            {collaboratorsInFilters.map((collaborator: any) => (
               <option key={collaborator.id} value={collaborator.id}>
                 {collaborator.name}
               </option>
@@ -509,6 +583,23 @@ export default function Asignaciones() {
             {areaScopes.map((scope: any) => (
               <option key={scope.id} value={scope.id}>
                 {scope.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="filter-group">
+          <label htmlFor="role-filter">Rol:</label>
+          <select
+            id="role-filter"
+            value={selectedRole}
+            onChange={(e) => setSelectedRole(e.target.value)}
+            className="filter-select"
+          >
+            <option value="">Todos</option>
+            {availableRoles.map((role) => (
+              <option key={role} value={role}>
+                {roleLabel[role] || role}
               </option>
             ))}
           </select>
@@ -558,6 +649,7 @@ export default function Asignaciones() {
           selectedCollaboratorId ||
           selectedKPIId ||
           selectedScopeId ||
+          selectedRole ||
           searchTerm ||
           selectedSubPeriodId !== null ||
           showMonthly) && (
@@ -568,6 +660,7 @@ export default function Asignaciones() {
               setSelectedCollaboratorId(null)
               setSelectedKPIId(null)
               setSelectedScopeId(null)
+              setSelectedRole('')
               setSearchTerm('')
               setSelectedSubPeriodId(null)
               setShowMonthly(false)
@@ -620,7 +713,9 @@ export default function Asignaciones() {
         ) : filteredAssignments && filteredAssignments.length > 0 ? (
           <>
             <div className="results-info">
-              Mostrando {filteredAssignments.length} de {assignments?.length || 0} asignaciones
+              {totalPages > 1
+                ? `Mostrando ${currentPage * PAGE_SIZE + 1}–${Math.min((currentPage + 1) * PAGE_SIZE, totalFiltered)} de ${totalFiltered} asignaciones`
+                : `Mostrando ${totalFiltered} de ${assignments?.length || 0} asignaciones`}
             </div>
             <table className={`data-table ${compactView ? 'compact' : ''}`}>
               <thead>
@@ -643,7 +738,7 @@ export default function Asignaciones() {
                 </tr>
               </thead>
               <tbody>
-                {filteredAssignments.map((assignment) => {
+                {(paginatedAssignments ?? []).map((assignment) => {
                   const totalWeight = getTotalWeightByCollaborator(assignment.collaboratorId, assignment.periodId)
                   const collaborator = collaboratorsById.get(assignment.collaboratorId)
                   const scopeFromCollaborator = collaborator?.orgScopeId
@@ -834,6 +929,28 @@ export default function Asignaciones() {
               </tbody>
             </table>
 
+            {totalPages > 1 && (
+              <div className="pagination-controls">
+                <button
+                  className="btn-secondary"
+                  onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+                  disabled={currentPage === 0}
+                >
+                  Anterior
+                </button>
+                <span className="pagination-info">
+                  Página {currentPage + 1} de {totalPages}
+                </span>
+                <button
+                  className="btn-secondary"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={currentPage >= totalPages - 1}
+                >
+                  Siguiente
+                </button>
+              </div>
+            )}
+
             {selectedPeriodId && (
               <div className="weight-summary">
                 <h3>Resumen de Ponderaciones por Colaborador</h3>
@@ -867,6 +984,12 @@ export default function Asignaciones() {
               </div>
             )}
           </>
+        ) : !selectedPeriodId && !selectedCollaboratorId ? (
+          <div className="empty-state">
+            <div className="empty-icon">🔍</div>
+            <h3>Seleccioná un período o colaborador</h3>
+            <p>Elegí un período o colaborador en los filtros de arriba para ver las asignaciones.</p>
+          </div>
         ) : (
           <div className="empty-state">
             <div className="empty-icon">📋</div>

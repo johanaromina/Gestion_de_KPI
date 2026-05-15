@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
+import { PoolConnection } from 'mysql2/promise'
 import { pool } from '../config/database'
-import { KPI } from '../types'
+import { KPI, KPIDirection } from '../types'
 import {
   calculateVariation,
   calculateWeightedResult,
@@ -10,26 +11,74 @@ import { recalculateScopeKPI } from '../services/scope-kpi-aggregation.service'
 import { computeScopeKpiMetrics } from '../services/scope-kpi-mixed.service'
 import { AuthRequest } from '../middleware/auth.middleware'
 import { recalcOKRsLinkedToScopeKpi } from '../services/okr.service'
+import { logger } from '../utils/logger'
+import {
+  parseKpiName,
+  parseKpiType,
+  resolveKpiDirectionInput,
+  VALID_KPI_TYPES,
+} from '../services/kpi-definition.service'
 
 const isConfigUser = (req: Request) => {
   const user = (req as AuthRequest).user
   return !!(user?.hasSuperpowers || user?.permissions?.includes('config.manage'))
 }
 
-const ensureKPIPeriodsTable = async () => {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS kpi_periods (
-      kpiId INT NOT NULL,
-      periodId INT NOT NULL,
-      PRIMARY KEY (kpiId, periodId)
+const normalizeOptionalText = (value: unknown): string | null =>
+  typeof value === 'string' && value.trim() ? value.trim() : null
+
+const bulkUpdateCollaboratorKpiMetrics = async (
+  conn: PoolConnection,
+  rows: any[],
+  direction: KPIDirection,
+  customFormula?: string | null
+) => {
+  if (!Array.isArray(rows) || rows.length === 0) return
+
+  const recalculated = rows.map((row) => {
+    const variation = calculateVariation(
+      direction,
+      Number(row.target ?? 0),
+      Number(row.actual ?? 0),
+      customFormula || undefined
     )
-  `)
+    const weightedResult = calculateWeightedResult(variation, Number(row.weight ?? 0))
+    return {
+      id: Number(row.id),
+      variation,
+      weightedResult,
+    }
+  })
+
+  const variationCases = recalculated.map(() => 'WHEN ? THEN ?').join(' ')
+  const weightedCases = recalculated.map(() => 'WHEN ? THEN ?').join(' ')
+  const ids = recalculated.map((row) => row.id)
+
+  await conn.query(
+    `UPDATE collaborator_kpis
+     SET variation = CASE id ${variationCases} END,
+         weightedResult = CASE id ${weightedCases} END
+     WHERE id IN (${ids.map(() => '?').join(',')})`,
+    [
+      ...recalculated.flatMap((row) => [row.id, row.variation]),
+      ...recalculated.flatMap((row) => [row.id, row.weightedResult]),
+      ...ids,
+    ]
+  )
 }
+
+// Run once at module load — not on every request
+pool.query(`
+  CREATE TABLE IF NOT EXISTS kpi_periods (
+    kpiId INT NOT NULL,
+    periodId INT NOT NULL,
+    PRIMARY KEY (kpiId, periodId)
+  )
+`).catch((err) => logger.error('[kpis] ensureKPIPeriodsTable failed:', err))
 
 export const getKPIs = async (req: Request, res: Response) => {
   try {
     const { area, areaId, periodId } = req.query
-    await ensureKPIPeriodsTable()
 
     let query = 'SELECT * FROM kpis'
     const params: any[] = []
@@ -99,14 +148,13 @@ export const getKPIs = async (req: Request, res: Response) => {
 
     res.json(enriched)
   } catch (error: any) {
-    console.error('Error fetching KPIs:', error)
+    logger.error('Error fetching KPIs:', error)
     res.status(500).json({ error: 'Error al obtener KPIs' })
   }
 }
 
 export const getKPIById = async (req: Request, res: Response) => {
   try {
-    await ensureKPIPeriodsTable()
     const { id } = req.params
     const [rows] = await pool.query<KPI[]>(
       'SELECT * FROM kpis WHERE id = ?',
@@ -134,7 +182,7 @@ export const getKPIById = async (req: Request, res: Response) => {
 
     res.json({ ...rows[0], areas, periodIds, scopeWeights: weightsRows || [] })
   } catch (error: any) {
-    console.error('Error fetching KPI:', error)
+    logger.error('Error fetching KPI:', error)
     res.status(500).json({ error: 'Error al obtener KPI' })
   }
 }
@@ -158,16 +206,29 @@ export const createKPI = async (req: Request, res: Response) => {
       scopeWeights,
     } = req.body
 
-    if (!name || !type) {
-      return res.status(400).json({ error: 'Faltan campos requeridos' })
+    const normalizedName = parseKpiName(name)
+    if (!normalizedName) {
+      return res.status(400).json({ error: 'El nombre es requerido' })
     }
 
-    const resolvedDirection =
-      direction && ['growth', 'reduction', 'exact'].includes(direction) ? direction : type === 'sla' ? 'reduction' : 'growth'
+    const normalizedType = parseKpiType(type)
+    if (!normalizedType) {
+      return res.status(400).json({
+        error: `Tipo de KPI inválido. Valores permitidos: ${VALID_KPI_TYPES.join(', ')}`,
+      })
+    }
+
+    const normalizedDescription = normalizeOptionalText(description)
+    const normalizedCriteria = normalizeOptionalText(criteria)
+    const normalizedFormula = normalizeOptionalText(formula)
+    const normalizedDefaultDataSource = normalizeOptionalText(defaultDataSource)
+    const normalizedDefaultCriteriaTemplate = normalizeOptionalText(defaultCriteriaTemplate)
+    const normalizedDefaultCalcRule = normalizeOptionalText(defaultCalcRule)
+    const resolvedDirection = resolveKpiDirectionInput(normalizedType, direction)
 
     // Validar fórmula si se proporciona
-    if (formula) {
-      const validation = validateFormula(formula)
+    if (normalizedFormula) {
+      const validation = validateFormula(normalizedFormula)
       if (!validation.valid) {
         return res.status(400).json({ error: validation.error })
       }
@@ -182,16 +243,16 @@ export const createKPI = async (req: Request, res: Response) => {
          (name, description, type, direction, criteria, formula, macroKPIId, defaultDataSource, defaultCriteriaTemplate, defaultCalcRule) 
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          name,
-          description || null,
-          type,
+          normalizedName,
+          normalizedDescription,
+          normalizedType,
           resolvedDirection,
-          criteria || null,
-          formula || null,
+          normalizedCriteria,
+          normalizedFormula,
           macroKPIId || null,
-          defaultDataSource || null,
-          defaultCriteriaTemplate || null,
-          defaultCalcRule || null,
+          normalizedDefaultDataSource,
+          normalizedDefaultCriteriaTemplate,
+          normalizedDefaultCalcRule,
         ]
       )
 
@@ -209,7 +270,6 @@ export const createKPI = async (req: Request, res: Response) => {
       }
 
       if (Array.isArray(periodIds)) {
-        await ensureKPIPeriodsTable()
         const values = periodIds
           .filter((p: any) => Number.isFinite(Number(p)))
           .map((p: number) => [kpiId, Number(p)])
@@ -234,16 +294,16 @@ export const createKPI = async (req: Request, res: Response) => {
 
       res.status(201).json({
         id: kpiId,
-        name,
-        description: description || null,
-        type,
+        name: normalizedName,
+        description: normalizedDescription,
+        type: normalizedType,
         direction: resolvedDirection,
-        criteria: criteria || null,
-        formula: formula || null,
+        criteria: normalizedCriteria,
+        formula: normalizedFormula,
         macroKPIId: macroKPIId || null,
-        defaultDataSource: defaultDataSource || null,
-        defaultCriteriaTemplate: defaultCriteriaTemplate || null,
-        defaultCalcRule: defaultCalcRule || null,
+        defaultDataSource: normalizedDefaultDataSource,
+        defaultCriteriaTemplate: normalizedDefaultCriteriaTemplate,
+        defaultCalcRule: normalizedDefaultCalcRule,
         areas: Array.isArray(areas) ? areas : [],
         scopeWeights: Array.isArray(scopeWeights) ? scopeWeights : [],
         periodIds: Array.isArray(periodIds)
@@ -257,7 +317,7 @@ export const createKPI = async (req: Request, res: Response) => {
       conn.release()
     }
   } catch (error: any) {
-    console.error('Error creating KPI:', error)
+    logger.error('Error creating KPI:', error)
     res.status(500).json({ error: 'Error al crear KPI' })
   }
 }
@@ -282,13 +342,30 @@ export const updateKPI = async (req: Request, res: Response) => {
       scopeWeights,
     } = req.body
 
+    const normalizedName = parseKpiName(name)
+    if (!normalizedName) {
+      return res.status(400).json({ error: 'El nombre es requerido' })
+    }
+
+    const normalizedType = parseKpiType(type)
+    if (!normalizedType) {
+      return res.status(400).json({
+        error: `Tipo de KPI inválido. Valores permitidos: ${VALID_KPI_TYPES.join(', ')}`,
+      })
+    }
+
+    const normalizedDescription = normalizeOptionalText(description)
+    const normalizedCriteria = normalizeOptionalText(criteria)
+    const normalizedFormula = normalizeOptionalText(formula)
+    const normalizedDefaultDataSource = normalizeOptionalText(defaultDataSource)
+    const normalizedDefaultCriteriaTemplate = normalizeOptionalText(defaultCriteriaTemplate)
+    const normalizedDefaultCalcRule = normalizeOptionalText(defaultCalcRule)
+
     // Validar fórmula si se proporciona
-    if (formula !== undefined) {
-      if (formula && formula.trim()) {
-        const validation = validateFormula(formula)
-        if (!validation.valid) {
-          return res.status(400).json({ error: validation.error })
-        }
+    if (normalizedFormula) {
+      const validation = validateFormula(normalizedFormula)
+      if (!validation.valid) {
+        return res.status(400).json({ error: validation.error })
       }
     }
 
@@ -296,28 +373,31 @@ export const updateKPI = async (req: Request, res: Response) => {
     try {
       await conn.beginTransaction()
 
-      const resolvedDirection =
-        direction && ['growth', 'reduction', 'exact'].includes(direction) ? direction : type === 'sla' ? 'reduction' : 'growth'
+      const resolvedDirection = resolveKpiDirectionInput(normalizedType, direction)
 
-      await conn.query(
+      const [updateResult] = await conn.query(
         `UPDATE kpis 
          SET name = ?, description = ?, type = ?, direction = ?, criteria = ?, formula = ?, macroKPIId = ?,
              defaultDataSource = ?, defaultCriteriaTemplate = ?, defaultCalcRule = ?
          WHERE id = ?`,
         [
-          name,
-          description,
-          type,
+          normalizedName,
+          normalizedDescription,
+          normalizedType,
           resolvedDirection,
-          criteria,
-          formula || null,
+          normalizedCriteria,
+          normalizedFormula,
           macroKPIId || null,
-          defaultDataSource || null,
-          defaultCriteriaTemplate || null,
-          defaultCalcRule || null,
+          normalizedDefaultDataSource,
+          normalizedDefaultCriteriaTemplate,
+          normalizedDefaultCalcRule,
           id,
         ]
       )
+      if (Number((updateResult as any).affectedRows || 0) === 0) {
+        await conn.rollback()
+        return res.status(404).json({ error: 'KPI no encontrado' })
+      }
 
       if (Array.isArray(areas)) {
         await conn.query('DELETE FROM kpi_areas WHERE kpiId = ?', [id])
@@ -331,7 +411,6 @@ export const updateKPI = async (req: Request, res: Response) => {
       }
 
       if (Array.isArray(periodIds)) {
-        await ensureKPIPeriodsTable()
         await conn.query('DELETE FROM kpi_periods WHERE kpiId = ?', [id])
         const values = periodIds
           .filter((p: any) => Number.isFinite(Number(p)))
@@ -360,22 +439,12 @@ export const updateKPI = async (req: Request, res: Response) => {
         [id]
       )
 
-      if (Array.isArray(affectedAssignments) && affectedAssignments.length > 0) {
-        for (const row of affectedAssignments) {
-          const variation = calculateVariation(
-            resolvedDirection,
-            Number(row.target ?? 0),
-            Number(row.actual ?? 0),
-            formula || undefined
-          )
-          const weightedResult = calculateWeightedResult(variation, Number(row.weight ?? 0))
-
-          await conn.query(
-            'UPDATE collaborator_kpis SET variation = ?, weightedResult = ? WHERE id = ?',
-            [variation, weightedResult, row.id]
-          )
-        }
-      }
+      await bulkUpdateCollaboratorKpiMetrics(
+        conn,
+        affectedAssignments,
+        resolvedDirection,
+        normalizedFormula
+      )
 
       await conn.commit()
     } catch (err) {
@@ -419,7 +488,7 @@ export const updateKPI = async (req: Request, res: Response) => {
         for (const row of Array.isArray(linkedRows) ? linkedRows : []) {
           await recalculateScopeKPI(row.scopeKpiId)
           recalcOKRsLinkedToScopeKpi(row.scopeKpiId).catch((err) =>
-            console.error('[OKR propagation] KPI update→scopeKpi→OKR:', err)
+            logger.error('[OKR propagation] KPI update→scopeKpi→OKR:', err)
           )
         }
 
@@ -439,19 +508,19 @@ export const updateKPI = async (req: Request, res: Response) => {
               frontier.push(row.scopeKpiId)
               await recalculateScopeKPI(row.scopeKpiId)
               recalcOKRsLinkedToScopeKpi(row.scopeKpiId).catch((err) =>
-                console.error('[OKR propagation] KPI update→scopeKpi→OKR:', err)
+                logger.error('[OKR propagation] KPI update→scopeKpi→OKR:', err)
               )
             }
           }
         }
       } catch (err) {
-        console.error('[scope propagation] KPI update→scopeKpi:', err)
+        logger.error('[scope propagation] KPI update→scopeKpi:', err)
       }
     })()
 
     res.json({ message: 'KPI actualizado correctamente' })
   } catch (error: any) {
-    console.error('Error updating KPI:', error)
+    logger.error('Error updating KPI:', error)
     res.status(500).json({ error: 'Error al actualizar KPI' })
   }
 }
@@ -461,11 +530,33 @@ export const deleteKPI = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
 
-    await pool.query('DELETE FROM kpis WHERE id = ?', [id])
+    const [usageRows] = await pool.query<any[]>(
+      `SELECT
+         (SELECT COUNT(*) FROM collaborator_kpis WHERE kpiId = ?) AS collaboratorAssignments,
+         (SELECT COUNT(*) FROM scope_kpis WHERE kpiId = ?) AS scopeAssignments,
+         (SELECT COUNT(*) FROM objective_trees_kpis WHERE kpiId = ?) AS objectiveLinks`,
+      [id, id, id]
+    )
+    const usage = Array.isArray(usageRows) && usageRows.length > 0 ? usageRows[0] : null
+    const totalReferences =
+      Number(usage?.collaboratorAssignments ?? 0) +
+      Number(usage?.scopeAssignments ?? 0) +
+      Number(usage?.objectiveLinks ?? 0)
+
+    if (totalReferences > 0) {
+      return res.status(409).json({
+        error: 'Este KPI está en uso y no puede eliminarse.',
+      })
+    }
+
+    const [result] = await pool.query<any>('DELETE FROM kpis WHERE id = ?', [id])
+    if (Number((result as any).affectedRows || 0) === 0) {
+      return res.status(404).json({ error: 'KPI no encontrado' })
+    }
 
     res.json({ message: 'KPI eliminado correctamente' })
   } catch (error: any) {
-    console.error('Error deleting KPI:', error)
+    logger.error('Error deleting KPI:', error)
     res.status(500).json({ error: 'Error al eliminar KPI' })
   }
 }

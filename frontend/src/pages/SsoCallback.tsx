@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
-import { consumeSsoRememberMe, storeAuthToken } from '../utils/authStorage'
+import { consumeSsoRememberMe } from '../utils/authStorage'
 import './Login.css'
 
 export default function SsoCallback() {
@@ -29,12 +29,7 @@ export default function SsoCallback() {
     const exchange = async () => {
       try {
         const rememberMe = consumeSsoRememberMe()
-        const response = await api.post('/auth/sso/exchange', {
-          code,
-          rememberMe,
-        })
-        const { token } = response.data
-        storeAuthToken(token, rememberMe)
+        await api.post('/auth/sso/exchange', { code, rememberMe })
         navigate('/', { replace: true })
       } catch (err: any) {
         setStatus('error')

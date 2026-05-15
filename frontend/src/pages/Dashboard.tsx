@@ -166,6 +166,8 @@ export default function Dashboard() {
     </svg>
   )
 
+  const DASHBOARD_STALE = 2 * 60 * 1000
+
   const { data: stats } = useQuery<DashboardStats>(
     'dashboard-stats',
     async () => {
@@ -175,6 +177,7 @@ export default function Dashboard() {
     {
       enabled: isHR,
       retry: false,
+      staleTime: DASHBOARD_STALE,
     }
   )
 
@@ -187,6 +190,7 @@ export default function Dashboard() {
     {
       enabled: isHR,
       retry: false,
+      staleTime: DASHBOARD_STALE,
     }
   )
 
@@ -199,6 +203,7 @@ export default function Dashboard() {
     {
       enabled: isLeadership && !!user?.collaboratorId,
       retry: false,
+      staleTime: DASHBOARD_STALE,
     }
   )
 
@@ -211,6 +216,7 @@ export default function Dashboard() {
     {
       enabled: isCollaborator && !!user?.collaboratorId,
       retry: false,
+      staleTime: DASHBOARD_STALE,
     }
   )
 
@@ -223,6 +229,7 @@ export default function Dashboard() {
     {
       enabled: isCollaborator && !!user?.collaboratorId,
       retry: false,
+      staleTime: DASHBOARD_STALE,
     }
   )
 
@@ -235,6 +242,7 @@ export default function Dashboard() {
     {
       enabled: isHR || isLeadership,
       retry: false,
+      staleTime: DASHBOARD_STALE,
     }
   )
 
@@ -247,6 +255,7 @@ export default function Dashboard() {
     {
       enabled: canConfig,
       retry: false,
+      staleTime: DASHBOARD_STALE,
     }
   )
 
@@ -262,7 +271,7 @@ export default function Dashboard() {
       const atRisk = objectives.filter((o) => (Number(o.progress) || 0) < 40).length
       return { active, avgProgress, atRisk }
     },
-    { retry: false }
+    { retry: false, staleTime: DASHBOARD_STALE }
   )
 
   const summaryKPIs = useMemo(() => {

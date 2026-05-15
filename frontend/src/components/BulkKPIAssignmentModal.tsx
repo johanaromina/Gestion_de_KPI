@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import api from '../services/api'
 import './BulkKPIAssignmentModal.css'
@@ -18,6 +18,16 @@ interface Props {
   onSuccess: (created: number, skipped: number) => void
 }
 
+const roleLabel: Record<string, string> = {
+  collaborator: 'Colaborador',
+  leader: 'Líder',
+  manager: 'Gerente',
+  director: 'Director',
+  admin: 'Administrador',
+}
+
+const dataSourceOptions = ['Jira', 'Xray', 'DB MySQL', 'CSV upload', 'Manual', 'Otro']
+
 export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: Props) {
   const queryClient = useQueryClient()
   const [step, setStep] = useState<1 | 2>(prefill ? 2 : 1)
@@ -27,9 +37,18 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
   const [periodId, setPeriodId] = useState(prefill ? String(prefill.periodId) : '')
   const [target, setTarget] = useState(prefill ? String(prefill.target) : '')
   const [weight, setWeight] = useState(prefill ? String(prefill.weight) : '0')
+  const [applyAdvancedOptions, setApplyAdvancedOptions] = useState(false)
+  const [assignmentStatus, setAssignmentStatus] = useState<'draft' | 'proposed' | 'approved' | 'closed'>('draft')
+  const [curationStatus, setCurationStatus] = useState<'pending' | 'in_review' | 'approved' | 'rejected'>('pending')
+  const [inputMode, setInputMode] = useState<'manual' | 'import' | 'auto'>('manual')
+  const [dataSource, setDataSource] = useState('')
+  const [sourceConfig, setSourceConfig] = useState('')
+  const [criteriaText, setCriteriaText] = useState('')
+  const [evidenceUrl, setEvidenceUrl] = useState('')
 
   // Paso 2
   const [scopeId, setScopeId] = useState('')
+  const [selectedRole, setSelectedRole] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
 
   const { data: kpis = [] } = useQuery<any[]>('kpis', () => api.get('/kpis').then(r => r.data))
@@ -80,12 +99,42 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
     return result
   }, [scopeId, orgScopes])
 
-  const filteredCollaborators = useMemo(() => {
-    if (!scopeId) return collaborators.filter((c: any) => c.status !== 'inactive')
-    return collaborators.filter((c: any) =>
-      c.status !== 'inactive' && c.orgScopeId && descendantScopeIds.has(c.orgScopeId)
+  const descendantScopeNames = useMemo(() => {
+    if (!scopeId) return new Set<string>()
+    return new Set(
+      Array.from(descendantScopeIds)
+        .map((id) => scopeById.get(id)?.name)
+        .filter(Boolean)
     )
-  }, [collaborators, scopeId, descendantScopeIds])
+  }, [scopeId, descendantScopeIds, scopeById])
+
+  const activeCollaborators = useMemo(
+    () => collaborators.filter((c: any) => c.status !== 'inactive'),
+    [collaborators]
+  )
+
+  const availableRoles = useMemo<string[]>(() =>
+    Array.from(
+      new Set<string>(
+        activeCollaborators
+          .map((c: any) => String(c.role || ''))
+          .filter(Boolean)
+      )
+    ).sort((a, b) => String(roleLabel[a] || a).localeCompare(String(roleLabel[b] || b)))
+  , [activeCollaborators])
+
+  const scopeFilteredCollaborators = useMemo(() => {
+    if (!scopeId) return activeCollaborators
+    return activeCollaborators.filter((c: any) => {
+      if (c.orgScopeId) return descendantScopeIds.has(c.orgScopeId)
+      return descendantScopeNames.has(c.area)
+    })
+  }, [activeCollaborators, scopeId, descendantScopeIds, descendantScopeNames])
+
+  const filteredCollaborators = useMemo(() => {
+    if (!selectedRole) return scopeFilteredCollaborators
+    return scopeFilteredCollaborators.filter((c: any) => c.role === selectedRole)
+  }, [scopeFilteredCollaborators, selectedRole])
 
   // Detectar cuáles ya tienen el KPI asignado en este período
   const alreadyAssignedIds = useMemo(() => {
@@ -96,12 +145,29 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
     return set
   }, [existingAssignments, kpiId])
 
+  const eligibleCollaborators = useMemo(
+    () => filteredCollaborators.filter((c: any) => !alreadyAssignedIds.has(c.id)),
+    [filteredCollaborators, alreadyAssignedIds]
+  )
+
+  const filteredAlreadyAssignedCount = useMemo(
+    () => filteredCollaborators.filter((c: any) => alreadyAssignedIds.has(c.id)).length,
+    [filteredCollaborators, alreadyAssignedIds]
+  )
+
+  useEffect(() => {
+    const eligibleIds = new Set<number>(eligibleCollaborators.map((c: any) => c.id))
+    setSelectedIds((prev) => {
+      const next = new Set(Array.from(prev).filter((id) => eligibleIds.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [eligibleCollaborators])
+
   const toggleAll = () => {
-    const eligible = filteredCollaborators.filter((c: any) => !alreadyAssignedIds.has(c.id))
-    if (selectedIds.size === eligible.length) {
+    if (selectedIds.size === eligibleCollaborators.length) {
       setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(eligible.map((c: any) => c.id)))
+      setSelectedIds(new Set(eligibleCollaborators.map((c: any) => c.id)))
     }
   }
 
@@ -114,13 +180,27 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
   }
 
   const bulkMutation = useMutation(
-    () => api.post('/collaborator-kpis/bulk', {
-      kpiId: Number(kpiId),
-      periodId: Number(periodId),
-      collaboratorIds: Array.from(selectedIds),
-      target: Number(target),
-      weight: Number(weight),
-    }).then(r => r.data),
+    () => {
+      const payload: Record<string, any> = {
+        kpiId: Number(kpiId),
+        periodId: Number(periodId),
+        collaboratorIds: Array.from(selectedIds),
+        target: Number(target),
+        weight: Number(weight),
+      }
+
+      if (applyAdvancedOptions) {
+        payload.status = assignmentStatus
+        payload.curationStatus = curationStatus
+        payload.inputMode = inputMode
+        payload.dataSource = dataSource
+        payload.sourceConfig = sourceConfig
+        payload.criteriaText = criteriaText
+        payload.evidenceUrl = evidenceUrl
+      }
+
+      return api.post('/collaborator-kpis/bulk', payload).then(r => r.data)
+    },
     {
       onSuccess: (data) => {
         queryClient.invalidateQueries('collaborator-kpis')
@@ -131,9 +211,21 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
 
   const step1Valid = kpiId && periodId && target && Number(target) > 0
 
-  const selectedKpiName = prefill?.kpiName ?? kpis.find((k: any) => k.id === Number(kpiId))?.name ?? ''
+  const selectedKpi = useMemo(
+    () => kpis.find((k: any) => k.id === Number(kpiId)) ?? null,
+    [kpis, kpiId]
+  )
+
+  useEffect(() => {
+    if (!applyAdvancedOptions || !selectedKpi) return
+    const defaultCriteria = selectedKpi.criteria || selectedKpi.defaultCriteriaTemplate || ''
+    setDataSource((prev) => prev || selectedKpi.defaultDataSource || '')
+    setCriteriaText((prev) => prev || defaultCriteria)
+  }, [applyAdvancedOptions, selectedKpi?.id])
+
+  const selectedKpiName = prefill?.kpiName ?? selectedKpi?.name ?? ''
   const selectedPeriodName = prefill?.periodName ?? periods.find((p: any) => p.id === Number(periodId))?.name ?? ''
-  const eligibleCount = filteredCollaborators.filter((c: any) => !alreadyAssignedIds.has(c.id)).length
+  const eligibleCount = eligibleCollaborators.length
 
   return (
     <div className="bulk-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -205,6 +297,92 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
                   <small>Peso del KPI en el total del colaborador</small>
                 </div>
               </div>
+
+              <div className="bulk-advanced-toggle">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={applyAdvancedOptions}
+                    onChange={(e) => setApplyAdvancedOptions(e.target.checked)}
+                  />
+                  Aplicar configuración avanzada opcional a todas las asignaciones
+                </label>
+                <small>Permite definir estado, curaduría, modo de carga y criterio sin editar luego una por una.</small>
+              </div>
+
+              {applyAdvancedOptions && (
+                <div className="bulk-advanced-panel">
+                  <div className="bulk-form-row">
+                    <div className="bulk-field">
+                      <label>Estado</label>
+                      <select value={assignmentStatus} onChange={e => setAssignmentStatus(e.target.value as any)}>
+                        <option value="draft">Borrador</option>
+                        <option value="proposed">Propuesto</option>
+                        <option value="approved">Aprobado</option>
+                        <option value="closed">Cerrado</option>
+                      </select>
+                    </div>
+                    <div className="bulk-field">
+                      <label>Curaduría</label>
+                      <select value={curationStatus} onChange={e => setCurationStatus(e.target.value as any)}>
+                        <option value="pending">Pendiente</option>
+                        <option value="in_review">En revisión</option>
+                        <option value="approved">Aprobada</option>
+                        <option value="rejected">Rechazada</option>
+                      </select>
+                    </div>
+                    <div className="bulk-field">
+                      <label>Modo de carga</label>
+                      <select value={inputMode} onChange={e => setInputMode(e.target.value as any)}>
+                        <option value="manual">Manual</option>
+                        <option value="import">Import</option>
+                        <option value="auto">Auto</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="bulk-form-row">
+                    <div className="bulk-field">
+                      <label>Fuente del dato</label>
+                      <select value={dataSource} onChange={e => setDataSource(e.target.value)}>
+                        <option value="">Sin definir</option>
+                        {dataSourceOptions.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="bulk-field">
+                      <label>Origen / Query / Endpoint</label>
+                      <input
+                        type="text"
+                        value={sourceConfig}
+                        onChange={e => setSourceConfig(e.target.value)}
+                        placeholder="JQL / SQL / URL / reporte"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="bulk-field">
+                    <label>Criterio de cálculo</label>
+                    <textarea
+                      value={criteriaText}
+                      onChange={e => setCriteriaText(e.target.value)}
+                      rows={3}
+                      placeholder="Describe cómo se calcula target / alcance / variación"
+                    />
+                  </div>
+
+                  <div className="bulk-field">
+                    <label>Evidencia / adjunto</label>
+                    <input
+                      type="text"
+                      value={evidenceUrl}
+                      onChange={e => setEvidenceUrl(e.target.value)}
+                      placeholder="Link o referencia"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -217,27 +395,36 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
                 <span><strong>Período:</strong> {selectedPeriodName}</span>
                 <span><strong>Meta:</strong> {target}</span>
                 <span><strong>Peso:</strong> {weight}%</span>
-                {!prefill && (
-                  <button className="bulk-edit-step1" onClick={() => setStep(1)}>Editar</button>
-                )}
+                <button className="bulk-edit-step1" onClick={() => setStep(1)}>Editar</button>
               </div>
 
-              {/* Filtro por equipo/área */}
-              <div className="bulk-field" style={{ marginBottom: 12 }}>
-                <label>Filtrar por equipo / área</label>
-                <select value={scopeId} onChange={e => { setScopeId(e.target.value); setSelectedIds(new Set()) }}>
-                  <option value="">Todos los colaboradores activos</option>
-                  {assignableScopes.map((s: any) => (
-                    <option key={s.id} value={s.id}>{s.label}</option>
-                  ))}
-                </select>
+              {/* Filtros de destinatarios */}
+              <div className="bulk-form-row" style={{ marginBottom: 12 }}>
+                <div className="bulk-field">
+                  <label>Filtrar por equipo / área</label>
+                  <select value={scopeId} onChange={e => setScopeId(e.target.value)}>
+                    <option value="">Todos los colaboradores activos</option>
+                    {assignableScopes.map((s: any) => (
+                      <option key={s.id} value={s.id}>{s.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="bulk-field">
+                  <label>Filtrar por rol</label>
+                  <select value={selectedRole} onChange={e => setSelectedRole(e.target.value)}>
+                    <option value="">Todos los roles</option>
+                    {availableRoles.map((role) => (
+                      <option key={role} value={role}>{roleLabel[role] || role}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* Controles selección */}
               <div className="bulk-select-controls">
                 <span className="bulk-count-label">
                   {filteredCollaborators.length} colaboradores
-                  {alreadyAssignedIds.size > 0 && ` · ${alreadyAssignedIds.size} ya asignados`}
+                  {filteredAlreadyAssignedCount > 0 && ` · ${filteredAlreadyAssignedCount} ya asignados`}
                   {` · ${eligibleCount} disponibles`}
                 </span>
                 {eligibleCount > 0 && (
@@ -250,12 +437,13 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
               {/* Lista de colaboradores */}
               <div className="bulk-collaborator-list">
                 {filteredCollaborators.length === 0 && (
-                  <div className="bulk-empty">No hay colaboradores activos en este equipo.</div>
+                  <div className="bulk-empty">No hay colaboradores activos con los filtros seleccionados.</div>
                 )}
                 {filteredCollaborators.map((c: any) => {
                   const already = alreadyAssignedIds.has(c.id)
                   const checked = selectedIds.has(c.id)
                   const scopeName = c.orgScopeId ? scopeById.get(c.orgScopeId)?.name : c.area
+                  const collaboratorRole = roleLabel[c.role] || c.role
                   return (
                     <label
                       key={c.id}
@@ -269,7 +457,12 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
                       />
                       <div className="bulk-collab-info">
                         <span className="bulk-collab-name">{c.name}</span>
-                        {c.position && <span className="bulk-collab-pos">{c.position}</span>}
+                        {(collaboratorRole || c.position) && (
+                          <span className="bulk-collab-pos">
+                            {collaboratorRole}
+                            {c.position ? ` · ${c.position}` : ''}
+                          </span>
+                        )}
                         {scopeName && <span className="bulk-collab-scope">{scopeName}</span>}
                       </div>
                       {already && <span className="bulk-collab-taken">ya asignado</span>}
