@@ -22,6 +22,116 @@ import {
 } from 'recharts'
 import './Dashboard.css'
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const DASHBOARD_STALE = 2 * 60 * 1000
+
+const AREA_COLORS = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#84cc16']
+
+// ─── Static render helpers ────────────────────────────────────────────────────
+
+function StatIcon({ name }: { name: 'users' | 'calendar' | 'target' | 'chart' | 'clipboard' | 'clock' }) {
+  switch (name) {
+    case 'users':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4ZM6 13a3 3 0 1 0-3-3 3 3 0 0 0 3 3Zm10 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4Zm-10 .5C3.34 15.5 0 16.84 0 19.5V22h6v-2.5c0-1.14.47-2.06 1.2-2.78A8.3 8.3 0 0 0 6 15.5Z" fill="currentColor" />
+        </svg>
+      )
+    case 'calendar':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1.5A2.5 2.5 0 0 1 22 6.5v13A2.5 2.5 0 0 1 19.5 22h-15A2.5 2.5 0 0 1 2 19.5v-13A2.5 2.5 0 0 1 4.5 4H6V3a1 1 0 0 1 1-1Zm-2.5 6V19.5c0 .55.45 1 1 1h15a1 1 0 0 0 1-1V8Z" fill="currentColor" />
+        </svg>
+      )
+    case 'target':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 2a10 10 0 1 0 10 10A10.01 10.01 0 0 0 12 2Zm0 4a6 6 0 1 1-6 6 6 6 0 0 1 6-6Zm0 3a3 3 0 1 0 3 3 3 3 0 0 0-3-3Z" fill="currentColor" />
+        </svg>
+      )
+    case 'chart':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 20a1 1 0 0 1-1-1V5a1 1 0 1 1 2 0v13h14a1 1 0 1 1 0 2Zm4-4a1 1 0 0 1-1-1V9a1 1 0 1 1 2 0v6a1 1 0 0 1-1 1Zm5 0a1 1 0 0 1-1-1V7a1 1 0 1 1 2 0v8a1 1 0 0 1-1 1Zm5 0a1 1 0 0 1-1-1v-4a1 1 0 1 1 2 0v4a1 1 0 0 1-1 1Z" fill="currentColor" />
+        </svg>
+      )
+    case 'clipboard':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M9 2h6a2 2 0 0 1 2 2h1.5A1.5 1.5 0 0 1 20 5.5v14A2.5 2.5 0 0 1 17.5 22h-11A2.5 2.5 0 0 1 4 19.5v-14A1.5 1.5 0 0 1 5.5 4H7a2 2 0 0 1 2-2Zm0 2v1h6V4Zm-2 4a1 1 0 0 0-1 1v9.5c0 .55.45 1 1 1h10a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1Z" fill="currentColor" />
+        </svg>
+      )
+    case 'clock':
+    default:
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 2a10 10 0 1 0 10 10A10.01 10.01 0 0 0 12 2Zm1 5a1 1 0 0 0-2 0v5a1 1 0 0 0 .4.8l3 2.25a1 1 0 1 0 1.2-1.6L13 11.5Z" fill="currentColor" />
+        </svg>
+      )
+  }
+}
+
+function UserIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-4 0-8 2-8 4.5V22h16v-3.5C20 16 16 14 12 14Z" fill="currentColor" />
+    </svg>
+  )
+}
+
+const progressColor = (p: number) =>
+  p >= 70 ? '#16a34a' : p >= 40 ? '#d97706' : '#dc2626'
+
+// ─── OKR Widget ───────────────────────────────────────────────────────────────
+
+function OkrWidget({
+  summary,
+  title,
+  onNavigate,
+}: {
+  summary: { active: number; avgProgress: number; atRisk: number }
+  title: string
+  onNavigate: () => void
+}) {
+  return (
+    <div className="okr-widget">
+      <div className="okr-widget-header">
+        <h3>{title}</h3>
+        <button className="okr-widget-link" onClick={onNavigate}>Ver todos →</button>
+      </div>
+      <div className="okr-widget-stats">
+        <div className="okr-widget-stat">
+          <span className="okr-widget-value">{summary.active}</span>
+          <span className="okr-widget-label">Objetivos activos</span>
+        </div>
+        <div className="okr-widget-stat">
+          <span className="okr-widget-value" style={{ color: progressColor(summary.avgProgress) }}>
+            {summary.avgProgress}%
+          </span>
+          <span className="okr-widget-label">Progreso promedio</span>
+        </div>
+        {summary.atRisk > 0 && (
+          <div className="okr-widget-stat">
+            <span className="okr-widget-value" style={{ color: '#dc2626' }}>{summary.atRisk}</span>
+            <span className="okr-widget-label">En riesgo (&lt;40%)</span>
+          </div>
+        )}
+      </div>
+      <div className="okr-widget-bar-wrap">
+        <div className="okr-widget-bar-track">
+          <div
+            className="okr-widget-bar-fill"
+            style={{ width: `${summary.avgProgress}%`, background: progressColor(summary.avgProgress) }}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 interface DashboardStats {
   totalCollaborators: number
   activePeriods: number
@@ -85,6 +195,8 @@ interface CollaboratorKPI {
   kpiDirection?: 'growth' | 'reduction' | 'exact'
 }
 
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const { user, isLoading: authLoading, isHR, isLeadership, isCollaborator, canConfig } = useAuth()
@@ -98,165 +210,55 @@ export default function Dashboard() {
   const formatNumber = (value: number, digits = 2) =>
     new Intl.NumberFormat('es-ES', { maximumFractionDigits: digits }).format(value)
   const formatPercent = (value: number, digits = 1) => `${formatNumber(value, digits)}%`
-  const renderStatIcon = (name: 'users' | 'calendar' | 'target' | 'chart' | 'clipboard' | 'clock') => {
-    switch (name) {
-      case 'users':
-        return (
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4ZM6 13a3 3 0 1 0-3-3 3 3 0 0 0 3 3Zm10 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4Zm-10 .5C3.34 15.5 0 16.84 0 19.5V22h6v-2.5c0-1.14.47-2.06 1.2-2.78A8.3 8.3 0 0 0 6 15.5Z"
-              fill="currentColor"
-            />
-          </svg>
-        )
-      case 'calendar':
-        return (
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1.5A2.5 2.5 0 0 1 22 6.5v13A2.5 2.5 0 0 1 19.5 22h-15A2.5 2.5 0 0 1 2 19.5v-13A2.5 2.5 0 0 1 4.5 4H6V3a1 1 0 0 1 1-1Zm-2.5 6V19.5c0 .55.45 1 1 1h15a1 1 0 0 0 1-1V8Z"
-              fill="currentColor"
-            />
-          </svg>
-        )
-      case 'target':
-        return (
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M12 2a10 10 0 1 0 10 10A10.01 10.01 0 0 0 12 2Zm0 4a6 6 0 1 1-6 6 6 6 0 0 1 6-6Zm0 3a3 3 0 1 0 3 3 3 3 0 0 0-3-3Z"
-              fill="currentColor"
-            />
-          </svg>
-        )
-      case 'chart':
-        return (
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M4 20a1 1 0 0 1-1-1V5a1 1 0 1 1 2 0v13h14a1 1 0 1 1 0 2Zm4-4a1 1 0 0 1-1-1V9a1 1 0 1 1 2 0v6a1 1 0 0 1-1 1Zm5 0a1 1 0 0 1-1-1V7a1 1 0 1 1 2 0v8a1 1 0 0 1-1 1Zm5 0a1 1 0 0 1-1-1v-4a1 1 0 1 1 2 0v4a1 1 0 0 1-1 1Z"
-              fill="currentColor"
-            />
-          </svg>
-        )
-      case 'clipboard':
-        return (
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M9 2h6a2 2 0 0 1 2 2h1.5A1.5 1.5 0 0 1 20 5.5v14A2.5 2.5 0 0 1 17.5 22h-11A2.5 2.5 0 0 1 4 19.5v-14A1.5 1.5 0 0 1 5.5 4H7a2 2 0 0 1 2-2Zm0 2v1h6V4Zm-2 4a1 1 0 0 0-1 1v9.5c0 .55.45 1 1 1h10a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1Z"
-              fill="currentColor"
-            />
-          </svg>
-        )
-      case 'clock':
-      default:
-        return (
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M12 2a10 10 0 1 0 10 10A10.01 10.01 0 0 0 12 2Zm1 5a1 1 0 0 0-2 0v5a1 1 0 0 0 .4.8l3 2.25a1 1 0 1 0 1.2-1.6L13 11.5Z"
-              fill="currentColor"
-            />
-          </svg>
-        )
-    }
-  }
-  const renderUserIcon = () => (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-4 0-8 2-8 4.5V22h16v-3.5C20 16 16 14 12 14Z"
-        fill="currentColor"
-      />
-    </svg>
-  )
-
-  const DASHBOARD_STALE = 2 * 60 * 1000
 
   const { data: stats } = useQuery<DashboardStats>(
     'dashboard-stats',
-    async () => {
-      const response = await api.get('/dashboard/stats')
-      return response.data
-    },
-    {
-      enabled: isHR,
-      retry: false,
-      staleTime: DASHBOARD_STALE,
-    }
+    async () => (await api.get('/dashboard/stats')).data,
+    { enabled: isHR, retry: false, staleTime: DASHBOARD_STALE }
   )
 
   const { data: areaStats } = useQuery<AreaStats[]>(
     'dashboard-area-stats',
-    async () => {
-      const response = await api.get('/dashboard/area-stats')
-      return response.data
-    },
-    {
-      enabled: isHR,
-      retry: false,
-      staleTime: DASHBOARD_STALE,
-    }
+    async () => (await api.get('/dashboard/area-stats')).data,
+    { enabled: isHR, retry: false, staleTime: DASHBOARD_STALE }
   )
 
   const { data: teamStats } = useQuery<TeamStats>(
     ['dashboard-team-stats', user?.collaboratorId],
-    async () => {
-      const response = await api.get(`/dashboard/team-stats/${user?.collaboratorId}`)
-      return response.data
-    },
-    {
-      enabled: isLeadership && !!user?.collaboratorId,
-      retry: false,
-      staleTime: DASHBOARD_STALE,
-    }
+    async () => (await api.get(`/dashboard/team-stats/${user?.collaboratorId}`)).data,
+    { enabled: isLeadership && !!user?.collaboratorId, retry: false, staleTime: DASHBOARD_STALE }
   )
 
   const { data: teamKPIs } = useQuery<KPICompliance[]>(
     ['dashboard-team-kpis', user?.collaboratorId],
-    async () => {
-      const response = await api.get(`/dashboard/team-kpis/${user?.collaboratorId}`)
-      return response.data
-    },
-    {
-      enabled: isCollaborator && !!user?.collaboratorId,
-      retry: false,
-      staleTime: DASHBOARD_STALE,
-    }
+    async () => (await api.get(`/dashboard/team-kpis/${user?.collaboratorId}`)).data,
+    { enabled: isCollaborator && !!user?.collaboratorId, retry: false, staleTime: DASHBOARD_STALE }
   )
 
   const { data: collaboratorKPIs } = useQuery<CollaboratorKPI[]>(
     ['collaborator-kpis-dashboard', user?.collaboratorId],
-    async () => {
-      const response = await api.get(`/collaborator-kpis/collaborator/${user?.collaboratorId}`)
-      return response.data
-    },
-    {
-      enabled: isCollaborator && !!user?.collaboratorId,
-      retry: false,
-      staleTime: DASHBOARD_STALE,
-    }
+    async () => (await api.get(`/collaborator-kpis/collaborator/${user?.collaboratorId}`)).data,
+    { enabled: isCollaborator && !!user?.collaboratorId, retry: false, staleTime: DASHBOARD_STALE }
   )
 
+  // Vista org-wide — solo HR
   const { data: complianceByPeriod } = useQuery(
     'dashboard-compliance-period',
-    async () => {
-      const response = await api.get('/dashboard/compliance-by-period')
-      return response.data
-    },
-    {
-      enabled: isHR || isLeadership,
-      retry: false,
-      staleTime: DASHBOARD_STALE,
-    }
+    async () => (await api.get('/dashboard/compliance-by-period')).data,
+    { enabled: isHR, retry: false, staleTime: DASHBOARD_STALE }
+  )
+
+  // Vista filtrada al equipo — solo Liderazgo
+  const { data: teamComplianceByPeriod } = useQuery(
+    ['dashboard-team-compliance-period', user?.collaboratorId],
+    async () => (await api.get(`/dashboard/team-compliance-by-period/${user?.collaboratorId}`)).data,
+    { enabled: isLeadership && !!user?.collaboratorId, retry: false, staleTime: DASHBOARD_STALE }
   )
 
   const { data: notificationSummary } = useQuery<NotificationSummary>(
     'notification-summary',
-    async () => {
-      const response = await api.get('/notifications/summary')
-      return response.data
-    },
-    {
-      enabled: canConfig,
-      retry: false,
-      staleTime: DASHBOARD_STALE,
-    }
+    async () => (await api.get('/notifications/summary')).data,
+    { enabled: canConfig, retry: false, staleTime: DASHBOARD_STALE }
   )
 
   const { data: okrSummary } = useQuery<{ active: number; avgProgress: number; atRisk: number }>(
@@ -271,7 +273,7 @@ export default function Dashboard() {
       const atRisk = objectives.filter((o) => (Number(o.progress) || 0) < 40).length
       return { active, avgProgress, atRisk }
     },
-    { retry: false, staleTime: DASHBOARD_STALE }
+    { enabled: !!user, retry: false, staleTime: DASHBOARD_STALE }
   )
 
   const summaryKPIs = useMemo(() => {
@@ -306,7 +308,7 @@ export default function Dashboard() {
         const impact = calculateWeightedImpact(variation, k.weight, k.subPeriodWeight)
         return sum + (impact || 0)
       }, 0) || 0
-    const overall = weightedAchieved
+
     const totalGap =
       summaryKPIs.reduce((sum, k) => {
         const target = Number(k.target) || 0
@@ -352,7 +354,7 @@ export default function Dashboard() {
 
     return {
       totalWeight,
-      overall,
+      overall: weightedAchieved,
       totalGap,
       monthly: monthly ? Object.values(monthly) : [],
     }
@@ -372,34 +374,25 @@ export default function Dashboard() {
       )
       const variation =
         kpi.variation ?? calculateVariationPercent(direction, targetValue, actualValue)
-      const isOnTrack = variation !== null && variation >= 100
-      const isRisk = variation !== null && variation < 80
       return {
         ...kpi,
         targetValue,
         actualValue,
         variation,
-        isOnTrack,
-        isRisk,
+        isOnTrack: variation !== null && variation >= 100,
+        isRisk: variation !== null && variation < 80,
       }
     })
 
-    const total = computed.length
-    const withoutActual = computed.filter((k) => k.actualValue === null).length
-    const onTrack = computed.filter((k) => k.isOnTrack).length
-    const atRisk = computed.filter((k) => k.isRisk).length
-
-    const topRisk = computed
-      .filter((k) => k.isRisk && k.variation !== null)
-      .sort((a, b) => (a.variation ?? 0) - (b.variation ?? 0))
-      .slice(0, 3)
-
     return {
-      total,
-      withoutActual,
-      onTrack,
-      atRisk,
-      topRisk,
+      total: computed.length,
+      withoutActual: computed.filter((k) => k.actualValue === null).length,
+      onTrack: computed.filter((k) => k.isOnTrack).length,
+      atRisk: computed.filter((k) => k.isRisk).length,
+      topRisk: computed
+        .filter((k) => k.isRisk && k.variation !== null)
+        .sort((a, b) => (a.variation ?? 0) - (b.variation ?? 0))
+        .slice(0, 3),
     }
   }, [summaryKPIs])
 
@@ -411,6 +404,8 @@ export default function Dashboard() {
     )
   }
 
+  // ─── Vista HR ────────────────────────────────────────────────────────────────
+
   if (isHR) {
     return (
       <div className="dashboard">
@@ -421,7 +416,7 @@ export default function Dashboard() {
           </div>
           <div className="user-info">
             <span className="user-name">
-              <span className="user-icon">{renderUserIcon()}</span>
+              <span className="user-icon"><UserIcon /></span>
               {user?.name}
             </span>
             <span className="user-role">Recursos Humanos</span>
@@ -470,52 +465,47 @@ export default function Dashboard() {
 
         <div className="dashboard-grid">
           <div className="stat-card">
-            <div className="stat-icon">{renderStatIcon('users')}</div>
+            <div className="stat-icon"><StatIcon name="users" /></div>
             <div className="stat-content">
               <h3>Colaboradores</h3>
               <p className="stat-value">{stats?.totalCollaborators || 0}</p>
               <p className="stat-label">Total registrados</p>
             </div>
           </div>
-
           <div className="stat-card">
-            <div className="stat-icon">{renderStatIcon('calendar')}</div>
+            <div className="stat-icon"><StatIcon name="calendar" /></div>
             <div className="stat-content">
               <h3>Periodos Activos</h3>
               <p className="stat-value">{stats?.activePeriods || 0}</p>
               <p className="stat-label">En evaluacion</p>
             </div>
           </div>
-
           <div className="stat-card">
-            <div className="stat-icon">{renderStatIcon('target')}</div>
+            <div className="stat-icon"><StatIcon name="target" /></div>
             <div className="stat-content">
               <h3>KPIs</h3>
               <p className="stat-value">{stats?.totalKPIs || 0}</p>
               <p className="stat-label">Definidos</p>
             </div>
           </div>
-
           <div className="stat-card">
-            <div className="stat-icon">{renderStatIcon('chart')}</div>
+            <div className="stat-icon"><StatIcon name="chart" /></div>
             <div className="stat-content">
               <h3>Cumplimiento</h3>
               <p className="stat-value">{stats?.averageCompliance?.toFixed(1) || 0}%</p>
               <p className="stat-label">Promedio general</p>
             </div>
           </div>
-
           <div className="stat-card">
-            <div className="stat-icon">{renderStatIcon('clipboard')}</div>
+            <div className="stat-icon"><StatIcon name="clipboard" /></div>
             <div className="stat-content">
               <h3>Asignaciones</h3>
               <p className="stat-value">{stats?.totalAssignments || 0}</p>
               <p className="stat-label">Total</p>
             </div>
           </div>
-
           <div className="stat-card">
-            <div className="stat-icon">{renderStatIcon('clock')}</div>
+            <div className="stat-icon"><StatIcon name="clock" /></div>
             <div className="stat-content">
               <h3>Pendientes</h3>
               <p className="stat-value">{stats?.pendingAssignments || 0}</p>
@@ -526,41 +516,7 @@ export default function Dashboard() {
 
         {okrSummary && okrSummary.active > 0 && (
           <div className="dashboard-section">
-            <div className="okr-widget">
-              <div className="okr-widget-header">
-                <h3>OKRs activos</h3>
-                <button className="okr-widget-link" onClick={() => navigate('/okr')}>Ver todos →</button>
-              </div>
-              <div className="okr-widget-stats">
-                <div className="okr-widget-stat">
-                  <span className="okr-widget-value">{okrSummary.active}</span>
-                  <span className="okr-widget-label">Objetivos activos</span>
-                </div>
-                <div className="okr-widget-stat">
-                  <span className="okr-widget-value" style={{ color: okrSummary.avgProgress >= 70 ? '#16a34a' : okrSummary.avgProgress >= 40 ? '#d97706' : '#dc2626' }}>
-                    {okrSummary.avgProgress}%
-                  </span>
-                  <span className="okr-widget-label">Progreso promedio</span>
-                </div>
-                {okrSummary.atRisk > 0 && (
-                  <div className="okr-widget-stat">
-                    <span className="okr-widget-value" style={{ color: '#dc2626' }}>{okrSummary.atRisk}</span>
-                    <span className="okr-widget-label">En riesgo (&lt;40%)</span>
-                  </div>
-                )}
-              </div>
-              <div className="okr-widget-bar-wrap">
-                <div className="okr-widget-bar-track">
-                  <div
-                    className="okr-widget-bar-fill"
-                    style={{
-                      width: `${okrSummary.avgProgress}%`,
-                      background: okrSummary.avgProgress >= 70 ? '#16a34a' : okrSummary.avgProgress >= 40 ? '#d97706' : '#dc2626'
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
+            <OkrWidget summary={okrSummary} title="OKRs activos" onNavigate={() => navigate('/okr')} />
           </div>
         )}
 
@@ -575,7 +531,7 @@ export default function Dashboard() {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="averageCompliance" fill="#f97316" name="Cumplimiento %" />
+                  <Bar dataKey="averageCompliance" fill="#6366f1" name="Cumplimiento %" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -591,12 +547,7 @@ export default function Dashboard() {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="compliance"
-                    stroke="#f97316"
-                    name="Cumplimiento %"
-                  />
+                  <Line type="monotone" dataKey="compliance" stroke="#0ea5e9" name="Cumplimiento %" />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -614,14 +565,11 @@ export default function Dashboard() {
                     cx="50%"
                     cy="50%"
                     outerRadius={100}
-                    fill="#f97316"
+                    fill="#6366f1"
                     label
                   >
                     {areaStats.map((_, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={['#f97316', '#ea580c', '#fb923c', '#111827', '#6b7280'][index % 5]}
-                      />
+                      <Cell key={`cell-${index}`} fill={AREA_COLORS[index % AREA_COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip />
@@ -635,29 +583,19 @@ export default function Dashboard() {
         <div className="dashboard-section">
           <h2>Accesos Rapidos</h2>
           <div className="quick-actions">
-            <button className="action-btn" onClick={() => navigate('/periodos')}>
-              Crear Periodo
-            </button>
-            <button className="action-btn" onClick={() => navigate('/colaboradores')}>
-              Agregar Colaborador
-            </button>
-            <button className="action-btn" onClick={() => navigate('/kpis')}>
-              Definir KPI
-            </button>
-            <button className="action-btn" onClick={() => navigate('/asignaciones')}>
-              Nueva Asignacion
-            </button>
-            <button className="action-btn" onClick={() => navigate('/vistas-agregadas')}>
-              Vistas Agregadas
-            </button>
-            <button className="action-btn" onClick={() => navigate('/auditoria')}>
-              Auditoria
-            </button>
+            <button className="action-btn" onClick={() => navigate('/periodos')}>Crear Periodo</button>
+            <button className="action-btn" onClick={() => navigate('/colaboradores')}>Agregar Colaborador</button>
+            <button className="action-btn" onClick={() => navigate('/kpis')}>Definir KPI</button>
+            <button className="action-btn" onClick={() => navigate('/asignaciones')}>Nueva Asignacion</button>
+            <button className="action-btn" onClick={() => navigate('/vistas-agregadas')}>Vistas Agregadas</button>
+            <button className="action-btn" onClick={() => navigate('/auditoria')}>Auditoria</button>
           </div>
         </div>
       </div>
     )
   }
+
+  // ─── Vista Liderazgo ──────────────────────────────────────────────────────────
 
   if (isLeadership) {
     return (
@@ -669,7 +607,7 @@ export default function Dashboard() {
           </div>
           <div className="user-info">
             <span className="user-name">
-              <span className="user-icon">{renderUserIcon()}</span>
+              <span className="user-icon"><UserIcon /></span>
               {user?.name}
             </span>
             <span className="user-role">Lider</span>
@@ -714,34 +652,31 @@ export default function Dashboard() {
 
         <div className="dashboard-grid">
           <div className="stat-card">
-            <div className="stat-icon">{renderStatIcon('users')}</div>
+            <div className="stat-icon"><StatIcon name="users" /></div>
             <div className="stat-content">
               <h3>Miembros del Equipo</h3>
               <p className="stat-value">{teamStats?.teamMembers || 0}</p>
               <p className="stat-label">Colaboradores</p>
             </div>
           </div>
-
           <div className="stat-card">
-            <div className="stat-icon">{renderStatIcon('chart')}</div>
+            <div className="stat-icon"><StatIcon name="chart" /></div>
             <div className="stat-content">
               <h3>Cumplimiento del Equipo</h3>
               <p className="stat-value">{teamStats?.teamAverageCompliance?.toFixed(1) || 0}%</p>
               <p className="stat-label">Promedio</p>
             </div>
           </div>
-
           <div className="stat-card">
-            <div className="stat-icon">{renderStatIcon('clipboard')}</div>
+            <div className="stat-icon"><StatIcon name="clipboard" /></div>
             <div className="stat-content">
               <h3>KPIs Completados</h3>
               <p className="stat-value">{teamStats?.teamCompletedKPIs || 0}</p>
               <p className="stat-label">Del equipo</p>
             </div>
           </div>
-
           <div className="stat-card">
-            <div className="stat-icon">{renderStatIcon('clock')}</div>
+            <div className="stat-icon"><StatIcon name="clock" /></div>
             <div className="stat-content">
               <h3>KPIs Pendientes</h3>
               <p className="stat-value">{teamStats?.teamPendingKPIs || 0}</p>
@@ -752,61 +687,22 @@ export default function Dashboard() {
 
         {okrSummary && okrSummary.active > 0 && (
           <div className="dashboard-section">
-            <div className="okr-widget">
-              <div className="okr-widget-header">
-                <h3>OKRs activos</h3>
-                <button className="okr-widget-link" onClick={() => navigate('/okr')}>Ver todos →</button>
-              </div>
-              <div className="okr-widget-stats">
-                <div className="okr-widget-stat">
-                  <span className="okr-widget-value">{okrSummary.active}</span>
-                  <span className="okr-widget-label">Objetivos activos</span>
-                </div>
-                <div className="okr-widget-stat">
-                  <span className="okr-widget-value" style={{ color: okrSummary.avgProgress >= 70 ? '#16a34a' : okrSummary.avgProgress >= 40 ? '#d97706' : '#dc2626' }}>
-                    {okrSummary.avgProgress}%
-                  </span>
-                  <span className="okr-widget-label">Progreso promedio</span>
-                </div>
-                {okrSummary.atRisk > 0 && (
-                  <div className="okr-widget-stat">
-                    <span className="okr-widget-value" style={{ color: '#dc2626' }}>{okrSummary.atRisk}</span>
-                    <span className="okr-widget-label">En riesgo (&lt;40%)</span>
-                  </div>
-                )}
-              </div>
-              <div className="okr-widget-bar-wrap">
-                <div className="okr-widget-bar-track">
-                  <div
-                    className="okr-widget-bar-fill"
-                    style={{
-                      width: `${okrSummary.avgProgress}%`,
-                      background: okrSummary.avgProgress >= 70 ? '#16a34a' : okrSummary.avgProgress >= 40 ? '#d97706' : '#dc2626'
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
+            <OkrWidget summary={okrSummary} title="OKRs activos" onNavigate={() => navigate('/okr')} />
           </div>
         )}
 
-        {complianceByPeriod && complianceByPeriod.length > 0 && (
+        {teamComplianceByPeriod && teamComplianceByPeriod.length > 0 && (
           <div className="charts-grid">
             <div className="chart-card">
               <h3>Evolucion de Cumplimiento del Equipo</h3>
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={complianceByPeriod}>
+                <LineChart data={teamComplianceByPeriod}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="period" />
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="compliance"
-                    stroke="#f97316"
-                    name="Cumplimiento %"
-                  />
+                  <Line type="monotone" dataKey="compliance" stroke="#10b981" name="Cumplimiento %" />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -816,23 +712,17 @@ export default function Dashboard() {
         <div className="dashboard-section">
           <h2>Acciones Rapidas</h2>
           <div className="quick-actions">
-            <button className="action-btn" onClick={() => navigate('/asignaciones')}>
-              Gestionar Asignaciones
-            </button>
-            <button className="action-btn" onClick={() => navigate('/mi-parrilla')}>
-              Mi Parrilla
-            </button>
-            <button className="action-btn" onClick={() => navigate('/vistas-agregadas')}>
-              Estadisticas
-            </button>
-            <button className="action-btn" onClick={() => navigate('/colaboradores')}>
-              Ver Colaboradores
-            </button>
+            <button className="action-btn" onClick={() => navigate('/asignaciones')}>Gestionar Asignaciones</button>
+            <button className="action-btn" onClick={() => navigate('/mi-parrilla')}>Mi Parrilla</button>
+            <button className="action-btn" onClick={() => navigate('/vistas-agregadas')}>Estadisticas</button>
+            <button className="action-btn" onClick={() => navigate('/colaboradores')}>Ver Colaboradores</button>
           </div>
         </div>
       </div>
     )
   }
+
+  // ─── Vista Colaborador ────────────────────────────────────────────────────────
 
   return (
     <div className="dashboard">
@@ -843,7 +733,7 @@ export default function Dashboard() {
         </div>
         <div className="user-info">
           <span className="user-name">
-            <span className="user-icon">{renderUserIcon()}</span>
+            <span className="user-icon"><UserIcon /></span>
             {user?.name}
           </span>
           <span className="user-role">Colaborador</span>
@@ -984,9 +874,7 @@ export default function Dashboard() {
           <div className="progress-grid">
             <div className="progress-card">
               <p className="progress-label">KPIs al dia</p>
-              <p className="progress-value">
-                {progressInsights.onTrack}/{progressInsights.total}
-              </p>
+              <p className="progress-value">{progressInsights.onTrack}/{progressInsights.total}</p>
               <p className="progress-caption">Cumpliendo o superando objetivo</p>
             </div>
             <div className="progress-card">
@@ -1049,12 +937,8 @@ export default function Dashboard() {
                     <span className="mini-weight">{formatPercent(m.weight, 2)} peso</span>
                   </div>
                   <div className="mini-body">
-                    <div>
-                      <span className="detail-label">Objetivo:</span> {formatNumber(m.target, 2)}
-                    </div>
-                    <div>
-                      <span className="detail-label">Actual:</span> {formatNumber(m.actual, 2)}
-                    </div>
+                    <div><span className="detail-label">Objetivo:</span> {formatNumber(m.target, 2)}</div>
+                    <div><span className="detail-label">Actual:</span> {formatNumber(m.actual, 2)}</div>
                     <div>
                       <span className="detail-label">Avance:</span>{' '}
                       {monthlyProgress === null ? '-' : formatPercent(monthlyProgress, 1)}
@@ -1078,8 +962,8 @@ export default function Dashboard() {
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="target" fill="#e5e7eb" name="Objetivo" />
-                <Bar dataKey="actual" fill="#f97316" name="Actual" />
+                <Bar dataKey="target" fill="#cbd5e1" name="Objetivo" />
+                <Bar dataKey="actual" fill="#6366f1" name="Actual" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -1088,50 +972,16 @@ export default function Dashboard() {
 
       {okrSummary && okrSummary.active > 0 && (
         <div className="dashboard-section">
-          <div className="okr-widget">
-            <div className="okr-widget-header">
-              <h3>Mis OKRs</h3>
-              <button className="okr-widget-link" onClick={() => navigate('/okr')}>Ver todos →</button>
-            </div>
-            <div className="okr-widget-stats">
-              <div className="okr-widget-stat">
-                <span className="okr-widget-value">{okrSummary.active}</span>
-                <span className="okr-widget-label">Objetivos activos</span>
-              </div>
-              <div className="okr-widget-stat">
-                <span className="okr-widget-value" style={{ color: okrSummary.avgProgress >= 70 ? '#16a34a' : okrSummary.avgProgress >= 40 ? '#d97706' : '#dc2626' }}>
-                  {okrSummary.avgProgress}%
-                </span>
-                <span className="okr-widget-label">Progreso promedio</span>
-              </div>
-            </div>
-            <div className="okr-widget-bar-wrap">
-              <div className="okr-widget-bar-track">
-                <div
-                  className="okr-widget-bar-fill"
-                  style={{
-                    width: `${okrSummary.avgProgress}%`,
-                    background: okrSummary.avgProgress >= 70 ? '#16a34a' : okrSummary.avgProgress >= 40 ? '#d97706' : '#dc2626'
-                  }}
-                />
-              </div>
-            </div>
-          </div>
+          <OkrWidget summary={okrSummary} title="Mis OKRs" onNavigate={() => navigate('/okr')} />
         </div>
       )}
 
       <div className="dashboard-section">
         <h2>Acciones Rapidas</h2>
         <div className="quick-actions">
-          <button className="action-btn" onClick={() => navigate('/mi-parrilla')}>
-            Ver Mi Parrilla
-          </button>
-          <button className="action-btn" onClick={() => navigate('/historial')}>
-            Mi Historial
-          </button>
-          <button className="action-btn" onClick={() => navigate('/okr')}>
-            Mis OKRs
-          </button>
+          <button className="action-btn" onClick={() => navigate('/mi-parrilla')}>Ver Mi Parrilla</button>
+          <button className="action-btn" onClick={() => navigate('/historial')}>Mi Historial</button>
+          <button className="action-btn" onClick={() => navigate('/okr')}>Mis OKRs</button>
         </div>
       </div>
     </div>

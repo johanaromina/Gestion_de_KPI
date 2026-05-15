@@ -6,6 +6,7 @@ import {
   getMyKPIs,
   getTeamKPIs,
   getComplianceByPeriod,
+  getTeamComplianceByPeriod,
   getExecutiveTree,
   getExecutiveTrends,
 } from '../controllers/dashboard.controller'
@@ -13,7 +14,6 @@ import { authenticate, authorize } from '../middleware/auth.middleware'
 
 const router = Router()
 
-// Todas las rutas requieren autenticación
 router.use(authenticate)
 
 router.get('/stats', getDashboardStats)
@@ -22,8 +22,8 @@ router.get('/team-stats/:leaderId', getTeamStats)
 router.get('/my-kpis/:collaboratorId', getMyKPIs)
 router.get('/team-kpis/:collaboratorId', getTeamKPIs)
 router.get('/compliance-by-period', getComplianceByPeriod)
+router.get('/team-compliance-by-period/:leaderId', getTeamComplianceByPeriod)
 router.get('/executive-tree', authorize('admin', 'director', 'manager', 'leader'), getExecutiveTree)
 router.get('/executive-trends', authorize('admin', 'director', 'manager', 'leader'), getExecutiveTrends)
 
 export default router
-
