@@ -30,7 +30,7 @@ interface CollaboratorKPI {
   criteriaText?: string
   evidenceUrl?: string
   curatorAssignee?: string
-  curationStatus?: 'pending' | 'in_review' | 'approved' | 'rejected'
+  curationStatus?: 'pending' | 'in_review' | 'approved' | 'rejected' | 'changes_requested'
   inputMode?: 'manual' | 'import' | 'auto'
   createCriteriaVersion?: boolean
 }
@@ -996,6 +996,8 @@ export default function CollaboratorKPIForm({
                   ? 'En revision'
                   : formData.curationStatus === 'approved'
                   ? 'Aprobado'
+                  : formData.curationStatus === 'changes_requested'
+                  ? 'Cambios solicitados'
                   : 'Rechazado'}
               </span>
             </div>
@@ -1140,6 +1142,7 @@ export default function CollaboratorKPIForm({
                   <option value="in_review">En revision</option>
                   <option value="approved">Aprobado</option>
                   <option value="rejected">Rechazado</option>
+                  <option value="changes_requested">Cambios solicitados</option>
                 </select>
               )}
             </div>

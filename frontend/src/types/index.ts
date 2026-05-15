@@ -101,7 +101,7 @@ export interface CollaboratorKPI {
   weightedResult?: number
   status: 'draft' | 'proposed' | 'approved' | 'closed'
   comments?: string
-  curationStatus?: 'pending' | 'in_review' | 'approved' | 'rejected'
+  curationStatus?: 'pending' | 'in_review' | 'approved' | 'rejected' | 'changes_requested'
   dataSource?: string
   dataSourceName?: string
   sourceConfig?: string
@@ -147,7 +147,7 @@ export interface ScopeKPI {
   variation?: number | null
   weightedResult?: number | null
   status: 'draft' | 'proposed' | 'approved' | 'closed'
-  curationStatus?: 'pending' | 'in_review' | 'approved' | 'rejected'
+  curationStatus?: 'pending' | 'in_review' | 'approved' | 'rejected' | 'changes_requested'
   inputMode?: 'manual' | 'import' | 'auto'
   orgScopeName?: string
   orgScopeType?: string

@@ -6,6 +6,8 @@ import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
 import { detectOutlier } from '../utils/outlierDetection'
 import './Curaduria.css'
 
+type CurationStatus = 'pending' | 'in_review' | 'approved' | 'rejected' | 'changes_requested'
+
 type CurationItem = {
   id?: number | null
   criteriaVersionId?: number | null
@@ -17,15 +19,31 @@ type CurationItem = {
   dataSource?: string
   sourceConfig?: string
   criteriaText?: string
-  criteriaStatus?: 'pending' | 'in_review' | 'approved' | 'rejected'
-  assignmentCurationStatus?: 'pending' | 'in_review' | 'approved' | 'rejected'
+  criteriaStatus?: CurationStatus
+  assignmentCurationStatus?: CurationStatus
   assignmentDataSource?: string
   assignmentSourceConfig?: string
   kpiCriteria?: string
   comment?: string
-  status?: 'pending' | 'in_review' | 'approved' | 'rejected'
+  status?: CurationStatus
   createdAt?: string
   createdByName?: string
+}
+
+const STATUS_LABEL: Record<CurationStatus, string> = {
+  pending: 'Pendiente',
+  in_review: 'En revision',
+  approved: 'Aprobado',
+  rejected: 'Rechazado',
+  changes_requested: 'Cambios solicitados',
+}
+
+const STATUS_PILL_CLASS: Record<CurationStatus, string> = {
+  pending: 'review',
+  in_review: 'review',
+  approved: 'ok',
+  rejected: 'rejected',
+  changes_requested: 'changes',
 }
 
 export default function Curaduria() {
@@ -133,32 +151,32 @@ export default function Curaduria() {
     }
   )
 
-  const ensureCriteriaId = async (item: CurationItem): Promise<number | null> => {
+  // Obtiene el criteriaId existente o crea uno automáticamente si hay texto disponible.
+  // No tiene side effects de UI — el caller es responsable de abrir modales si retorna null.
+  const tryGetOrCreateCriteriaId = async (item: CurationItem): Promise<number | null> => {
     const existingId = item.criteriaVersionId || item.id || null
     if (existingId) return existingId
 
-    const dataSource =
-      item.assignmentDataSource ||
-      item.dataSource ||
-      (item.criteriaText || item.kpiCriteria ? 'Manual' : '')
-    const criteriaText = item.criteriaText || item.kpiCriteria || ''
-    const sourceConfig = item.assignmentSourceConfig || item.sourceConfig || ''
+    const text = item.criteriaText || item.kpiCriteria || ''
+    if (!text.trim()) return null
 
-    if (!criteriaText.trim()) {
-      setCriteriaAssignmentId(item.assignmentId)
-      setCriteriaDataSource(dataSource || '')
-      setCriteriaSourceConfig(sourceConfig || '')
-      setCriteriaText('')
-      setShowCriteriaModal(true)
-      return null
-    }
+    const dataSource = item.assignmentDataSource || item.dataSource || 'Manual'
+    const sourceConfig = item.assignmentSourceConfig || item.sourceConfig || ''
 
     const response = await api.post(`/curation/assignments/${item.assignmentId}/criteria`, {
       dataSource: dataSource || undefined,
       sourceConfig: sourceConfig || undefined,
-      criteriaText,
+      criteriaText: text,
     })
     return response.data?.id || null
+  }
+
+  const openCriteriaModalFor = (item: CurationItem) => {
+    setCriteriaAssignmentId(item.assignmentId)
+    setCriteriaDataSource(item.assignmentDataSource || '')
+    setCriteriaSourceConfig(item.assignmentSourceConfig || '')
+    setCriteriaText('')
+    setShowCriteriaModal(true)
   }
 
   const handleReview = async (
@@ -170,8 +188,11 @@ export default function Curaduria() {
       setReviewModal({ item, action })
       return
     }
-    const criteriaId = await ensureCriteriaId(item)
-    if (!criteriaId) return
+    const criteriaId = await tryGetOrCreateCriteriaId(item)
+    if (!criteriaId) {
+      openCriteriaModalFor(item)
+      return
+    }
     await reviewMutation.mutateAsync({ id: criteriaId, action, comment: undefined })
   }
 
@@ -179,14 +200,16 @@ export default function Curaduria() {
     if (!reviewModal) return
     const { item, action } = reviewModal
     if (action === 'reject' && !reviewComment.trim()) return
-    const criteriaId = await ensureCriteriaId(item)
-    if (!criteriaId) return
+    const criteriaId = await tryGetOrCreateCriteriaId(item)
+    if (!criteriaId) {
+      openCriteriaModalFor(item)
+      setReviewModal(null)
+      return
+    }
     await reviewMutation.mutateAsync({ id: criteriaId, action, comment: reviewComment.trim() || undefined })
     setReviewModal(null)
     setReviewComment('')
   }
-
-  const filteredItems = useMemo(() => items || [], [items])
 
   /* ── Outlier analysis map: assignmentId → OutlierAnalysis ── */
   const outlierMap = useMemo(() => {
@@ -218,7 +241,6 @@ export default function Curaduria() {
     return scopeMatch?.name || ''
   }, [scopeFilter, orgScopes])
 
-  // Preseleccionar asignación si llega por query
   useEffect(() => {
     if (assignmentId && !criteriaAssignmentId) {
       setCriteriaAssignmentId(Number(assignmentId))
@@ -247,6 +269,7 @@ export default function Curaduria() {
   const tabOptions = [
     { key: 'pending', label: 'Pendientes' },
     { key: 'in_review', label: 'En revision' },
+    { key: 'changes_requested', label: 'Cambios solicitados' },
     { key: 'approved', label: 'Aprobadas' },
     { key: 'rejected', label: 'Rechazadas' },
     { key: 'all', label: 'Cambios recientes' },
@@ -260,15 +283,17 @@ export default function Curaduria() {
   }
 
   const formatMeta = (item: CurationItem) => {
-    const by = item.createdByName ? ' · Data Curator' : ''
+    const by = item.createdByName ? ` · ${item.createdByName}` : ''
     return item.createdAt ? `${item.createdAt}${by}` : '-'
   }
 
-  const resolveStatus = (item: CurationItem) =>
+  const resolveStatus = (item: CurationItem): CurationStatus =>
     item.criteriaStatus || item.assignmentCurationStatus || 'pending'
 
   const resolveCriteriaText = (item: CurationItem) =>
     item.criteriaText || item.kpiCriteria || ''
+
+  const displayItems = items || []
 
   const exportCsv = () => {
     const headers = [
@@ -284,7 +309,7 @@ export default function Curaduria() {
       'Comentario',
       'Creado',
     ]
-    const rows = filteredItems.map((item) => [
+    const rows = displayItems.map((item) => [
       item.id,
       item.assignmentId,
       item.collaboratorName,
@@ -326,7 +351,7 @@ export default function Curaduria() {
   const exportExcel = () => {
     const rows = [
       ['ID', 'Asignacion', 'Colaborador', 'Scope', 'KPI', 'Periodo', 'Fuente', 'Criterio', 'Estado', 'Comentario', 'Creado'],
-      ...filteredItems.map((item) => [
+      ...displayItems.map((item) => [
         item.id,
         item.assignmentId,
         item.collaboratorName,
@@ -513,7 +538,7 @@ export default function Curaduria() {
                 <td colSpan={9} className="empty-row">Cargando bandeja...</td>
               </tr>
             ) : (
-              filteredItems.map((item) => {
+              displayItems.map((item) => {
                 const status = resolveStatus(item)
                 const criteriaId = item.criteriaVersionId || item.id || null
                 const canReview = !!criteriaId
@@ -541,14 +566,8 @@ export default function Curaduria() {
                       })()}
                     </td>
                     <td>
-                      <span className={`status-pill ${status === 'approved' ? 'ok' : 'review'}`}>
-                        {status === 'pending'
-                          ? 'Pendiente'
-                          : status === 'in_review'
-                          ? 'En revision'
-                          : status === 'approved'
-                          ? 'Aprobado'
-                          : 'Rechazado'}
+                      <span className={`status-pill ${STATUS_PILL_CLASS[status]}`}>
+                        {STATUS_LABEL[status]}
                       </span>
                       {item.comment ? <div className="comment">{item.comment}</div> : null}
                     </td>
@@ -572,7 +591,7 @@ export default function Curaduria() {
                         <button
                           className="btn-secondary"
                           onClick={() => handleReview(item, 'request')}
-                          disabled={status === 'in_review'}
+                          disabled={status === 'changes_requested' || !canReview}
                         >
                           Pedir cambios
                         </button>
@@ -596,7 +615,7 @@ export default function Curaduria() {
                 )
               })
             )}
-            {filteredItems.length === 0 && (
+            {displayItems.length === 0 && !isLoading && (
               <tr>
                 <td colSpan={9} className="empty-row">
                   No hay items para curar con este filtro.

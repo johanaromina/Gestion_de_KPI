@@ -136,6 +136,15 @@ export default function Asignaciones() {
       .join('\n')
   }, [subPeriods])
 
+  const shouldLoadAssignments =
+    !!selectedPeriodId ||
+    !!selectedCollaboratorId ||
+    !!selectedKPIId ||
+    !!selectedScopeId ||
+    !!selectedRole ||
+    !!searchTerm.trim() ||
+    selectedSubPeriodId !== null
+
   // Asignaciones
   const { data: assignments, isLoading } = useQuery<CollaboratorKPI[]>(
     ['collaborator-kpis', selectedPeriodId, selectedCollaboratorId],
@@ -149,7 +158,7 @@ export default function Asignaciones() {
       const response = await api.get(url)
       return response.data
     },
-    { enabled: !!selectedPeriodId || !!selectedCollaboratorId }
+    { enabled: shouldLoadAssignments }
   )
 
   const deleteMutation = useMutation(
@@ -347,6 +356,7 @@ export default function Asignaciones() {
       Array.from(selectedScopeDescendantIds)
         .map((id) => orgScopesById.get(id)?.name)
         .filter(Boolean)
+        .map((name) => String(name).trim().toLowerCase())
     )
   }, [selectedScopeId, selectedScopeDescendantIds, orgScopesById])
 
@@ -362,8 +372,9 @@ export default function Asignaciones() {
 
   const collaboratorMatchesScope = (collaborator: any) => {
     if (!selectedScopeId) return true
-    if (collaborator.orgScopeId) return selectedScopeDescendantIds.has(collaborator.orgScopeId)
-    return selectedScopeDescendantNames.has(collaborator.area)
+    const collaboratorScopeId = toNumber(collaborator.orgScopeId)
+    if (collaboratorScopeId !== null) return selectedScopeDescendantIds.has(collaboratorScopeId)
+    return selectedScopeDescendantNames.has(String(collaborator.area || '').trim().toLowerCase())
   }
 
   const collaboratorsInFilters = useMemo(
@@ -386,31 +397,31 @@ export default function Asignaciones() {
 
   // Filtro local
   const filteredAssignments = assignments?.filter((assignment) => {
+    const collaboratorId = toNumber(assignment.collaboratorId)
+    const periodId = toNumber(assignment.periodId)
+    const kpiId = toNumber(assignment.kpiId)
+    const subPeriodId = toNumber((assignment as any).subPeriodId)
+    const collaborator = collaboratorId !== null ? collaboratorsById.get(collaboratorId) : null
     const matchesCollaborator =
-      !selectedCollaboratorId || assignment.collaboratorId === selectedCollaboratorId
-    const matchesPeriod = !selectedPeriodId || assignment.periodId === selectedPeriodId
-    const matchesKPI = !selectedKPIId || assignment.kpiId === selectedKPIId
+      !selectedCollaboratorId || collaboratorId === selectedCollaboratorId
+    const matchesPeriod = !selectedPeriodId || periodId === selectedPeriodId
+    const matchesKPI = !selectedKPIId || kpiId === selectedKPIId
     const matchesSubPeriod =
       selectedSubPeriodId === null
         ? true
-        : (assignment as any).subPeriodId === selectedSubPeriodId
+        : subPeriodId === selectedSubPeriodId
     const matchesShowMonthly = showMonthly || (assignment as any).subPeriodId === null
-    const matchesScope = (() => {
-      const collaborator = collaborators?.find((c: any) => c.id === assignment.collaboratorId)
-      if (!collaborator) return false
-      return collaboratorMatchesScope(collaborator)
-    })()
+    const matchesScope = !selectedScopeId || (!!collaborator && collaboratorMatchesScope(collaborator))
     const matchesRole = (() => {
       if (!selectedRole) return true
-      const collaborator = collaborators?.find((c: any) => c.id === assignment.collaboratorId)
       return collaborator?.role === selectedRole
     })()
     const matchesSearch =
       !searchTerm ||
-      (collaborators?.find((c: any) => c.id === assignment.collaboratorId)?.name || '')
+      (collaborator?.name || '')
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
-      (kpis?.find((k: any) => k.id === assignment.kpiId)?.name || '')
+      (kpis?.find((k: any) => Number(k.id) === kpiId)?.name || '')
         .toLowerCase()
         .includes(searchTerm.toLowerCase())
 
@@ -429,6 +440,16 @@ export default function Asignaciones() {
   useEffect(() => {
     setCurrentPage(0)
   }, [selectedPeriodId, selectedCollaboratorId, selectedKPIId, selectedScopeId, selectedRole, selectedSubPeriodId, searchTerm, showMonthly])
+
+  const hasActiveFilters =
+    !!selectedPeriodId ||
+    !!selectedCollaboratorId ||
+    !!selectedKPIId ||
+    !!selectedScopeId ||
+    !!selectedRole ||
+    !!searchTerm.trim() ||
+    selectedSubPeriodId !== null ||
+    !showMonthly
 
   const totalFiltered = filteredAssignments?.length ?? 0
   const totalPages = Math.ceil(totalFiltered / PAGE_SIZE)
@@ -645,14 +666,7 @@ export default function Asignaciones() {
           />
         </div>
 
-        {(selectedPeriodId ||
-          selectedCollaboratorId ||
-          selectedKPIId ||
-          selectedScopeId ||
-          selectedRole ||
-          searchTerm ||
-          selectedSubPeriodId !== null ||
-          showMonthly) && (
+        {hasActiveFilters && (
           <button
             className="btn-clear-filters"
             onClick={() => {
@@ -663,7 +677,7 @@ export default function Asignaciones() {
               setSelectedRole('')
               setSearchTerm('')
               setSelectedSubPeriodId(null)
-              setShowMonthly(false)
+              setShowMonthly(true)
             }}
           >
             Limpiar Filtros
@@ -984,17 +998,23 @@ export default function Asignaciones() {
               </div>
             )}
           </>
-        ) : !selectedPeriodId && !selectedCollaboratorId ? (
+        ) : !shouldLoadAssignments ? (
           <div className="empty-state">
             <div className="empty-icon">🔍</div>
-            <h3>Seleccioná un período o colaborador</h3>
-            <p>Elegí un período o colaborador en los filtros de arriba para ver las asignaciones.</p>
+            <h3>Seleccioná filtros para ver asignaciones</h3>
+            <p>Podés buscar por período, colaborador, KPI, área o rol desde los filtros de arriba.</p>
+          </div>
+        ) : (assignments?.length ?? 0) > 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">🧭</div>
+            <h3>No hay resultados con los filtros actuales</h3>
+            <p>Ajustá período, área, rol o búsqueda para ver asignaciones coincidentes.</p>
           </div>
         ) : (
           <div className="empty-state">
             <div className="empty-icon">📋</div>
-            <h3>No hay asignaciones todavía</h3>
-            <p>Una asignación vincula un KPI con un colaborador para un período específico, definiendo la meta y el peso en su evaluación.</p>
+            <h3>No hay asignaciones para la selección actual</h3>
+            <p>La combinación elegida no tiene asignaciones registradas todavía.</p>
             <p className="empty-state-hint">
               Para crear asignaciones necesitás tener:
               &nbsp;✓ <a href="/colaboradores">Colaboradores</a> cargados &nbsp;

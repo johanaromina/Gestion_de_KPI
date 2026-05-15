@@ -105,6 +105,7 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
       Array.from(descendantScopeIds)
         .map((id) => scopeById.get(id)?.name)
         .filter(Boolean)
+        .map((name) => String(name).trim().toLowerCase())
     )
   }, [scopeId, descendantScopeIds, scopeById])
 
@@ -126,8 +127,11 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
   const scopeFilteredCollaborators = useMemo(() => {
     if (!scopeId) return activeCollaborators
     return activeCollaborators.filter((c: any) => {
-      if (c.orgScopeId) return descendantScopeIds.has(c.orgScopeId)
-      return descendantScopeNames.has(c.area)
+      const collaboratorScopeId = Number(c.orgScopeId)
+      if (Number.isFinite(collaboratorScopeId) && collaboratorScopeId > 0) {
+        return descendantScopeIds.has(collaboratorScopeId)
+      }
+      return descendantScopeNames.has(String(c.area || '').trim().toLowerCase())
     })
   }, [activeCollaborators, scopeId, descendantScopeIds, descendantScopeNames])
 
@@ -442,7 +446,7 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
                 {filteredCollaborators.map((c: any) => {
                   const already = alreadyAssignedIds.has(c.id)
                   const checked = selectedIds.has(c.id)
-                  const scopeName = c.orgScopeId ? scopeById.get(c.orgScopeId)?.name : c.area
+                  const scopeName = c.orgScopeId ? scopeById.get(Number(c.orgScopeId))?.name : c.area
                   const collaboratorRole = roleLabel[c.role] || c.role
                   return (
                     <label

@@ -34,12 +34,10 @@ export const getCurationItems = async (req: Request, res: Response) => {
                  JOIN kpis k ON ck.kpiId = k.id
                  JOIN collaborators c ON ck.collaboratorId = c.id
                  JOIN periods p ON ck.periodId = p.id
-                 LEFT JOIN kpi_criteria_versions cv_latest
-                   ON cv_latest.id = (
-                     SELECT id FROM kpi_criteria_versions
-                     WHERE assignmentId = ck.id
-                     ORDER BY createdAt DESC LIMIT 1
-                   )
+                 LEFT JOIN (
+                   SELECT *, ROW_NUMBER() OVER (PARTITION BY assignmentId ORDER BY createdAt DESC) AS rn
+                   FROM kpi_criteria_versions
+                 ) cv_latest ON cv_latest.assignmentId = ck.id AND cv_latest.rn = 1
                  LEFT JOIN collaborators cb ON cv_latest.createdBy = cb.id
                  WHERE 1=1`
 
@@ -47,12 +45,8 @@ export const getCurationItems = async (req: Request, res: Response) => {
 
     if (status) {
       if (status === 'pending' || status === 'in_review') {
-        query +=
-          ' AND (cv_latest.status = ? OR (cv_latest.id IS NULL AND ck.curationStatus = ?))'
+        query += ' AND (cv_latest.status = ? OR (cv_latest.id IS NULL AND ck.curationStatus = ?))'
         params.push(status, status)
-      } else if (status === 'approved' || status === 'rejected') {
-        query += ' AND cv_latest.status = ?'
-        params.push(status)
       } else {
         query += ' AND cv_latest.status = ?'
         params.push(status)
@@ -107,6 +101,14 @@ export const createCriteriaVersion = async (req: Request, res: Response) => {
 
     if (!assignmentId) {
       return res.status(400).json({ error: 'assignmentId es requerido' })
+    }
+
+    const [existing] = await pool.query<any[]>(
+      'SELECT id FROM collaborator_kpis WHERE id = ?',
+      [assignmentId]
+    )
+    if (!Array.isArray(existing) || existing.length === 0) {
+      return res.status(404).json({ error: 'Asignación no encontrada' })
     }
 
     const userId = (req as AuthRequest).user?.id || null
@@ -227,14 +229,14 @@ export const requestCriteriaChanges = async (req: Request, res: Response) => {
       `UPDATE kpi_criteria_versions
        SET status = ?, reviewedBy = ?, reviewedAt = NOW(), comment = ?
        WHERE id = ?`,
-      ['in_review', userId, comment || null, id]
+      ['changes_requested', userId, comment || null, id]
     )
 
     await pool.query(
       `UPDATE collaborator_kpis
        SET curationStatus = ?
        WHERE id = ?`,
-      ['in_review', assignmentId]
+      ['changes_requested', assignmentId]
     )
 
     res.json({ message: 'Cambios solicitados correctamente' })
