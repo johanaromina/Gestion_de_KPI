@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { pool } from '../config/database'
 import { AuthRequest } from '../middleware/auth.middleware'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 const userCanManageConfig = (req: Request) => {
   const user = (req as AuthRequest).user
@@ -77,14 +78,14 @@ export const listPermissions = async (_req: Request, res: Response) => {
     res.json(rows)
   } catch (error) {
     logger.error('Error listing permissions:', error)
-    res.status(500).json({ error: 'Error al obtener permisos' })
+    return sendApiError(res, 500, 'CONFIG_PERMISSIONS_FETCH_FAILED', 'Error al obtener permisos')
   }
 }
 
 export const listRoles = async (req: Request, res: Response) => {
   try {
     if (!userCanViewConfig(req)) {
-      return res.status(403).json({ error: 'No autorizado' })
+      return sendApiError(res, 403, 'CONFIG_FORBIDDEN', 'No autorizado')
     }
 
     const [roles] = await pool.query<any[]>(
@@ -106,14 +107,14 @@ export const listRoles = async (req: Request, res: Response) => {
     res.json(payload)
   } catch (error) {
     logger.error('Error listing roles:', error)
-    res.status(500).json({ error: 'Error al obtener roles' })
+    return sendApiError(res, 500, 'CONFIG_ROLES_FETCH_FAILED', 'Error al obtener roles')
   }
 }
 
 export const assignRoleToCollaborator = async (req: Request, res: Response) => {
   try {
     if (!userCanManageConfig(req)) {
-      return res.status(403).json({ error: 'No autorizado' })
+      return sendApiError(res, 403, 'CONFIG_FORBIDDEN', 'No autorizado')
     }
 
     const { collaboratorId } = req.params
@@ -123,7 +124,7 @@ export const assignRoleToCollaborator = async (req: Request, res: Response) => {
       roleCode,
     ])
     if (!Array.isArray(roleRows) || roleRows.length === 0) {
-      return res.status(400).json({ error: 'Rol inválido' })
+      return sendApiError(res, 400, 'CONFIG_ROLE_INVALID', 'Rol inválido')
     }
     const roleId = roleRows[0].id
 
@@ -138,7 +139,7 @@ export const assignRoleToCollaborator = async (req: Request, res: Response) => {
     res.json({ message: 'Rol asignado', roleCode })
   } catch (error) {
     logger.error('Error assigning role:', error)
-    res.status(500).json({ error: 'Error al asignar rol' })
+    return sendApiError(res, 500, 'CONFIG_ROLE_ASSIGN_FAILED', 'Error al asignar rol')
   }
 }
 
@@ -156,21 +157,21 @@ export const getCollaboratorPermissions = async (req: Request, res: Response) =>
     res.json({ collaboratorId: Number(collaboratorId), permissions: codes })
   } catch (error) {
     logger.error('Error fetching collaborator permissions:', error)
-    res.status(500).json({ error: 'Error al obtener permisos del colaborador' })
+    return sendApiError(res, 500, 'CONFIG_COLLABORATOR_PERMISSIONS_FETCH_FAILED', 'Error al obtener permisos del colaborador')
   }
 }
 
 export const updateCollaboratorPermissions = async (req: Request, res: Response) => {
   try {
     if (!userCanManageConfig(req)) {
-      return res.status(403).json({ error: 'No autorizado' })
+      return sendApiError(res, 403, 'CONFIG_FORBIDDEN', 'No autorizado')
     }
 
     const { collaboratorId } = req.params
     const { permissions } = req.body as { permissions: string[] }
 
     if (!Array.isArray(permissions)) {
-      return res.status(400).json({ error: 'Permisos inválidos' })
+      return sendApiError(res, 400, 'CONFIG_PERMISSIONS_INVALID', 'Permisos inválidos')
     }
 
     // Obtener ids de permisos válidos
@@ -191,14 +192,14 @@ export const updateCollaboratorPermissions = async (req: Request, res: Response)
     res.json({ message: 'Permisos actualizados', permissions: permissions })
   } catch (error) {
     logger.error('Error updating collaborator permissions:', error)
-    res.status(500).json({ error: 'Error al actualizar permisos' })
+    return sendApiError(res, 500, 'CONFIG_COLLABORATOR_PERMISSIONS_UPDATE_FAILED', 'Error al actualizar permisos')
   }
 }
 
 export const toggleSuperpowers = async (req: Request, res: Response) => {
   try {
     if (!userCanManageConfig(req)) {
-      return res.status(403).json({ error: 'No autorizado' })
+      return sendApiError(res, 403, 'CONFIG_FORBIDDEN', 'No autorizado')
     }
     const { collaboratorId } = req.params
     const { hasSuperpowers } = req.body as { hasSuperpowers: boolean }
@@ -209,6 +210,6 @@ export const toggleSuperpowers = async (req: Request, res: Response) => {
     res.json({ message: 'Superpoderes actualizados', hasSuperpowers })
   } catch (error) {
     logger.error('Error toggling superpowers:', error)
-    res.status(500).json({ error: 'Error al actualizar superpoderes' })
+    return sendApiError(res, 500, 'CONFIG_SUPERPOWERS_UPDATE_FAILED', 'Error al actualizar superpoderes')
   }
 }

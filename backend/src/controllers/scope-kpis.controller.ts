@@ -13,6 +13,7 @@ import { recalculateScopeKPI, recalcParentScopeKPIs } from '../services/scope-kp
 import { hydrateScopeKpiMixedFields } from '../services/scope-kpi-mixed.service'
 import { recalcOKRsLinkedToScopeKpi } from '../services/okr.service'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 const isConfigUser = (req: Request) => {
   const user = (req as AuthRequest).user
@@ -21,6 +22,20 @@ const isConfigUser = (req: Request) => {
 
 const ALLOWED_AGGREGATION_METHODS = new Set(['sum', 'avg', 'weighted_avg'])
 const buildPlaceholders = (count: number) => Array.from({ length: count }, () => '?').join(', ')
+
+const sendScopeKpiError = (
+  res: Response,
+  error: any,
+  fallbackCode: string,
+  fallbackMessage: string,
+  status = 500
+) => {
+  const message = error?.message || fallbackMessage
+  if (message === 'Scope KPI no encontrado') {
+    return sendApiError(res, 404, 'SCOPE_KPI_NOT_FOUND', 'Scope KPI no encontrado')
+  }
+  return sendApiError(res, status, fallbackCode, message)
+}
 
 const fetchObjectivesForScopeKpis = async (scopeKpiIds: number[]) => {
   const grouped = new Map<number, any[]>()
@@ -108,7 +123,7 @@ export const getScopeKPIs = async (req: Request, res: Response) => {
     res.json(await attachObjectivesToScopeKpis(Array.isArray(rows) ? rows : []))
   } catch (error: any) {
     logger.error('Error fetching scope KPIs:', error)
-    res.status(500).json({ error: 'Error al obtener Scope KPIs' })
+    return sendApiError(res, 500, 'SCOPE_KPI_FETCH_FAILED', 'Error al obtener Scope KPIs')
   }
 }
 
@@ -118,7 +133,7 @@ export const getScopeKPIById = async (req: Request, res: Response) => {
     const [hydrated] = await attachObjectivesToScopeKpis([row])
     res.json(hydrated || row)
   } catch (error: any) {
-    res.status(error?.message === 'Scope KPI no encontrado' ? 404 : 500).json({ error: error?.message || 'Error al obtener Scope KPI' })
+    return sendScopeKpiError(res, error, 'SCOPE_KPI_FETCH_ONE_FAILED', 'Error al obtener Scope KPI')
   }
 }
 
@@ -129,9 +144,8 @@ export const getScopeKPIObjectives = async (req: Request, res: Response) => {
     const objectivesMap = await fetchObjectivesForScopeKpis([scopeKpiId])
     res.json(objectivesMap.get(scopeKpiId) || [])
   } catch (error: any) {
-    const message = error?.message || 'Error al obtener objetivos del Scope KPI'
     logger.error('Error fetching scope KPI objectives:', error)
-    res.status(message === 'Scope KPI no encontrado' ? 404 : 500).json({ error: message })
+    return sendScopeKpiError(res, error, 'SCOPE_KPI_OBJECTIVES_FETCH_FAILED', 'Error al obtener objetivos del Scope KPI')
   }
 }
 
@@ -171,62 +185,61 @@ export const getScopeKPIAggregationRuns = async (req: Request, res: Response) =>
 
     res.json(hydratedRows)
   } catch (error: any) {
-    const message = error?.message || 'Error al obtener corridas de agregación del Scope KPI'
     logger.error('Error fetching scope KPI aggregation runs:', error)
-    res.status(message === 'Scope KPI no encontrado' ? 404 : 500).json({ error: message })
+    return sendScopeKpiError(res, error, 'SCOPE_KPI_RUNS_FETCH_FAILED', 'Error al obtener corridas de agregación del Scope KPI')
   }
 }
 
 export const createScopeKPI = async (req: Request, res: Response) => {
   try {
     if (!isConfigUser(req)) {
-      return res.status(403).json({ error: 'No autorizado' })
+      return sendApiError(res, 403, 'SCOPE_KPI_FORBIDDEN', 'No autorizado')
     }
     const id = await createScopeKPIRecord(req.body)
     res.status(201).json({ id })
   } catch (error: any) {
     logger.error('Error creating scope KPI:', error)
-    res.status(400).json({ error: error?.message || 'Error al crear Scope KPI' })
+    return sendScopeKpiError(res, error, 'SCOPE_KPI_CREATE_FAILED', 'Error al crear Scope KPI', 400)
   }
 }
 
 export const updateScopeKPI = async (req: Request, res: Response) => {
   try {
     if (!isConfigUser(req)) {
-      return res.status(403).json({ error: 'No autorizado' })
+      return sendApiError(res, 403, 'SCOPE_KPI_FORBIDDEN', 'No autorizado')
     }
     await updateScopeKPIRecord(Number(req.params.id), req.body)
     res.json({ message: 'Scope KPI actualizado correctamente' })
   } catch (error: any) {
     logger.error('Error updating scope KPI:', error)
-    res.status(400).json({ error: error?.message || 'Error al actualizar Scope KPI' })
+    return sendScopeKpiError(res, error, 'SCOPE_KPI_UPDATE_FAILED', 'Error al actualizar Scope KPI', 400)
   }
 }
 
 export const deleteScopeKPI = async (req: Request, res: Response) => {
   try {
     if (!isConfigUser(req)) {
-      return res.status(403).json({ error: 'No autorizado' })
+      return sendApiError(res, 403, 'SCOPE_KPI_FORBIDDEN', 'No autorizado')
     }
     await pool.query(`DELETE FROM scope_kpis WHERE id = ?`, [req.params.id])
     res.json({ message: 'Scope KPI eliminado correctamente' })
   } catch (error: any) {
     logger.error('Error deleting scope KPI:', error)
-    res.status(500).json({ error: 'Error al eliminar Scope KPI' })
+    return sendApiError(res, 500, 'SCOPE_KPI_DELETE_FAILED', 'Error al eliminar Scope KPI')
   }
 }
 
 export const copyScopeKPI = async (req: Request, res: Response) => {
   try {
     if (!isConfigUser(req)) {
-      return res.status(403).json({ error: 'No autorizado' })
+      return sendApiError(res, 403, 'SCOPE_KPI_FORBIDDEN', 'No autorizado')
     }
 
     const sourceId = Number(req.params.id)
     const { targetScopeIds, copyLinks = false } = req.body
 
     if (!Array.isArray(targetScopeIds) || targetScopeIds.length === 0) {
-      return res.status(400).json({ error: 'targetScopeIds debe ser un array no vacío' })
+      return sendApiError(res, 400, 'SCOPE_KPI_COPY_TARGETS_REQUIRED', 'targetScopeIds debe ser un array no vacío')
     }
 
     const source = await getScopeKPIByIdOrThrow(sourceId)
@@ -238,7 +251,7 @@ export const copyScopeKPI = async (req: Request, res: Response) => {
       )
     )
     if (normalizedTargetScopeIds.length === 0) {
-      return res.status(400).json({ error: 'targetScopeIds no contiene IDs válidos' })
+      return sendApiError(res, 400, 'SCOPE_KPI_COPY_TARGETS_INVALID', 'targetScopeIds no contiene IDs válidos')
     }
 
     const [scopeRows] = await pool.query<any[]>(
@@ -250,7 +263,7 @@ export const copyScopeKPI = async (req: Request, res: Response) => {
     const scopeById = new Map((Array.isArray(scopeRows) ? scopeRows : []).map((row) => [Number(row.id), row]))
     const sourceScope = scopeById.get(Number(source.orgScopeId))
     if (!sourceScope) {
-      return res.status(404).json({ error: 'Scope origen no encontrado' })
+      return sendApiError(res, 404, 'SCOPE_KPI_SOURCE_SCOPE_NOT_FOUND', 'Scope origen no encontrado')
     }
 
     // Only copy scope→scope links; collaborator links belong to the other team's assignments
@@ -378,33 +391,33 @@ export const copyScopeKPI = async (req: Request, res: Response) => {
     res.status(201).json({ results })
   } catch (error: any) {
     logger.error('Error copying scope KPI:', error)
-    res.status(error?.message === 'Scope KPI no encontrado' ? 404 : 500).json({ error: error?.message || 'Error al copiar KPI grupal' })
+    return sendScopeKpiError(res, error, 'SCOPE_KPI_COPY_FAILED', 'Error al copiar KPI grupal')
   }
 }
 
 export const closeScopeKPI = async (req: Request, res: Response) => {
   try {
     if (!isConfigUser(req)) {
-      return res.status(403).json({ error: 'No autorizado' })
+      return sendApiError(res, 403, 'SCOPE_KPI_FORBIDDEN', 'No autorizado')
     }
     await closeScopeKPIRecord(Number(req.params.id))
     res.json({ message: 'Scope KPI cerrado correctamente' })
   } catch (error: any) {
     logger.error('Error closing scope KPI:', error)
-    res.status(500).json({ error: 'Error al cerrar Scope KPI' })
+    return sendApiError(res, 500, 'SCOPE_KPI_CLOSE_FAILED', 'Error al cerrar Scope KPI')
   }
 }
 
 export const reopenScopeKPI = async (req: Request, res: Response) => {
   try {
     if (!isConfigUser(req)) {
-      return res.status(403).json({ error: 'No autorizado' })
+      return sendApiError(res, 403, 'SCOPE_KPI_FORBIDDEN', 'No autorizado')
     }
     await reopenScopeKPIRecord(Number(req.params.id))
     res.json({ message: 'Scope KPI reabierto correctamente' })
   } catch (error: any) {
     logger.error('Error reopening scope KPI:', error)
-    res.status(500).json({ error: 'Error al reabrir Scope KPI' })
+    return sendApiError(res, 500, 'SCOPE_KPI_REOPEN_FAILED', 'Error al reabrir Scope KPI')
   }
 }
 
@@ -426,7 +439,7 @@ export const recalculateScopeKPIController = async (req: Request, res: Response)
     res.json({ message: 'Scope KPI recalculado correctamente', ...result })
   } catch (error: any) {
     logger.error('Error recalculating scope KPI:', error)
-    res.status(400).json({ error: error?.message || 'Error al recalcular Scope KPI' })
+    return sendScopeKpiError(res, error, 'SCOPE_KPI_RECALC_FAILED', 'Error al recalcular Scope KPI', 400)
   }
 }
 
@@ -450,31 +463,31 @@ export const getScopeKPILinks = async (req: Request, res: Response) => {
     res.json(rows)
   } catch (error: any) {
     logger.error('Error fetching scope KPI links:', error)
-    res.status(500).json({ error: 'Error al obtener links del Scope KPI' })
+    return sendApiError(res, 500, 'SCOPE_KPI_LINKS_FETCH_FAILED', 'Error al obtener links del Scope KPI')
   }
 }
 
 export const createScopeKPILink = async (req: Request, res: Response) => {
   try {
     if (!isConfigUser(req)) {
-      return res.status(403).json({ error: 'No autorizado' })
+      return sendApiError(res, 403, 'SCOPE_KPI_FORBIDDEN', 'No autorizado')
     }
     const scopeKpiId = Number(req.params.id)
     const { childType, collaboratorAssignmentId, childScopeKpiId, contributionWeight, aggregationMethod, formulaConfig, sortOrder } = req.body
     if (!childType || !aggregationMethod) {
-      return res.status(400).json({ error: 'childType y aggregationMethod son requeridos' })
+      return sendApiError(res, 400, 'SCOPE_KPI_LINK_FIELDS_REQUIRED', 'childType y aggregationMethod son requeridos')
     }
     if (!['collaborator', 'scope'].includes(childType)) {
-      return res.status(400).json({ error: 'childType inválido' })
+      return sendApiError(res, 400, 'SCOPE_KPI_LINK_CHILD_TYPE_INVALID', 'childType inválido')
     }
     if (!ALLOWED_AGGREGATION_METHODS.has(aggregationMethod)) {
-      return res.status(400).json({ error: 'aggregationMethod inválido. Solo se soporta sum, avg y weighted_avg' })
+      return sendApiError(res, 400, 'SCOPE_KPI_LINK_AGGREGATION_INVALID', 'aggregationMethod inválido. Solo se soporta sum, avg y weighted_avg')
     }
     if (childType === 'collaborator' && (!collaboratorAssignmentId || childScopeKpiId)) {
-      return res.status(400).json({ error: 'collaboratorAssignmentId es requerido para childType collaborator' })
+      return sendApiError(res, 400, 'SCOPE_KPI_LINK_COLLABORATOR_REQUIRED', 'collaboratorAssignmentId es requerido para childType collaborator')
     }
     if (childType === 'scope' && (!childScopeKpiId || collaboratorAssignmentId)) {
-      return res.status(400).json({ error: 'childScopeKpiId es requerido para childType scope' })
+      return sendApiError(res, 400, 'SCOPE_KPI_LINK_SCOPE_REQUIRED', 'childScopeKpiId es requerido para childType scope')
     }
     const [result] = await pool.query(
       `INSERT INTO scope_kpi_links
@@ -494,27 +507,27 @@ export const createScopeKPILink = async (req: Request, res: Response) => {
     res.status(201).json({ id: (result as any).insertId })
   } catch (error: any) {
     logger.error('Error creating scope KPI link:', error)
-    res.status(500).json({ error: 'Error al crear link del Scope KPI' })
+    return sendApiError(res, 500, 'SCOPE_KPI_LINK_CREATE_FAILED', 'Error al crear link del Scope KPI')
   }
 }
 
 export const updateScopeKPILink = async (req: Request, res: Response) => {
   try {
     if (!isConfigUser(req)) {
-      return res.status(403).json({ error: 'No autorizado' })
+      return sendApiError(res, 403, 'SCOPE_KPI_FORBIDDEN', 'No autorizado')
     }
     const { childType, collaboratorAssignmentId, childScopeKpiId, contributionWeight, aggregationMethod, formulaConfig, sortOrder } = req.body
     if (!['collaborator', 'scope'].includes(childType)) {
-      return res.status(400).json({ error: 'childType inválido' })
+      return sendApiError(res, 400, 'SCOPE_KPI_LINK_CHILD_TYPE_INVALID', 'childType inválido')
     }
     if (!ALLOWED_AGGREGATION_METHODS.has(aggregationMethod)) {
-      return res.status(400).json({ error: 'aggregationMethod inválido. Solo se soporta sum, avg y weighted_avg' })
+      return sendApiError(res, 400, 'SCOPE_KPI_LINK_AGGREGATION_INVALID', 'aggregationMethod inválido. Solo se soporta sum, avg y weighted_avg')
     }
     if (childType === 'collaborator' && (!collaboratorAssignmentId || childScopeKpiId)) {
-      return res.status(400).json({ error: 'collaboratorAssignmentId es requerido para childType collaborator' })
+      return sendApiError(res, 400, 'SCOPE_KPI_LINK_COLLABORATOR_REQUIRED', 'collaboratorAssignmentId es requerido para childType collaborator')
     }
     if (childType === 'scope' && (!childScopeKpiId || collaboratorAssignmentId)) {
-      return res.status(400).json({ error: 'childScopeKpiId es requerido para childType scope' })
+      return sendApiError(res, 400, 'SCOPE_KPI_LINK_SCOPE_REQUIRED', 'childScopeKpiId es requerido para childType scope')
     }
     await pool.query(
       `UPDATE scope_kpi_links
@@ -535,20 +548,20 @@ export const updateScopeKPILink = async (req: Request, res: Response) => {
     res.json({ message: 'Link actualizado correctamente' })
   } catch (error: any) {
     logger.error('Error updating scope KPI link:', error)
-    res.status(500).json({ error: 'Error al actualizar link del Scope KPI' })
+    return sendApiError(res, 500, 'SCOPE_KPI_LINK_UPDATE_FAILED', 'Error al actualizar link del Scope KPI')
   }
 }
 
 export const deleteScopeKPILink = async (req: Request, res: Response) => {
   try {
     if (!isConfigUser(req)) {
-      return res.status(403).json({ error: 'No autorizado' })
+      return sendApiError(res, 403, 'SCOPE_KPI_FORBIDDEN', 'No autorizado')
     }
     await pool.query(`DELETE FROM scope_kpi_links WHERE id = ?`, [req.params.linkId])
     res.json({ message: 'Link eliminado correctamente' })
   } catch (error: any) {
     logger.error('Error deleting scope KPI link:', error)
-    res.status(500).json({ error: 'Error al eliminar link del Scope KPI' })
+    return sendApiError(res, 500, 'SCOPE_KPI_LINK_DELETE_FAILED', 'Error al eliminar link del Scope KPI')
   }
 }
 

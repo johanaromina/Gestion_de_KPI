@@ -3,6 +3,7 @@ import { pool } from '../config/database'
 import { calculateVariation } from '../utils/kpi-formulas'
 import { KPIDirection } from '../types'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 const resolveDirection = (direction?: string | null): KPIDirection => {
   if (direction === 'growth' || direction === 'reduction' || direction === 'exact') return direction
@@ -175,7 +176,7 @@ export const getReductionKPIs = async (req: Request, res: Response) => {
     res.json(Object.values(grouped))
   } catch (error: any) {
     logger.error('Error fetching reduction KPIs:', error)
-    res.status(500).json({ error: 'Error al obtener KPIs de reducción' })
+    return sendApiError(res, 500, 'REDUCTION_VIEW_KPIS_FETCH_FAILED', 'Error al obtener KPIs de reducción')
   }
 }
 
@@ -319,7 +320,7 @@ export const getReductionStatistics = async (req: Request, res: Response) => {
     res.json(statistics)
   } catch (error: any) {
     logger.error('Error fetching reduction statistics:', error)
-    res.status(500).json({ error: 'Error al obtener estadísticas de reducción' })
+    return sendApiError(res, 500, 'REDUCTION_VIEW_STATS_FETCH_FAILED', 'Error al obtener estadísticas de reducción')
   }
 }
 
@@ -384,7 +385,7 @@ export const getReductionEvolution = async (req: Request, res: Response) => {
     res.json(evolution)
   } catch (error: any) {
     logger.error('Error fetching reduction evolution:', error)
-    res.status(500).json({ error: 'Error al obtener evolución de reducción' })
+    return sendApiError(res, 500, 'REDUCTION_VIEW_EVOLUTION_FETCH_FAILED', 'Error al obtener evolución de reducción')
   }
 }
 

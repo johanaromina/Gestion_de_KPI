@@ -11,6 +11,7 @@ import { recalcOKRsLinkedToCollaboratorKpi, recalcOKRsLinkedToScopeKpi } from '.
 import { recalcScopeKPIsLinkedToAssignment } from '../services/scope-kpi-propagation.service'
 import { recalcParentScopeKPIs } from '../services/scope-kpi-aggregation.service'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 const getMeasurementKpiConfig = async (assignmentId?: number | null, scopeKpiId?: number | null) => {
   if (assignmentId) {
@@ -77,7 +78,7 @@ export const getMeasurements = async (req: Request, res: Response) => {
     res.json(rows)
   } catch (error: any) {
     logger.error('Error fetching measurements:', error)
-    res.status(500).json({ error: 'Error al obtener mediciones' })
+    return sendApiError(res, 500, 'MEASUREMENT_FETCH_FAILED', 'Error al obtener mediciones')
   }
 }
 
@@ -100,10 +101,15 @@ export const createMeasurement = async (req: Request, res: Response) => {
     try {
       ensureSingleMeasurementOwner(assignmentId, scopeKpiId)
     } catch (validationError: any) {
-      return res.status(400).json({ error: validationError?.message || 'Owner de medición inválido' })
+      return sendApiError(
+        res,
+        400,
+        'MEASUREMENT_OWNER_INVALID',
+        validationError?.message || 'Owner de medición inválido'
+      )
     }
     if (value === undefined) {
-      return res.status(400).json({ error: 'value es requerido' })
+      return sendApiError(res, 400, 'MEASUREMENT_VALUE_REQUIRED', 'value es requerido')
     }
     const normalizedValue = Number(value)
     const kpiConfig = await getMeasurementKpiConfig(assignmentId, scopeKpiId)
@@ -116,7 +122,7 @@ export const createMeasurement = async (req: Request, res: Response) => {
         })
       : null
     if (actualValidationError) {
-      return res.status(400).json({ error: actualValidationError })
+      return sendApiError(res, 400, 'MEASUREMENT_ACTUAL_VALUE_INVALID', actualValidationError)
     }
 
     const userId = (req as AuthRequest).user?.id || null
@@ -131,6 +137,7 @@ export const createMeasurement = async (req: Request, res: Response) => {
       if (Array.isArray(existingRows) && existingRows.length > 0) {
         const existing = existingRows[0]
         return res.status(409).json({
+          code: 'MEASUREMENT_DUPLICATE_APPROVED',
           error: `Ya existe una medición aprobada con valor ${existing.value} (${new Date(existing.capturedAt).toLocaleDateString('es-AR')}). Para reemplazarla enviá force=true con un motivo.`,
           existingValue: existing.value,
           existingDate: existing.capturedAt,
@@ -149,9 +156,12 @@ export const createMeasurement = async (req: Request, res: Response) => {
         if (curationStatus === 'in_review') {
           warning = 'Curaduría en revisión: medición aprobada con warning'
         } else if (curationStatus !== 'approved') {
-          return res.status(400).json({
-            error: 'No se puede aprobar una medición si la curaduría no está aprobada',
-          })
+          return sendApiError(
+            res,
+            400,
+            'MEASUREMENT_CURATION_REQUIRED',
+            'No se puede aprobar una medición si la curaduría no está aprobada'
+          )
         }
       }
     }
@@ -169,9 +179,12 @@ export const createMeasurement = async (req: Request, res: Response) => {
           user?.permissions?.includes('curation_review') ||
           user?.permissions?.includes('config.manage')
         if (isClosed && !canOverride) {
-          return res.status(400).json({
-            error: 'El subperíodo está cerrado. Solo Admin/Curator pueden overridear.',
-          })
+          return sendApiError(
+            res,
+            400,
+            'MEASUREMENT_SUBPERIOD_CLOSED',
+            'El subperíodo está cerrado. Solo Admin/Curator pueden overridear.'
+          )
         }
       }
     }
@@ -223,7 +236,7 @@ export const createMeasurement = async (req: Request, res: Response) => {
     res.status(201).json({ id: measurementId, warning })
   } catch (error: any) {
     logger.error('Error creating measurement:', error)
-    res.status(500).json({ error: 'Error al crear medición' })
+    return sendApiError(res, 500, 'MEASUREMENT_CREATE_FAILED', 'Error al crear medición')
   }
 }
 
@@ -236,7 +249,7 @@ export const approveMeasurement = async (req: Request, res: Response) => {
       [id]
     )
     if (!Array.isArray(rows) || rows.length === 0) {
-      return res.status(404).json({ error: 'Medición no encontrada' })
+      return sendApiError(res, 404, 'MEASUREMENT_NOT_FOUND', 'Medición no encontrada')
     }
 
     const measurement = rows[0]
@@ -251,7 +264,7 @@ export const approveMeasurement = async (req: Request, res: Response) => {
         })
       : null
     if (actualValidationError) {
-      return res.status(400).json({ error: actualValidationError })
+      return sendApiError(res, 400, 'MEASUREMENT_ACTUAL_VALUE_INVALID', actualValidationError)
     }
 
     let warning: string | null = null
@@ -265,9 +278,7 @@ export const approveMeasurement = async (req: Request, res: Response) => {
         if (curationStatus === 'in_review') {
           warning = 'Curaduría en revisión: medición aprobada con warning'
         } else if (curationStatus !== 'approved') {
-          return res.status(400).json({
-            error: 'No se puede aprobar una medición si la curaduría no está aprobada',
-          })
+          return sendApiError(res, 400, 'MEASUREMENT_CURATION_REQUIRED', 'No se puede aprobar una medición si la curaduría no está aprobada')
         }
       }
     }
@@ -285,9 +296,7 @@ export const approveMeasurement = async (req: Request, res: Response) => {
           user?.permissions?.includes('curation_review') ||
           user?.permissions?.includes('config.manage')
         if (isClosed && !canOverride) {
-          return res.status(400).json({
-            error: 'El subperíodo está cerrado. Solo Admin/Curator pueden overridear.',
-          })
+          return sendApiError(res, 400, 'MEASUREMENT_SUBPERIOD_CLOSED', 'El subperíodo está cerrado. Solo Admin/Curator pueden overridear.')
         }
       }
     }
@@ -328,7 +337,7 @@ export const approveMeasurement = async (req: Request, res: Response) => {
     res.json({ message: 'Medición aprobada correctamente', warning })
   } catch (error: any) {
     logger.error('Error approving measurement:', error)
-    res.status(500).json({ error: 'Error al aprobar medición' })
+    return sendApiError(res, 500, 'MEASUREMENT_APPROVE_FAILED', 'Error al aprobar medición')
   }
 }
 
@@ -339,6 +348,6 @@ export const rejectMeasurement = async (req: Request, res: Response) => {
     res.json({ message: 'Medición rechazada correctamente' })
   } catch (error: any) {
     logger.error('Error rejecting measurement:', error)
-    res.status(500).json({ error: 'Error al rechazar medición' })
+    return sendApiError(res, 500, 'MEASUREMENT_REJECT_FAILED', 'Error al rechazar medición')
   }
 }

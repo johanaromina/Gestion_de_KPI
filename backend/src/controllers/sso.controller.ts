@@ -7,6 +7,7 @@ import {
   listEnabledSsoProviders,
 } from '../services/sso.service'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 const setAuthCookie = (res: Response, token: string, rememberMe?: boolean) => {
   const maxAge = rememberMe ? 30 * 24 * 60 * 60 * 1000 : undefined
@@ -25,7 +26,7 @@ export const getSsoProviders = async (req: Request, res: Response) => {
     res.json(providers)
   } catch (error: any) {
     logger.error('Error listing SSO providers:', error)
-    res.status(500).json({ error: 'Error al obtener providers SSO' })
+    return sendApiError(res, 500, 'SSO_PROVIDERS_FETCH_FAILED', 'Error al obtener providers SSO')
   }
 }
 
@@ -43,7 +44,7 @@ export const startSso = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     logger.error('Error starting SSO:', error)
-    res.status(400).json({ error: error?.message || 'Error al iniciar SSO' })
+    return sendApiError(res, 400, 'SSO_START_FAILED', error?.message || 'Error al iniciar SSO')
   }
 }
 
@@ -54,7 +55,7 @@ export const handleSsoCallback = async (req: Request, res: Response) => {
     const state = String(req.query.state || '')
 
     if (!code || !state) {
-      return res.redirect(`${appEnv.frontendBaseUrl}/sso/callback?error=missing_code`)
+      return res.redirect(`${appEnv.frontendBaseUrl}/sso/callback?error=SSO_CALLBACK_MISSING_CODE`)
     }
 
     const handoffCode = await consumeSsoCallback(providerRef, code, state)
@@ -63,8 +64,8 @@ export const handleSsoCallback = async (req: Request, res: Response) => {
     )
   } catch (error: any) {
     logger.error('Error in SSO callback:', error)
-    const message = encodeURIComponent(error?.message || 'Error al procesar SSO')
-    return res.redirect(`${appEnv.frontendBaseUrl}/sso/callback?error=${message}`)
+    const code = encodeURIComponent('SSO_CALLBACK_FAILED')
+    return res.redirect(`${appEnv.frontendBaseUrl}/sso/callback?error=${code}`)
   }
 }
 
@@ -72,7 +73,7 @@ export const exchangeSsoCode = async (req: Request, res: Response) => {
   try {
     const { code, rememberMe } = req.body
     if (!code) {
-      return res.status(400).json({ error: 'Codigo SSO requerido' })
+      return sendApiError(res, 400, 'SSO_CODE_REQUIRED', 'Codigo SSO requerido')
     }
 
     const session = await exchangeSsoHandoffCode(String(code), !!rememberMe)
@@ -80,6 +81,6 @@ export const exchangeSsoCode = async (req: Request, res: Response) => {
     res.json({ user: session.user })
   } catch (error: any) {
     logger.error('Error exchanging SSO code:', error)
-    res.status(400).json({ error: error?.message || 'Error al intercambiar codigo SSO' })
+    return sendApiError(res, 400, 'SSO_EXCHANGE_FAILED', error?.message || 'Error al intercambiar codigo SSO')
   }
 }

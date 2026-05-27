@@ -8,6 +8,8 @@ import { AuthRequest } from '../middleware/auth.middleware'
 import { appEnv } from '../config/env'
 import { sendMail } from '../utils/mailer'
 import { logger } from '../utils/logger'
+import { validateString, validateEmail, validateEnum, collectErrors } from '../utils/validate'
+import { sendApiError } from '../utils/api-errors'
 
 type CollaboratorRow = Collaborator & RowDataPacket
 
@@ -69,15 +71,23 @@ const wouldCreateCycle = async (collaboratorId: number, newManagerId: number): P
 export const getCollaborators = async (req: Request, res: Response) => {
   try {
     const includeInactive = req.query.includeInactive === 'true'
+    const limit = req.query.limit !== undefined ? Math.max(1, Math.min(1000, Number(req.query.limit))) : null
+    const offset = req.query.offset !== undefined ? Math.max(0, Number(req.query.offset)) : 0
     const safeColumns = 'id, name, email, position, area, orgScopeId, managerId, role, status, mfaEnabled, inviteToken, inviteTokenExpiresAt, createdAt, updatedAt'
-    const query = includeInactive
-      ? `SELECT ${safeColumns} FROM collaborators ORDER BY name ASC`
-      : `SELECT ${safeColumns} FROM collaborators WHERE status = 'active' ORDER BY name ASC`
-    const [rows] = await pool.query<CollaboratorRow[]>(query)
+    const where = includeInactive ? '' : `WHERE status = 'active'`
+    const baseQuery = `SELECT ${safeColumns} FROM collaborators ${where} ORDER BY name ASC`
+
+    if (limit !== null) {
+      const [[{ total }]] = await pool.query<any[]>(`SELECT COUNT(*) as total FROM collaborators ${where}`)
+      const [rows] = await pool.query<CollaboratorRow[]>(`${baseQuery} LIMIT ? OFFSET ?`, [limit, offset])
+      return res.json({ data: rows as Collaborator[], total: Number(total), limit, offset })
+    }
+
+    const [rows] = await pool.query<CollaboratorRow[]>(baseQuery)
     res.json(rows as Collaborator[])
   } catch (error: any) {
     logger.error('Error fetching collaborators:', error)
-    res.status(500).json({ error: 'Error al obtener colaboradores' })
+    return sendApiError(res, 500, 'COLLABORATOR_FETCH_FAILED', 'Error al obtener colaboradores')
   }
 }
 
@@ -91,13 +101,13 @@ export const getCollaboratorById = async (req: Request, res: Response) => {
     )
 
     if (Array.isArray(rows) && rows.length === 0) {
-      return res.status(404).json({ error: 'Colaborador no encontrado' })
+      return sendApiError(res, 404, 'COLLABORATOR_NOT_FOUND', 'Colaborador no encontrado')
     }
 
     res.json(rows[0])
   } catch (error: any) {
     logger.error('Error fetching collaborator:', error)
-    res.status(500).json({ error: 'Error al obtener colaborador' })
+    return sendApiError(res, 500, 'COLLABORATOR_FETCH_ONE_FAILED', 'Error al obtener colaborador')
   }
 }
 
@@ -107,9 +117,36 @@ export const createCollaborator = async (req: Request, res: Response) => {
     const user = (req as AuthRequest).user
     const normalizedEmail = email ? String(email).trim().toLowerCase() : null
 
-    if (!name || !position || (!area && !orgScopeId) || !role) {
-      return res.status(400).json({ error: 'Faltan campos requeridos' })
-    }
+    const VALID_ROLES = ['admin', 'director', 'manager', 'leader', 'collaborator'] as const
+    const validationErrors = collectErrors([
+      validateString(name, 'name', 150),
+      validateString(position, 'position', 150),
+      validateEnum(role, 'role', VALID_ROLES),
+      ...(!area && !orgScopeId ? [{ field: 'area', message: 'area u orgScopeId es requerido' }] : []),
+      ])
+      if (validationErrors.length > 0) {
+        return sendApiError(
+          res,
+          400,
+          'COLLABORATOR_VALIDATION_FAILED',
+          validationErrors[0].message,
+          undefined,
+          { fields: validationErrors }
+        )
+      }
+      if (normalizedEmail) {
+        const emailErr = validateEmail(normalizedEmail, 'email')
+        if (emailErr) {
+          return sendApiError(
+            res,
+            400,
+            'COLLABORATOR_EMAIL_INVALID',
+            emailErr.message,
+            undefined,
+            { fields: [emailErr] }
+          )
+        }
+      }
 
     let resolvedArea = area
     let resolvedOrgScopeId = orgScopeId ? Number(orgScopeId) : null
@@ -120,7 +157,7 @@ export const createCollaborator = async (req: Request, res: Response) => {
         [resolvedOrgScopeId]
       )
       if (!scopeRows || scopeRows.length === 0) {
-        return res.status(400).json({ error: 'Scope no encontrado' })
+        return sendApiError(res, 400, 'COLLABORATOR_SCOPE_NOT_FOUND', 'Scope no encontrado')
       }
       resolvedArea = scopeRows[0].name
     }
@@ -129,7 +166,7 @@ export const createCollaborator = async (req: Request, res: Response) => {
       !canEditCollaborator(user, resolvedArea) &&
       !['admin', 'director'].includes(user?.role || '')
     ) {
-      return res.status(403).json({ error: 'Solo puedes crear colaboradores en tu area' })
+      return sendApiError(res, 403, 'COLLABORATOR_CREATE_FORBIDDEN', 'Solo puedes crear colaboradores en tu area')
     }
 
     if (normalizedEmail) {
@@ -138,7 +175,7 @@ export const createCollaborator = async (req: Request, res: Response) => {
         [normalizedEmail]
       )
       if (Array.isArray(existing) && existing.length > 0) {
-        return res.status(400).json({ error: 'Email ya registrado' })
+        return sendApiError(res, 400, 'COLLABORATOR_EMAIL_EXISTS', 'Email ya registrado')
       }
     }
 
@@ -222,7 +259,7 @@ export const createCollaborator = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     logger.error('Error creating collaborator:', error)
-    res.status(500).json({ error: 'Error al crear colaborador' })
+    return sendApiError(res, 500, 'COLLABORATOR_CREATE_FAILED', 'Error al crear colaborador')
   }
 }
 
@@ -237,7 +274,40 @@ export const updateCollaborator = async (req: Request, res: Response) => {
       'SELECT * FROM collaborators WHERE id = ?',
       [id]
     )
-    const oldValues = Array.isArray(oldRows) && oldRows.length > 0 ? oldRows[0] : null
+    if (!Array.isArray(oldRows) || oldRows.length === 0) {
+      return sendApiError(res, 404, 'COLLABORATOR_NOT_FOUND', 'Colaborador no encontrado')
+    }
+    const oldValues = oldRows[0]
+
+    const VALID_ROLES = ['admin', 'director', 'manager', 'leader', 'collaborator'] as const
+    const validationErrors = collectErrors([
+      name !== undefined ? validateString(name, 'name', 150) : null,
+      position !== undefined ? validateString(position, 'position', 150) : null,
+      role !== undefined ? validateEnum(role, 'role', VALID_ROLES) : null,
+      ])
+      if (validationErrors.length > 0) {
+        return sendApiError(
+          res,
+          400,
+          'COLLABORATOR_VALIDATION_FAILED',
+          validationErrors[0].message,
+          undefined,
+          { fields: validationErrors }
+        )
+      }
+      if (normalizedEmail) {
+        const emailErr = validateEmail(normalizedEmail, 'email')
+        if (emailErr) {
+          return sendApiError(
+            res,
+            400,
+            'COLLABORATOR_EMAIL_INVALID',
+            emailErr.message,
+            undefined,
+            { fields: [emailErr] }
+          )
+        }
+      }
 
     let resolvedArea = area
     let resolvedOrgScopeId = orgScopeId ? Number(orgScopeId) : oldValues?.orgScopeId || null
@@ -248,13 +318,13 @@ export const updateCollaborator = async (req: Request, res: Response) => {
         [resolvedOrgScopeId]
       )
       if (!scopeRows || scopeRows.length === 0) {
-        return res.status(400).json({ error: 'Scope no encontrado' })
+        return sendApiError(res, 400, 'COLLABORATOR_SCOPE_NOT_FOUND', 'Scope no encontrado')
       }
       resolvedArea = scopeRows[0].name
     }
 
     if (!canEditCollaborator(user, oldValues?.area, Number(id))) {
-      return res.status(403).json({ error: 'No autorizado para editar fuera de tu area' })
+      return sendApiError(res, 403, 'COLLABORATOR_UPDATE_FORBIDDEN', 'No autorizado para editar fuera de tu area')
     }
 
     if (normalizedEmail) {
@@ -263,51 +333,51 @@ export const updateCollaborator = async (req: Request, res: Response) => {
         [normalizedEmail, id]
       )
       if (Array.isArray(existing) && existing.length > 0) {
-        return res.status(400).json({ error: 'Email ya registrado' })
+        return sendApiError(res, 400, 'COLLABORATOR_EMAIL_EXISTS', 'Email ya registrado')
       }
     }
 
     if (managerId && Number(managerId) !== (oldValues?.managerId ?? null)) {
       const hasCycle = await wouldCreateCycle(Number(id), Number(managerId))
       if (hasCycle) {
-        return res.status(400).json({
-          error: 'No se puede asignar ese jefe directo porque generaría una relación circular en la jerarquía',
-        })
+        return sendApiError(
+          res,
+          400,
+          'COLLABORATOR_MANAGER_CYCLE',
+          'No se puede asignar ese jefe directo porque generaría una relación circular en la jerarquía'
+        )
       }
     }
 
+    const sets: string[] = []
+    const setVals: any[] = []
+    if ('name' in req.body)       { sets.push('name = ?');       setVals.push(String(name).trim()) }
+    if ('position' in req.body)   { sets.push('position = ?');   setVals.push(String(position).trim()) }
+    if ('area' in req.body || 'orgScopeId' in req.body) {
+      sets.push('area = ?', 'orgScopeId = ?')
+      setVals.push(resolvedArea ?? oldValues.area, resolvedOrgScopeId)
+    }
+    if ('managerId' in req.body)  { sets.push('managerId = ?');  setVals.push(managerId || null) }
+    if ('role' in req.body)       { sets.push('role = ?');       setVals.push(role) }
+    if ('email' in req.body)      { sets.push('email = ?');      setVals.push(normalizedEmail) }
+    if ('mfaEnabled' in req.body) { sets.push('mfaEnabled = ?'); setVals.push(mfaEnabled ? 1 : 0) }
+
+    if (sets.length === 0) {
+      return sendApiError(res, 400, 'COLLABORATOR_UPDATE_NO_FIELDS', 'No hay campos para actualizar')
+    }
+
     await pool.query(
-      `UPDATE collaborators
-       SET name = ?, position = ?, area = ?, orgScopeId = ?, managerId = ?, role = ?, email = ?, mfaEnabled = ?
-       WHERE id = ?`,
-      [
-        name,
-        position,
-        resolvedArea,
-        resolvedOrgScopeId,
-        managerId || null,
-        role,
-        normalizedEmail,
-        mfaEnabled ? 1 : 0,
-        id,
-      ]
+      `UPDATE collaborators SET ${sets.join(', ')} WHERE id = ?`,
+      [...setVals, id]
     )
 
+    const newSnapshot = Object.fromEntries(sets.map((s, i) => [s.split(' ')[0], setVals[i]]))
     await logAudit(
       'collaborators',
       parseInt(id),
       'UPDATE',
       oldValues,
-      {
-        name,
-        position,
-        area: resolvedArea,
-        orgScopeId: resolvedOrgScopeId,
-        managerId: managerId || null,
-        role,
-        email: normalizedEmail,
-        mfaEnabled: mfaEnabled ? 1 : 0,
-      },
+      newSnapshot,
       {
         userId: (req as any).user?.id,
         userName: (req as any).user?.name,
@@ -319,7 +389,7 @@ export const updateCollaborator = async (req: Request, res: Response) => {
     res.json({ message: 'Colaborador actualizado correctamente' })
   } catch (error: any) {
     logger.error('Error updating collaborator:', error)
-    res.status(500).json({ error: 'Error al actualizar colaborador' })
+    return sendApiError(res, 500, 'COLLABORATOR_UPDATE_FAILED', 'Error al actualizar colaborador')
   }
 }
 
@@ -335,7 +405,7 @@ export const deleteCollaborator = async (req: Request, res: Response) => {
     const oldValues = Array.isArray(oldRows) && oldRows.length > 0 ? oldRows[0] : null
 
     if (!canEditCollaborator(user, oldValues?.area, Number(id))) {
-      return res.status(403).json({ error: 'No autorizado para eliminar fuera de tu area' })
+      return sendApiError(res, 403, 'COLLABORATOR_DELETE_FORBIDDEN', 'No autorizado para eliminar fuera de tu area')
     }
 
     await pool.query('DELETE FROM collaborators WHERE id = ?', [id])
@@ -359,7 +429,7 @@ export const deleteCollaborator = async (req: Request, res: Response) => {
     res.json({ message: 'Colaborador eliminado correctamente' })
   } catch (error: any) {
     logger.error('Error deleting collaborator:', error)
-    res.status(500).json({ error: 'Error al eliminar colaborador' })
+    return sendApiError(res, 500, 'COLLABORATOR_DELETE_FAILED', 'Error al eliminar colaborador')
   }
 }
 
@@ -374,13 +444,13 @@ export const deactivateCollaborator = async (req: Request, res: Response) => {
       [id]
     )
     if (!Array.isArray(currentRows) || currentRows.length === 0) {
-      return res.status(404).json({ error: 'Colaborador no encontrado' })
+      return sendApiError(res, 404, 'COLLABORATOR_NOT_FOUND', 'Colaborador no encontrado')
     }
 
     const current = currentRows[0]
 
     if (!canEditCollaborator(user, current?.area, Number(id))) {
-      return res.status(403).json({ error: 'No autorizado para desactivar fuera de tu area' })
+      return sendApiError(res, 403, 'COLLABORATOR_DEACTIVATE_FORBIDDEN', 'No autorizado para desactivar fuera de tu area')
     }
 
     await pool.query(
@@ -420,7 +490,7 @@ export const deactivateCollaborator = async (req: Request, res: Response) => {
     res.json({ message: 'Colaborador marcado como inactivo' })
   } catch (error: any) {
     logger.error('Error deactivating collaborator:', error)
-    res.status(500).json({ error: 'Error al desactivar colaborador' })
+    return sendApiError(res, 500, 'COLLABORATOR_DEACTIVATE_FAILED', 'Error al desactivar colaborador')
   }
 }
 
@@ -431,7 +501,7 @@ export const changeCollaboratorRole = async (req: Request, res: Response) => {
     const user = (req as AuthRequest).user
 
     if (!role) {
-      return res.status(400).json({ error: 'El rol es requerido' })
+      return sendApiError(res, 400, 'COLLABORATOR_ROLE_REQUIRED', 'El rol es requerido')
     }
 
     const [currentRows] = await pool.query<any[]>(
@@ -439,13 +509,13 @@ export const changeCollaboratorRole = async (req: Request, res: Response) => {
       [id]
     )
     if (!Array.isArray(currentRows) || currentRows.length === 0) {
-      return res.status(404).json({ error: 'Colaborador no encontrado' })
+      return sendApiError(res, 404, 'COLLABORATOR_NOT_FOUND', 'Colaborador no encontrado')
     }
 
     const current = currentRows[0]
 
     if (!canEditCollaborator(user, current?.area)) {
-      return res.status(403).json({ error: 'No autorizado para cambiar rol fuera de tu area' })
+      return sendApiError(res, 403, 'COLLABORATOR_CHANGE_ROLE_FORBIDDEN', 'No autorizado para cambiar rol fuera de tu area')
     }
 
     await pool.query(
@@ -484,7 +554,7 @@ export const changeCollaboratorRole = async (req: Request, res: Response) => {
     res.json({ message: 'Rol actualizado correctamente' })
   } catch (error: any) {
     logger.error('Error changing collaborator role:', error)
-    res.status(500).json({ error: 'Error al cambiar rol de colaborador' })
+    return sendApiError(res, 500, 'COLLABORATOR_CHANGE_ROLE_FAILED', 'Error al cambiar rol de colaborador')
   }
 }
 
@@ -498,7 +568,7 @@ export const getCollaboratorEvents = async (req: Request, res: Response) => {
     res.json(rows)
   } catch (error: any) {
     logger.error('Error fetching collaborator events:', error)
-    res.status(500).json({ error: 'Error al obtener eventos del colaborador' })
+    return sendApiError(res, 500, 'COLLABORATOR_EVENTS_FETCH_FAILED', 'Error al obtener eventos del colaborador')
   }
 }
 
@@ -507,15 +577,24 @@ export const resendInvite = async (req: Request, res: Response) => {
     const caller = (req as AuthRequest).user
     const callerRole = (caller?.role || '').trim().toLowerCase()
     if (!['admin', 'director', 'manager', 'leader'].includes(callerRole)) {
-      return res.status(403).json({ error: 'No tenés permiso para reenviar invitaciones' })
+      return sendApiError(res, 403, 'COLLABORATOR_RESEND_INVITE_FORBIDDEN', 'No tenés permiso para reenviar invitaciones')
     }
 
     const { id } = req.params
     const [rows] = await pool.query<any[]>('SELECT * FROM collaborators WHERE id = ?', [Number(id)])
     const collaborator = rows?.[0]
-    if (!collaborator) return res.status(404).json({ error: 'Colaborador no encontrado' })
-    if (!collaborator.email) return res.status(400).json({ error: 'El colaborador no tiene email configurado' })
-    if (collaborator.passwordHash) return res.status(400).json({ error: 'El colaborador ya tiene contraseña configurada' })
+    if (!collaborator) return sendApiError(res, 404, 'COLLABORATOR_NOT_FOUND', 'Colaborador no encontrado')
+    if (!collaborator.email) {
+      return sendApiError(res, 400, 'COLLABORATOR_RESEND_INVITE_EMAIL_MISSING', 'El colaborador no tiene email configurado')
+    }
+    if (collaborator.passwordHash) {
+      return sendApiError(
+        res,
+        400,
+        'COLLABORATOR_RESEND_INVITE_PASSWORD_ALREADY_SET',
+        'El colaborador ya tiene contraseña configurada'
+      )
+    }
 
     const rawToken = crypto.randomBytes(32).toString('hex')
     const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex')
@@ -537,7 +616,7 @@ export const resendInvite = async (req: Request, res: Response) => {
     res.json({ message: 'Invitación reenviada correctamente' })
   } catch (error: any) {
     logger.error('Error in resendInvite:', error)
-    res.status(500).json({ error: 'Error al reenviar invitación' })
+    return sendApiError(res, 500, 'COLLABORATOR_RESEND_INVITE_FAILED', 'Error al reenviar invitación')
   }
 }
 
@@ -547,12 +626,17 @@ export const importCollaborators = async (req: Request, res: Response) => {
     const callerRole = (caller?.role || '').trim().toLowerCase()
     const ALLOWED_IMPORT_ROLES = ['admin', 'director', 'manager', 'leader']
     if (!ALLOWED_IMPORT_ROLES.includes(callerRole)) {
-      return res.status(403).json({ error: 'No tenés permiso para importar colaboradores' })
+      return sendApiError(
+        res,
+        403,
+        'COLLABORATOR_IMPORT_FORBIDDEN',
+        'No tenes permiso para importar colaboradores'
+      )
     }
 
     const rows: { name: string; email?: string; position?: string; role?: string; areaName?: string }[] = req.body?.rows
     if (!Array.isArray(rows) || rows.length === 0)
-      return res.status(400).json({ error: 'No hay filas para importar' })
+      return sendApiError(res, 400, 'COLLABORATOR_IMPORT_ROWS_REQUIRED', 'No hay filas para importar')
 
     const VALID_ROLES = ['admin', 'director', 'manager', 'leader', 'collaborator']
 
@@ -566,23 +650,39 @@ export const importCollaborators = async (req: Request, res: Response) => {
     const existingEmails = new Set((emailRows as any[]).map((r) => r.email.toLowerCase()))
 
     const created: number[] = []
-    const errors: { row: number; message: string }[] = []
+    const errors: Array<{ row: number; code: string; message: string; values?: Record<string, unknown> }> = []
 
     for (let i = 0; i < rows.length; i++) {
       const item = rows[i]
       const rowNum = i + 1
 
-      if (!item.name?.trim()) { errors.push({ row: rowNum, message: 'Nombre vacío' }); continue }
+      if (!item.name?.trim()) {
+        errors.push({ row: rowNum, code: 'COLLABORATOR_IMPORT_NAME_EMPTY', message: 'Nombre vacio' })
+        continue
+      }
 
       const role = item.role?.trim().toLowerCase() || 'collaborator'
       if (!VALID_ROLES.includes(role)) {
-        errors.push({ row: rowNum, message: `Rol inválido: "${item.role}". Usá: collaborator, leader, director, admin` })
+        errors.push({
+          row: rowNum,
+          code: 'COLLABORATOR_IMPORT_ROLE_INVALID',
+          message: `Rol invalido: "${item.role}". Usa: collaborator, leader, director, admin`,
+          values: {
+            role: item.role,
+            allowedRoles: VALID_ROLES.filter((value) => value !== 'manager').join(', '),
+          },
+        })
         continue
       }
 
       const normalizedEmail = item.email?.trim().toLowerCase() || null
       if (normalizedEmail && existingEmails.has(normalizedEmail)) {
-        errors.push({ row: rowNum, message: `Email "${normalizedEmail}" ya registrado` })
+        errors.push({
+          row: rowNum,
+          code: 'COLLABORATOR_IMPORT_EMAIL_EXISTS',
+          message: `Email "${normalizedEmail}" ya registrado`,
+          values: { email: normalizedEmail },
+        })
         continue
       }
 
@@ -591,7 +691,12 @@ export const importCollaborators = async (req: Request, res: Response) => {
       if (areaLabel) {
         orgScopeId = scopeByName.get(areaLabel.toLowerCase()) ?? null
         if (!orgScopeId) {
-          errors.push({ row: rowNum, message: `Área "${areaLabel}" no encontrada` })
+          errors.push({
+            row: rowNum,
+            code: 'COLLABORATOR_IMPORT_AREA_NOT_FOUND',
+            message: `Area "${areaLabel}" no encontrada`,
+            values: { areaName: areaLabel },
+          })
           continue
         }
       }
@@ -609,6 +714,6 @@ export const importCollaborators = async (req: Request, res: Response) => {
     return res.status(201).json({ total: rows.length, created: created.length, errors })
   } catch (error: any) {
     logger.error('Error importando colaboradores:', error)
-    return res.status(500).json({ error: error?.message || 'Error al importar colaboradores' })
+    return sendApiError(res, 500, 'COLLABORATOR_IMPORT_FAILED', 'Error al importar colaboradores')
   }
 }

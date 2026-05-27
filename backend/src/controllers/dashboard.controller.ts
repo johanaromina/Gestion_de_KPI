@@ -3,6 +3,7 @@ import { pool } from '../config/database'
 import { AuthRequest } from '../middleware/auth.middleware'
 import { hydrateScopeKpiMixedFields } from '../services/scope-kpi-mixed.service'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 const toFiniteNumber = (value: any) => {
   const num = Number(value)
@@ -238,7 +239,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     logger.error('Error getting dashboard stats:', error)
-    res.status(500).json({ error: 'Error al obtener estadísticas del dashboard' })
+    return sendApiError(res, 500, 'DASHBOARD_STATS_FETCH_FAILED', 'Error al obtener estadísticas del dashboard')
   }
 }
 
@@ -270,7 +271,7 @@ export const getAreaStats = async (req: Request, res: Response) => {
     res.json(stats)
   } catch (error: any) {
     logger.error('Error getting area stats:', error)
-    res.status(500).json({ error: 'Error al obtener estadísticas por área' })
+    return sendApiError(res, 500, 'DASHBOARD_AREA_STATS_FETCH_FAILED', 'Error al obtener estadísticas por área')
   }
 }
 
@@ -281,7 +282,7 @@ export const getTeamStats = async (req: Request, res: Response) => {
     const user = (req as AuthRequest).user
 
     if (user?.collaboratorId !== leaderId && user?.role !== 'admin') {
-      return res.status(403).json({ error: 'No tienes permisos para ver estas estadísticas' })
+      return sendApiError(res, 403, 'DASHBOARD_TEAM_STATS_FORBIDDEN', 'No tienes permisos para ver estas estadísticas')
     }
 
     const [teamMembers] = await pool.query<any[]>(
@@ -321,7 +322,7 @@ export const getTeamStats = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     logger.error('Error getting team stats:', error)
-    res.status(500).json({ error: 'Error al obtener estadísticas del equipo' })
+    return sendApiError(res, 500, 'DASHBOARD_TEAM_STATS_FETCH_FAILED', 'Error al obtener estadísticas del equipo')
   }
 }
 
@@ -332,7 +333,7 @@ export const getMyKPIs = async (req: Request, res: Response) => {
     const user = (req as AuthRequest).user
 
     if (user?.collaboratorId !== collaboratorId && user?.role !== 'admin') {
-      return res.status(403).json({ error: 'No tienes permisos para ver estos KPIs' })
+      return sendApiError(res, 403, 'DASHBOARD_MY_KPIS_FORBIDDEN', 'No tienes permisos para ver estos KPIs')
     }
 
     const [rows] = await pool.query<any[]>(
@@ -361,7 +362,7 @@ export const getMyKPIs = async (req: Request, res: Response) => {
     res.json(kpis)
   } catch (error: any) {
     logger.error('Error getting my KPIs:', error)
-    res.status(500).json({ error: 'Error al obtener tus KPIs' })
+    return sendApiError(res, 500, 'DASHBOARD_MY_KPIS_FETCH_FAILED', 'Error al obtener tus KPIs')
   }
 }
 
@@ -372,7 +373,7 @@ export const getTeamKPIs = async (req: Request, res: Response) => {
     const user = (req as AuthRequest).user
 
     if (user?.collaboratorId !== collaboratorId && user?.role !== 'admin') {
-      return res.status(403).json({ error: 'No tienes permisos para ver estos KPIs' })
+      return sendApiError(res, 403, 'DASHBOARD_TEAM_KPIS_FORBIDDEN', 'No tienes permisos para ver estos KPIs')
     }
 
     const [collaborator] = await pool.query<any[]>(
@@ -420,7 +421,7 @@ export const getTeamKPIs = async (req: Request, res: Response) => {
     res.json(kpis)
   } catch (error: any) {
     logger.error('Error getting team KPIs:', error)
-    res.status(500).json({ error: 'Error al obtener KPIs del equipo' })
+    return sendApiError(res, 500, 'DASHBOARD_TEAM_KPIS_FETCH_FAILED', 'Error al obtener KPIs del equipo')
   }
 }
 
@@ -451,7 +452,7 @@ export const getComplianceByPeriod = async (req: Request, res: Response) => {
     res.json(data)
   } catch (error: any) {
     logger.error('Error getting compliance by period:', error)
-    res.status(500).json({ error: 'Error al obtener cumplimiento por período' })
+    return sendApiError(res, 500, 'DASHBOARD_COMPLIANCE_FETCH_FAILED', 'Error al obtener cumplimiento por período')
   }
 }
 
@@ -462,7 +463,7 @@ export const getTeamComplianceByPeriod = async (req: Request, res: Response) => 
     const user = (req as AuthRequest).user
 
     if (user?.collaboratorId !== leaderId && user?.role !== 'admin') {
-      return res.status(403).json({ error: 'No tienes permisos' })
+      return sendApiError(res, 403, 'DASHBOARD_TEAM_COMPLIANCE_FORBIDDEN', 'No tienes permisos')
     }
 
     const [teamMembers] = await pool.query<any[]>(
@@ -505,7 +506,7 @@ export const getTeamComplianceByPeriod = async (req: Request, res: Response) => 
     res.json(data)
   } catch (error: any) {
     logger.error('Error getting team compliance by period:', error)
-    res.status(500).json({ error: 'Error al obtener cumplimiento del equipo por período' })
+    return sendApiError(res, 500, 'DASHBOARD_TEAM_COMPLIANCE_FETCH_FAILED', 'Error al obtener cumplimiento del equipo por período')
   }
 }
 
@@ -513,7 +514,7 @@ export const getExecutiveTree = async (req: Request, res: Response) => {
   try {
     const user = (req as AuthRequest).user
     if (!user || !['admin', 'director', 'manager', 'leader'].includes(user.role)) {
-      return res.status(403).json({ error: 'No tienes permisos para ver el tablero ejecutivo' })
+      return sendApiError(res, 403, 'DASHBOARD_EXECUTIVE_TREE_FORBIDDEN', 'No tienes permisos para ver el tablero ejecutivo')
     }
 
     const requestedPeriodId = req.query.periodId ? Number(req.query.periodId) : null
@@ -608,7 +609,7 @@ export const getExecutiveTree = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     logger.error('Error getting executive tree:', error)
-    res.status(500).json({ error: 'Error al obtener tablero ejecutivo' })
+    return sendApiError(res, 500, 'DASHBOARD_EXECUTIVE_TREE_FETCH_FAILED', 'Error al obtener tablero ejecutivo')
   }
 }
 
@@ -616,7 +617,7 @@ export const getExecutiveTrends = async (req: Request, res: Response) => {
   try {
     const user = (req as AuthRequest).user
     if (!user || !['admin', 'director', 'manager', 'leader'].includes(user.role)) {
-      return res.status(403).json({ error: 'No tienes permisos para ver tendencias ejecutivas' })
+      return sendApiError(res, 403, 'DASHBOARD_EXECUTIVE_TRENDS_FORBIDDEN', 'No tienes permisos para ver tendencias ejecutivas')
     }
 
     const requestedScopeId = req.query.scopeId ? Number(req.query.scopeId) : null
@@ -750,6 +751,6 @@ export const getExecutiveTrends = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     logger.error('Error getting executive trends:', error)
-    res.status(500).json({ error: 'Error al obtener tendencias ejecutivas' })
+    return sendApiError(res, 500, 'DASHBOARD_EXECUTIVE_TRENDS_FETCH_FAILED', 'Error al obtener tendencias ejecutivas')
   }
 }

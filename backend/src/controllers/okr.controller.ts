@@ -3,6 +3,7 @@ import { AuthRequest } from '../middleware/auth.middleware'
 import { pool } from '../config/database'
 import * as okrService from '../services/okr.service'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 // ── Objectives ─────────────────────────────────────────────
 
@@ -19,18 +20,18 @@ export const getObjectives = async (req: AuthRequest, res: Response) => {
     res.json(objectives)
   } catch (error) {
     logger.error('[OKR] getObjectives:', error)
-    res.status(500).json({ error: 'Error al obtener objetivos' })
+    return sendApiError(res, 500, 'OKR_OBJECTIVES_FETCH_FAILED', 'Error al obtener objetivos')
   }
 }
 
 export const getObjective = async (req: AuthRequest, res: Response) => {
   try {
     const objective = await okrService.getObjectiveById(Number(req.params.id))
-    if (!objective) return res.status(404).json({ error: 'Objetivo no encontrado' })
+    if (!objective) return sendApiError(res, 404, 'OKR_OBJECTIVE_NOT_FOUND', 'Objetivo no encontrado')
     res.json(objective)
   } catch (error) {
     logger.error('[OKR] getObjective:', error)
-    res.status(500).json({ error: 'Error al obtener objetivo' })
+    return sendApiError(res, 500, 'OKR_OBJECTIVE_FETCH_FAILED', 'Error al obtener objetivo')
   }
 }
 
@@ -38,14 +39,14 @@ export const createObjective = async (req: AuthRequest, res: Response) => {
   try {
     const { title, description, parentId, orgScopeId, periodId, ownerId, status } = req.body
     if (!title || !periodId || !ownerId) {
-      return res.status(400).json({ error: 'title, periodId y ownerId son requeridos' })
+      return sendApiError(res, 400, 'OKR_OBJECTIVE_FIELDS_REQUIRED', 'title, periodId y ownerId son requeridos')
     }
     const id = await okrService.createObjective({ title, description, parentId, orgScopeId, periodId, ownerId, status })
     const created = await okrService.getObjectiveById(id)
     res.status(201).json(created)
   } catch (error) {
     logger.error('[OKR] createObjective:', error)
-    res.status(500).json({ error: 'Error al crear objetivo' })
+    return sendApiError(res, 500, 'OKR_OBJECTIVE_CREATE_FAILED', 'Error al crear objetivo')
   }
 }
 
@@ -56,7 +57,7 @@ export const updateObjective = async (req: AuthRequest, res: Response) => {
     res.json(updated)
   } catch (error) {
     logger.error('[OKR] updateObjective:', error)
-    res.status(500).json({ error: 'Error al actualizar objetivo' })
+    return sendApiError(res, 500, 'OKR_OBJECTIVE_UPDATE_FAILED', 'Error al actualizar objetivo')
   }
 }
 
@@ -66,7 +67,7 @@ export const deleteObjective = async (req: AuthRequest, res: Response) => {
     res.json({ success: true })
   } catch (error) {
     logger.error('[OKR] deleteObjective:', error)
-    res.status(500).json({ error: 'Error al eliminar objetivo' })
+    return sendApiError(res, 500, 'OKR_OBJECTIVE_DELETE_FAILED', 'Error al eliminar objetivo')
   }
 }
 
@@ -78,7 +79,7 @@ export const getKeyResults = async (req: AuthRequest, res: Response) => {
     res.json(krs)
   } catch (error) {
     logger.error('[OKR] getKeyResults:', error)
-    res.status(500).json({ error: 'Error al obtener key results' })
+    return sendApiError(res, 500, 'OKR_KEY_RESULTS_FETCH_FAILED', 'Error al obtener key results')
   }
 }
 
@@ -86,7 +87,7 @@ export const createKeyResult = async (req: AuthRequest, res: Response) => {
   try {
     const objectiveId = Number(req.params.objectiveId)
     const { title, description, krType, startValue, targetValue, currentValue, unit, collaboratorKpiId, scopeKpiId, weight, ownerId, sortOrder, kpiLinks } = req.body
-    if (!title) return res.status(400).json({ error: 'title es requerido' })
+    if (!title) return sendApiError(res, 400, 'OKR_KEY_RESULT_TITLE_REQUIRED', 'title es requerido')
 
     const id = await okrService.createKeyResult({
       objectiveId, title, description, krType, startValue, targetValue,
@@ -97,7 +98,12 @@ export const createKeyResult = async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     logger.error('[OKR] createKeyResult:', error)
     const detail = error?.sqlMessage || error?.message || null
-    res.status(500).json({ error: detail ? `Error al crear key result: ${detail}` : 'Error al crear key result' })
+    return sendApiError(
+      res,
+      500,
+      'OKR_KEY_RESULT_CREATE_FAILED',
+      detail ? `Error al crear key result: ${detail}` : 'Error al crear key result'
+    )
   }
 }
 
@@ -107,7 +113,7 @@ export const updateKeyResult = async (req: AuthRequest, res: Response) => {
     res.json({ success: true })
   } catch (error) {
     logger.error('[OKR] updateKeyResult:', error)
-    res.status(500).json({ error: 'Error al actualizar key result' })
+    return sendApiError(res, 500, 'OKR_KEY_RESULT_UPDATE_FAILED', 'Error al actualizar key result')
   }
 }
 
@@ -117,7 +123,7 @@ export const deleteKeyResult = async (req: AuthRequest, res: Response) => {
     res.json({ success: true })
   } catch (error) {
     logger.error('[OKR] deleteKeyResult:', error)
-    res.status(500).json({ error: 'Error al eliminar key result' })
+    return sendApiError(res, 500, 'OKR_KEY_RESULT_DELETE_FAILED', 'Error al eliminar key result')
   }
 }
 
@@ -129,7 +135,7 @@ export const getCheckIns = async (req: AuthRequest, res: Response) => {
     res.json(checkIns)
   } catch (error) {
     logger.error('[OKR] getCheckIns:', error)
-    res.status(500).json({ error: 'Error al obtener check-ins' })
+    return sendApiError(res, 500, 'OKR_CHECKINS_FETCH_FAILED', 'Error al obtener check-ins')
   }
 }
 
@@ -140,7 +146,7 @@ export const createCheckIn = async (req: AuthRequest, res: Response) => {
     const authorId = req.user!.id
 
     if (value === undefined || value === null) {
-      return res.status(400).json({ error: 'value es requerido' })
+      return sendApiError(res, 400, 'OKR_CHECKIN_VALUE_REQUIRED', 'value es requerido')
     }
 
     const id = await okrService.createCheckIn({ keyResultId, value: Number(value), note, authorId })
@@ -148,7 +154,7 @@ export const createCheckIn = async (req: AuthRequest, res: Response) => {
     res.status(201).json(checkIns.find((c) => c.id === id))
   } catch (error) {
     logger.error('[OKR] createCheckIn:', error)
-    res.status(500).json({ error: 'Error al crear check-in' })
+    return sendApiError(res, 500, 'OKR_CHECKIN_CREATE_FAILED', 'Error al crear check-in')
   }
 }
 
@@ -160,19 +166,19 @@ export const getTreeLinks = async (req: AuthRequest, res: Response) => {
     res.json(links)
   } catch (error) {
     logger.error('[OKR] getTreeLinks:', error)
-    res.status(500).json({ error: 'Error al obtener vinculos con arbol' })
+    return sendApiError(res, 500, 'OKR_TREE_LINKS_FETCH_FAILED', 'Error al obtener vinculos con arbol')
   }
 }
 
 export const addTreeLink = async (req: AuthRequest, res: Response) => {
   try {
     const { objectiveTreeId } = req.body
-    if (!objectiveTreeId) return res.status(400).json({ error: 'objectiveTreeId requerido' })
+    if (!objectiveTreeId) return sendApiError(res, 400, 'OKR_TREE_ID_REQUIRED', 'objectiveTreeId requerido')
     await okrService.linkToObjectiveTree(Number(req.params.id), Number(objectiveTreeId))
     res.json({ success: true })
   } catch (error) {
     logger.error('[OKR] addTreeLink:', error)
-    res.status(500).json({ error: 'Error al vincular con arbol' })
+    return sendApiError(res, 500, 'OKR_TREE_LINK_CREATE_FAILED', 'Error al vincular con arbol')
   }
 }
 
@@ -182,7 +188,7 @@ export const removeTreeLink = async (req: AuthRequest, res: Response) => {
     res.json({ success: true })
   } catch (error) {
     logger.error('[OKR] removeTreeLink:', error)
-    res.status(500).json({ error: 'Error al desvincular del arbol' })
+    return sendApiError(res, 500, 'OKR_TREE_LINK_DELETE_FAILED', 'Error al desvincular del arbol')
   }
 }
 
@@ -341,7 +347,7 @@ export const getDataSources = async (req: AuthRequest, res: Response) => {
     res.json(result)
   } catch (error) {
     logger.error('[OKR] getDataSources:', error)
-    res.status(500).json({ error: 'Error al obtener fuentes de datos' })
+    return sendApiError(res, 500, 'OKR_DATA_SOURCES_FETCH_FAILED', 'Error al obtener fuentes de datos')
   }
 }
 
@@ -350,12 +356,12 @@ export const getDataSources = async (req: AuthRequest, res: Response) => {
 export const getAlignmentTree = async (req: AuthRequest, res: Response) => {
   try {
     const { periodId } = req.query
-    if (!periodId) return res.status(400).json({ error: 'periodId es requerido' })
+    if (!periodId) return sendApiError(res, 400, 'OKR_ALIGNMENT_PERIOD_REQUIRED', 'periodId es requerido')
     const tree = await okrService.getAlignmentTree(Number(periodId))
     res.json(tree)
   } catch (error) {
     logger.error('[OKR] getAlignmentTree:', error)
-    res.status(500).json({ error: 'Error al obtener árbol de alineación' })
+    return sendApiError(res, 500, 'OKR_ALIGNMENT_TREE_FETCH_FAILED', 'Error al obtener árbol de alineación')
   }
 }
 
@@ -365,6 +371,6 @@ export const getFullTree = async (_req: AuthRequest, res: Response) => {
     res.json(tree)
   } catch (error) {
     logger.error('[OKR] getFullTree:', error)
-    res.status(500).json({ error: 'Error al obtener árbol completo de OKRs' })
+    return sendApiError(res, 500, 'OKR_FULL_TREE_FETCH_FAILED', 'Error al obtener árbol completo de OKRs')
   }
 }

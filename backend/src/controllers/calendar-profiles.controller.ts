@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { pool } from '../config/database'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 export const listCalendarProfiles = async (_req: Request, res: Response) => {
   try {
@@ -10,7 +11,7 @@ export const listCalendarProfiles = async (_req: Request, res: Response) => {
     res.json(rows || [])
   } catch (error: any) {
     logger.error('Error fetching calendar profiles:', error)
-    res.status(500).json({ error: 'Error al obtener calendarios' })
+    return sendApiError(res, 500, 'CALENDAR_PROFILE_FETCH_FAILED', 'Error al obtener calendarios')
   }
 }
 
@@ -18,7 +19,7 @@ export const createCalendarProfile = async (req: Request, res: Response) => {
   try {
     const { name, description, frequency, active } = req.body
     if (!name) {
-      return res.status(400).json({ error: 'name es requerido' })
+      return sendApiError(res, 400, 'CALENDAR_PROFILE_NAME_REQUIRED', 'name es requerido')
     }
     const [result] = await pool.query(
       `INSERT INTO calendar_profiles (name, description, frequency, active)
@@ -29,7 +30,7 @@ export const createCalendarProfile = async (req: Request, res: Response) => {
     res.status(201).json({ id: insertResult.insertId })
   } catch (error: any) {
     logger.error('Error creating calendar profile:', error)
-    res.status(500).json({ error: 'Error al crear calendario' })
+    return sendApiError(res, 500, 'CALENDAR_PROFILE_CREATE_FAILED', 'Error al crear calendario')
   }
 }
 
@@ -46,7 +47,7 @@ export const updateCalendarProfile = async (req: Request, res: Response) => {
     res.json({ message: 'Calendario actualizado' })
   } catch (error: any) {
     logger.error('Error updating calendar profile:', error)
-    res.status(500).json({ error: 'Error al actualizar calendario' })
+    return sendApiError(res, 500, 'CALENDAR_PROFILE_UPDATE_FAILED', 'Error al actualizar calendario')
   }
 }
 
@@ -69,19 +70,25 @@ export const deleteCalendarProfile = async (req: Request, res: Response) => {
     const subCount = Number(subRows?.[0]?.count || 0)
     const assignmentCount = Number(assignmentRows?.[0]?.count || 0)
     if (scopeCount > 0 || subCount > 0 || assignmentCount > 0) {
-      return res.status(400).json({
-        error: 'No se puede eliminar un calendario en uso.',
-        details: {
-          scopes: scopeCount,
-          subPeriods: subCount,
-          assignments: assignmentCount,
-        },
-      })
+      return sendApiError(
+        res,
+        400,
+        'CALENDAR_PROFILE_IN_USE',
+        'No se puede eliminar un calendario en uso.',
+        undefined,
+        {
+          details: {
+            scopes: scopeCount,
+            subPeriods: subCount,
+            assignments: assignmentCount,
+          },
+        }
+      )
     }
     await pool.query(`DELETE FROM calendar_profiles WHERE id = ?`, [id])
     res.json({ message: 'Calendario eliminado' })
   } catch (error: any) {
     logger.error('Error deleting calendar profile:', error)
-    res.status(500).json({ error: 'Error al eliminar calendario' })
+    return sendApiError(res, 500, 'CALENDAR_PROFILE_DELETE_FAILED', 'Error al eliminar calendario')
   }
 }

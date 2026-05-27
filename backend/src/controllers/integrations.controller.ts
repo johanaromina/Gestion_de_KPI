@@ -7,6 +7,7 @@ import { decryptSecret, encryptSecret } from '../utils/crypto'
 import { resolveConnectorAdapter } from '../integrations/adapters'
 import { appEnv } from '../config/env'
 import { logger } from '../utils/logger'
+import { apiError, sendApiError, sendCaughtApiError } from '../utils/api-errors'
 
 type IntegrationRow = {
   id: number
@@ -175,7 +176,7 @@ const validateTargetTemplateParams = async (templateId: number, rawParams: any) 
     [templateId]
   )
   if (!Array.isArray(templateRows) || templateRows.length === 0) {
-    throw new Error('Plantilla no encontrada')
+    throw apiError(404, 'INTEGRATION_TEMPLATE_NOT_FOUND', 'Plantilla no encontrada')
   }
 
   const template = templateRows[0] as TemplateRow
@@ -197,7 +198,12 @@ const validateTargetTemplateParams = async (templateId: number, rawParams: any) 
   const missingKeys = requiredKeys.filter((key) => !hasConfiguredValue(params[key]))
 
   if (missingKeys.length > 0) {
-    throw new Error(`Faltan params requeridos para la plantilla: ${missingKeys.join(', ')}`)
+    throw apiError(
+      400,
+      'INTEGRATION_TEMPLATE_REQUIRED_PARAMS_MISSING',
+      `Faltan params requeridos para la plantilla: ${missingKeys.join(', ')}`,
+      { keys: missingKeys.join(', ') }
+    )
   }
 }
 
@@ -295,13 +301,13 @@ export const testIntegrationJql = async (req: Request, res: Response) => {
   try {
     const { endpoint, jql, authType, authConfig } = req.body
     if (!endpoint || !jql) {
-      return res.status(400).json({ error: 'endpoint y jql son requeridos' })
+      return sendApiError(res, 400, 'INTEGRATION_JQL_TEST_FIELDS_REQUIRED', 'endpoint y jql son requeridos')
     }
     const total = await jiraSearch(endpoint, authType, authConfig || {}, jql)
     res.json({ total })
   } catch (error: any) {
     logger.error('Error testing integration JQL:', error)
-    res.status(500).json({ error: 'Error al probar JQL' })
+    return sendApiError(res, 500, 'INTEGRATION_JQL_TEST_FAILED', 'Error al probar JQL')
   }
 }
 
@@ -317,7 +323,7 @@ export const listAuthProfiles = async (_req: Request, res: Response) => {
     res.json(data)
   } catch (error: any) {
     logger.error('Error fetching auth profiles:', error)
-    res.status(500).json({ error: 'Error al obtener auth profiles' })
+    return sendApiError(res, 500, 'INTEGRATION_AUTH_PROFILE_FETCH_FAILED', 'Error al obtener auth profiles')
   }
 }
 
@@ -325,7 +331,7 @@ export const createAuthProfile = async (req: Request, res: Response) => {
   try {
     const { name, connector, endpoint, authType, authConfig } = req.body
     if (!name) {
-      return res.status(400).json({ error: 'name es requerido' })
+      return sendApiError(res, 400, 'INTEGRATION_AUTH_PROFILE_NAME_REQUIRED', 'name es requerido')
     }
     const [result] = await pool.query(
       `INSERT INTO auth_profiles (name, connector, endpoint, authType, authConfig)
@@ -342,7 +348,7 @@ export const createAuthProfile = async (req: Request, res: Response) => {
     res.status(201).json({ id: insertResult.insertId })
   } catch (error: any) {
     logger.error('Error creating auth profile:', error)
-    res.status(500).json({ error: 'Error al crear auth profile' })
+    return sendApiError(res, 500, 'INTEGRATION_AUTH_PROFILE_CREATE_FAILED', 'Error al crear auth profile')
   }
 }
 
@@ -364,7 +370,7 @@ export const updateAuthProfile = async (req: Request, res: Response) => {
     res.json({ message: 'Auth profile actualizado' })
   } catch (error: any) {
     logger.error('Error updating auth profile:', error)
-    res.status(500).json({ error: 'Error al actualizar auth profile' })
+    return sendApiError(res, 500, 'INTEGRATION_AUTH_PROFILE_UPDATE_FAILED', 'Error al actualizar auth profile')
   }
 }
 
@@ -379,7 +385,7 @@ export const listTemplates = async (_req: Request, res: Response) => {
     res.json(rows)
   } catch (error: any) {
     logger.error('Error fetching templates:', error)
-    res.status(500).json({ error: 'Error al obtener plantillas' })
+    return sendApiError(res, 500, 'INTEGRATION_TEMPLATE_LIST_FAILED', 'Error al obtener plantillas')
   }
 }
 
@@ -398,10 +404,10 @@ export const createTemplate = async (req: Request, res: Response) => {
       enabled,
     } = req.body
     if (!name) {
-      return res.status(400).json({ error: 'name es requerido' })
+      return sendApiError(res, 400, 'INTEGRATION_TEMPLATE_NAME_REQUIRED', 'name es requerido')
     }
     if (schedule && !cron.validate(schedule)) {
-      return res.status(400).json({ error: 'Cron inválido' })
+      return sendApiError(res, 400, 'INTEGRATION_TEMPLATE_CRON_INVALID', 'Cron invalido')
     }
     const resolvedMetricType: 'count' | 'ratio' = metricType === 'count' ? 'count' : 'ratio'
     const isSpecific = computeIsSpecific(resolvedMetricType, queryTestsTemplate, queryStoriesTemplate)
@@ -427,7 +433,7 @@ export const createTemplate = async (req: Request, res: Response) => {
     res.status(201).json({ id: insertResult.insertId })
   } catch (error: any) {
     logger.error('Error creating template:', error)
-    res.status(500).json({ error: 'Error al crear plantilla' })
+    return sendApiError(res, 500, 'INTEGRATION_TEMPLATE_CREATE_FAILED', 'Error al crear plantilla')
   }
 }
 
@@ -446,8 +452,11 @@ export const updateTemplate = async (req: Request, res: Response) => {
       authProfileId,
       enabled,
     } = req.body
+    if (!name) {
+      return sendApiError(res, 400, 'INTEGRATION_TEMPLATE_NAME_REQUIRED', 'name es requerido')
+    }
     if (schedule && !cron.validate(schedule)) {
-      return res.status(400).json({ error: 'Cron inválido' })
+      return sendApiError(res, 400, 'INTEGRATION_TEMPLATE_CRON_INVALID', 'Cron invalido')
     }
     const resolvedMetricType: 'count' | 'ratio' = metricType === 'count' ? 'count' : 'ratio'
     const isSpecific = computeIsSpecific(resolvedMetricType, queryTestsTemplate, queryStoriesTemplate)
@@ -473,7 +482,7 @@ export const updateTemplate = async (req: Request, res: Response) => {
     res.json({ message: 'Plantilla actualizada' })
   } catch (error: any) {
     logger.error('Error updating template:', error)
-    res.status(500).json({ error: 'Error al actualizar plantilla' })
+    return sendApiError(res, 500, 'INTEGRATION_TEMPLATE_UPDATE_FAILED', 'Error al actualizar plantilla')
   }
 }
 
@@ -515,7 +524,7 @@ export const listTargets = async (req: Request, res: Response) => {
     res.json(data)
   } catch (error: any) {
     logger.error('Error fetching targets:', error)
-    res.status(500).json({ error: 'Error al obtener targets' })
+    return sendApiError(res, 500, 'INTEGRATION_TARGET_FETCH_FAILED', 'Error al obtener targets')
   }
 }
 
@@ -524,16 +533,14 @@ export const createTarget = async (req: Request, res: Response) => {
     const { templateId, scopeType, scopeId, orgScopeId, params, assignmentId, scopeKpiId, macroKpiId, enabled } = req.body
     const resolvedScopeKpiId = scopeKpiId || macroKpiId || null
     if (!templateId || (!scopeId && !orgScopeId)) {
-      return res.status(400).json({ error: 'templateId y scopeId/orgScopeId son requeridos' })
+      return sendApiError(res, 400, 'INTEGRATION_TARGET_FIELDS_REQUIRED', 'templateId y scopeId/orgScopeId son requeridos')
     }
     if (assignmentId && resolvedScopeKpiId) {
-      return res.status(400).json({ error: 'Un target solo puede apuntar a assignmentId o scopeKpiId' })
+      return sendApiError(res, 400, 'INTEGRATION_TARGET_EXCLUSIVE_OWNER', 'Un target solo puede apuntar a assignmentId o scopeKpiId')
     }
     const usersCount = getUsersCount(params)
     if (assignmentId && usersCount > 1) {
-      return res.status(400).json({
-        error: 'Target con multiples users no puede asignarse a un KPI individual. Usa un target por persona o quita la asignacion.',
-      })
+      return sendApiError(res, 400, 'INTEGRATION_TARGET_MULTI_USER_ASSIGNMENT', 'Target con multiples users no puede asignarse a un KPI individual. Usa un target por persona o quita la asignacion.')
     }
     await validateTargetTemplateParams(Number(templateId), params)
     const [result] = await pool.query(
@@ -555,7 +562,11 @@ export const createTarget = async (req: Request, res: Response) => {
     res.status(201).json({ id: insertResult.insertId })
   } catch (error: any) {
     logger.error('Error creating target:', error)
-    res.status(400).json({ error: error?.message || 'Error al crear target' })
+    return sendCaughtApiError(res, error, {
+      status: 400,
+      code: 'INTEGRATION_TARGET_CREATE_FAILED',
+      error: error?.message || 'Error al crear target',
+    })
   }
 }
 
@@ -565,13 +576,11 @@ export const updateTarget = async (req: Request, res: Response) => {
     const { templateId, scopeType, scopeId, orgScopeId, params, assignmentId, scopeKpiId, macroKpiId, enabled } = req.body
     const resolvedScopeKpiId = scopeKpiId || macroKpiId || null
     if (assignmentId && resolvedScopeKpiId) {
-      return res.status(400).json({ error: 'Un target solo puede apuntar a assignmentId o scopeKpiId' })
+      return sendApiError(res, 400, 'INTEGRATION_TARGET_EXCLUSIVE_OWNER', 'Un target solo puede apuntar a assignmentId o scopeKpiId')
     }
     const usersCount = getUsersCount(params)
     if (assignmentId && usersCount > 1) {
-      return res.status(400).json({
-        error: 'Target con multiples users no puede asignarse a un KPI individual. Usa un target por persona o quita la asignacion.',
-      })
+      return sendApiError(res, 400, 'INTEGRATION_TARGET_MULTI_USER_ASSIGNMENT', 'Target con multiples users no puede asignarse a un KPI individual. Usa un target por persona o quita la asignacion.')
     }
     await validateTargetTemplateParams(Number(templateId), params)
     await pool.query(
@@ -593,7 +602,11 @@ export const updateTarget = async (req: Request, res: Response) => {
     res.json({ message: 'Target actualizado' })
   } catch (error: any) {
     logger.error('Error updating target:', error)
-    res.status(400).json({ error: error?.message || 'Error al actualizar target' })
+    return sendCaughtApiError(res, error, {
+      status: 400,
+      code: 'INTEGRATION_TARGET_UPDATE_FAILED',
+      error: error?.message || 'Error al actualizar target',
+    })
   }
 }
 
@@ -629,7 +642,7 @@ export const listTemplateRuns = async (req: Request, res: Response) => {
     res.json(data)
   } catch (error: any) {
     logger.error('Error fetching template runs:', error)
-    res.status(500).json({ error: 'Error al obtener ejecuciones' })
+    return sendApiError(res, 500, 'INTEGRATION_TEMPLATE_RUNS_FETCH_FAILED', 'Error al obtener ejecuciones')
   }
 }
 
@@ -640,7 +653,7 @@ export const archiveRun = async (req: Request, res: Response) => {
     res.json({ message: 'Run archivado' })
   } catch (error: any) {
     logger.error('Error archiving run:', error)
-    res.status(500).json({ error: 'Error al archivar run' })
+    return sendApiError(res, 500, 'INTEGRATION_RUN_ARCHIVE_FAILED', 'Error al archivar run')
   }
 }
 
@@ -651,7 +664,7 @@ export const deleteRun = async (req: Request, res: Response) => {
     res.json({ message: 'Run eliminado' })
   } catch (error: any) {
     logger.error('Error deleting run:', error)
-    res.status(500).json({ error: 'Error al eliminar run' })
+    return sendApiError(res, 500, 'INTEGRATION_RUN_DELETE_FAILED', 'Error al eliminar run')
   }
 }
 
@@ -659,7 +672,7 @@ export const archiveRuns = async (req: Request, res: Response) => {
   try {
     const { templateId, targetId, status } = req.body || {}
     if (!templateId) {
-      return res.status(400).json({ error: 'templateId es requerido' })
+      return sendApiError(res, 400, 'INTEGRATION_TEMPLATE_ID_REQUIRED', 'templateId es requerido')
     }
     const params: any[] = [templateId]
     let query = `UPDATE integration_template_runs SET archived = 1 WHERE templateId = ?`
@@ -675,7 +688,7 @@ export const archiveRuns = async (req: Request, res: Response) => {
     res.json({ message: 'Runs archivados', result })
   } catch (error: any) {
     logger.error('Error archiving runs:', error)
-    res.status(500).json({ error: 'Error al archivar runs' })
+    return sendApiError(res, 500, 'INTEGRATION_RUNS_ARCHIVE_FAILED', 'Error al archivar runs')
   }
 }
 
@@ -683,7 +696,7 @@ export const deleteRuns = async (req: Request, res: Response) => {
   try {
     const { templateId, targetId, status } = req.body || {}
     if (!templateId) {
-      return res.status(400).json({ error: 'templateId es requerido' })
+      return sendApiError(res, 400, 'INTEGRATION_TEMPLATE_ID_REQUIRED', 'templateId es requerido')
     }
     const params: any[] = [templateId]
     let query = `DELETE FROM integration_template_runs WHERE templateId = ?`
@@ -699,7 +712,7 @@ export const deleteRuns = async (req: Request, res: Response) => {
     res.json({ message: 'Runs eliminados', result })
   } catch (error: any) {
     logger.error('Error deleting runs:', error)
-    res.status(500).json({ error: 'Error al eliminar runs' })
+    return sendApiError(res, 500, 'INTEGRATION_RUNS_DELETE_FAILED', 'Error al eliminar runs')
   }
 }
 
@@ -717,7 +730,7 @@ export const runTemplate = async (req: Request, res: Response) => {
     })
     res.json({ message: 'Plantilla ejecutada', result })
   } catch (error: any) {
-    res.status(500).json({ error: error?.message || 'Error al ejecutar plantilla' })
+    return sendApiError(res, 500, 'INTEGRATION_TEMPLATE_RUN_FAILED', error?.message || 'Error al ejecutar plantilla')
   }
 }
 
@@ -728,7 +741,7 @@ export const runTarget = async (req: Request, res: Response) => {
 
     const [targetRows] = await pool.query<any[]>(`SELECT * FROM integration_targets WHERE id = ?`, [id])
     if (!Array.isArray(targetRows) || targetRows.length === 0) {
-      return res.status(404).json({ error: 'Target no encontrado' })
+      return sendApiError(res, 404, 'INTEGRATION_TARGET_NOT_FOUND', 'Target no encontrado')
     }
     const target = targetRows[0]
 
@@ -742,7 +755,7 @@ export const runTarget = async (req: Request, res: Response) => {
 
     res.json({ message: 'Target ejecutado', result })
   } catch (error: any) {
-    res.status(500).json({ error: error?.message || 'Error al ejecutar target' })
+    return sendApiError(res, 500, 'INTEGRATION_TARGET_RUN_FAILED', error?.message || 'Error al ejecutar target')
   }
 }
 
@@ -776,7 +789,7 @@ export const testTemplate = async (req: Request, res: Response) => {
     if (templateId) {
       const [templateRows] = await pool.query<any[]>(`SELECT * FROM integration_templates WHERE id = ?`, [templateId])
       if (!Array.isArray(templateRows) || templateRows.length === 0) {
-        return res.status(404).json({ error: 'Plantilla no encontrada' })
+        return sendApiError(res, 404, 'INTEGRATION_TEMPLATE_NOT_FOUND', 'Plantilla no encontrada')
       }
       const template = templateRows[0]
       resolvedConnector = template.connector || resolvedConnector
@@ -798,10 +811,20 @@ export const testTemplate = async (req: Request, res: Response) => {
 
     const requiresEndpoint = resolvedConnector !== 'sheets'
     if ((requiresEndpoint && !resolvedEndpoint) || !resolvedTestsTemplate) {
-      return res.status(400).json({ error: 'endpoint y queryTestsTemplate son requeridos' })
+      return sendApiError(
+        res,
+        400,
+        'INTEGRATION_TEMPLATE_TEST_REQUIRED_FIELDS',
+        'endpoint y queryTestsTemplate son requeridos'
+      )
     }
     if (resolvedMetricType === 'ratio' && !resolvedStoriesTemplate) {
-      return res.status(400).json({ error: 'queryStoriesTemplate es requerido para metricType ratio' })
+      return sendApiError(
+        res,
+        400,
+        'INTEGRATION_TEMPLATE_TEST_RATIO_REQUIRED',
+        'queryStoriesTemplate es requerido para metricType ratio'
+      )
     }
 
     let baseParams: Record<string, any> = {}
@@ -929,7 +952,7 @@ export const testTemplate = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     logger.error('Error testing template:', error)
-    res.status(500).json({ error: error?.message || 'Error al probar template' })
+    return sendApiError(res, 500, 'INTEGRATION_TEMPLATE_TEST_FAILED', error?.message || 'Error al probar template')
   }
 }
 
@@ -938,10 +961,10 @@ export const getNextCronRun = async (req: Request, res: Response) => {
     const { expression } = req.query
     const expr = String(expression || '').trim()
     if (!expr) {
-      return res.status(400).json({ error: 'expression es requerido' })
+      return sendApiError(res, 400, 'INTEGRATION_CRON_EXPRESSION_REQUIRED', 'expression es requerido')
     }
     if (!cron.validate(expr)) {
-      return res.status(400).json({ error: 'Cron inválido' })
+      return sendApiError(res, 400, 'INTEGRATION_CRON_EXPRESSION_INVALID', 'Cron inválido')
     }
     const task = cron.schedule(expr, () => {})
     const next = (task as any)?.nextDates?.()?.toDate?.() || null
@@ -949,7 +972,7 @@ export const getNextCronRun = async (req: Request, res: Response) => {
     res.json({ nextRun: next ? next.toISOString() : null })
   } catch (error: any) {
     logger.error('Error computing cron next run:', error)
-    res.status(500).json({ error: 'Error al calcular próxima ejecución' })
+    return sendApiError(res, 500, 'INTEGRATION_CRON_NEXT_RUN_FAILED', 'Error al calcular próxima ejecución')
   }
 }
 
@@ -967,7 +990,7 @@ export const listIntegrations = async (_req: Request, res: Response) => {
     res.json(data)
   } catch (error: any) {
     logger.error('Error fetching integrations:', error)
-    res.status(500).json({ error: 'Error al obtener integraciones' })
+    return sendApiError(res, 500, 'INTEGRATION_FETCH_FAILED', 'Error al obtener integraciones')
   }
 }
 
@@ -979,7 +1002,7 @@ export const getIntegrationById = async (req: Request, res: Response) => {
       [id]
     )
     if (!Array.isArray(rows) || rows.length === 0) {
-      return res.status(404).json({ error: 'Integración no encontrada' })
+      return sendApiError(res, 404, 'INTEGRATION_NOT_FOUND', 'Integración no encontrada')
     }
     const row = rows[0]
     res.json({
@@ -988,7 +1011,7 @@ export const getIntegrationById = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     logger.error('Error fetching integration:', error)
-    res.status(500).json({ error: 'Error al obtener integración' })
+    return sendApiError(res, 500, 'INTEGRATION_FETCH_ONE_FAILED', 'Error al obtener integración')
   }
 }
 
@@ -997,7 +1020,7 @@ export const createIntegration = async (req: Request, res: Response) => {
     const { name, type, endpoint, assignmentId, jql, jqlTests, jqlStories, authType, authConfig, status, schedule } =
       req.body
     if (!name || !type) {
-      return res.status(400).json({ error: 'name y type son requeridos' })
+      return sendApiError(res, 400, 'INTEGRATION_FIELDS_REQUIRED', 'name y type son requeridos')
     }
 
     const [result] = await pool.query(
@@ -1023,7 +1046,7 @@ export const createIntegration = async (req: Request, res: Response) => {
     res.status(201).json({ id: insertResult.insertId })
   } catch (error: any) {
     logger.error('Error creating integration:', error)
-    res.status(500).json({ error: 'Error al crear integración' })
+    return sendApiError(res, 500, 'INTEGRATION_CREATE_FAILED', 'Error al crear integración')
   }
 }
 
@@ -1056,7 +1079,7 @@ export const updateIntegration = async (req: Request, res: Response) => {
     res.json({ message: 'Integración actualizada' })
   } catch (error: any) {
     logger.error('Error updating integration:', error)
-    res.status(500).json({ error: 'Error al actualizar integración' })
+    return sendApiError(res, 500, 'INTEGRATION_UPDATE_FAILED', 'Error al actualizar integración')
   }
 }
 
@@ -1065,24 +1088,22 @@ export const updateIntegrationStatus = async (req: Request, res: Response) => {
     const { id } = req.params
     const { status } = req.body
     if (!status) {
-      return res.status(400).json({ error: 'status es requerido' })
+      return sendApiError(res, 400, 'INTEGRATION_STATUS_REQUIRED', 'status es requerido')
     }
     await pool.query(`UPDATE integrations SET status = ? WHERE id = ?`, [status, id])
     res.json({ message: 'Estado actualizado' })
   } catch (error: any) {
     logger.error('Error updating integration status:', error)
-    res.status(500).json({ error: 'Error al actualizar estado' })
+    return sendApiError(res, 500, 'INTEGRATION_STATUS_UPDATE_FAILED', 'Error al actualizar estado')
   }
 }
 
 export const runIntegration = async (_req: Request, res: Response) => {
   try {
-    return res.status(410).json({
-      error: 'Endpoint de integraciones legacy deshabilitado. Usa /integrations/templates/:id/run',
-    })
+    return sendApiError(res, 410, 'INTEGRATION_LEGACY_DISABLED', 'Endpoint de integraciones legacy deshabilitado. Usa /integrations/templates/:id/run')
   } catch (error: any) {
     logger.error('Error running integration:', error)
-    res.status(500).json({ error: 'Error al ejecutar integración' })
+    return sendApiError(res, 500, 'INTEGRATION_RUN_FAILED', 'Error al ejecutar integración')
   }
 }
 
@@ -1111,7 +1132,7 @@ export const listIntegrationRuns = async (req: Request, res: Response) => {
     res.json(data)
   } catch (error: any) {
     logger.error('Error fetching integration runs:', error)
-    res.status(500).json({ error: 'Error al obtener ejecuciones' })
+    return sendApiError(res, 500, 'INTEGRATION_RUNS_FETCH_FAILED', 'Error al obtener ejecuciones')
   }
 }
 
@@ -1160,8 +1181,8 @@ export const sheetsPreview = async (req: Request, res: Response) => {
   try {
     const { sheetUrl, tab, apiKey: bodyApiKey } = req.body as { sheetUrl?: string; tab?: string; apiKey?: string }
     const apiKey = bodyApiKey || appEnv.googleApiKey
-    if (!sheetUrl) return res.status(400).json({ error: 'Falta la URL de la planilla' })
-    if (!apiKey) return res.status(400).json({ error: 'Falta la API key de Google' })
+    if (!sheetUrl) return sendApiError(res, 400, 'INTEGRATION_SHEETS_URL_REQUIRED', 'Falta la URL de la planilla')
+    if (!apiKey) return sendApiError(res, 400, 'INTEGRATION_SHEETS_API_KEY_REQUIRED', 'Falta la API key de Google')
 
     const sheetId = extractSheetId(sheetUrl)
     const tabs = await fetchSheetTabs(sheetId, apiKey)
@@ -1178,7 +1199,7 @@ export const sheetsPreview = async (req: Request, res: Response) => {
 
     return res.json({ sheetId, tabs, headers, preview })
   } catch (error: any) {
-    return res.status(400).json({ error: error?.message || 'Error al leer la planilla' })
+    return sendApiError(res, 400, 'INTEGRATION_SHEETS_PREVIEW_FAILED', error?.message || 'Error al leer la planilla')
   }
 }
 
@@ -1223,15 +1244,15 @@ export const sheetsWizard = async (req: AuthRequest, res: Response) => {
     const isBulk = Array.isArray(assignments) && assignments.length > 0
 
     const apiKey = bodyApiKey || appEnv.googleApiKey
-    if (!sheetUrl) return res.status(400).json({ error: 'Falta la URL de la planilla' })
-    if (!tab) return res.status(400).json({ error: 'Falta la pestaña (tab)' })
+    if (!sheetUrl) return sendApiError(res, 400, 'INTEGRATION_SHEETS_URL_REQUIRED', 'Falta la URL de la planilla')
+    if (!tab) return sendApiError(res, 400, 'INTEGRATION_SHEETS_TAB_REQUIRED', 'Falta la pestaña (tab)')
     if (valueColumn === undefined || valueColumn === null || valueColumn === '')
-      return res.status(400).json({ error: 'Falta la columna de valor' })
+      return sendApiError(res, 400, 'INTEGRATION_SHEETS_VALUE_COLUMN_REQUIRED', 'Falta la columna de valor')
     if (!isBulk && !assignmentId && !scopeKpiId)
-      return res.status(400).json({ error: 'Falta el KPI destino (assignmentId o scopeKpiId)' })
+      return sendApiError(res, 400, 'INTEGRATION_SHEETS_KPI_TARGET_REQUIRED', 'Falta el KPI destino (assignmentId o scopeKpiId)')
     if (isBulk && !collaboratorColumn)
-      return res.status(400).json({ error: 'Falta la columna de agente (collaboratorColumn)' })
-    if (!apiKey) return res.status(400).json({ error: 'Falta la API key de Google' })
+      return sendApiError(res, 400, 'INTEGRATION_SHEETS_COLLABORATOR_COLUMN_REQUIRED', 'Falta la columna de agente (collaboratorColumn)')
+    if (!apiKey) return sendApiError(res, 400, 'INTEGRATION_SHEETS_API_KEY_REQUIRED', 'Falta la API key de Google')
 
     const sheetId = extractSheetId(sheetUrl)
     const wizardName = name || `Google Sheets — ${tab}`
@@ -1305,6 +1326,6 @@ export const sheetsWizard = async (req: AuthRequest, res: Response) => {
     return res.status(201).json({ authProfileId, templateId, targetId, name: wizardName })
   } catch (error: any) {
     logger.error('Sheets wizard error:', error)
-    return res.status(500).json({ error: error?.message || 'Error al crear la integración' })
+    return sendApiError(res, 500, 'INTEGRATION_SHEETS_WIZARD_FAILED', error?.message || 'Error al crear la integración')
   }
 }

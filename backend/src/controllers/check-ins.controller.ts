@@ -2,6 +2,7 @@ import { Response } from 'express'
 import { pool } from '../config/database'
 import { AuthRequest } from '../middleware/auth.middleware'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 /* GET /api/check-ins
    Leaders/admins get their team's check-ins; collaborators get their own.
@@ -59,7 +60,7 @@ export const getCheckIns = async (req: AuthRequest, res: Response) => {
     res.json(rows)
   } catch (err) {
     logger.error('[check-ins] getCheckIns error:', err)
-    res.status(500).json({ error: 'Error al obtener check-ins' })
+    return sendApiError(res, 500, 'CHECKIN_FETCH_FAILED', 'Error al obtener check-ins')
   }
 }
 
@@ -89,7 +90,7 @@ export const getCurrentWeekCheckIn = async (req: AuthRequest, res: Response) => 
     res.json(Array.isArray(rows) && rows.length > 0 ? rows[0] : null)
   } catch (err) {
     logger.error('[check-ins] getCurrentWeekCheckIn error:', err)
-    res.status(500).json({ error: 'Error al obtener check-in de la semana' })
+    return sendApiError(res, 500, 'CHECKIN_CURRENT_WEEK_FETCH_FAILED', 'Error al obtener check-in de la semana')
   }
 }
 
@@ -100,7 +101,7 @@ export const upsertCheckIn = async (req: AuthRequest, res: Response) => {
     const { q1, q2, q3, mood, collaboratorKpiId, weekStart: bodyWeekStart } = req.body
 
     if (!q1?.trim() || !q2?.trim() || !q3?.trim()) {
-      return res.status(400).json({ error: 'Las tres preguntas son obligatorias' })
+      return sendApiError(res, 400, 'CHECKIN_REQUIRED_QUESTIONS', 'Las tres preguntas son obligatorias')
     }
 
     // Determine weekStart (Monday of current week unless explicitly given)
@@ -140,7 +141,7 @@ export const upsertCheckIn = async (req: AuthRequest, res: Response) => {
     res.status(201).json(Array.isArray(rows) ? rows[0] : {})
   } catch (err) {
     logger.error('[check-ins] upsertCheckIn error:', err)
-    res.status(500).json({ error: 'Error al guardar check-in' })
+    return sendApiError(res, 500, 'CHECKIN_SAVE_FAILED', 'Error al guardar check-in')
   }
 }
 
@@ -153,14 +154,14 @@ export const addCheckInNote = async (req: AuthRequest, res: Response) => {
 
     const [rows] = await pool.query<any[]>('SELECT id FROM check_ins WHERE id = ?', [id])
     if (!Array.isArray(rows) || rows.length === 0) {
-      return res.status(404).json({ error: 'Check-in no encontrado' })
+      return sendApiError(res, 404, 'CHECKIN_NOT_FOUND', 'Check-in no encontrado')
     }
 
     await pool.query('UPDATE check_ins SET note = ? WHERE id = ?', [note ?? null, id])
     res.json({ success: true })
   } catch (err) {
     logger.error('[check-ins] addCheckInNote error:', err)
-    res.status(500).json({ error: 'Error al guardar comentario' })
+    return sendApiError(res, 500, 'CHECKIN_NOTE_SAVE_FAILED', 'Error al guardar comentario')
   }
 }
 
@@ -187,6 +188,6 @@ export const getTeamCheckInSummary = async (req: AuthRequest, res: Response) => 
     res.json(rows)
   } catch (err) {
     logger.error('[check-ins] getTeamCheckInSummary error:', err)
-    res.status(500).json({ error: 'Error al obtener resumen del equipo' })
+    return sendApiError(res, 500, 'CHECKIN_TEAM_SUMMARY_FETCH_FAILED', 'Error al obtener resumen del equipo')
   }
 }

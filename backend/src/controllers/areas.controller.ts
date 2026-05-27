@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { pool } from '../config/database'
 import { Area } from '../types'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 export const getAreas = async (_req: Request, res: Response) => {
   try {
@@ -9,7 +10,7 @@ export const getAreas = async (_req: Request, res: Response) => {
     res.json(rows)
   } catch (error: any) {
     logger.error('Error fetching areas:', error)
-    res.status(500).json({ error: 'Error al obtener áreas' })
+    return sendApiError(res, 500, 'AREA_FETCH_FAILED', 'Error al obtener áreas')
   }
 }
 
@@ -18,7 +19,7 @@ export const createArea = async (req: Request, res: Response) => {
     const { name, parentId } = req.body
 
     if (!name || !name.trim()) {
-      return res.status(400).json({ error: 'El nombre es requerido' })
+      return sendApiError(res, 400, 'AREA_NAME_REQUIRED', 'El nombre es requerido')
     }
 
     const [result] = await pool.query(
@@ -34,7 +35,7 @@ export const createArea = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     logger.error('Error creating area:', error)
-    res.status(500).json({ error: 'Error al crear área' })
+    return sendApiError(res, 500, 'AREA_CREATE_FAILED', 'Error al crear área')
   }
 }
 
@@ -44,7 +45,7 @@ export const updateArea = async (req: Request, res: Response) => {
     const { name, parentId } = req.body
 
     if (!name || !name.trim()) {
-      return res.status(400).json({ error: 'El nombre es requerido' })
+      return sendApiError(res, 400, 'AREA_NAME_REQUIRED', 'El nombre es requerido')
     }
 
     await pool.query(
@@ -55,7 +56,7 @@ export const updateArea = async (req: Request, res: Response) => {
     res.json({ message: 'Área actualizada correctamente' })
   } catch (error: any) {
     logger.error('Error updating area:', error)
-    res.status(500).json({ error: 'Error al actualizar área' })
+    return sendApiError(res, 500, 'AREA_UPDATE_FAILED', 'Error al actualizar área')
   }
 }
 
@@ -66,6 +67,6 @@ export const deleteArea = async (req: Request, res: Response) => {
     res.json({ message: 'Área eliminada correctamente' })
   } catch (error: any) {
     logger.error('Error deleting area:', error)
-    res.status(500).json({ error: 'Error al eliminar área' })
+    return sendApiError(res, 500, 'AREA_DELETE_FAILED', 'Error al eliminar área')
   }
 }

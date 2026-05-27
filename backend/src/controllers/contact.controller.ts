@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { appEnv } from '../config/env'
 import { isMailConfigured, sendMail } from '../utils/mailer'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 const demoRequestSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -24,7 +25,7 @@ export const submitDemoRequest = async (req: Request, res: Response) => {
   try {
     const parsed = demoRequestSchema.safeParse(req.body)
     if (!parsed.success) {
-      return res.status(400).json({ error: 'Revisá los datos del formulario e intentá nuevamente.' })
+      return sendApiError(res, 400, 'CONTACT_DEMO_INVALID', 'Revisá los datos del formulario e intentá nuevamente.')
     }
 
     const payload = {
@@ -87,6 +88,7 @@ export const submitDemoRequest = async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('Error submitting demo request:', error)
     return res.status(500).json({
+      code: 'CONTACT_DEMO_SUBMIT_FAILED',
       error: 'No pudimos enviar la solicitud. Intentá nuevamente o usá los canales directos de contacto.',
     })
   }

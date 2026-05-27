@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { pool } from '../config/database'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 const parseJson = (value: any) => {
   if (!value) return null
@@ -28,7 +29,7 @@ export const listOrgScopes = async (_req: Request, res: Response) => {
     res.json(data)
   } catch (error: any) {
     logger.error('Error fetching org scopes:', error)
-    res.status(500).json({ error: 'Error al obtener scopes' })
+    return sendApiError(res, 500, 'ORG_SCOPE_FETCH_FAILED', 'Error al obtener scopes')
   }
 }
 
@@ -36,7 +37,7 @@ export const createOrgScope = async (req: Request, res: Response) => {
   try {
     const { name, type, parentId, metadata, active, calendarProfileId } = req.body
     if (!name) {
-      return res.status(400).json({ error: 'name es requerido' })
+      return sendApiError(res, 400, 'ORG_SCOPE_NAME_REQUIRED', 'name es requerido')
     }
     const [result] = await pool.query(
       `INSERT INTO org_scopes (name, type, parentId, calendarProfileId, metadata, active)
@@ -54,7 +55,7 @@ export const createOrgScope = async (req: Request, res: Response) => {
     res.status(201).json({ id: insertResult.insertId })
   } catch (error: any) {
     logger.error('Error creating org scope:', error)
-    res.status(500).json({ error: 'Error al crear scope' })
+    return sendApiError(res, 500, 'ORG_SCOPE_CREATE_FAILED', 'Error al crear scope')
   }
 }
 
@@ -101,7 +102,7 @@ export const updateOrgScope = async (req: Request, res: Response) => {
     res.json({ message: 'Scope actualizado', warning })
   } catch (error: any) {
     logger.error('Error updating org scope:', error)
-    res.status(500).json({ error: 'Error al actualizar scope' })
+    return sendApiError(res, 500, 'ORG_SCOPE_UPDATE_FAILED', 'Error al actualizar scope')
   }
 }
 
@@ -109,7 +110,7 @@ export const importOrgScopes = async (req: Request, res: Response) => {
   try {
     const rows: { name: string; type?: string; parentName?: string }[] = req.body?.rows
     if (!Array.isArray(rows) || rows.length === 0)
-      return res.status(400).json({ error: 'No hay filas para importar' })
+      return sendApiError(res, 400, 'ORG_SCOPE_IMPORT_ROWS_REQUIRED', 'No hay filas para importar')
 
     // Cargar scopes existentes para resolver parentName
     const [existing] = await pool.query<any[]>('SELECT id, name, type, parentId FROM org_scopes')
@@ -124,7 +125,7 @@ export const importOrgScopes = async (req: Request, res: Response) => {
     }
 
     const created: number[] = []
-    const errors: { row: number; message: string }[] = []
+    const errors: Array<{ row: number; code: string; message: string; values?: Record<string, unknown> }> = []
 
     // Dos pasadas: primero los que no tienen padre (o padre ya existe), luego los que dependen de los recién creados
     const pending = rows.map((r, i) => ({ ...r, rowIndex: i + 1 }))
@@ -133,7 +134,11 @@ export const importOrgScopes = async (req: Request, res: Response) => {
       const remaining: typeof pending = []
       for (const item of (pass === 0 ? pending : pending.filter((p) => !created.includes(p.rowIndex)))) {
         if (!item.name?.trim()) {
-          errors.push({ row: item.rowIndex, message: 'Nombre vacío' })
+          errors.push({
+            row: item.rowIndex,
+            code: 'ORG_SCOPE_IMPORT_NAME_EMPTY',
+            message: 'Nombre vacio',
+          })
           continue
         }
         const normalizedName = item.name.trim().toLowerCase()
@@ -144,7 +149,12 @@ export const importOrgScopes = async (req: Request, res: Response) => {
           parentId = byName.get(key) ?? null
           if (!parentId) {
             if (pass === 0) { remaining.push(item); continue }
-            errors.push({ row: item.rowIndex, message: `Área padre "${item.parentName}" no encontrada` })
+            errors.push({
+              row: item.rowIndex,
+              code: 'ORG_SCOPE_IMPORT_PARENT_NOT_FOUND',
+              message: `Area padre "${item.parentName}" no encontrada`,
+              values: { parentName: item.parentName },
+            })
             continue
           }
         }
@@ -152,7 +162,9 @@ export const importOrgScopes = async (req: Request, res: Response) => {
         if (existingKeys.has(duplicateKey)) {
           errors.push({
             row: item.rowIndex,
+            code: 'ORG_SCOPE_IMPORT_DUPLICATE',
             message: `La unidad "${item.name.trim()}" ya existe con el mismo tipo y padre`,
+            values: { name: item.name.trim() },
           })
           continue
         }
@@ -171,7 +183,7 @@ export const importOrgScopes = async (req: Request, res: Response) => {
     return res.status(201).json({ total: rows.length, created: created.length, errors })
   } catch (error: any) {
     logger.error('Error importando org scopes:', error)
-    return res.status(500).json({ error: error?.message || 'Error al importar áreas' })
+    return sendApiError(res, 500, 'ORG_SCOPE_IMPORT_FAILED', 'Error al importar areas')
   }
 }
 
@@ -184,9 +196,12 @@ export const deleteOrgScope = async (req: Request, res: Response) => {
       [id]
     )
     if (Number(childRows?.[0]?.count || 0) > 0) {
-      return res.status(400).json({
-        error: 'No se puede eliminar: el scope tiene hijos. Mueve o elimina los hijos primero.',
-      })
+      return sendApiError(
+        res,
+        400,
+        'ORG_SCOPE_DELETE_HAS_CHILDREN',
+        'No se puede eliminar: el scope tiene hijos. Mueve o elimina los hijos primero.'
+      )
     }
 
     const [collabRows] = await pool.query<any[]>(
@@ -194,9 +209,12 @@ export const deleteOrgScope = async (req: Request, res: Response) => {
       [id]
     )
     if (Number(collabRows?.[0]?.count || 0) > 0) {
-      return res.status(400).json({
-        error: 'No se puede eliminar: hay colaboradores asignados a este scope.',
-      })
+      return sendApiError(
+        res,
+        400,
+        'ORG_SCOPE_DELETE_HAS_COLLABORATORS',
+        'No se puede eliminar: hay colaboradores asignados a este scope.'
+      )
     }
 
     const [assignRows] = await pool.query<any[]>(
@@ -207,9 +225,12 @@ export const deleteOrgScope = async (req: Request, res: Response) => {
       [id]
     )
     if (Number(assignRows?.[0]?.count || 0) > 0) {
-      return res.status(400).json({
-        error: 'No se puede eliminar: hay asignaciones activas vinculadas a este scope.',
-      })
+      return sendApiError(
+        res,
+        400,
+        'ORG_SCOPE_DELETE_HAS_ASSIGNMENTS',
+        'No se puede eliminar: hay asignaciones activas vinculadas a este scope.'
+      )
     }
 
     const [targetRows] = await pool.query<any[]>(
@@ -217,15 +238,18 @@ export const deleteOrgScope = async (req: Request, res: Response) => {
       [id]
     )
     if (Number(targetRows?.[0]?.count || 0) > 0) {
-      return res.status(400).json({
-        error: 'No se puede eliminar: hay integraciones/targets asociados a este scope.',
-      })
+      return sendApiError(
+        res,
+        400,
+        'ORG_SCOPE_DELETE_HAS_TARGETS',
+        'No se puede eliminar: hay integraciones/targets asociados a este scope.'
+      )
     }
 
     await pool.query('DELETE FROM org_scopes WHERE id = ?', [id])
     res.json({ message: 'Scope eliminado' })
   } catch (error: any) {
     logger.error('Error deleting org scope:', error)
-    res.status(500).json({ error: 'Error al eliminar scope' })
+    return sendApiError(res, 500, 'ORG_SCOPE_DELETE_FAILED', 'Error al eliminar scope')
   }
 }

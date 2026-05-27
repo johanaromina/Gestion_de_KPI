@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { pool } from '../config/database'
 import { AuthRequest } from '../middleware/auth.middleware'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 export const getCurationItems = async (req: Request, res: Response) => {
   try {
@@ -90,7 +91,7 @@ export const getCurationItems = async (req: Request, res: Response) => {
     res.json(rows)
   } catch (error: any) {
     logger.error('Error fetching curation items:', error)
-    res.status(500).json({ error: 'Error al obtener curaduría' })
+    return sendApiError(res, 500, 'CURATION_FETCH_FAILED', 'Error al obtener curaduría')
   }
 }
 
@@ -100,7 +101,7 @@ export const createCriteriaVersion = async (req: Request, res: Response) => {
     const { dataSource, sourceConfig, criteriaText, evidenceUrl } = req.body
 
     if (!assignmentId) {
-      return res.status(400).json({ error: 'assignmentId es requerido' })
+      return sendApiError(res, 400, 'CURATION_ASSIGNMENT_ID_REQUIRED', 'assignmentId es requerido')
     }
 
     const [existing] = await pool.query<any[]>(
@@ -108,7 +109,7 @@ export const createCriteriaVersion = async (req: Request, res: Response) => {
       [assignmentId]
     )
     if (!Array.isArray(existing) || existing.length === 0) {
-      return res.status(404).json({ error: 'Asignación no encontrada' })
+      return sendApiError(res, 404, 'CURATION_ASSIGNMENT_NOT_FOUND', 'Asignación no encontrada')
     }
 
     const userId = (req as AuthRequest).user?.id || null
@@ -131,7 +132,7 @@ export const createCriteriaVersion = async (req: Request, res: Response) => {
     res.status(201).json({ id: insertResult.insertId })
   } catch (error: any) {
     logger.error('Error creating criteria version:', error)
-    res.status(500).json({ error: 'Error al crear versión de criterio' })
+    return sendApiError(res, 500, 'CURATION_VERSION_CREATE_FAILED', 'Error al crear versión de criterio')
   }
 }
 
@@ -146,7 +147,7 @@ export const approveCriteriaVersion = async (req: Request, res: Response) => {
       [id]
     )
     if (!Array.isArray(rows) || rows.length === 0) {
-      return res.status(404).json({ error: 'Versión de criterio no encontrada' })
+      return sendApiError(res, 404, 'CURATION_VERSION_NOT_FOUND', 'Versión de criterio no encontrada')
     }
 
     const { assignmentId, dataSource, sourceConfig } = rows[0]
@@ -168,7 +169,7 @@ export const approveCriteriaVersion = async (req: Request, res: Response) => {
     res.json({ message: 'Criterio aprobado correctamente' })
   } catch (error: any) {
     logger.error('Error approving criteria version:', error)
-    res.status(500).json({ error: 'Error al aprobar criterio' })
+    return sendApiError(res, 500, 'CURATION_APPROVE_FAILED', 'Error al aprobar criterio')
   }
 }
 
@@ -183,7 +184,7 @@ export const rejectCriteriaVersion = async (req: Request, res: Response) => {
       [id]
     )
     if (!Array.isArray(rows) || rows.length === 0) {
-      return res.status(404).json({ error: 'Versión de criterio no encontrada' })
+      return sendApiError(res, 404, 'CURATION_VERSION_NOT_FOUND', 'Versión de criterio no encontrada')
     }
 
     const assignmentId = rows[0].assignmentId
@@ -205,7 +206,7 @@ export const rejectCriteriaVersion = async (req: Request, res: Response) => {
     res.json({ message: 'Criterio rechazado correctamente' })
   } catch (error: any) {
     logger.error('Error rejecting criteria version:', error)
-    res.status(500).json({ error: 'Error al rechazar criterio' })
+    return sendApiError(res, 500, 'CURATION_REJECT_FAILED', 'Error al rechazar criterio')
   }
 }
 
@@ -220,7 +221,7 @@ export const requestCriteriaChanges = async (req: Request, res: Response) => {
       [id]
     )
     if (!Array.isArray(rows) || rows.length === 0) {
-      return res.status(404).json({ error: 'Versión de criterio no encontrada' })
+      return sendApiError(res, 404, 'CURATION_VERSION_NOT_FOUND', 'Versión de criterio no encontrada')
     }
 
     const assignmentId = rows[0].assignmentId
@@ -242,6 +243,6 @@ export const requestCriteriaChanges = async (req: Request, res: Response) => {
     res.json({ message: 'Cambios solicitados correctamente' })
   } catch (error: any) {
     logger.error('Error requesting criteria changes:', error)
-    res.status(500).json({ error: 'Error al solicitar cambios' })
+    return sendApiError(res, 500, 'CURATION_CHANGES_REQUEST_FAILED', 'Error al solicitar cambios')
   }
 }

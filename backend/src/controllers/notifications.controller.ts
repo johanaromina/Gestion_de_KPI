@@ -4,6 +4,7 @@ import { isMailConfigured, sendMail, verifyMailTransport } from '../utils/mailer
 import { pool } from '../config/database'
 import { appEnv } from '../config/env'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 const ensureAppConfigTable = async () => {
   await pool.query(`
@@ -33,7 +34,7 @@ export const getNotificationSummary = async (_req: Request, res: Response) => {
     })
   } catch (error: any) {
     logger.error('Error getting notification summary:', error)
-    res.status(500).json({ error: 'Error al obtener notificaciones' })
+    return sendApiError(res, 500, 'NOTIFICATION_SUMMARY_FETCH_FAILED', 'Error al obtener notificaciones')
   }
 }
 
@@ -43,7 +44,7 @@ export const triggerNotifications = async (_req: Request, res: Response) => {
     res.json({ message: 'Notificaciones ejecutadas' })
   } catch (error: any) {
     logger.error('Error running notifications:', error)
-    res.status(500).json({ error: 'Error al ejecutar notificaciones' })
+    return sendApiError(res, 500, 'NOTIFICATION_TRIGGER_FAILED', 'Error al ejecutar notificaciones')
   }
 }
 
@@ -63,7 +64,7 @@ export const getSlackConfig = async (_req: Request, res: Response) => {
         : ''
     res.json({ configured, preview, source: dbUrl ? 'db' : appEnv.slackWebhookUrl ? 'env' : 'none' })
   } catch (error: any) {
-    res.status(500).json({ error: 'Error al obtener configuración Slack' })
+    return sendApiError(res, 500, 'NOTIFICATION_SLACK_CONFIG_FETCH_FAILED', 'Error al obtener configuración Slack')
   }
 }
 
@@ -71,7 +72,7 @@ export const saveSlackConfig = async (req: Request, res: Response) => {
   try {
     const { webhookUrl } = req.body as { webhookUrl?: string }
     if (!webhookUrl || !webhookUrl.startsWith('https://hooks.slack.com/')) {
-      return res.status(400).json({ error: 'URL inválida. Debe ser un Incoming Webhook de Slack (https://hooks.slack.com/...)' })
+      return sendApiError(res, 400, 'NOTIFICATION_SLACK_WEBHOOK_INVALID', 'URL inválida. Debe ser un Incoming Webhook de Slack (https://hooks.slack.com/...)')
     }
     await ensureAppConfigTable()
     await pool.query(
@@ -81,7 +82,7 @@ export const saveSlackConfig = async (req: Request, res: Response) => {
     )
     res.json({ ok: true })
   } catch (error: any) {
-    res.status(500).json({ error: 'Error al guardar configuración Slack' })
+    return sendApiError(res, 500, 'NOTIFICATION_SLACK_CONFIG_SAVE_FAILED', 'Error al guardar configuración Slack')
   }
 }
 
@@ -91,7 +92,7 @@ export const deleteSlackConfig = async (_req: Request, res: Response) => {
     await pool.query(`DELETE FROM app_config WHERE \`key_\` = 'slack_webhook_url'`)
     res.json({ ok: true })
   } catch (error: any) {
-    res.status(500).json({ error: 'Error al eliminar configuración Slack' })
+    return sendApiError(res, 500, 'NOTIFICATION_SLACK_CONFIG_DELETE_FAILED', 'Error al eliminar configuración Slack')
   }
 }
 
@@ -106,17 +107,22 @@ export const getEmailStatus = async (_req: Request, res: Response) => {
 
 export const testEmail = async (req: Request, res: Response) => {
   if (!isMailConfigured()) {
-    return res.status(400).json({ error: 'SMTP no configurado. Agregá SMTP_HOST, SMTP_USER y SMTP_PASS en el .env del servidor.' })
+    return sendApiError(
+      res,
+      400,
+      'NOTIFICATION_EMAIL_SMTP_NOT_CONFIGURED',
+      'SMTP no configurado. Agregá SMTP_HOST, SMTP_USER y SMTP_PASS en el .env del servidor.'
+    )
   }
   try {
     await verifyMailTransport()
   } catch (err: any) {
-    return res.status(400).json({ error: `Conexión SMTP fallida: ${err?.message}` })
+    return sendApiError(res, 400, 'NOTIFICATION_EMAIL_SMTP_CONNECTION_FAILED', `Conexión SMTP fallida: ${err?.message}`)
   }
   const user = (req as any).user
   const to = (req.body as any)?.to || user?.email
   if (!to) {
-    return res.status(400).json({ error: 'Ingresá un email de destino para la prueba.' })
+    return sendApiError(res, 400, 'NOTIFICATION_EMAIL_TO_REQUIRED', 'Ingresá un email de destino para la prueba.')
   }
   try {
     await sendMail({
@@ -127,7 +133,7 @@ export const testEmail = async (req: Request, res: Response) => {
     })
     res.json({ ok: true, to })
   } catch (err: any) {
-    res.status(500).json({ error: `Error al enviar: ${err?.message}` })
+    return sendApiError(res, 500, 'NOTIFICATION_EMAIL_SEND_FAILED', `Error al enviar: ${err?.message}`)
   }
 }
 
@@ -139,7 +145,7 @@ export const testSlackConfig = async (_req: Request, res: Response) => {
     )
     const webhookUrl = rows?.[0]?.value || appEnv.slackWebhookUrl || ''
     if (!webhookUrl) {
-      return res.status(400).json({ error: 'No hay webhook configurado' })
+      return sendApiError(res, 400, 'NOTIFICATION_SLACK_WEBHOOK_MISSING', 'No hay webhook configurado')
     }
     await sendSlackMessage(webhookUrl, '✅ Conexión con KPI Manager verificada correctamente.', [
       {
@@ -152,6 +158,6 @@ export const testSlackConfig = async (_req: Request, res: Response) => {
     ])
     res.json({ ok: true })
   } catch (error: any) {
-    res.status(400).json({ error: error?.message || 'Error al enviar mensaje de prueba' })
+    return sendApiError(res, 400, 'NOTIFICATION_SLACK_TEST_FAILED', error?.message || 'Error al enviar mensaje de prueba')
   }
 }
