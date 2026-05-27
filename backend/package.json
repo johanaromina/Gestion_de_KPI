@@ -29,7 +29,8 @@
     "test:okr": "node --import tsx --test tests/okr.test.ts",
     "test:auth": "node --import tsx --test tests/auth.test.ts",
     "test:unit": "node --import tsx --test tests/okr.test.ts tests/auth.test.ts",
-    "smoke:prod": "tsx scripts/smoke-prod.ts"
+    "smoke:prod": "tsx scripts/smoke-prod.ts",
+    "smoke:release": "tsx scripts/smoke-release.ts"
   },
   "dependencies": {
     "@types/cookie-parser": "^1.4.10",
