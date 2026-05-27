@@ -62,23 +62,10 @@ const FEATURES = [
 ] as const
 
 const COMMERCIAL_STEPS = [
-  {
-    step: '01',
-    key: 'demo',
-  },
-  {
-    step: '02',
-    key: 'survey',
-  },
-  {
-    step: '03',
-    key: 'impl',
-  },
-  {
-    step: '04',
-    key: 'decide',
-  },
- ] as const
+  { step: '01', key: 'setup' },
+  { step: '02', key: 'import' },
+  { step: '03', key: 'track' },
+] as const
 
 const VALUE_PILLARS = [
   {
@@ -94,6 +81,12 @@ const VALUE_PILLARS = [
     icon: '🎯',
   },
  ] as const
+
+const OUTCOMES = [
+  { key: 'detect', icon: '⚡' },
+  { key: 'avoid', icon: '🚫' },
+  { key: 'report', icon: '📄' },
+] as const
 
 const IMPACT_METRICS = [1, 2, 3, 4] as const
 
@@ -137,7 +130,7 @@ const TESTIMONIALS = [
  ] as const
 
 const PROBLEM_KEYS = ['p1', 'p2', 'p3', 'p4'] as const
-const FAQ_IDS = [1, 2, 3, 4, 5] as const
+const FAQ_IDS = [1, 2, 3, 4, 5, 6, 7] as const
 
 const normalizePhoneHref = (value: string) => {
   const trimmed = String(value || '').trim()
@@ -160,6 +153,7 @@ export default function Landing() {
   const [demoSubmitMessage, setDemoSubmitMessage] = useState('')
 
   const demoHref = '#contacto'
+  const tryHref = '/login'
   const contactMailHref = contactEmail
     ? `mailto:${contactEmail}?subject=${encodeURIComponent(t('contact.mail_subject'))}`
     : '#contacto'
@@ -277,6 +271,11 @@ export default function Landing() {
       desc: t(`process.steps.${step.key}_desc`),
     }
   })
+  const outcomes = OUTCOMES.map((o) => ({
+    ...o,
+    title: t(`outcomes.${o.key}_title`),
+    desc: t(`outcomes.${o.key}_desc`),
+  }))
   const features = FEATURES.map((feature) => ({
     ...feature,
     title: t(`features.${feature.key}_title`),
@@ -363,7 +362,7 @@ export default function Landing() {
         </a>
         <div className="landing-nav-actions">
           <Link to="/login" className="landing-btn-ghost">{t('nav.login')}</Link>
-          <a href={demoHref} className="landing-btn-primary">{t('nav.demo_btn')}</a>
+          <Link to={tryHref} className="landing-btn-primary">{t('nav.try_btn')}</Link>
         </div>
       </nav>
 
@@ -382,12 +381,20 @@ export default function Landing() {
               {t('hero.subtitle')}
             </p>
             <div className="landing-hero-ctas">
-              <a href={demoHref} className="landing-hero-cta-primary">
-                {t('hero.cta_demo')}
-              </a>
+              <Link to={tryHref} className="landing-hero-cta-primary">
+                {t('hero.cta_try')}
+              </Link>
               <a href="#como-funciona" className="landing-hero-cta-secondary">
                 {t('hero.cta_how')}
               </a>
+              <a href={demoHref} className="landing-hero-cta-ghost">
+                {t('hero.cta_demo')}
+              </a>
+            </div>
+            <div className="landing-hero-trust-pills">
+              <span className="landing-hero-trust-pill">{t('hero.trust_p1')}</span>
+              <span className="landing-hero-trust-pill">{t('hero.trust_p2')}</span>
+              <span className="landing-hero-trust-pill">{t('hero.trust_p3')}</span>
             </div>
             <div className="landing-hero-trust">
               <div className="landing-hero-trust-avatars">
@@ -398,16 +405,6 @@ export default function Landing() {
               </div>
               <span>{t('hero.trust')}</span>
             </div>
-            {contactCards.length > 0 && (
-              <div className="landing-hero-contact-rail">
-                {contactCards.slice(0, 3).map((contact) => (
-                  <a className="landing-hero-contact-card" href={contact.href} key={`${contact.label}-${contact.value}`}>
-                    <span className="landing-hero-contact-label">{contact.label}</span>
-                    <span className="landing-hero-contact-value">{contact.value}</span>
-                  </a>
-                ))}
-              </div>
-            )}
           </div>
 
           <div className="landing-hero-visual">
@@ -576,6 +573,23 @@ export default function Landing() {
         </div>
       </section>
 
+      <section className="landing-outcomes">
+        <div className="landing-section-header">
+          <div className="landing-section-eyebrow">{t('outcomes.eyebrow')}</div>
+          <h2 className="landing-section-title">{t('outcomes.title')}</h2>
+          <p className="landing-section-subtitle">{t('outcomes.subtitle')}</p>
+        </div>
+        <div className="landing-outcomes-grid">
+          {outcomes.map((o) => (
+            <div className="landing-outcome-card" key={o.key}>
+              <div className="landing-feature-icon">{o.icon}</div>
+              <h3 className="landing-feature-title">{o.title}</h3>
+              <p className="landing-feature-desc">{o.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section className="landing-features">
         <div className="landing-section-header">
           <div className="landing-section-eyebrow">{t('features.eyebrow')}</div>
@@ -627,14 +641,15 @@ export default function Landing() {
                   </li>
                 ))}
               </ul>
-              <a href={demoHref} className={`landing-plan-cta ${plan.ctaStyle}`}>
-                {plan.cta}
-              </a>
+              {plan.key === 'enterprise'
+                ? <a href={demoHref} className={`landing-plan-cta ${plan.ctaStyle}`}>{plan.cta}</a>
+                : <Link to={tryHref} className={`landing-plan-cta ${plan.ctaStyle}`}>{plan.cta}</Link>
+              }
             </div>
           ))}
         </div>
         <p className="landing-pricing-note">
-          {t('pricing.note')} · <a href={demoHref} className="landing-pricing-note-link">{t('pricing.note_link')}</a>
+          {t('pricing.note')} · <Link to={tryHref} className="landing-pricing-note-link">{t('pricing.note_link')}</Link>
         </p>
       </section>
 
