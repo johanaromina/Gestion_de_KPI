@@ -1,0 +1,66 @@
+{
+  "title": "Check-ins semanales",
+  "subtitle": "3 preguntas · cada lunes · visibles para tu líder. Conecta tu semana con los KPIs del período.",
+  "actions": {
+    "do_checkin": "Hacer check-in esta semana",
+    "edit_checkin": "Editar check-in",
+    "cancel": "Cancelar",
+    "submit": "Enviar check-in",
+    "update": "Actualizar check-in",
+    "saving": "Guardando...",
+    "add_comment": "+ Agregar comentario",
+    "edit_comment": "Editar comentario",
+    "save_comment": "Guardar"
+  },
+  "form": {
+    "week_label": "Semana del {{week}}",
+    "editing_badge": "Editando",
+    "mood_question": "¿Cómo te sentiste esta semana?",
+    "error_required": "Las tres preguntas son obligatorias.",
+    "q1_label": "1. ¿Cómo avanzaste esta semana respecto a tus KPIs?",
+    "q1_placeholder": "Describí los avances, logros o lo que completaste...",
+    "q2_label": "2. ¿Qué obstáculos encontraste?",
+    "q2_placeholder": "Blockers, dependencias, problemas sin resolver...",
+    "q3_label": "3. ¿Cuál es tu foco principal para la próxima semana?",
+    "q3_placeholder": "Tus 1-2 prioridades para los próximos 7 días..."
+  },
+  "mood": {
+    "1": "Muy mal",
+    "2": "Mal",
+    "3": "Neutro",
+    "4": "Bien",
+    "5": "Muy bien"
+  },
+  "submitted": {
+    "badge": "Enviado ✓",
+    "q1_label": "¿Cómo avanzaste?",
+    "q2_label": "¿Obstáculos?",
+    "q3_label": "¿Foco siguiente semana?",
+    "leader_note_label": "Comentario de tu líder"
+  },
+  "team_summary": {
+    "title": "Participación del equipo",
+    "count": "{{total}} check-ins"
+  },
+  "history": {
+    "my_title": "Mis check-ins anteriores",
+    "team_title": "Check-ins del equipo",
+    "loading": "Cargando...",
+    "empty_own": "No hay check-ins anteriores registrados.",
+    "empty": "No hay check-ins registrados.",
+    "q1_short": "Avances",
+    "q2_short": "Obstáculos",
+    "q3_short": "Foco próxima semana",
+    "leader_note_label": "Comentario de tu líder",
+    "note_placeholder": "Agregar comentario para el colaborador...",
+    "saving_note": "Guardando..."
+  },
+  "filters": {
+    "collaborator_label": "Colaborador",
+    "all_collaborators": "Todos",
+    "weeks_label": "Últimas semanas",
+    "weeks_option": "{{count}} semanas"
+  },
+  "kpi_hint": "Tus KPIs activos:",
+  "kpi_fallback": "KPI #{{id}}"
+}

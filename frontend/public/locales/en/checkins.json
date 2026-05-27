@@ -1,0 +1,66 @@
+{
+  "title": "Weekly Check-ins",
+  "subtitle": "3 questions · every Monday · visible to your leader. Connect your week to the KPIs of the period.",
+  "actions": {
+    "do_checkin": "Submit this week's check-in",
+    "edit_checkin": "Edit check-in",
+    "cancel": "Cancel",
+    "submit": "Submit check-in",
+    "update": "Update check-in",
+    "saving": "Saving...",
+    "add_comment": "+ Add comment",
+    "edit_comment": "Edit comment",
+    "save_comment": "Save"
+  },
+  "form": {
+    "week_label": "Week of {{week}}",
+    "editing_badge": "Editing",
+    "mood_question": "How did you feel this week?",
+    "error_required": "All three questions are required.",
+    "q1_label": "1. How did you progress this week on your KPIs?",
+    "q1_placeholder": "Describe your advances, achievements, or what you completed...",
+    "q2_label": "2. What obstacles did you encounter?",
+    "q2_placeholder": "Blockers, dependencies, unresolved issues...",
+    "q3_label": "3. What is your main focus for next week?",
+    "q3_placeholder": "Your 1-2 priorities for the next 7 days..."
+  },
+  "mood": {
+    "1": "Very bad",
+    "2": "Bad",
+    "3": "Neutral",
+    "4": "Good",
+    "5": "Very good"
+  },
+  "submitted": {
+    "badge": "Submitted ✓",
+    "q1_label": "How did you progress?",
+    "q2_label": "Obstacles?",
+    "q3_label": "Focus next week?",
+    "leader_note_label": "Comment from your leader"
+  },
+  "team_summary": {
+    "title": "Team participation",
+    "count": "{{total}} check-ins"
+  },
+  "history": {
+    "my_title": "My previous check-ins",
+    "team_title": "Team check-ins",
+    "loading": "Loading...",
+    "empty_own": "No previous check-ins recorded.",
+    "empty": "No check-ins recorded.",
+    "q1_short": "Progress",
+    "q2_short": "Obstacles",
+    "q3_short": "Focus next week",
+    "leader_note_label": "Comment from your leader",
+    "note_placeholder": "Add a comment for the collaborator...",
+    "saving_note": "Saving..."
+  },
+  "filters": {
+    "collaborator_label": "Collaborator",
+    "all_collaborators": "All",
+    "weeks_label": "Last weeks",
+    "weeks_option": "{{count}} weeks"
+  },
+  "kpi_hint": "Your active KPIs:",
+  "kpi_fallback": "KPI #{{id}}"
+}

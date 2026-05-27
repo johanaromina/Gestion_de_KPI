@@ -1,0 +1,269 @@
+{
+  "title": "Marketplace de KPI Templates",
+  "subtitle_one": "{{count}} template por industria listo para importar. Seleccioná los que aplican a tu organización y se crean en un click.",
+  "subtitle_other": "{{count}} templates por industria listos para importar. Seleccioná los que aplican a tu organización y se crean en un click.",
+  "import_btn_one": "Importar {{count}} KPI",
+  "import_btn_other": "Importar {{count}} KPIs",
+  "importing": "Importando...",
+  "result": {
+    "imported_one": "<strong>{{count}} importado:</strong>",
+    "imported_other": "<strong>{{count}} importados:</strong>",
+    "skipped_one": "<strong>{{count}} ya existía:</strong>",
+    "skipped_other": "<strong>{{count}} ya existían:</strong>",
+    "failed_one": "<strong>{{count}} falló:</strong>",
+    "failed_other": "<strong>{{count}} fallaron:</strong>"
+  },
+  "search_placeholder": "Buscar templates...",
+  "cat_all_one": "Todos ({{count}})",
+  "cat_all_other": "Todos ({{count}})",
+  "selection": {
+    "none": "Seleccioná los KPIs a importar",
+    "count_one": "{{count}} seleccionado",
+    "count_other": "{{count}} seleccionados",
+    "select_all_one": "Seleccionar todos ({{count}})",
+    "select_all_other": "Seleccionar todos ({{count}})",
+    "clear": "Limpiar selección"
+  },
+  "empty": "No hay templates que coincidan con tu búsqueda.",
+  "card": {
+    "exists_badge": "Ya existe",
+    "selected_badge": "✓ Seleccionado",
+    "preview_btn": "Ver detalle"
+  },
+  "modal": {
+    "type_label": "Tipo",
+    "direction_label": "Dirección",
+    "target_label": "Meta sugerida",
+    "criteria_label": "Criterio de medición",
+    "formula_label": "Fórmula de variación",
+    "close": "Cerrar",
+    "import_btn": "Importar este KPI",
+    "select_to_import": "Seleccionar para importar",
+    "deselect": "Quitar selección",
+    "exists_in_catalog": "Ya existe en tu catálogo"
+  },
+  "direction": {
+    "growth": "Crecimiento ↑",
+    "reduction": "Reducción ↓",
+    "exact": "Exacto ="
+  },
+  "type": {
+    "manual": "Manual",
+    "count": "Conteo",
+    "ratio": "Ratio",
+    "sla": "SLA",
+    "value": "Valor"
+  },
+  "units": {
+    "clientes": "clientes",
+    "tickets": "tickets",
+    "bugs": "bugs",
+    "deploys": "deploys",
+    "min": "min",
+    "dias": "días",
+    "puntos": "puntos",
+    "cursos": "cursos",
+    "u_persona": "unidades/persona",
+    "leads": "leads",
+    "sesiones": "sesiones",
+    "ratio": "ratio"
+  },
+  "catalog": {
+    "sales": {
+      "label": "Ventas",
+      "description": "KPIs para equipos comerciales y de revenue",
+      "templates": {
+        "ingresos_mensuales": {
+          "name": "Ingresos mensuales",
+          "description": "Total de ingresos generados en el mes por el equipo comercial.",
+          "criteria": "Suma de todos los contratos cerrados en el período, expresada en moneda local."
+        },
+        "nuevos_clientes_adquiridos": {
+          "name": "Nuevos clientes adquiridos",
+          "description": "Cantidad de nuevos clientes que firmaron contrato por primera vez.",
+          "criteria": "Clientes que no tenían contrato previo y firmaron en el período."
+        },
+        "tasa_de_conversion": {
+          "name": "Tasa de conversión",
+          "description": "Porcentaje de oportunidades que se convierten en ventas cerradas.",
+          "criteria": "(Ventas cerradas / Oportunidades totales) × 100."
+        },
+        "ticket_promedio": {
+          "name": "Ticket promedio",
+          "description": "Valor promedio de cada venta cerrada en el período.",
+          "criteria": "Ingresos totales dividido por cantidad de ventas cerradas."
+        },
+        "retencion_de_clientes": {
+          "name": "Retención de clientes",
+          "description": "Porcentaje de clientes que renuevan o continúan activos.",
+          "criteria": "(Clientes que renovaron / Clientes al inicio del período) × 100."
+        },
+        "churn_rate": {
+          "name": "Churn rate",
+          "description": "Porcentaje de clientes que cancelaron en el período.",
+          "criteria": "(Clientes perdidos / Clientes al inicio del período) × 100."
+        }
+      }
+    },
+    "tech": {
+      "label": "Tecnología",
+      "description": "KPIs para equipos de desarrollo, producto y DevOps",
+      "templates": {
+        "tickets_cerrados": {
+          "name": "Tickets cerrados",
+          "description": "Cantidad de tickets resueltos en el período.",
+          "criteria": "Tickets con estado \"cerrado\" o \"resuelto\" en el sistema de gestión (Jira, Linear, etc.)."
+        },
+        "bugs_criticos_resueltos": {
+          "name": "Bugs críticos resueltos",
+          "description": "Bugs de prioridad alta o crítica cerrados en el período.",
+          "criteria": "Tickets con etiqueta \"bug\" y prioridad \"alta\" o \"crítica\" cerrados en el período."
+        },
+        "uptime_del_servicio": {
+          "name": "Uptime del servicio",
+          "description": "Porcentaje de disponibilidad del sistema en producción.",
+          "criteria": "(Minutos disponibles / Minutos totales del período) × 100. Excluye mantenimiento programado."
+        },
+        "tiempo_de_respuesta_promedio_api": {
+          "name": "Tiempo de respuesta promedio (API)",
+          "description": "Latencia promedio de las endpoints de API en milisegundos.",
+          "criteria": "Percentil 95 de latencia medido por el sistema de monitoreo (Datadog, New Relic, etc.)."
+        },
+        "cobertura_de_tests": {
+          "name": "Cobertura de tests",
+          "description": "Porcentaje de código cubierto por tests automatizados.",
+          "criteria": "Líneas cubiertas / Líneas totales del codebase, según reporte de cobertura."
+        },
+        "deploys_a_produccion": {
+          "name": "Deploys a producción",
+          "description": "Cantidad de deploys exitosos realizados en el período.",
+          "criteria": "Deployments que llegaron a producción sin rollback en las primeras 24h."
+        },
+        "mean_time_to_recovery_mttr": {
+          "name": "Mean Time to Recovery (MTTR)",
+          "description": "Tiempo promedio de recuperación ante incidentes en producción.",
+          "criteria": "Promedio de minutos entre detección del incidente y restauración del servicio."
+        }
+      }
+    },
+    "hr": {
+      "label": "Recursos Humanos",
+      "description": "KPIs para People, Talent y RRHH",
+      "templates": {
+        "tasa_de_retencion_de_talento": {
+          "name": "Tasa de retención de talento",
+          "description": "Porcentaje de colaboradores que permanecen en la organización.",
+          "criteria": "((Colaboradores al final - Ingresos) / Colaboradores al inicio) × 100."
+        },
+        "tiempo_de_cobertura_de_vacantes": {
+          "name": "Tiempo de cobertura de vacantes",
+          "description": "Días promedio desde la apertura de un puesto hasta la incorporación.",
+          "criteria": "Promedio de días entre publicación de la búsqueda y fecha de ingreso del candidato."
+        },
+        "nps_de_empleados_enps": {
+          "name": "NPS de empleados (eNPS)",
+          "description": "Net Promoter Score interno medido en encuesta de clima.",
+          "criteria": "(% promotores - % detractores). Escala -100 a +100."
+        },
+        "ausentismo": {
+          "name": "Ausentismo",
+          "description": "Porcentaje de días perdidos por ausencias no programadas.",
+          "criteria": "(Días de ausencia no programados / Días hábiles totales del equipo) × 100."
+        },
+        "capacitaciones_completadas": {
+          "name": "Capacitaciones completadas",
+          "description": "Número de capacitaciones o cursos terminados por el equipo.",
+          "criteria": "Módulos o cursos marcados como completados en la plataforma de aprendizaje."
+        }
+      }
+    },
+    "ops": {
+      "label": "Operaciones",
+      "description": "KPIs para equipos de operaciones, logística y calidad",
+      "templates": {
+        "on_time_delivery_otd": {
+          "name": "On-Time Delivery (OTD)",
+          "description": "Porcentaje de entregas realizadas en tiempo y forma.",
+          "criteria": "(Entregas a tiempo / Entregas totales) × 100."
+        },
+        "costo_operativo_por_unidad": {
+          "name": "Costo operativo por unidad",
+          "description": "Costo promedio de operar por unidad procesada.",
+          "criteria": "Costos operativos totales del período dividido por unidades procesadas."
+        },
+        "tasa_de_defectos": {
+          "name": "Tasa de defectos",
+          "description": "Porcentaje de unidades producidas con defectos.",
+          "criteria": "(Unidades defectuosas / Unidades totales producidas) × 100."
+        },
+        "productividad_por_colaborador": {
+          "name": "Productividad por colaborador",
+          "description": "Unidades procesadas / valor generado por persona en el período.",
+          "criteria": "Output total del equipo dividido por cantidad de colaboradores activos."
+        },
+        "sla_de_atencion_al_cliente": {
+          "name": "SLA de atención al cliente",
+          "description": "Porcentaje de tickets de clientes resueltos dentro del SLA acordado.",
+          "criteria": "(Tickets resueltos en tiempo / Tickets totales) × 100."
+        }
+      }
+    },
+    "marketing": {
+      "label": "Marketing",
+      "description": "KPIs para equipos de marketing, growth y comunicación",
+      "templates": {
+        "leads_generados": {
+          "name": "Leads generados",
+          "description": "Cantidad de nuevos leads captados en el período.",
+          "criteria": "Contactos nuevos con datos validados que entraron al CRM en el período."
+        },
+        "costo_por_lead_cpl": {
+          "name": "Costo por lead (CPL)",
+          "description": "Inversión promedio en marketing por cada lead generado.",
+          "criteria": "Inversión total en marketing / cantidad de leads generados."
+        },
+        "trafico_organico": {
+          "name": "Tráfico orgánico",
+          "description": "Visitas al sitio web provenientes de búsqueda orgánica.",
+          "criteria": "Sesiones de canal \"Organic Search\" en Google Analytics o equivalente."
+        },
+        "tasa_de_apertura_de_emails": {
+          "name": "Tasa de apertura de emails",
+          "description": "Porcentaje de destinatarios que abrieron los emails de la campaña.",
+          "criteria": "(Aperturas únicas / Emails enviados) × 100."
+        },
+        "roi_de_campanas": {
+          "name": "ROI de campañas",
+          "description": "Retorno sobre la inversión de las campañas de marketing.",
+          "criteria": "((Ingresos atribuidos - Inversión) / Inversión) × 100."
+        }
+      }
+    },
+    "finance": {
+      "label": "Finanzas",
+      "description": "KPIs para equipos de finanzas, tesorería y controlling",
+      "templates": {
+        "ebitda": {
+          "name": "EBITDA",
+          "description": "Resultado antes de intereses, impuestos, depreciación y amortización.",
+          "criteria": "Resultado operativo + depreciación + amortización, según estado de resultados."
+        },
+        "dias_de_cobro_dso": {
+          "name": "Días de cobro (DSO)",
+          "description": "Promedio de días que tarda en cobrarse una factura.",
+          "criteria": "(Cuentas por cobrar / Ingresos del período) × días del período."
+        },
+        "liquidez_corriente": {
+          "name": "Liquidez corriente",
+          "description": "Ratio entre activos corrientes y pasivos corrientes.",
+          "criteria": "Activos corrientes / Pasivos corrientes. Valor óptimo > 1."
+        },
+        "presupuesto_ejecutado": {
+          "name": "Presupuesto ejecutado",
+          "description": "Porcentaje del presupuesto aprobado que fue efectivamente ejecutado.",
+          "criteria": "(Gasto real / Presupuesto aprobado) × 100. Meta: 100% (ni sub ni sobreejecución)."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "title": "Mi cuenta",
+  "subtitle": "Administra tu acceso personal a esta instancia.",
+  "hint": "Si no recordás tu contraseña actual, usá “Olvidé mi contraseña” desde la pantalla de login.",
+  "fallbacks": {
+    "user": "Usuario",
+    "no_email": "Sin email configurado",
+    "no_role": "Sin rol"
+  },
+  "form": {
+    "current_password": "Contraseña actual",
+    "new_password": "Nueva contraseña",
+    "confirm_password": "Confirmar nueva contraseña"
+  },
+  "actions": {
+    "saving": "Guardando...",
+    "update_password": "Actualizar contraseña"
+  },
+  "success": {
+    "updated": "Contraseña actualizada correctamente."
+  },
+  "errors": {
+    "required_fields": "Completá todos los campos.",
+    "min_length": "La nueva contraseña debe tener al menos 8 caracteres.",
+    "password_mismatch": "Las nuevas contraseñas no coinciden.",
+    "change_failed": "No se pudo cambiar la contraseña.",
+    "session_invalid": "Tu sesión expiró. Volvé a iniciar sesión.",
+    "user_not_found": "No se encontró tu usuario.",
+    "local_password_not_set": "Tu cuenta no tiene una contraseña local configurada. Usá recuperación de contraseña o acceso corporativo.",
+    "current_password_incorrect": "La contraseña actual es incorrecta.",
+    "same_password": "La nueva contraseña debe ser distinta de la actual."
+  }
+}

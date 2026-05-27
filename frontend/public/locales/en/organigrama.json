@@ -1,0 +1,27 @@
+{
+  "title": "Org Chart",
+  "subtitle": "Hierarchical structure",
+  "loading": "Loading structure…",
+  "empty": {
+    "title": "No organizational units",
+    "text": "Create areas in",
+    "link": "Settings → Organizational Structure"
+  },
+  "total_units_one": "{{count}} unit · tree view (3 levels)",
+  "total_units_other": "{{count}} units · tree view (3 levels)",
+  "breadcrumb_home": "Home",
+  "types": {
+    "company": "Company",
+    "area": "Area",
+    "team": "Team",
+    "business_unit": "Business unit"
+  },
+  "card": {
+    "dir_abbr": "dir.",
+    "drill_one": "View {{count}} sub-unit →",
+    "drill_other": "View {{count}} sub-units →",
+    "kpi_toggle_hide": "▲",
+    "kpi_toggle_show_one": "▼ {{count}} KPI",
+    "kpi_toggle_show_other": "▼ {{count}} KPIs"
+  }
+}

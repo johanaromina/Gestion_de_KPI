@@ -1,0 +1,72 @@
+{
+  "title": "Auditoría",
+  "subtitle": "Historial de cambios en el sistema",
+  "filters": {
+    "entity_type_label": "Tipo de Entidad:",
+    "entity_type_all": "Todos",
+    "action_label": "Acción:",
+    "action_all": "Todas",
+    "entity_id_label": "ID de Entidad:",
+    "entity_id_placeholder": "Ej: 123",
+    "user_id_label": "Usuario ID:",
+    "user_id_placeholder": "Ej: 12",
+    "result_label": "Resultado:",
+    "result_all": "Todos",
+    "result_success": "Éxito",
+    "result_error": "Error",
+    "kpi_id_label": "KPI ID:",
+    "kpi_id_placeholder": "Ej: 28",
+    "collab_id_label": "Colaborador ID:",
+    "collab_id_placeholder": "Ej: 63",
+    "period_id_label": "Período ID:",
+    "period_id_placeholder": "Ej: 1",
+    "start_date_label": "Fecha Inicio:",
+    "end_date_label": "Fecha Fin:",
+    "search_label": "Buscar",
+    "search_placeholder": "Usuario, KPI, comentario...",
+    "clear_btn": "Limpiar Filtros"
+  },
+  "entity_types": {
+    "collaborators": "Colaboradores",
+    "kpis": "KPIs",
+    "collaborator_kpis": "Asignaciones",
+    "periods": "Períodos",
+    "calendar_subperiods": "Subperíodos",
+    "objective_trees": "Árbol de Objetivos"
+  },
+  "actions": {
+    "CREATE": "Crear",
+    "UPDATE": "Actualizar",
+    "DELETE": "Eliminar",
+    "CLOSE": "Cerrar",
+    "REOPEN": "Reabrir",
+    "APPROVE": "Aprobar",
+    "REJECT": "Rechazar"
+  },
+  "table": {
+    "date": "Fecha",
+    "user": "Usuario",
+    "action": "Acción",
+    "entity": "Entidad",
+    "id": "ID",
+    "result": "Resultado",
+    "duration": "Duración",
+    "ip": "IP",
+    "ua": "UA",
+    "changes": "Cambios"
+  },
+  "result_success": "Éxito",
+  "result_error": "Error",
+  "critical_badge": "Crítico",
+  "duration_ms": "{{value}} ms",
+  "user_fallback": "User #{{id}}",
+  "showing": "Mostrando {{shown}} de {{total}} registros",
+  "pagination": {
+    "prev": "Anterior",
+    "next": "Siguiente",
+    "page_of": "Página {{page}} de {{total}}"
+  },
+  "empty_title": "Sin registros",
+  "empty_subtitle": "Prueba ajustando los filtros",
+  "loading": "Cargando logs de auditoría..."
+}

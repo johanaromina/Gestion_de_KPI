@@ -1,0 +1,826 @@
+{
+  "title": "Configuración",
+  "restricted": "No tenés permisos para administrar configuración.",
+  "subtitle": "Estructura organizacional, calendarios e integraciones",
+  "guide": {
+    "hide": "Ocultar guía inicial",
+    "show": "Ver guía inicial",
+    "title": "Guía inicial de configuración",
+    "completed": "La configuración base ya está completa. Podés reabrir esta guía cuando quieras.",
+    "progress": "Completaste {{done}} de {{total}} pasos base.",
+    "how_to": "¿Cómo configurar el sistema por primera vez?",
+    "steps": {
+      "areas": "<strong>Creá las áreas y equipos</strong> de tu empresa en <em>Estructura Organizacional</em> (más abajo ↓)",
+      "collaborators": "Agregá los <strong>colaboradores</strong> y asignales un área y jefe directo → <a href=\"/colaboradores\">Colaboradores</a>",
+      "kpis": "Definí los <strong>KPIs</strong> que vas a medir → <a href=\"/kpis\">KPIs</a>",
+      "periods": "Creá un <strong>período activo</strong> (anual, semestral, trimestral) → <a href=\"/periodos\">Períodos</a>",
+      "assignments": "Asigná KPIs a cada colaborador con su meta → <a href=\"/asignaciones\">Asignaciones</a>"
+    },
+    "note": "Los calendarios e integraciones son opcionales y se pueden configurar después.",
+    "save_hide": "Guardar y ocultar",
+    "checklist": {
+      "areas_label": "Áreas y equipos",
+      "areas_desc": "Creá la estructura organizacional base.",
+      "collaborators_label": "Colaboradores",
+      "collaborators_desc": "Cargá personas y asignales área y jefe directo.",
+      "periods_label": "Períodos",
+      "periods_desc": "Definí al menos un período activo para operar.",
+      "assignments_label": "Asignaciones",
+      "assignments_desc": "Asigná KPIs con metas a cada colaborador."
+    }
+  },
+  "banners": {
+    "sheets_title": "Conectar Google Sheets",
+    "sheets_text": "Importá valores de KPI directamente desde tus planillas, sin configuración técnica.",
+    "sheets_action": "Conectar planilla →",
+    "slack_title": "Conectar Slack",
+    "slack_text": "Recibí alertas de KPIs en riesgo directamente en tu canal de Slack.",
+    "slack_action": "Configurar Slack →",
+    "email_title": "Notificaciones por email",
+    "email_active": "SMTP activo — enviando desde {{from}} vía {{host}}",
+    "email_inactive": "Configurá SMTP_HOST, SMTP_USER y SMTP_PASS en el .env del servidor para activar alertas por email.",
+    "email_sent": "Email enviado a {{to}}",
+    "email_test_placeholder": "email de prueba",
+    "email_test_error": "Error al enviar email de prueba",
+    "email_test_sending": "Enviando...",
+    "email_test_action": "Enviar email de prueba"
+  },
+  "advanced": {
+    "title": "Configuración avanzada — Integraciones",
+    "hint": "Jira, Zendesk, conectores externos. Solo para administradores técnicos."
+  },
+  "integrations": {
+    "title": "Integraciones (plantillas)",
+    "subtitle": "Configurá plantillas reutilizables, targets y auth profiles.",
+    "new_template": "Nueva plantilla",
+    "create_targets_all": "Crear targets (todas las áreas)",
+    "create_targets_new": "Crear para áreas nuevas",
+    "deactivate_inactive": "Desactivar áreas inactivas",
+    "new_target": "Nuevo target",
+    "new_auth": "Nuevo auth profile",
+    "archive_errors": "Archivar errores",
+    "delete_errors": "Eliminar errores",
+    "tabs": {
+      "templates": "Plantillas",
+      "targets": "Targets",
+      "runs": "Runs",
+      "auth": "Auth"
+    },
+    "template_label": "Plantilla",
+    "select_template": "Seleccioná una plantilla",
+    "dialogs": {
+      "archive_errors": "¿Archivar todos los runs con error de esta plantilla?",
+      "delete_errors": "¿Eliminar todos los runs con error de esta plantilla?",
+      "archive_errors_title": "Archivar errores",
+      "delete_errors_title": "Eliminar errores"
+    }
+  },
+  "calendar": {
+    "title": "Calendarios de medición",
+    "subtitle": "Definí ciclos de medición por área o equipo (mensual, trimestral o custom).",
+    "new": "Nuevo calendario",
+    "name": "Nombre",
+    "frequency": "Frecuencia",
+    "status": "Estado",
+    "subperiods": "Subperíodos",
+    "empty": "No hay calendarios configurados."
+  },
+  "org": {
+    "title": "Estructura Organizacional",
+    "subtitle": "Jerarquía de áreas, equipos y personas con herencia de calendarios.",
+    "new": "Nueva unidad",
+    "search": "Buscar unidad",
+    "search_placeholder": "Nombre, tipo o unidad padre",
+    "type": "Tipo",
+    "all": "Todos",
+    "showing": "Mostrando {{shown}} de {{total}} unidades",
+    "parent": "Unidad padre",
+    "empty_filtered": "No hay unidades que coincidan con los filtros actuales.",
+    "empty_title": "Todavía no hay áreas ni equipos.",
+    "empty_hint": "Hacé clic en Nueva unidad para crear la primera área de tu empresa (por ejemplo: Ventas, Tecnología, Operaciones).",
+    "delete_confirm": "¿Seguro que querés eliminar la unidad \"{{name}}\" ({{type}})? Esta acción no se puede deshacer.",
+    "delete_confirm_title": "Confirmar eliminación",
+    "delete_error": "Error al eliminar la unidad organizacional"
+  },
+  "modals": {
+    "template_new": "Nueva plantilla",
+    "template_edit": "Editar plantilla",
+    "target_new": "Nuevo target",
+    "target_edit": "Editar target",
+    "target_wizard": "Duplicar target por users",
+    "auth_new": "Nuevo auth profile",
+    "auth_edit": "Editar auth profile",
+    "calendar_new": "Nuevo calendario",
+    "calendar_edit": "Editar calendario",
+    "subperiods": "Subperíodos · {{name}}",
+    "target_preview": "Preview de target",
+    "scope_new": "Nueva unidad organizacional",
+    "scope_edit": "Editar unidad"
+  },
+  "dialog_titles": {
+    "warning": "Advertencia"
+  },
+  "actions": {
+    "saving": "Guardando...",
+    "save_template": "Guardar plantilla",
+    "save_target": "Guardar target",
+    "create_targets": "Crear targets",
+    "creating": "Creando...",
+    "save_auth": "Guardar auth profile",
+    "save_calendar": "Guardar calendario",
+    "save_unit": "Guardar unidad"
+  },
+  "errors": {
+    "paste_jql": "Pegá un JQL para convertir.",
+    "invalid_params_json_editor": "El JSON de params no es válido. Corregilo antes de usar el editor de mapping.",
+    "save_template": "Error al guardar plantilla",
+    "required_params": "Faltan params requeridos: {{keys}}",
+    "invalid_params_json": "El JSON de params no es válido",
+    "multiple_users_assignment": "Un target con múltiples users no puede asignarse a un KPI individual. Usá un target por persona o quitá la asignación.",
+    "mapping_and_direct_destination": "Un target con mapping por filas no puede apuntar también a una asignación o Scope KPI directo.",
+    "single_destination_only": "Un target solo puede apuntar a asignación o Scope KPI.",
+    "save_target": "Error al guardar target",
+    "select_mapping_destination": "Seleccioná al menos un destino para crear mappings explícitos.",
+    "assignment_unavailable": "La asignación seleccionada ya no está disponible para {{key}}.",
+    "base_collaborator_unresolved": "No se pudo resolver el colaborador base para {{key}}.",
+    "scope_kpi_unavailable": "El Scope KPI seleccionado ya no está disponible para {{key}}.",
+    "base_scope_unresolved": "No se pudo resolver el scope base para {{key}}.",
+    "save_explicit_mappings": "Error al guardar mappings explícitos",
+    "target_missing_users": "El target no tiene lista de users para duplicar.",
+    "target_min_users": "Necesitás al menos 2 users para duplicar.",
+    "select_template_to_test": "Seleccioná una plantilla para probar el target."
+  },
+  "api_errors": {
+    "template_name_required": "El nombre de la plantilla es obligatorio.",
+    "template_cron_invalid": "El cron configurado no es válido.",
+    "mapping_entity_type_invalid": "El tipo de entidad del mapping no es válido.",
+    "mapping_entity_id_required": "Falta la entidad del mapping.",
+    "mapping_entity_not_found": "La entidad seleccionada para el mapping ya no existe.",
+    "mapping_items_required": "Tenés que enviar al menos un mapping para guardar.",
+    "org_delete_has_children": "No se puede eliminar la unidad porque tiene hijos.",
+    "org_delete_has_collaborators": "No se puede eliminar la unidad porque tiene colaboradores asignados.",
+    "org_delete_has_assignments": "No se puede eliminar la unidad porque tiene asignaciones vinculadas.",
+    "org_delete_has_targets": "No se puede eliminar la unidad porque tiene targets o integraciones asociados.",
+    "template_not_found": "La plantilla seleccionada ya no existe.",
+    "template_test_required_fields": "Faltan datos obligatorios para probar la plantilla.",
+    "template_test_ratio_required": "La plantilla ratio necesita la query de historias.",
+    "email_smtp_not_configured": "SMTP no está configurado en el servidor.",
+    "email_smtp_connection_failed": "No se pudo validar la conexión SMTP.",
+    "email_to_required": "Ingresá un email de destino para la prueba."
+  },
+  "messages": {
+    "create_targets_error": "Error al crear targets",
+    "targets_created": "Targets creados: {{count}}",
+    "targets_created_with_existing": "Targets creados: {{created}} · ya existían: {{skipped}}",
+    "targets_created_with_skipped": "Targets creados: {{created}} · omitidos: {{skipped}}",
+    "targets_by_user": "Targets por usuario: {{created}}",
+    "targets_by_user_with_skipped": "Targets por usuario: {{created}} · ya existían: {{skipped}}",
+    "duplicate_targets_error": "Error al duplicar targets",
+    "no_changes_to_apply": "No hay cambios para aplicar.",
+    "targets_enabled": "Targets habilitados: {{count}}",
+    "no_users_to_duplicate": "No hay users en params para duplicar.",
+    "no_new_areas": "No hay áreas nuevas para crear targets.",
+    "preview_rows_loaded": "Filas cargadas desde preview: {{count}}",
+    "preview_rows_unmapped_loaded": "Claves faltantes agregadas al editor: {{count}}",
+    "targets_deactivated": "Targets desactivados: {{count}}",
+    "no_targets_to_deactivate": "No hay targets para desactivar.",
+    "explicit_mappings_saved": "Mappings explícitos guardados y filas resueltas: {{count}}",
+    "target_run_success": "Target ejecutado. Revisá Runs.",
+    "test_target_error": "Error al probar target",
+    "test_params_error": "Error al probar params"
+  },
+  "options": {
+    "connectors": {
+      "jira": "Jira",
+      "xray": "Xray",
+      "sheets": "Google Sheets",
+      "looker": "Looker",
+      "generic_api": "Generic API",
+      "manual": "Manual / CSV"
+    },
+    "metric_types": {
+      "count": "COUNT — Conteo por filtro",
+      "ratio": "RATIO A/B — Cumplimiento / Conversión",
+      "sla": "SLA — Cumplimiento temporal",
+      "value": "VALUE — Valor directo",
+      "value_agg": "VALUE_AGG — Suma / Promedio",
+      "manual": "MANUAL — Declarativo"
+    },
+    "auth_types": {
+      "none": "Sin auth",
+      "basic": "Basic",
+      "bearer": "Bearer",
+      "apiKey": "API Key"
+    },
+    "frequencies": {
+      "monthly": "Mensual",
+      "quarterly": "Trimestral",
+      "custom": "Custom"
+    },
+    "run_status": {
+      "success": "Éxito",
+      "error": "Error",
+      "failed": "Falló",
+      "running": "En ejecución",
+      "queued": "En cola",
+      "archived": "Archivado"
+    }
+  },
+  "template_modal": {
+    "connector": "Connector",
+    "metric_type": "Tipo de métrica",
+    "quick_templates": "Plantillas rápidas",
+    "auth_profile": "Auth Profile",
+    "select_auth_profile": "Selecciona un auth profile",
+    "no_auth_profiles": "No hay auth profiles para este conector.",
+    "formula": "Fórmula",
+    "schedule": "Frecuencia / Cron",
+    "schedule_monthly": "Mensual (1° 02:00)",
+    "schedule_daily": "Diario (02:00)",
+    "schedule_weekly": "Semanal (Lun 02:00)",
+    "schedule_hint": "Cron sugerido para cierre mensual. Ej: 0 2 1 * *.",
+    "next_run": "Próxima ejecución: {{value}}",
+    "active": "Activa",
+    "inactive": "Inactiva",
+    "labels": {
+      "filter_a": "Filtro A (template)",
+      "request_config": "Config request (template)",
+      "looker_config": "Config Looker (template)",
+      "config_a": "Config A (template)",
+      "filter_b": "Filtro B (template)",
+      "config_b": "Config B (template)",
+      "config": "Config (template)"
+    },
+    "examples": {
+      "primary_sla_jira": "Ejemplo: {baseFilter} AND {endDate} >= {from} AND {endDate} < {to} AND {endDate} <= {limitDate}",
+      "primary_ratio_jira": "Ejemplo: {filterA} AND {dateFieldA} >= {from} AND {dateFieldA} < {to}",
+      "primary_default_jira": "Ejemplo: {baseFilter} AND {dateField} >= {from} AND {dateField} < {to}",
+      "primary_generic_api": "Ejemplo: path={path} method={method} resultPath={resultPath} valuePath={valuePath} aggregation={aggregation}",
+      "primary_looker": "Ejemplo: resourceType={query|look|dashboard|dashboard_element|inline_query} resourceId={resourceId} dashboardElementId={dashboardElementId} resultFormat={resultFormat} resultPath={resultPath} valuePath={valuePath}",
+      "primary_default": "Ejemplo: baseFilter={baseFilter} dateField={dateField} from={from} to={to}",
+      "secondary_sla_jira": "Ejemplo: {baseFilter} AND {endDate} >= {from} AND {endDate} < {to}",
+      "secondary_default_jira": "Ejemplo: {filterB} AND {dateFieldB} >= {from} AND {dateFieldB} < {to}",
+      "secondary_generic_api": "Opcional. Solo si querés documentar otro bloque de placeholders.",
+      "secondary_looker": "Opcional. Para inline_query usá queryBody. Para dashboard podés usar dashboardElementId, dashboardElementTitle o dashboardElementIndex.",
+      "secondary_default": "Ejemplo: usá el mismo config A o separá A/B si necesitás dos agregados.",
+      "single_manual": "Ejemplo: manual",
+      "single_generic_api": "Ejemplo: path={path} method={method} query={query} resultPath={resultPath} valuePath={valuePath} aggregation={aggregation}",
+      "single_looker": "Ejemplo: resourceType={query|look|dashboard|dashboard_element|inline_query} resourceId={resourceId} dashboardElementId={dashboardElementId} dashboardElementTitle={dashboardElementTitle} resultFormat={resultFormat} resultPath={resultPath} valuePath={valuePath}",
+      "single_default": "Ejemplo: sheetKey={sheetKey} range={range} areaColumn={areaColumn} collaboratorColumn={collaboratorColumn} kpiColumn={kpiColumn}. En params: collaboratorValue + valueColumn o valueColumnFromPeriod=true + valueColumnPeriodFormat=YYYYMM"
+    },
+    "placeholders_hint": "Sugerencia: usa placeholders (ej: {baseFilter}, {from}, {to}) para que la plantilla sea reutilizable.",
+    "time_placeholders_hint": "Sugerencia: incluir {from} y {to} para filtrar por periodo.",
+    "literal_values_hint": "Sugerencia: evitá valores fijos (Story/Bug/Done). Ponelos en el Target con placeholders.",
+    "quick_template_labels": {
+      "count": "COUNT",
+      "ratio": "RATIO",
+      "sla": "SLA",
+      "sheets_value": "Sheets VALUE",
+      "sheets_agg": "Sheets AGG",
+      "sheets_grid": "Sheets GRID",
+      "sheets_grid_agg": "Sheets GRID AGG",
+      "api_value": "API VALUE",
+      "api_agg": "API AGG",
+      "looker_value": "Looker VALUE",
+      "looker_agg": "Looker AGG",
+      "manual": "Manual / CSV"
+    }
+  },
+  "target_modal": {
+    "template": "Template",
+    "scope_type": "Tipo de unidad",
+    "org_scope": "Unidad organizacional",
+    "select_org_scope": "Seleccioná un área o equipo",
+    "external_id": "ID externo",
+    "assignment_destination": "Asignación destino (solo si es individual)",
+    "select_assignment": "Selecciona una asignación",
+    "assignment_destination_hint": "Seleccioná una asignación base solo si el target debe escribir sobre un KPI colaborador.",
+    "scope_kpi_destination": "KPI Grupal destino",
+    "select_scope_kpi": "Seleccioná un KPI Grupal",
+    "scope_kpi_destination_hint": "Seleccioná esto si el target debe escribir sobre un KPI organizacional. Solo uno de los dos destinos puede estar informado.",
+    "raw_jql": "JQL raw (opcional)",
+    "raw_jql_hint": "Usalo solo como ayuda para convertir un JQL en params JSON.",
+    "raw_jql_placeholder": "Pegar JQL aquí...",
+    "convert_jql": "Convertir JQL → JSON",
+    "clear": "Limpiar",
+    "params_json": "Params JSON (guardado real del target)",
+    "params_json_hint": "Este contenido es el que se persiste y usa el runner al ejecutar el target.",
+    "sheets_params_hint": "Para hojas por líder: usá <code>range</code> con A1 notation (ej: <code>'Alexis Cantenys'!A3:Z</code>), <code>collaboratorValue</code> para elegir la fila correcta y, si los meses son columnas, <code>valueColumnFromPeriod=true</code> + <code>valueColumnPeriodFormat=YYYYMM</code>.",
+    "required_params": "Params requeridos por la plantilla:",
+    "explicit_mapping_hint": "Para actualizar múltiples destinos desde una sola corrida, podés usar <code>targetMap</code>, <code>mappingKeyPath</code>, <code>mappingValuePath</code> y <code>mappingOwnerType</code> (<code>assignment</code> o <code>scopeKpi</code>).",
+    "explicit_mapping_hint_looker": "Para actualizar múltiples destinos desde una sola corrida, podés usar <code>targetMap</code>, <code>mappingKeyPath</code>, <code>mappingValuePath</code> y <code>mappingOwnerType</code> (<code>assignment</code> o <code>scopeKpi</code>). Looker también soporta <code>resourceType</code> dashboard y dashboard_element.",
+    "mapping_editor": "Editor de mapping por filas",
+    "mapping_editor_hint": "Armá el targetMap desde UI. Si usás este editor, quitá el destino directo del target. Cuando importás desde preview, el sistema intenta autocompletar coincidencias por nombre.",
+    "mapping_result_path": "Mapping result path",
+    "mapping_key_path": "Mapping key path",
+    "mapping_value_path": "Mapping value path",
+    "placeholders": {
+      "mapping_result_path": "data.rows",
+      "mapping_key_path": "qa o area",
+      "mapping_value_path": "stories_delivered o revenue",
+      "external_key": "Johana / Revenue / CS"
+    },
+    "add_mapping_row": "Agregar fila de mapping",
+    "no_mapping_rows": "Sin filas configuradas. Agregá una fila para mapear claves externas a asignaciones o Scope KPIs.",
+    "unresolved_warning": "Hay <strong>{{count}}</strong> filas del <code>targetMap</code> sin destino asignado. Completalas o eliminá las que no quieras usar.",
+    "explicit_mapping_intro": "Podés crear mappings explícitos de <code>data_source_mappings</code> para <strong>{{source}}</strong> sin salir del modal. Eso guarda la clave externa para futuros previews y además resuelve estas filas ahora.",
+    "calculated_period": "Periodo calculado: {{period}} · Rango: {{from}} → {{to}}.",
+    "target_subperiod": "Subperíodo destino: {{name}} · {{start}} → {{end}}",
+    "target_subperiod_later": "Subperíodo destino: se resolverá al ejecutar (no hay calendario asociado o subperíodos).",
+    "assignment_subperiod_warning": "Esta asignación pertenece a un subperíodo específico. Para que el mes se resuelva automáticamente, seleccioná la asignación base (sin subperíodo).",
+    "scope_kpi_subperiod_warning": "Este Scope KPI pertenece a un subperíodo específico. Si querés resolución mensual automática, usá un Scope KPI base sin subperíodo.",
+    "owner_types": {
+      "assignment": "Asignación",
+      "scope_kpi": "KPI Grupal"
+    },
+    "table": {
+      "external_key": "Clave externa",
+      "destination": "Destino",
+      "assignment": "Asignación",
+      "scope_kpi": "KPI Grupal"
+    },
+    "explicit_table": {
+      "external_key": "Clave externa",
+      "destination": "Destino a persistir",
+      "persisted_on": "Se guarda sobre"
+    },
+    "explicit_row": {
+      "no_key": "Sin clave",
+      "assignment_hint": "La clave se guardará contra el colaborador base de la asignación elegida.",
+      "scope_kpi_hint": "La clave se guardará contra el org scope base del Scope KPI elegido.",
+      "select_assignment": "Seleccioná una asignación",
+      "select_scope_kpi": "Seleccioná un KPI Grupal",
+      "collaborator_fallback": "Colaborador",
+      "scope_fallback": "Org scope",
+      "pending": "Pendiente"
+    },
+    "explicit_actions": {
+      "saving": "Guardando mappings...",
+      "save_and_resolve": "Guardar mappings explícitos y resolver ({{count}})"
+    },
+    "preview_actions": {
+      "testing": "Probando...",
+      "test": "Probar params",
+      "load_keys": "Cargar claves desde preview",
+      "add_missing": "Agregar solo faltantes"
+    },
+    "preview_hint": "El preview usa la plantilla seleccionada y los params actuales del modal, sin necesidad de guardar el target antes.",
+    "fallbacks": {
+      "collaborator": "Colaborador #{{id}}",
+      "kpi": "KPI #{{id}}",
+      "period": "Período #{{id}}",
+      "scope": "Scope #{{id}}",
+      "scope_kpi": "Scope KPI #{{id}}"
+    },
+    "errors": {
+      "assignment_blocked": "Hay multiples users en params. Para asignación individual, crea un target por persona o quitá la asignación.",
+      "invalid_json": "El JSON de params no es válido.",
+      "missing_required_params": "Faltan params requeridos para la plantilla:",
+      "both_destinations": "El target no puede apuntar a asignación y KPI Grupal al mismo tiempo.",
+      "direct_destination_with_mapping": "Si configurás mapping por filas, quitá el destino directo del target. Cada fila debe resolver su propia asignación o Scope KPI."
+    }
+  },
+  "target_wizard": {
+    "template": "Template:",
+    "hint": "Selecciona el colaborador y, si corresponde, la asignación destino. Se creará un target por cada user.",
+    "user_jira": "User Jira",
+    "collaborator": "Colaborador",
+    "assignment": "Asignación",
+    "select_collaborator": "Selecciona colaborador",
+    "no_assignment": "Sin asignación"
+  },
+  "auth_modal": {
+    "connector": "Connector",
+    "endpoint": "Endpoint",
+    "endpoint_placeholder": "https://tu-dominio.atlassian.net",
+    "auth_type": "Auth Type",
+    "username": "Usuario",
+    "password": "Password",
+    "token": "Token",
+    "client_id": "Client ID",
+    "client_secret": "Client Secret",
+    "api_key": "API Key",
+    "header": "Header",
+    "auth_profile_hints": {
+      "jira_xray": "Jira/Xray: usá email + API token (Basic) o Bearer token.",
+      "sheets": "Google Sheets: soporta hojas por líder con KPI/Área/Colaborador y meses en columnas. Si la planilla es pública, podés dejar sin auth o usar API Key.",
+      "generic_api": "Generic API: usá endpoint base + Bearer, API Key, Basic o sin auth, según la fuente.",
+      "looker": "Looker: usá el endpoint base de la instancia y auth por token o clientId/clientSecret.",
+      "manual": "Manual/CSV no requiere auth profile."
+    },
+    "endpoint_hints": {
+      "sheets": "Opcional. Ejemplo: https://sheets.googleapis.com",
+      "looker": "Ejemplo: https://mi-looker.empresa.com o https://mi-looker.empresa.com/api/4.0",
+      "generic_api": "Ejemplo: https://api.empresa.com o https://tu-looker/api/4.0",
+      "default": "Ejemplo: https://tu-dominio.atlassian.net"
+    },
+    "looker_hint": "Si cargás clientId/clientSecret, KPI Manager hace POST /api/4.0/login. También podés usar token directo."
+  },
+  "subperiod_modal": {
+    "loading_periods": "Cargando períodos...",
+    "select_period": "Selecciona un período",
+    "no_periods": "No hay períodos disponibles",
+    "load_error": "No se pudieron cargar los períodos.",
+    "no_periods_hint": "No hay períodos creados. Primero tenés que crear uno en la pantalla Períodos.",
+    "select_period_hint": "Selecciona un período para ver los subperíodos.",
+    "new": "Nuevo subperíodo",
+    "start": "Inicio",
+    "end": "Fin",
+    "empty": "No hay subperíodos para este calendario y período."
+  },
+  "target_preview": {
+    "filter_a": "Filtro A",
+    "filter_b": "Filtro B",
+    "loading": "Probando target…",
+    "value_only": "Valor: {{value}}",
+    "value_ab": "A: {{a}} · B: {{b}} · Valor: {{value}}",
+    "range": "Rango: {{from}} → {{to}}"
+  },
+  "preview_meta": {
+    "not_available": "N/A",
+    "labels": {
+      "connector": "Conector",
+      "requested_resource": "Recurso pedido",
+      "resolved_resource": "Recurso resuelto",
+      "format": "Formato",
+      "aggregation": "Agregación",
+      "rows": "Filas",
+      "result_path": "Result path",
+      "key_path": "Key path",
+      "value_path": "Value path",
+      "extracted_value": "Valor extraído"
+    },
+    "rows_summary": "{{matched}} evaluadas · {{mapped}} mapeadas · {{unmapped}} sin mapping",
+    "dashboard_element_resolved": "Dashboard element resuelto:",
+    "unmapped_warning": "Claves sin mapping detectadas",
+    "unmapped_more": "y {{count}} más.",
+    "sample_rows": "Muestra de filas detectadas",
+    "request_url": "Request URL",
+    "table": {
+      "external_key": "Clave externa",
+      "preview_value": "Valor preview"
+    }
+  },
+  "scope_kpi_form": {
+    "title_new": "Nuevo KPI Grupal",
+    "title_edit": "Editar KPI Grupal",
+    "name_label": "Nombre",
+    "base_kpi_label": "KPI base",
+    "base_kpi_placeholder": "Seleccioná un KPI",
+    "scope_label": "Área / Equipo",
+    "scope_placeholder": "Seleccioná un área o equipo",
+    "period_label": "Período",
+    "period_placeholder": "Seleccioná un período",
+    "subperiod_label": "Subperíodo",
+    "subperiod_placeholder": "Sin subperíodo",
+    "owner_level_label": "Nivel organizacional",
+    "source_mode_label": "Modo de cálculo",
+    "target_label": "Meta",
+    "weight_label": "Peso (%) ⓘ",
+    "weight_hint": "Peso de este KPI dentro del área (1–100%). La suma de todos los KPIs del área debería ser 100%.",
+    "status_label": "Estado",
+    "curation_label": "Curaduría",
+    "actual_label": "Actual inicial",
+    "actual_direct_label": "Actual directo inicial",
+    "mixed_note": "El valor manual o integrado se tomará como componente directo. La agregación desde links completará el componente agregado.",
+    "direct_weight_label": "Peso directo",
+    "aggregated_weight_label": "Peso agregado",
+    "direct_label_label": "Etiqueta directo",
+    "aggregated_label_label": "Etiqueta agregado",
+    "direct_label_default": "Componente directo",
+    "aggregated_label_default": "Componente agregado",
+    "description_label": "Descripción",
+    "error_required": "Completá nombre, KPI, área/equipo y período",
+    "error_weight_range": "El peso debe estar entre 1 y 100 (%)",
+    "error_mixed_weight": "En modo mixed, los pesos directo y agregado deben sumar más de 0",
+    "error_save": "Error al guardar el KPI Grupal",
+    "save": "Guardar",
+    "saving": "Guardando..."
+  },
+  "scope_kpi_links": {
+    "title": "Contribuciones del KPI Grupal",
+    "child_type_label": "Tipo de hijo",
+    "child_types": {
+      "collaborator": "KPI colaborador",
+      "scope": "KPI Grupal"
+    },
+    "collaborator_assignment_label": "Asignación colaborador",
+    "collaborator_assignment_placeholder": "Seleccioná una asignación",
+    "child_scope_label": "KPI Grupal hijo",
+    "child_scope_placeholder": "Seleccioná un KPI Grupal",
+    "aggregation_method_label": "Método",
+    "aggregation_methods": {
+      "weighted_avg": "Promedio ponderado",
+      "avg": "Promedio",
+      "sum": "Suma"
+    },
+    "contribution_weight_label": "Peso de contribución",
+    "sort_order_label": "Orden",
+    "reset": "Limpiar",
+    "add": "Agregar link",
+    "update": "Actualizar link",
+    "saving": "Guardando...",
+    "recalculate": "Recalcular",
+    "recalculating": "Recalculando...",
+    "table": {
+      "type": "Tipo",
+      "origin": "Origen",
+      "method": "Método",
+      "weight": "Peso",
+      "order": "Orden",
+      "actions": "Acciones"
+    },
+    "type_labels": {
+      "collaborator": "Colaborador",
+      "scope": "KPI Grupal"
+    }
+  },
+  "scope_kpi_detail": {
+    "title_fallback": "Detalle Scope KPI",
+    "base_kpi": "KPI base",
+    "scope": "Scope",
+    "owner": "Responsable",
+    "source": "Origen",
+    "status": "Estado",
+    "loading": "Cargando detalle...",
+    "summary": "Resumen",
+    "actual": "Actual",
+    "target": "Target",
+    "variation": "Variación",
+    "result": "Resultado",
+    "mixed_title": "Composición Mixed",
+    "mixed_note": "El valor final combina el componente directo y el agregado. Las mediciones manuales o importadas alimentan el directo; el recálculo desde links actualiza el agregado.",
+    "direct_component": "Componente directo",
+    "aggregated_component": "Componente agregado",
+    "final_result": "Resultado final",
+    "weight": "Peso: {{value}}",
+    "mix_ratio": "Mix {{direct}}/{{aggregated}}",
+    "contributions": "Contribuciones",
+    "open_child": "Abrir hijo",
+    "type": "Tipo",
+    "order": "Orden",
+    "child_scope": "Scope hijo #{{id}}",
+    "assignment": "Asignación #{{id}}",
+    "no_links": "Este Scope KPI todavía no tiene links configurados.",
+    "objectives": "Objetivos vinculados",
+    "no_objectives": "Sin objetivos estratégicos asociados.",
+    "runs": "Corridas de agregación",
+    "no_message": "Sin mensaje",
+    "inputs": "Inputs: {{count}}",
+    "system": "Sistema",
+    "no_runs": "No hay corridas de agregación para este Scope KPI.",
+    "measurements": "Mediciones recientes",
+    "no_measurements": "No hay mediciones recientes para este Scope KPI.",
+    "fallbacks": {
+      "scope_kpi": "Scope KPI #{{id}}",
+      "collaborator": "Colaborador",
+      "kpi": "KPI",
+      "child_scope": "Scope KPI"
+    },
+    "child_types": {
+      "collaborator": "Colaborador",
+      "scope": "KPI Grupal"
+    }
+  },
+  "sheets_wizard": {
+    "title": "Conectar Google Sheets",
+    "subtitle": "Importá valores de KPI directamente desde tu planilla",
+    "progress": "Paso {{current}} de {{total}}",
+    "errors": {
+      "preview": "No se pudo leer la planilla",
+      "create": "Error al crear la integración",
+      "url_required": "Pegá la URL de la planilla de Google Sheets",
+      "tab_required": "Seleccioná una pestaña",
+      "column_required": "Seleccioná la columna con el valor del KPI",
+      "bulk_required": "Seleccioná al menos un colaborador",
+      "bulk_name_required": "Completá el nombre en planilla de todos los colaboradores",
+      "kpi_required": "Seleccioná el KPI destino"
+    },
+    "defaults": {
+      "integration_name": "Google Sheets - {{tab}}"
+    },
+    "schedule_options": {
+      "daily": "Cada día a las 6am",
+      "hourly": "Cada hora",
+      "weekly": "Cada semana (lunes 6am)",
+      "manual": "Solo manual"
+    },
+    "kpi_option_fallbacks": {
+      "collaborator": "Colaborador",
+      "kpi": "KPI #{{id}}",
+      "period": "período",
+      "scope_prefix": "[Área]"
+    },
+    "steps": {
+      "url_title": "¿Cuál es la planilla?",
+      "url_hint": "Abrí tu Google Sheets y copiá la URL completa desde la barra del navegador.",
+      "tab_title": "¿En qué pestaña están los datos?",
+      "tab_hint": "Seleccioná la hoja (pestaña) de tu planilla que tiene los valores del KPI.",
+      "column_title": "¿Qué columna tiene el valor del KPI?",
+      "column_hint": "Elegí la columna que contiene el número que querés usar como medición.",
+      "kpi_title": "¿A qué KPI van los datos?",
+      "schedule_title": "¿Cada cuánto se sincroniza?",
+      "schedule_hint": "La app va a leer automáticamente la planilla con esa frecuencia y actualizar el KPI.",
+      "done_title_one": "¡{{count}} integración creada!",
+      "done_title_other": "¡{{count}} integraciones creadas!"
+    },
+    "fields": {
+      "sheet_url": "URL de Google Sheets",
+      "api_key": "API Key de Google",
+      "api_key_optional": "(opcional si está configurada en el servidor)",
+      "aggregation": "Si hay múltiples filas, usar:",
+      "agent_column": "¿Hay una columna que identifica a cada persona?",
+      "agent_column_optional": "(opcional - para conectar varios agentes a la vez)",
+      "integration_name": "Nombre de esta integración"
+    },
+    "placeholders": {
+      "sheet_url": "https://docs.google.com/spreadsheets/d/...",
+      "api_key": "AIza...",
+      "search_assignment": "Buscar por colaborador o KPI...",
+      "search_scope": "Buscar por área o nombre del KPI...",
+      "agent_name": "Nombre exacto en la planilla",
+      "single_value_option": "- No, la planilla tiene un solo valor -"
+    },
+    "hints": {
+      "public_or_api_key": "La planilla debe ser pública o tu API key debe tener acceso a ella.",
+      "api_key_help": "Cómo obtener una API Key ↗",
+      "no_tabs": "No se encontraron pestañas. Verificá la URL y la API key.",
+      "preview_label": "Vista previa (primeras filas):",
+      "agent_column_hint": "El sistema va a filtrar cada fila por el nombre del agente. En el siguiente paso elegís qué colaboradores conectar.",
+      "scope_destination": "Los datos van al KPI consolidado del área o equipo. Usalo cuando una sola planilla tiene el dato agregado de todo el grupo.",
+      "bulk_destination": "Seleccioná los colaboradores a conectar. El sistema va a filtrar la fila de cada uno por la columna {{column}}. Podés editar el nombre si no coincide exactamente con la planilla.",
+      "single_destination": "Los datos van a una persona específica. Usalo cuando la planilla tiene un único valor.",
+      "empty_search": "No se encontraron KPIs con ese nombre.",
+      "next_sync": "La próxima sincronización automática ocurrirá según el horario configurado.",
+      "manual_run": "También podés ejecutarla manualmente desde la sección de Integraciones."
+    },
+    "loading": {
+      "sheet": "Leyendo planilla...",
+      "columns": "Cargando columnas..."
+    },
+    "actions": {
+      "connect": "Conectar",
+      "connecting": "Conectando...",
+      "create": "Crear integración",
+      "creating": "Creando integración...",
+      "done": "Listo"
+    },
+    "aggregation_options": {
+      "FIRST": "El primer valor encontrado",
+      "SUM": "Suma de todos",
+      "AVG": "Promedio",
+      "MAX": "Valor máximo",
+      "MIN": "Valor mínimo"
+    },
+    "kpi_tabs": {
+      "assignment": "KPI individual",
+      "scope_kpi": "KPI de área o equipo"
+    },
+    "bulk_selection_one": "{{count}} colaborador seleccionado - se va a crear {{count}} integración.",
+    "bulk_selection_other": "{{count}} colaboradores seleccionados - se van a crear {{count}} integraciones.",
+    "summary": {
+      "sheet": "Planilla:",
+      "tab": "Pestaña:",
+      "column": "Columna:",
+      "collaborators": "Colaboradores:",
+      "destination_kpi": "KPI destino:"
+    },
+    "done": {
+      "bulk_message": "Tu planilla {{tab}} quedó conectada a {{count}} colaboradores filtrando por la columna {{column}}.",
+      "single_message": "Tu planilla {{tab}} ya está conectada al KPI {{kpi}}.",
+      "template_id": "Template #{{id}}",
+      "targets_created": "{{count}} targets creados",
+      "target_id": "Target #{{id}}"
+    }
+  },
+  "slack_wizard": {
+    "title": "Conectar Slack",
+    "subtitle": "Recibí alertas de KPIs directamente en tu canal",
+    "progress": "Paso {{current}} de {{total}}",
+    "errors": {
+      "save": "Error al guardar",
+      "test": "No se pudo enviar el mensaje de prueba",
+      "url_required": "Pegá la URL del webhook",
+      "url_invalid": "La URL debe empezar con https://hooks.slack.com/"
+    },
+    "loading": "Verificando configuración...",
+    "status": {
+      "configured": "Slack conectado",
+      "configured_hint": "Las alertas se envían al webhook configurado:",
+      "change_channel_hint": "Para cambiar el canal, desconectá y volvé a configurar.",
+      "not_configured": "Slack no configurado",
+      "not_configured_hint": "Conectá tu workspace de Slack para recibir alertas automáticas cuando:"
+    },
+    "benefits": {
+      "risk": "Un KPI está por debajo del 80% de cumplimiento",
+      "missing": "Un colaborador no cargó sus valores",
+      "deadline": "Un período está por vencer"
+    },
+    "instructions": {
+      "title": "Crear un Incoming Webhook en Slack",
+      "hint": "Seguí estos pasos en Slack. Tarda menos de 2 minutos:",
+      "step_1": "Abrí <link>api.slack.com/apps</link> e iniciá sesión con tu cuenta de Slack.",
+      "step_2": "Hacé clic en <strong>Create New App</strong> y elegí <strong>From scratch</strong>.",
+      "step_3": "Poné un nombre, por ejemplo <code>KPI Manager</code>, y elegí tu workspace.",
+      "step_4": "En el menú izquierdo, hacé clic en <strong>Incoming Webhooks</strong>.",
+      "step_5": "Activá el toggle <strong>Activate Incoming Webhooks</strong>.",
+      "step_6": "Hacé clic en <strong>Add New Webhook to Workspace</strong>, elegí el canal donde querés recibir las alertas y confirmá.",
+      "step_7": "Copiá la URL que aparece. Empieza con <code>https://hooks.slack.com/services/...</code>."
+    },
+    "paste": {
+      "title": "Pegá la URL del webhook",
+      "hint": "Copiá la URL desde la página de tu app en Slack y pegala acá.",
+      "label": "Webhook URL",
+      "placeholder": "https://hooks.slack.com/services/T.../B.../...",
+      "security_hint": "La URL se guarda de forma segura. No se muestra completa una vez guardada."
+    },
+    "test": {
+      "title": "Probar la conexión",
+      "hint": "Webhook guardado. Enviá un mensaje de prueba para verificar que llegue a tu canal de Slack.",
+      "preview_title": "KPI Manager",
+      "preview_badge": "App",
+      "preview_message": "KPI Manager conectado a Slack",
+      "preview_hint": "Vas a recibir alertas aquí cuando haya KPIs en riesgo..."
+    },
+    "done": {
+      "title": "¡Slack conectado!",
+      "message": "El mensaje de prueba se envió correctamente. A partir de ahora vas a recibir alertas automáticas en tu canal de Slack.",
+      "hint": "Las alertas se disparan cuando cambian los datos: KPIs en riesgo, valores faltantes o períodos por vencer."
+    },
+    "actions": {
+      "disconnect": "Desconectar Slack",
+      "disconnecting": "Eliminando...",
+      "send_test": "Enviar mensaje de prueba",
+      "sending": "Enviando...",
+      "not_now": "Ahora no",
+      "configure": "Configurar →",
+      "have_url": "Ya tengo la URL →",
+      "save": "Guardar →",
+      "saving": "Guardando...",
+      "skip_test": "Omitir prueba",
+      "done": "Listo"
+    }
+  },
+  "onboarding": {
+    "title": "Configuración inicial",
+    "progress": "{{done}} de {{total}} pasos completados",
+    "hide": "Ocultar",
+    "completed_label": "Completado",
+    "blocked": "Primero completá el paso {{step}}",
+    "done": {
+      "title": "¡Sistema configurado!",
+      "message": "Ya podés empezar a cargar datos y ver resultados."
+    },
+    "steps": {
+      "org": {
+        "title": "Definí la estructura organizacional",
+        "description": "Creá las áreas y equipos de tu empresa. Esto define quién es responsable de qué KPI.",
+        "action": "Ir a Configuración →"
+      },
+      "kpis": {
+        "title": "Cargá los KPIs de tu empresa",
+        "description": "Definí qué vas a medir: ventas, tickets resueltos, NPS, cumplimiento de entregas, etc.",
+        "action": "Ir a KPIs →"
+      },
+      "period": {
+        "title": "Creá un período activo",
+        "description": "Definí el ciclo de evaluación (anual, semestral, trimestral) y sus sub-períodos.",
+        "action": "Ir a Períodos →"
+      },
+      "assignments": {
+        "title": "Asigná KPIs a tus colaboradores",
+        "description": "Definí qué KPI mide cada persona, con su objetivo y peso en la evaluación.",
+        "action": "Ir a Asignaciones →"
+      }
+    }
+  },
+  "scope_modal": {
+    "unknown_type": "Sin tipo",
+    "name_placeholder": "Ej: Comercial, Tecnología, Operaciones",
+    "inactive_hint": "Las unidades inactivas no aparecen en nuevas asignaciones.",
+    "type_hints": {
+      "area": "Sector estable: Comercial, RRHH, Tecnología…",
+      "team": "Subgrupo dentro de un área: Soporte Técnico, Ventas B2B…",
+      "company": "Unidad raíz de la organización.",
+      "person": "Persona individual como unidad de estructura.",
+      "product": "Producto o línea de negocio."
+    },
+    "hierarchy_title": "Jerarquía y calendario",
+    "parent": "Depende de",
+    "no_parent": "— Sin superior (unidad raíz) —",
+    "parent_hint": "Elegí la unidad de la que depende esta. Dejalo vacío si es un área raíz.",
+    "calendar": "Calendario de medición",
+    "calendar_inherit": "📅 Hereda el calendario del superior",
+    "calendar_hint": "Define la frecuencia de medición de KPIs (mensual, trimestral, etc.). Si no lo cambiás, hereda del padre.",
+    "hide_advanced": "Ocultar opciones avanzadas",
+    "show_advanced": "Mostrar opciones avanzadas",
+    "advanced_hint": "Solo si usás conectores externos (Jira, Sheets, etc.)",
+    "integration_params": "Parámetros de integración (JSON)",
+    "integration_params_placeholder": "{\"projects\":[\"GT_MISIM\"],\"authProfileId\":1}",
+    "integration_params_hint": "Parámetros técnicos heredables para integraciones. Dejalo vacío si no usás conectores.",
+    "external_connector": "Conector externo",
+    "connector_alias": "Alias en el conector",
+    "connector_alias_placeholder": "comercial, ventas, sales",
+    "connector_alias_hint": "Nombre con el que aparece esta unidad en {{source}}. Podés poner varios separados por coma."
+  }
+}

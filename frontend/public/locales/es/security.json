@@ -1,0 +1,66 @@
+{
+  "title": "Seguridad",
+  "subtitle": "Gestiona roles, permisos por equipo y excepciones por usuario.",
+  "tabs": {
+    "roles": "Roles",
+    "groups": "Permisos por equipo",
+    "users": "Excepciones por usuario",
+    "audit": "Auditoría"
+  },
+  "roles": {
+    "title": "Roles base",
+    "subtitle": "Creá, cloná y ajustá roles sin tocar código.",
+    "new": "Nuevo rol",
+    "duplicate": "Duplicar",
+    "users_count": "{{count}} usuarios"
+  },
+  "groups": {
+    "title": "Permisos por equipo",
+    "subtitle": "Definí el rol por defecto de cada scope.",
+    "scope": "Scope",
+    "type": "Tipo",
+    "default_role": "Rol por defecto",
+    "no_role": "Sin rol",
+    "empty": "No hay scopes configurados."
+  },
+  "users": {
+    "title": "Excepciones por usuario",
+    "subtitle": "El rol del equipo aplica por defecto. Acá definís overrides.",
+    "user": "Usuario",
+    "effective_role": "Rol efectivo",
+    "overrides": "Overrides",
+    "no_role": "Sin rol",
+    "active_overrides": "Overrides activos",
+    "permissions_count": "{{count}} permisos",
+    "team_role": "Rol del equipo",
+    "permissions": "Permisos",
+    "reset": "Resetear"
+  },
+  "audit_hint": "Usá la pantalla de Auditoría para ver cambios de roles y permisos.",
+  "role_source": {
+    "usuario": "usuario",
+    "equipo": "equipo",
+    "legacy": "legacy",
+    "none": "sin origen"
+  },
+  "scope_types": {
+    "company": "Empresa",
+    "business_unit": "Unidad de negocio",
+    "area": "Área",
+    "team": "Equipo",
+    "person": "Persona",
+    "product": "Producto"
+  },
+  "role_modal": {
+    "new_title": "Nuevo rol",
+    "edit_title": "Editar rol",
+    "code": "Código",
+    "permissions": "Permisos",
+    "save": "Guardar rol"
+  },
+  "override_modal": {
+    "title": "Permisos personalizados · {{name}}",
+    "save": "Guardar permisos"
+  },
+  "empty_permissions": "No hay permisos configurados. Inicializá los permisos en el backend y recargá."
+}

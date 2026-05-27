@@ -1,0 +1,269 @@
+{
+  "title": "KPI Template Marketplace",
+  "subtitle_one": "{{count}} industry template ready to import. Select the ones that apply to your organization — created in one click.",
+  "subtitle_other": "{{count}} industry templates ready to import. Select the ones that apply to your organization — created in one click.",
+  "import_btn_one": "Import {{count}} KPI",
+  "import_btn_other": "Import {{count}} KPIs",
+  "importing": "Importing...",
+  "result": {
+    "imported_one": "<strong>{{count}} imported:</strong>",
+    "imported_other": "<strong>{{count}} imported:</strong>",
+    "skipped_one": "<strong>{{count}} already existed:</strong>",
+    "skipped_other": "<strong>{{count}} already existed:</strong>",
+    "failed_one": "<strong>{{count}} failed:</strong>",
+    "failed_other": "<strong>{{count}} failed:</strong>"
+  },
+  "search_placeholder": "Search templates...",
+  "cat_all_one": "All ({{count}})",
+  "cat_all_other": "All ({{count}})",
+  "selection": {
+    "none": "Select the KPIs to import",
+    "count_one": "{{count}} selected",
+    "count_other": "{{count}} selected",
+    "select_all_one": "Select all ({{count}})",
+    "select_all_other": "Select all ({{count}})",
+    "clear": "Clear selection"
+  },
+  "empty": "No templates match your search.",
+  "card": {
+    "exists_badge": "Already exists",
+    "selected_badge": "✓ Selected",
+    "preview_btn": "View detail"
+  },
+  "modal": {
+    "type_label": "Type",
+    "direction_label": "Direction",
+    "target_label": "Suggested target",
+    "criteria_label": "Measurement criteria",
+    "formula_label": "Variation formula",
+    "close": "Close",
+    "import_btn": "Import this KPI",
+    "select_to_import": "Select to import",
+    "deselect": "Deselect",
+    "exists_in_catalog": "Already in your catalog"
+  },
+  "direction": {
+    "growth": "Growth ↑",
+    "reduction": "Reduction ↓",
+    "exact": "Exact ="
+  },
+  "type": {
+    "manual": "Manual",
+    "count": "Count",
+    "ratio": "Ratio",
+    "sla": "SLA",
+    "value": "Value"
+  },
+  "units": {
+    "clientes": "clients",
+    "tickets": "tickets",
+    "bugs": "bugs",
+    "deploys": "deploys",
+    "min": "min",
+    "dias": "days",
+    "puntos": "points",
+    "cursos": "courses",
+    "u_persona": "units/person",
+    "leads": "leads",
+    "sesiones": "sessions",
+    "ratio": "ratio"
+  },
+  "catalog": {
+    "sales": {
+      "label": "Sales",
+      "description": "KPIs for commercial and revenue teams",
+      "templates": {
+        "ingresos_mensuales": {
+          "name": "Monthly revenue",
+          "description": "Total revenue generated during the month by the sales team.",
+          "criteria": "Sum of all contracts closed during the period, expressed in local currency."
+        },
+        "nuevos_clientes_adquiridos": {
+          "name": "New customers acquired",
+          "description": "Number of new customers who signed a contract for the first time.",
+          "criteria": "Customers without a previous contract who signed during the period."
+        },
+        "tasa_de_conversion": {
+          "name": "Conversion rate",
+          "description": "Percentage of opportunities converted into closed sales.",
+          "criteria": "(Closed sales / Total opportunities) × 100."
+        },
+        "ticket_promedio": {
+          "name": "Average deal size",
+          "description": "Average value of each closed sale during the period.",
+          "criteria": "Total revenue divided by the number of closed sales."
+        },
+        "retencion_de_clientes": {
+          "name": "Customer retention",
+          "description": "Percentage of customers who renew or remain active.",
+          "criteria": "(Customers who renewed / Customers at the start of the period) × 100."
+        },
+        "churn_rate": {
+          "name": "Churn rate",
+          "description": "Percentage of customers who canceled during the period.",
+          "criteria": "(Lost customers / Customers at the start of the period) × 100."
+        }
+      }
+    },
+    "tech": {
+      "label": "Technology",
+      "description": "KPIs for engineering, product, and DevOps teams",
+      "templates": {
+        "tickets_cerrados": {
+          "name": "Closed tickets",
+          "description": "Number of tickets resolved during the period.",
+          "criteria": "Tickets with status \"closed\" or \"resolved\" in the tracking system (Jira, Linear, etc.)."
+        },
+        "bugs_criticos_resueltos": {
+          "name": "Critical bugs resolved",
+          "description": "High or critical priority bugs closed during the period.",
+          "criteria": "Tickets tagged as \"bug\" with \"high\" or \"critical\" priority closed during the period."
+        },
+        "uptime_del_servicio": {
+          "name": "Service uptime",
+          "description": "Production system availability percentage.",
+          "criteria": "(Available minutes / Total minutes in the period) × 100. Scheduled maintenance excluded."
+        },
+        "tiempo_de_respuesta_promedio_api": {
+          "name": "Average response time (API)",
+          "description": "Average API endpoint latency in milliseconds.",
+          "criteria": "95th percentile latency measured by the monitoring system (Datadog, New Relic, etc.)."
+        },
+        "cobertura_de_tests": {
+          "name": "Test coverage",
+          "description": "Percentage of code covered by automated tests.",
+          "criteria": "Covered lines / Total lines in the codebase, according to the coverage report."
+        },
+        "deploys_a_produccion": {
+          "name": "Production deploys",
+          "description": "Number of successful deploys performed during the period.",
+          "criteria": "Deployments that reached production without rollback during the first 24h."
+        },
+        "mean_time_to_recovery_mttr": {
+          "name": "Mean Time to Recovery (MTTR)",
+          "description": "Average recovery time after production incidents.",
+          "criteria": "Average minutes between incident detection and service restoration."
+        }
+      }
+    },
+    "hr": {
+      "label": "Human Resources",
+      "description": "KPIs for People, Talent, and HR teams",
+      "templates": {
+        "tasa_de_retencion_de_talento": {
+          "name": "Talent retention rate",
+          "description": "Percentage of employees who remain in the organization.",
+          "criteria": "((Employees at the end - New hires) / Employees at the start) × 100."
+        },
+        "tiempo_de_cobertura_de_vacantes": {
+          "name": "Time to fill vacancies",
+          "description": "Average days from job opening to candidate onboarding.",
+          "criteria": "Average days between job posting and candidate start date."
+        },
+        "nps_de_empleados_enps": {
+          "name": "Employee NPS (eNPS)",
+          "description": "Internal Net Promoter Score measured through climate surveys.",
+          "criteria": "(% promoters - % detractors). Range -100 to +100."
+        },
+        "ausentismo": {
+          "name": "Absenteeism",
+          "description": "Percentage of workdays lost due to unplanned absences.",
+          "criteria": "(Unplanned absence days / Total team workdays) × 100."
+        },
+        "capacitaciones_completadas": {
+          "name": "Completed trainings",
+          "description": "Number of trainings or courses completed by the team.",
+          "criteria": "Modules or courses marked as completed in the learning platform."
+        }
+      }
+    },
+    "ops": {
+      "label": "Operations",
+      "description": "KPIs for operations, logistics, and quality teams",
+      "templates": {
+        "on_time_delivery_otd": {
+          "name": "On-Time Delivery (OTD)",
+          "description": "Percentage of deliveries completed on time and in full.",
+          "criteria": "(On-time deliveries / Total deliveries) × 100."
+        },
+        "costo_operativo_por_unidad": {
+          "name": "Operating cost per unit",
+          "description": "Average operating cost per processed unit.",
+          "criteria": "Total operating costs during the period divided by processed units."
+        },
+        "tasa_de_defectos": {
+          "name": "Defect rate",
+          "description": "Percentage of produced units with defects.",
+          "criteria": "(Defective units / Total produced units) × 100."
+        },
+        "productividad_por_colaborador": {
+          "name": "Productivity per employee",
+          "description": "Processed units or value generated per person during the period.",
+          "criteria": "Total team output divided by active employees."
+        },
+        "sla_de_atencion_al_cliente": {
+          "name": "Customer support SLA",
+          "description": "Percentage of customer tickets resolved within the agreed SLA.",
+          "criteria": "(Tickets resolved on time / Total tickets) × 100."
+        }
+      }
+    },
+    "marketing": {
+      "label": "Marketing",
+      "description": "KPIs for marketing, growth, and communications teams",
+      "templates": {
+        "leads_generados": {
+          "name": "Generated leads",
+          "description": "Number of new leads captured during the period.",
+          "criteria": "New contacts with validated data that entered the CRM during the period."
+        },
+        "costo_por_lead_cpl": {
+          "name": "Cost per lead (CPL)",
+          "description": "Average marketing spend for each generated lead.",
+          "criteria": "Total marketing spend / Number of generated leads."
+        },
+        "trafico_organico": {
+          "name": "Organic traffic",
+          "description": "Website visits coming from organic search.",
+          "criteria": "\"Organic Search\" channel sessions in Google Analytics or equivalent."
+        },
+        "tasa_de_apertura_de_emails": {
+          "name": "Email open rate",
+          "description": "Percentage of recipients who opened campaign emails.",
+          "criteria": "(Unique opens / Sent emails) × 100."
+        },
+        "roi_de_campanas": {
+          "name": "Campaign ROI",
+          "description": "Return on investment from marketing campaigns.",
+          "criteria": "((Attributed revenue - Investment) / Investment) × 100."
+        }
+      }
+    },
+    "finance": {
+      "label": "Finance",
+      "description": "KPIs for finance, treasury, and controlling teams",
+      "templates": {
+        "ebitda": {
+          "name": "EBITDA",
+          "description": "Earnings before interest, taxes, depreciation, and amortization.",
+          "criteria": "Operating income + depreciation + amortization, according to the income statement."
+        },
+        "dias_de_cobro_dso": {
+          "name": "Days Sales Outstanding (DSO)",
+          "description": "Average number of days it takes to collect an invoice.",
+          "criteria": "(Accounts receivable / Period revenue) × days in the period."
+        },
+        "liquidez_corriente": {
+          "name": "Current ratio",
+          "description": "Ratio between current assets and current liabilities.",
+          "criteria": "Current assets / Current liabilities. Optimal value > 1."
+        },
+        "presupuesto_ejecutado": {
+          "name": "Executed budget",
+          "description": "Percentage of the approved budget that was actually executed.",
+          "criteria": "(Actual spend / Approved budget) × 100. Target: 100% (neither under nor over execution)."
+        }
+      }
+    }
+  }
+}

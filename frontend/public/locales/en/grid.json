@@ -1,0 +1,132 @@
+{
+  "title": "My Grid",
+  "period_label": "Active period:",
+  "no_period": "No active period",
+  "global_result": "Global result",
+  "weighted_result": "Weighted result",
+  "result_description": "Weighted average of all assigned KPIs",
+  "kpis_section_title": "KPI List",
+  "chart_title": "Results Chart",
+  "source_none": "No source",
+  "input_label": "Input:",
+  "last_update_label": "Last update:",
+  "pending_badge": "⏳ In review",
+  "error_collaborator_not_found": "Could not identify the collaborator",
+  "error_collaborator_hint": "Log in again to load your grid.",
+  "filters": {
+    "all_periods": "All periods",
+    "show_subperiods": "View sub-periods"
+  },
+  "period_status": {
+    "open": "Open",
+    "in_review": "In Review",
+    "closed": "Closed"
+  },
+  "table": {
+    "kpi": "KPI",
+    "description": "Description",
+    "target": "Target",
+    "actual": "Actual",
+    "compliance": "Compliance",
+    "weight": "Weight",
+    "weighted_result": "Weighted result",
+    "criteria": "Criteria",
+    "status": "Status",
+    "comments": "Comments",
+    "actions": "Actions"
+  },
+  "status": {
+    "draft": "Draft",
+    "proposed": "Proposed",
+    "approved": "Approved",
+    "closed": "Closed"
+  },
+  "curation": {
+    "pending": "Pending criteria",
+    "in_review": "In review",
+    "approved": "Criteria approved",
+    "rejected": "Criteria rejected",
+    "changes_requested": "Changes requested"
+  },
+  "input": {
+    "auto": "Auto",
+    "import": "Import",
+    "manual": "Manual"
+  },
+  "block": {
+    "kpi_closed": "KPI closed",
+    "period_closed": "Period closed",
+    "auto_input": "Automatic input — use Propose to override",
+    "curation_pending": "Criteria pending approval",
+    "use_propose": "Use the Propose button to suggest a value"
+  },
+  "actions": {
+    "edit_actual": "Edit actual value",
+    "propose": "Propose value",
+    "propose_title": "Propose values for review",
+    "export_pdf": "Export to PDF",
+    "export_excel": "Export to Excel",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "inline_edit": {
+    "label": "New actual value",
+    "placeholder": "Enter value",
+    "error": "Enter a valid numeric value."
+  },
+  "alert": {
+    "updated": "Value updated successfully.",
+    "error_default": "Error updating value. Check that the period is not closed."
+  },
+  "empty": "No KPIs assigned to this collaborator.",
+  "loading": "Loading grid...",
+  "general": {
+    "title": "General Grid (superpower only)",
+    "subtitle": "KPI summary by collaborator",
+    "filters": {
+      "search_label": "Search",
+      "search_placeholder": "Search by collaborator or KPI...",
+      "period_label": "Period",
+      "all": "All",
+      "collaborator_label": "Collaborator"
+    },
+    "card": {
+      "kpis": "KPIs: {{count}}",
+      "total_weight": "Total weight",
+      "avg_variation": "Avg variation",
+      "worst_variation": "Worst variation"
+    },
+    "types": {
+      "kpi": "KPI",
+      "manual": "Manual",
+      "count": "Count",
+      "ratio": "Ratio",
+      "sla": "SLA",
+      "value": "Value",
+      "growth": "Growth",
+      "reduction": "Reduction",
+      "exact": "Exact"
+    },
+    "loading": "Loading…",
+    "empty": {
+      "select_filter_title": "Select a period or collaborator",
+      "select_filter_text": "Choose a period or collaborator in the filters above to view data.",
+      "no_data_title": "No data",
+      "no_data_text": "Try other filters"
+    },
+    "table": {
+      "collaborator": "Collaborator",
+      "kpi": "KPI",
+      "period": "Period",
+      "type": "Type",
+      "target": "Target",
+      "actual": "Actual",
+      "weight": "Weight",
+      "variation": "Variation",
+      "status": "Status",
+      "trend": "Trend",
+      "actions": "Actions",
+      "view_detail": "View detail"
+    }
+  }
+}

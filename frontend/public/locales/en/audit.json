@@ -1,0 +1,72 @@
+{
+  "title": "Audit",
+  "subtitle": "System change history",
+  "filters": {
+    "entity_type_label": "Entity type:",
+    "entity_type_all": "All",
+    "action_label": "Action:",
+    "action_all": "All",
+    "entity_id_label": "Entity ID:",
+    "entity_id_placeholder": "E.g.: 123",
+    "user_id_label": "User ID:",
+    "user_id_placeholder": "E.g.: 12",
+    "result_label": "Result:",
+    "result_all": "All",
+    "result_success": "Success",
+    "result_error": "Error",
+    "kpi_id_label": "KPI ID:",
+    "kpi_id_placeholder": "E.g.: 28",
+    "collab_id_label": "Collaborator ID:",
+    "collab_id_placeholder": "E.g.: 63",
+    "period_id_label": "Period ID:",
+    "period_id_placeholder": "E.g.: 1",
+    "start_date_label": "Start date:",
+    "end_date_label": "End date:",
+    "search_label": "Search",
+    "search_placeholder": "User, KPI, comment...",
+    "clear_btn": "Clear Filters"
+  },
+  "entity_types": {
+    "collaborators": "Collaborators",
+    "kpis": "KPIs",
+    "collaborator_kpis": "Assignments",
+    "periods": "Periods",
+    "calendar_subperiods": "Sub-periods",
+    "objective_trees": "Objective tree"
+  },
+  "actions": {
+    "CREATE": "Create",
+    "UPDATE": "Update",
+    "DELETE": "Delete",
+    "CLOSE": "Close",
+    "REOPEN": "Reopen",
+    "APPROVE": "Approve",
+    "REJECT": "Reject"
+  },
+  "table": {
+    "date": "Date",
+    "user": "User",
+    "action": "Action",
+    "entity": "Entity",
+    "id": "ID",
+    "result": "Result",
+    "duration": "Duration",
+    "ip": "IP",
+    "ua": "UA",
+    "changes": "Changes"
+  },
+  "result_success": "Success",
+  "result_error": "Error",
+  "critical_badge": "Critical",
+  "duration_ms": "{{value}} ms",
+  "user_fallback": "User #{{id}}",
+  "showing": "Showing {{shown}} of {{total}} records",
+  "pagination": {
+    "prev": "Previous",
+    "next": "Next",
+    "page_of": "Page {{page}} of {{total}}"
+  },
+  "empty_title": "No records",
+  "empty_subtitle": "Try adjusting the filters",
+  "loading": "Loading audit logs..."
+}

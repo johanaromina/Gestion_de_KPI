@@ -1,0 +1,168 @@
+{
+  "title": "Input de datos",
+  "subtitle": "Carga automatizada o manual con validaciones técnicas.",
+  "actions": {
+    "configure_integrations": "Configurar integraciones",
+    "new_manual": "Nueva carga manual",
+    "manual_load": "Cargar manual",
+    "download_template": "Descargar plantilla",
+    "upload_file": "Subir archivo",
+    "uploading": "Subiendo...",
+    "run_auto_fetch": "Ejecutar fetch (auto)",
+    "run_jobs_now": "Ejecutar jobs ahora",
+    "running": "Ejecutando...",
+    "go_curation": "Ir a Curaduría →"
+  },
+  "auto_ingest": {
+    "title": "Ingesta automática",
+    "description": "Jobs activos y salud de integraciones.",
+    "active": "Integración activa: {{name}}",
+    "none": "Sin integraciones activas para la asignación seleccionada.",
+    "no_target": "No hay target vinculado a esta asignación. Configuralo en Integraciones > Targets.",
+    "api_errors": {
+      "target_not_found": "El target de integración ya no existe."
+    }
+  },
+  "filters": {
+    "area_label": "Área",
+    "all_areas": "Todas las áreas",
+    "kpi_label": "KPI",
+    "all_kpis": "Todos los KPIs",
+    "assignment_label": "Asignación",
+    "select_assignment": "Selecciona una asignación",
+    "no_assignments": "No hay asignaciones para esos filtros.",
+    "subperiod_label": "Subperíodo",
+    "subperiod_summary": "Resumen (sin subperíodo)",
+    "collaborator_fallback": "Colaborador #{{id}}",
+    "kpi_fallback": "KPI #{{id}}",
+    "period_fallback": "Período #{{id}}",
+    "subperiod_fallback": "Subperíodo #{{id}}"
+  },
+  "measurements": {
+    "title": "Historial de mediciones",
+    "only_pending": "Solo pendientes",
+    "loading": "Cargando mediciones...",
+    "empty_no_assignment": "Selecciona una asignación para ver mediciones.",
+    "empty": "No hay mediciones registradas.",
+    "table": {
+      "value": "Valor",
+      "mode": "Modo",
+      "date": "Fecha",
+      "source": "Usuario/Fuente",
+      "status": "Estado",
+      "actions": "Acciones"
+    },
+    "approve": "Aprobar",
+    "reject": "Rechazar",
+    "mode_manual": "Manual",
+    "mode_import": "Import",
+    "mode_auto": "Auto",
+    "status_approved": "Aprobado",
+    "status_rejected": "Rechazado",
+    "status_proposed": "Propuesto",
+    "status_draft": "Borrador",
+    "loaded_ok": "Medición cargada correctamente.",
+    "save_error": "No se pudo guardar la medición.",
+    "job_ok": "Job ejecutado correctamente. Revisá el historial de mediciones.",
+    "api_errors": {
+      "owner_invalid": "La medición debe estar asociada a una asignación válida.",
+      "value_required": "Tenés que ingresar un valor para la medición.",
+      "curation_required": "No se puede aprobar la medición hasta que la curaduría esté aprobada.",
+      "subperiod_closed": "El subperíodo está cerrado y no permite nuevas mediciones."
+    }
+  },
+  "cycle": {
+    "assignment": "Asignación",
+    "criteria": "Criterio",
+    "measurement": "Medición",
+    "approval": "Aprobación"
+  },
+  "meta": {
+    "source_label": "Fuente:",
+    "no_source": "Sin fuente",
+    "curation_label": "Curaduría:",
+    "criteria_label": "Criterio activo:",
+    "no_criteria": "Sin criterio",
+    "calendar_label": "Calendario:",
+    "integration_fallback": "Integración",
+    "calendar_frequency_monthly": "Mensual",
+    "calendar_frequency_quarterly": "Trimestral",
+    "calendar_frequency_custom": "Personalizado"
+  },
+  "job": {
+    "title": "Estado del job",
+    "last_run": "Última ejecución:",
+    "next_run": "Próximo run:",
+    "subperiod_label": "Subperíodo destino:",
+    "no_subperiod": "Sin subperíodo",
+    "skipped_label": "Omitido:",
+    "skipped_default": "El job ya tenía medición.",
+    "no_cron": "Sin cron",
+    "target_fallback": "Target #{{id}}",
+    "status_success": "Éxito",
+    "status_error": "Error",
+    "status_running": "En ejecución",
+    "status_queued": "En cola"
+  },
+  "curation": {
+    "warning": "Curaduría en revisión: la aprobación quedará registrada con advertencia.",
+    "blocked": "Curaduría pendiente, no se puede aprobar",
+    "blocked_detail": "Las mediciones no se pueden aprobar hasta que la curaduría esté aprobada.",
+    "hint_blocked": "La curaduria no está aprobada. Solo se permite proponer o dejar en borrador.",
+    "hint_warning": "Curaduria en revision: la aprobación quedará con warning."
+  },
+  "duplicate_dialog": {
+    "message": "Ya existe una medición aprobada con valor {{value}}{{date}}. ¿Querés reemplazarla?",
+    "date_part": " ({{date}})",
+    "title": "Valor duplicado",
+    "confirm": "Reemplazar"
+  },
+  "auto_fetch": {
+    "no_assignment": "Seleccioná una asignación primero para ejecutar el fetch.",
+    "prompt": "Ingresá el valor obtenido automáticamente:",
+    "prompt_title": "Valor automático",
+    "prompt_placeholder": "Ej: 95.5",
+    "prompt_confirm": "Cargar",
+    "success": "Valor cargado automáticamente como propuesto."
+  },
+  "modal": {
+    "title": "Cargar medición",
+    "assignment_fallback": "Asignación seleccionada",
+    "current_value": "Valor aprobado actual:",
+    "value_label": "Valor",
+    "value_placeholder": "Ej: 82.5",
+    "mode_label": "Modo",
+    "mode_manual": "Manual — ingreso directo por el usuario",
+    "mode_import": "Import — carga desde archivo CSV",
+    "mode_auto": "Auto — obtenido por integración externa",
+    "status_label": "Estado",
+    "reason_label": "Motivo (override)",
+    "reason_placeholder": "Razón del override (si aplica)",
+    "evidence_label": "Evidencia",
+    "evidence_placeholder": "Link o adjunto",
+    "save": "Guardar medición",
+    "saving": "Guardando...",
+    "cancel": "Cancelar"
+  },
+  "upload": {
+    "empty": "El archivo está vacío.",
+    "no_assignment_warning": "Seleccioná una asignación primero para cargar datos.",
+    "partial": "Se cargaron {{created}} mediciones. Errores: {{errors}}",
+    "success": "Se cargaron {{created}} mediciones correctamente.",
+    "row_invalid_assignment": "Fila {{row}}: assignmentId inválido.",
+    "row_invalid_value": "Fila {{row}}: value inválido.",
+    "row_error": "Fila {{row}}: {{error}}",
+    "row_error_fallback": "Error al crear medición"
+  },
+  "validations": {
+    "title": "Validaciones técnicas",
+    "types_title": "Tipos de dato",
+    "types_desc": "Se validan enteros, decimales y fechas esperadas.",
+    "nulls_title": "Nulos",
+    "nulls_desc": "Campos obligatorios sin valor son bloqueados.",
+    "ranges_title": "Rangos",
+    "ranges_desc": "Límites mínimos y máximos por KPI.",
+    "duplicates_title": "Duplicados",
+    "duplicates_desc": "Se evita duplicar claves de fuente + período."
+  }
+}

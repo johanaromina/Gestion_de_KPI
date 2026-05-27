@@ -1,0 +1,27 @@
+{
+  "title": "Organigrama",
+  "subtitle": "Estructura jerárquica",
+  "loading": "Cargando estructura…",
+  "empty": {
+    "title": "No hay unidades organizacionales",
+    "text": "Creá las áreas en",
+    "link": "Configuración → Estructura Organizacional"
+  },
+  "total_units_one": "{{count}} unidad · vista árbol (3 niveles)",
+  "total_units_other": "{{count}} unidades · vista árbol (3 niveles)",
+  "breadcrumb_home": "Inicio",
+  "types": {
+    "company": "Empresa",
+    "area": "Área",
+    "team": "Equipo",
+    "business_unit": "Unidad de negocio"
+  },
+  "card": {
+    "dir_abbr": "dir.",
+    "drill_one": "Ver {{count}} sub-unidad →",
+    "drill_other": "Ver {{count}} sub-unidades →",
+    "kpi_toggle_hide": "▲",
+    "kpi_toggle_show_one": "▼ {{count}} KPI",
+    "kpi_toggle_show_other": "▼ {{count}} KPIs"
+  }
+}

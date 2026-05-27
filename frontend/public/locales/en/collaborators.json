@@ -1,0 +1,134 @@
+{
+  "title": "Collaborators",
+  "subtitle": "Manage system collaborators",
+  "header": {
+    "manage_areas": "Manage Areas",
+    "add": "+ Add Collaborator"
+  },
+  "filters": {
+    "search_label": "Search:",
+    "search_placeholder": "Search by name or position...",
+    "area": "Area:",
+    "all_areas": "All areas",
+    "role": "Role:",
+    "all_roles": "All roles",
+    "show_inactive": "Show inactive",
+    "clear": "Clear Filters"
+  },
+  "table": {
+    "id": "ID",
+    "name": "Name",
+    "position": "Position",
+    "area": "Area",
+    "status": "Status",
+    "role": "Role",
+    "manager": "Direct manager",
+    "actions": "Actions"
+  },
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive"
+  },
+  "actions": {
+    "edit": "Edit",
+    "deactivate": "Deactivate",
+    "delete": "Delete",
+    "resend_invite": "Resend invitation",
+    "resending": "Sending..."
+  },
+  "results": {
+    "showing": "Showing {{shown}} of {{total}} collaborators"
+  },
+  "invite": {
+    "sent": "Invitation resent successfully",
+    "error": "Error resending invitation",
+    "api_errors": {
+      "forbidden": "You do not have permission to resend invitations.",
+      "not_found": "Collaborator not found.",
+      "email_missing": "The collaborator does not have an email configured.",
+      "password_already_set": "The collaborator already has a password configured."
+    }
+  },
+  "dialogs": {
+    "delete_title": "Delete collaborator",
+    "delete_msg": "Are you sure you want to delete collaborator \"{{name}}\"? This action cannot be undone and will remove all associated assignments.",
+    "delete_confirm": "Delete",
+    "delete_error_title": "Delete error",
+    "delete_error_msg": "Error deleting collaborator. Make sure they have no associated assignments.",
+    "deactivate_title": "Deactivate collaborator",
+    "deactivate_msg": "Deactivate \"{{name}}\". Optional: provide a reason (resignation, role change, leave).",
+    "deactivate_placeholder": "E.g.: voluntary resignation",
+    "deactivate_confirm": "Deactivate",
+    "deactivate_error": "Error deactivating collaborator",
+    "api_errors": {
+      "delete_forbidden": "You do not have permission to delete this collaborator.",
+      "deactivate_forbidden": "You do not have permission to deactivate this collaborator.",
+      "not_found": "Collaborator not found."
+    }
+  },
+  "empty": {
+    "no_results_title": "No collaborators found",
+    "no_results_subtitle": "Try adjusting the search filters",
+    "no_results_clear": "Clear Filters",
+    "no_data_title": "No collaborators registered",
+    "no_data_subtitle": "Start by adding your first collaborator to the system",
+    "no_data_btn": "Add Collaborator"
+  },
+  "loading": "Loading collaborators...",
+  "form": {
+    "title_create": "Create Collaborator",
+    "title_edit": "Edit Collaborator",
+    "name_label": "Full Name *",
+    "name_placeholder": "E.g.: John Smith",
+    "position_label": "Position *",
+    "position_placeholder": "E.g.: Senior Developer",
+    "area_label": "Area *",
+    "area_placeholder": "Select an area or team",
+    "area_new_btn": "+ New",
+    "area_new_title": "Create area",
+    "area_new_prompt": "New area name:",
+    "area_new_placeholder": "E.g.: Technology",
+    "area_new_confirm": "Create",
+    "area_error_create": "Error creating area",
+    "email_label": "Email",
+    "email_placeholder": "user@company.com",
+    "mfa_label": "Requires MFA",
+    "mfa_hint": "Enable email verification",
+    "mapping_source_type_label": "Source type",
+    "external_keys_label": "External keys",
+    "external_keys_placeholder": "johana, j.garcia, jgarcia@company.com",
+    "external_keys_hint_global": "Names or aliases this person uses in your external systems (Jira, Google Sheets, etc.). Used as a wildcard when no connector-specific alias exists.",
+    "external_keys_hint_specific": "Names or identifiers for this person in {{source}}. Comma-separated. E.g.: johana, j.garcia",
+    "role_label": "Role *",
+    "manager_label": "Direct manager",
+    "manager_placeholder": "Search by name or position...",
+    "manager_none": "No manager",
+    "manager_no_results": "No results",
+    "manager_remove_aria": "Remove manager",
+    "manager_warning": "This manager belongs to a unit that reports to this collaborator's area. Verify if this is correct.",
+    "person_scope_label": "Org chart node",
+    "person_scope_optional": "(optional)",
+    "person_scope_no_node": "No personal node assigned",
+    "person_scope_hint": "If this person has a \"Person\" node in the organizational structure, link it here so they appear in the org chart.",
+    "cancel": "Cancel",
+    "saving": "Saving...",
+    "update": "Update",
+    "create": "Create",
+    "errors": {
+      "name_required": "Name is required",
+      "position_required": "Position is required",
+      "area_required": "Area is required",
+      "role_required": "Role is required",
+      "email_invalid": "Invalid email",
+      "email_duplicate": "A collaborator with this email already exists",
+      "circular_manager": "This manager creates a circular relationship in the hierarchy",
+      "save_failed": "Could not save the collaborator"
+    },
+    "api_errors": {
+      "scope_not_found": "The selected area or scope no longer exists.",
+      "create_forbidden": "You do not have permission to create collaborators in that area.",
+      "update_forbidden": "You do not have permission to edit this collaborator.",
+      "not_found": "Collaborator not found."
+    }
+  }
+}

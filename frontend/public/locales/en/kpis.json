@@ -1,0 +1,122 @@
+{
+  "title": "KPIs",
+  "subtitle": "Manage KPI definitions",
+  "header": {
+    "create": "+ Create KPI"
+  },
+  "filters": {
+    "search_label": "Search:",
+    "search_placeholder": "Search by name or description...",
+    "type": "Type:",
+    "all_types": "All types",
+    "period": "Period:",
+    "all_periods": "All",
+    "clear": "Clear filters"
+  },
+  "stats": {
+    "total": "Total"
+  },
+  "results": {
+    "showing": "Showing {{shown}} of {{total}} KPIs"
+  },
+  "direction": {
+    "growth": "Growth",
+    "reduction": "Reduction",
+    "exact": "Exact"
+  },
+  "card": {
+    "no_description": "No description",
+    "criteria_label": "Criteria",
+    "criteria_none": "Not defined",
+    "formula_label": "Formula",
+    "formula_custom": "Custom",
+    "formula_default": "Default",
+    "macro_label": "Parent KPI ⓘ",
+    "macro_tooltip": "Macro KPI: groups several individual KPIs under a common parent indicator. Its result is the weighted average of its child KPIs.",
+    "usage_label": "Usage",
+    "usage_value": "{{count}} assignments · {{periods}} periods",
+    "periods_label": "Periods",
+    "no_assignments": "No assignments",
+    "read_only": "Read only",
+    "formula_sample_growth": "E.g.: target 100, actual 120 → 120%",
+    "formula_sample_reduction": "E.g.: target 100, actual 80 → 125%",
+    "formula_sample_exact": "E.g.: target 100, actual 120 → 80% (penalizes deviation)"
+  },
+  "actions": {
+    "edit": "Edit",
+    "delete": "Delete",
+    "close_period": "Close KPI (period)",
+    "close_period_title_active": "Close KPI in the selected period",
+    "close_period_title_inactive": "Select a period to close the KPI"
+  },
+  "dialogs": {
+    "delete_title": "Delete KPI",
+    "delete_msg": "Are you sure you want to delete KPI \"{{name}}\"? This action cannot be undone and will remove all associated assignments.",
+    "delete_confirm": "Delete",
+    "delete_error_title": "Delete error",
+    "delete_error_msg": "Error deleting KPI. Make sure it has no associated assignments.",
+    "close_period_title": "Close KPI in period",
+    "close_period_msg": "Close KPI \"{{name}}\" in {{period}}? This will close all its assignments in that period.",
+    "close_period_confirm": "Close",
+    "close_period_error": "Error closing the KPI in the period.",
+    "api_errors": {
+      "delete_forbidden": "You do not have permission to delete this KPI.",
+      "delete_in_use": "The KPI cannot be deleted because it has linked assignments.",
+      "close_period_required": "Select a period to close the KPI."
+    }
+  },
+  "empty": {
+    "no_results_title": "No KPIs found",
+    "no_results_subtitle": "Try adjusting the search filters",
+    "no_results_clear": "Clear filters",
+    "no_data_title": "No KPIs defined yet",
+    "no_data_subtitle": "A KPI is the indicator you will measure: monthly sales, resolved tickets, NPS, delivery compliance, etc.",
+    "no_data_btn": "Create first KPI",
+    "no_data_hint_pre": "Before creating KPIs make sure you have at least one area configured in ",
+    "no_data_hint_link": "Configuration"
+  },
+  "loading": "Loading KPIs...",
+  "form": {
+    "title_create": "Create KPI",
+    "title_edit": "Edit KPI",
+    "name_label": "KPI Name *",
+    "name_placeholder": "E.g.: Average response time",
+    "description_label": "Description",
+    "description_placeholder": "Describe the KPI and how it is measured...",
+    "type_label": "KPI Type *",
+    "type_hint": "Manual to start without integrations. Count/Ratio/SLA/Value are automated once the criteria is stable.",
+    "direction_label": "Calculation direction",
+    "direction_growth": "Growth (higher is better)",
+    "direction_reduction": "Reduction (lower is better)",
+    "direction_exact": "Exact (must match)",
+    "direction_hint": "Affects compliance calculation (variation).",
+    "macro_label": "Parent KPI (Optional)",
+    "macro_none": "No parent KPI",
+    "macro_hint": "If this KPI is part of a broader indicator, select the parent KPI that groups it. The parent's result is the weighted average of its children.",
+    "periods_label": "Periods",
+    "periods_hint": "Select the periods where this KPI will be active.",
+    "scope_weights_label": "Weight by area (optional)",
+    "scope_weights_no_areas": "No active areas to configure.",
+    "scope_weights_placeholder": "E.g.: 25",
+    "scope_weights_hint": "Define the KPI weight by area. This value is pre-loaded in Assignments and can be adjusted per person.",
+    "scope_weights_total": "Current sum of defined weights: {{value}}%",
+    "criteria_label": "Calculation Criteria",
+    "criteria_placeholder": "Describe how this KPI is calculated (formulas, rules, etc.)",
+    "criteria_hint": "E.g.: (Actual - Target) / Target * 100 for growth",
+    "formula_label": "Custom Formula (Optional)",
+    "formula_placeholder": "E.g.: (actual / target) * 100",
+    "formula_help_title": "View help",
+    "formula_vars_label": "Available variables",
+    "formula_ops_label": "Operators",
+    "formula_examples_label": "Examples",
+    "formula_hint": "If left empty, the default formula for the KPI type will be used.",
+    "cancel": "Cancel",
+    "saving": "Saving...",
+    "update": "Update",
+    "create": "Create",
+    "errors": {
+      "name_required": "Name is required",
+      "type_required": "Type is required"
+    }
+  }
+}
