@@ -2,12 +2,14 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import ProposeValueModal from '../components/ProposeValueModal'
 import ConsistencyAlerts from '../components/ConsistencyAlerts'
 import { useAuth } from '../hooks/useAuth'
 import { calculateVariationPercent, calculateWeightedImpact, resolveDirection } from '../utils/kpi'
+import { resolveApiErrorMessage } from '../utils/apiErrors'
 import './MiParrilla.css'
 
 interface CollaboratorKPI {
@@ -42,6 +44,7 @@ interface CollaboratorKPI {
 }
 
 export default function MiParrilla() {
+  const { t } = useTranslation('grid')
   const { collaboratorId } = useParams<{ collaboratorId: string }>()
   const { user, isLoading: loadingUser, isCollaborator } = useAuth()
   const resolvedId = useMemo(() => {
@@ -95,19 +98,21 @@ export default function MiParrilla() {
         setEditingKPIId(null)
         setActualValue('')
         setActualValueError('')
-        setInlineAlert({ type: 'info', message: 'Valor actualizado correctamente.' })
+        setInlineAlert({ type: 'info', message: t('alert.updated') })
       },
       onError: (error: any) => {
         setInlineAlert({
           type: 'error',
-          message: error.response?.data?.error || 'Error al actualizar el valor. Verificá que el período no esté cerrado.',
+          message: resolveApiErrorMessage(error, t, {
+            fallbackKey: 'alert.error_default',
+          }),
         })
       },
     }
   )
 
   // Obtener período actual (el más reciente abierto)
-  const currentPeriod = kpis?.[0]?.periodName || 'No hay período activo'
+  const currentPeriod = kpis?.[0]?.periodName || t('no_period')
   const periodStatus = kpis?.[0]?.periodStatus || 'closed'
   const currentPeriodId = kpis?.[0]?.periodId
 
@@ -150,9 +155,9 @@ export default function MiParrilla() {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      open: { label: 'Abierta', class: 'status-open' },
-      in_review: { label: 'En Revisión', class: 'status-review' },
-      closed: { label: 'Cerrada', class: 'status-closed' },
+      open: { label: t('period_status.open'), class: 'status-open' },
+      in_review: { label: t('period_status.in_review'), class: 'status-review' },
+      closed: { label: t('period_status.closed'), class: 'status-closed' },
     }
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.closed
     return (
@@ -165,26 +170,27 @@ export default function MiParrilla() {
   const getCurationBadge = (status?: CollaboratorKPI['curationStatus']) => {
     const effective = status || 'pending'
     const config = {
-      pending: { label: 'Pendiente', class: 'curation-pending' },
-      in_review: { label: 'En revision', class: 'curation-review' },
-      approved: { label: 'Aprobada', class: 'curation-approved' },
-      rejected: { label: 'Rechazada', class: 'curation-rejected' },
+      pending: { label: t('curation.pending'), class: 'curation-pending' },
+      in_review: { label: t('curation.in_review'), class: 'curation-review' },
+      approved: { label: t('curation.approved'), class: 'curation-approved' },
+      rejected: { label: t('curation.rejected'), class: 'curation-rejected' },
+      changes_requested: { label: t('curation.changes_requested'), class: 'curation-changes-requested' },
     } as const
-    const entry = config[effective]
-    return <span className={`curation-badge ${entry.class}`}>{entry.label}</span>
+    const entry = config[effective as keyof typeof config]
+    return <span className={`curation-badge ${entry?.class ?? ''}`}>{entry?.label ?? effective}</span>
   }
 
   const getInputLabel = (mode?: CollaboratorKPI['inputMode']) => {
     const normalized = mode || 'manual'
-    return normalized === 'auto' ? 'Auto' : normalized === 'import' ? 'Import' : 'Manual'
+    return normalized === 'auto' ? t('input.auto') : normalized === 'import' ? t('input.import') : t('input.manual')
   }
 
   const getBlockReason = (kpi: CollaboratorKPI): string | null => {
-    if (kpi.status === 'closed') return 'KPI cerrado'
-    if (periodStatus === 'closed') return 'Período cerrado'
-    if (kpi.inputMode === 'auto') return 'Carga automática — usá Proponer para override'
-    if (kpi.curationStatus !== 'approved') return 'Criterio pendiente de aprobación'
-    if (isCollaborator) return 'Usá el botón Proponer para sugerir un valor'
+    if (kpi.status === 'closed') return t('block.kpi_closed')
+    if (periodStatus === 'closed') return t('block.period_closed')
+    if (kpi.inputMode === 'auto') return t('block.auto_input')
+    if (kpi.curationStatus !== 'approved') return t('block.curation_pending')
+    if (isCollaborator) return t('block.use_propose')
     return null
   }
 
@@ -197,7 +203,7 @@ export default function MiParrilla() {
   const handleSaveActual = (kpiId: number) => {
     const value = parseFloat(actualValue)
     if (isNaN(value)) {
-      setActualValueError('Ingresá un valor numérico válido.')
+      setActualValueError(t('inline_edit.error'))
       return
     }
     setActualValueError('')
@@ -226,7 +232,7 @@ export default function MiParrilla() {
   if (loadingUser || loadingCollaborator || loadingKPIs) {
     return (
       <div className="mi-parrilla-page">
-        <div className="loading">Cargando parrilla de objetivos...</div>
+        <div className="loading">{t('loading')}</div>
       </div>
     )
   }
@@ -236,8 +242,8 @@ export default function MiParrilla() {
       <div className="mi-parrilla-page">
         <div className="empty-state">
           <div className="empty-icon">:/</div>
-          <h3>No se pudo identificar al colaborador</h3>
-          <p>Vuelve a iniciar sesión para cargar tu parrilla.</p>
+          <h3>{t('error_collaborator_not_found')}</h3>
+          <p>{t('error_collaborator_hint')}</p>
         </div>
       </div>
     )
@@ -253,7 +259,7 @@ export default function MiParrilla() {
       )}
       <div className="parrilla-header">
         <div>
-          <h1>Mi Parrilla de Objetivos</h1>
+          <h1>{t('title')}</h1>
           {collaborator && (
             <div className="collaborator-info">
               <p className="collaborator-name">{collaborator.name}</p>
@@ -265,7 +271,7 @@ export default function MiParrilla() {
         </div>
         <div className="period-info">
           <div>
-            <span className="period-label">Período:</span>
+            <span className="period-label">{t('period_label')}</span>
             <span className="period-name">{currentPeriod}</span>
           </div>
           <div className="period-status">
@@ -282,7 +288,7 @@ export default function MiParrilla() {
                   '_blank'
                 )
               }}
-              title="Exportar a PDF"
+              title={t('actions.export_pdf')}
             >
               📄 PDF
             </button>
@@ -294,7 +300,7 @@ export default function MiParrilla() {
                   '_blank'
                 )
               }}
-              title="Exportar a Excel"
+              title={t('actions.export_excel')}
             >
               📊 Excel
             </button>
@@ -308,7 +314,7 @@ export default function MiParrilla() {
 
       <div className="global-result-card">
         <div className="result-content">
-          <h2>Resultado Global del Período</h2>
+          <h2>{t('global_result')}</h2>
           <div className="result-value">
             <span className="result-number">{globalResult.toFixed(1)}%</span>
             <div className="result-bar">
@@ -319,29 +325,29 @@ export default function MiParrilla() {
             </div>
           </div>
           <p className="result-description">
-            Promedio ponderado de todos los KPIs asignados
+            {t('result_description')}
           </p>
         </div>
       </div>
 
       <div className="kpis-section">
-        <h2>Lista de KPIs</h2>
+        <h2>{t('kpis_section_title')}</h2>
         {kpis && kpis.length > 0 ? (
           <div className="kpis-table-container">
             <table className="kpis-table">
               <thead>
                 <tr>
-                  <th>KPI</th>
-                  <th>Descripción</th>
-                  <th>Target</th>
-                  <th>Alcance</th>
-                  <th>Variación</th>
-                  <th>Ponderación</th>
-                  <th>Alcance Ponderado</th>
-                  <th>Criterio</th>
-                  <th>Estado</th>
-                  <th>Comentarios</th>
-                  <th>Acciones</th>
+                  <th>{t('table.kpi')}</th>
+                  <th>{t('table.description')}</th>
+                  <th>{t('table.target')}</th>
+                  <th>{t('table.actual')}</th>
+                  <th>{t('table.compliance')}</th>
+                  <th>{t('table.weight')}</th>
+                  <th>{t('table.weighted_result')}</th>
+                  <th>{t('table.criteria')}</th>
+                  <th>{t('table.status')}</th>
+                  <th>{t('table.comments')}</th>
+                  <th>{t('table.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -402,7 +408,7 @@ export default function MiParrilla() {
                             <button
                               className="btn-edit-actual"
                               onClick={() => handleEditActual(kpi)}
-                              title="Editar alcance"
+                              title={t('actions.edit_actual')}
                             >
                               ✏️
                             </button>
@@ -428,13 +434,13 @@ export default function MiParrilla() {
                       <div className="criteria-meta">
                         {getCurationBadge(kpi.curationStatus)}
                         <span className="criteria-source">
-                          {kpi.dataSourceName || kpi.dataSource || 'Sin fuente'}
+                          {kpi.dataSourceName || kpi.dataSource || t('source_none')}
                         </span>
                         <span className="criteria-input">
-                          Input: {getInputLabel(kpi.inputMode)}
+                          {t('input_label')} {getInputLabel(kpi.inputMode)}
                         </span>
                         <span className="criteria-update">
-                          Último dato:{' '}
+                          {t('last_update_label')}{' '}
                           {kpi.lastMeasurementAt
                             ? `${kpi.lastMeasurementAt}${kpi.lastMeasurementBy ? ` · ${kpi.lastMeasurementBy}` : ''}`
                             : '-'}
@@ -445,10 +451,10 @@ export default function MiParrilla() {
                       <span
                         className={`kpi-status kpi-status-${kpi.status}`}
                       >
-                        {kpi.status === 'draft' && 'Borrador'}
-                        {kpi.status === 'proposed' && 'Propuesto'}
-                        {kpi.status === 'approved' && 'Aprobado'}
-                        {kpi.status === 'closed' && 'Cerrado'}
+                        {kpi.status === 'draft' && t('status.draft')}
+                        {kpi.status === 'proposed' && t('status.proposed')}
+                        {kpi.status === 'approved' && t('status.approved')}
+                        {kpi.status === 'closed' && t('status.closed')}
                       </span>
                     </td>
                     <td className="kpi-comments">
@@ -470,14 +476,14 @@ export default function MiParrilla() {
                               <button
                                 className="btn-propose"
                                 onClick={() => setProposingKPI(kpi)}
-                                title="Proponer valores para revisión"
+                                title={t('actions.propose_title')}
                               >
-                                📤 Proponer
+                                📤 {t('actions.propose')}
                               </button>
                             )}
                             {kpi.status === 'proposed' && (
                               <span className="pending-badge">
-                                ⏳ En revisión
+                                {t('pending_badge')}
                               </span>
                             )}
                           </>
@@ -501,15 +507,14 @@ export default function MiParrilla() {
         ) : (
           <div className="empty-state">
             <div className="empty-icon">📊</div>
-            <h3>No hay KPIs asignados</h3>
-            <p>No tienes KPIs asignados para este período</p>
+            <h3>{t('empty')}</h3>
           </div>
         )}
       </div>
 
       {chartData.length > 0 && (
         <div className="chart-section">
-          <h2>Gráfico de Resultados</h2>
+          <h2>{t('chart_title')}</h2>
           <div className="chart-container">
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={chartData}>
@@ -522,8 +527,8 @@ export default function MiParrilla() {
                 />
                 <YAxis />
                 <Tooltip />
-                <Bar dataKey="target" fill="#e5e7eb" name="Target" />
-                <Bar dataKey="actual" fill="#f97316" name="Actual" />
+                <Bar dataKey="target" fill="#e5e7eb" name={t('table.target')} />
+                <Bar dataKey="actual" fill="#f97316" name={t('table.actual')} />
               </BarChart>
             </ResponsiveContainer>
           </div>

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import ScopeKPIForm from '../components/ScopeKPIForm'
 import ScopeKPIDetailModal from '../components/ScopeKPIDetailModal'
@@ -10,6 +11,7 @@ import { ScopeKPI } from '../types'
 import './Asignaciones.css'
 
 export default function AsignacionesScope() {
+  const { t } = useTranslation(['assignments', 'common'])
   const queryClient = useQueryClient()
   const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null)
   const [selectedScopeId, setSelectedScopeId] = useState<number | null>(null)
@@ -70,12 +72,52 @@ export default function AsignacionesScope() {
     })
   }, [scopeKpis, searchTerm])
 
+  const getStatusLabel = (status?: string) => {
+    if (!status) return t('status.unknown')
+    const normalized = status.toLowerCase()
+    const known = ['draft', 'proposed', 'approved', 'closed']
+    if (known.includes(normalized)) {
+      return t(`status.${normalized}`)
+    }
+    return status
+  }
+
+  const getOwnerLevelLabel = (ownerLevel?: string) => {
+    if (!ownerLevel) return '-'
+    const normalized = ownerLevel.toLowerCase()
+    const known = ['team', 'area', 'business_unit', 'company', 'executive']
+    if (known.includes(normalized)) {
+      return t(`scope_kpis.owner_levels.${normalized}`)
+    }
+    return ownerLevel
+  }
+
+  const getSourceModeLabel = (sourceMode?: string) => {
+    if (!sourceMode) return '-'
+    const normalized = sourceMode.toLowerCase()
+    const known = ['direct', 'aggregated', 'mixed']
+    if (known.includes(normalized)) {
+      return t(`scope_kpis.source_modes.${normalized}`)
+    }
+    return sourceMode
+  }
+
+  const getScopeTypeLabel = (scopeType?: string) => {
+    if (!scopeType) return '-'
+    const normalized = scopeType.toLowerCase()
+    const known = ['company', 'area', 'team', 'person', 'business_unit', 'product']
+    if (known.includes(normalized)) {
+      return t(`scope_kpis.scope_types.${normalized}`)
+    }
+    return scopeType
+  }
+
   return (
     <div className="asignaciones-page">
       <div className="page-header">
         <div>
-          <h1>KPIs Grupales</h1>
-          <p className="subtitle">KPIs asignados a equipos, áreas, unidades de negocio y nivel ejecutivo.</p>
+          <h1>{t('scope_kpis.title')}</h1>
+          <p className="subtitle">{t('scope_kpis.subtitle')}</p>
         </div>
         <div className="header-actions">
           <button
@@ -86,20 +128,20 @@ export default function AsignacionesScope() {
               setShowForm(true)
             }}
           >
-            Nuevo KPI Grupal
+            {t('scope_kpis.new_btn')}
           </button>
         </div>
       </div>
 
       <div className="filters-section">
         <div className="search-group">
-          <label>Buscar</label>
-          <input className="filter-select" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Nombre, área, responsable..." />
+          <label>{t('scope_kpis.filters.search_label')}</label>
+          <input className="filter-select" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder={t('scope_kpis.filters.search_placeholder')} />
         </div>
         <div className="filter-group">
-          <label>Periodo</label>
+          <label>{t('scope_kpis.filters.period_label')}</label>
           <select className="filter-select" value={selectedPeriodId || ''} onChange={(e) => setSelectedPeriodId(e.target.value ? Number(e.target.value) : null)}>
-            <option value="">Todos</option>
+            <option value="">{t('scope_kpis.filters.all')}</option>
             {(periods || []).map((period: any) => (
               <option key={period.id} value={period.id}>
                 {period.name}
@@ -108,20 +150,20 @@ export default function AsignacionesScope() {
           </select>
         </div>
         <div className="filter-group">
-          <label>Área / Equipo</label>
+          <label>{t('scope_kpis.filters.scope_label')}</label>
           <select className="filter-select" value={selectedScopeId || ''} onChange={(e) => setSelectedScopeId(e.target.value ? Number(e.target.value) : null)}>
-            <option value="">Todos</option>
+            <option value="">{t('scope_kpis.filters.all')}</option>
             {(orgScopes || []).map((scope: any) => (
               <option key={scope.id} value={scope.id}>
-                {scope.name} ({scope.type})
+                {scope.name} ({getScopeTypeLabel(scope.type)})
               </option>
             ))}
           </select>
         </div>
         <div className="filter-group">
-          <label>Subperiodo</label>
+          <label>{t('scope_kpis.filters.subperiod_label')}</label>
           <select className="filter-select" value={selectedSubPeriodId || ''} onChange={(e) => setSelectedSubPeriodId(e.target.value ? Number(e.target.value) : null)}>
-            <option value="">Todos</option>
+            <option value="">{t('scope_kpis.filters.all')}</option>
             {(subPeriods || []).map((item: any) => (
               <option key={item.id} value={item.id}>
                 {item.name}
@@ -135,17 +177,17 @@ export default function AsignacionesScope() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Nombre</th>
-              <th>KPI base</th>
-              <th>Área / Equipo</th>
-              <th>Responsable</th>
-              <th>Origen</th>
-              <th>Target</th>
-              <th>Actual</th>
-              <th>Variación</th>
-              <th>Resultado</th>
-              <th>Estado</th>
-              <th className="actions-column">Acciones</th>
+              <th>{t('scope_kpis.table.name')}</th>
+              <th>{t('scope_kpis.table.kpi_base')}</th>
+              <th>{t('scope_kpis.table.scope')}</th>
+              <th>{t('scope_kpis.table.owner')}</th>
+              <th>{t('scope_kpis.table.source')}</th>
+              <th>{t('scope_kpis.table.target')}</th>
+              <th>{t('scope_kpis.table.actual')}</th>
+              <th>{t('scope_kpis.table.variation')}</th>
+              <th>{t('scope_kpis.table.result')}</th>
+              <th>{t('scope_kpis.table.status')}</th>
+              <th className="actions-column">{t('scope_kpis.table.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -155,52 +197,52 @@ export default function AsignacionesScope() {
                   <td className="name-cell">
                     <div>{item.name}</div>
                     {item.objectiveNames?.length ? (
-                      <div className="muted">Objetivos: {item.objectiveNames.join(' · ')}</div>
+                      <div className="muted">{t('scope_kpis.objectives_prefix')} {item.objectiveNames.join(' · ')}</div>
                     ) : null}
                     {item.sourceMode === 'mixed' ? (
                       <div className="muted">
-                        {item.mixedConfig?.directLabel || 'Directo'}: {item.directActual ?? '-'} · {item.mixedConfig?.aggregatedLabel || 'Agregado'}:{' '}
+                        {item.mixedConfig?.directLabel || t('scope_kpis.direct_label')}: {item.directActual ?? '-'} · {item.mixedConfig?.aggregatedLabel || t('scope_kpis.aggregated_label')}:{' '}
                         {item.aggregatedActual ?? '-'}
                       </div>
                     ) : null}
                   </td>
                   <td>{item.kpiName || item.kpiId}</td>
                   <td>{item.orgScopeName || item.orgScopeId}</td>
-                  <td>{item.ownerLevel}</td>
-                  <td>{item.sourceMode}</td>
+                  <td>{getOwnerLevelLabel(item.ownerLevel)}</td>
+                  <td>{getSourceModeLabel(item.sourceMode)}</td>
                   <td className="number-cell">{item.target}</td>
                   <td className="number-cell">{item.actual ?? '-'}</td>
                   <td className="number-cell">{item.variation ?? '-'}</td>
                   <td className="number-cell">{item.weightedResult ?? '-'}</td>
-                  <td>{item.status}</td>
+                  <td>{getStatusLabel(item.status)}</td>
                   <td className="actions-column">
                     <div className="action-buttons">
                       <button type="button" className="action-button view" onClick={() => setDetailScopeKpi(item)}>
-                        Detalle
+                        {t('scope_kpis.actions.detail')}
                       </button>
                       <button type="button" className="action-button edit" onClick={() => { setEditingScopeKpi(item); setShowForm(true) }}>
-                        Editar
+                        {t('scope_kpis.actions.edit')}
                       </button>
                       <button type="button" className="action-button approve" onClick={() => setLinksScopeKpi(item)}>
-                        Links
+                        {t('scope_kpis.actions.links')}
                       </button>
                       <button type="button" className="action-button edit" onClick={() => setCopyingScopeKpi(item)}>
-                        Copiar
+                        {t('scope_kpis.actions.copy')}
                       </button>
                       <button type="button" className="action-button view" onClick={() => actionMutation.mutate({ id: item.id, action: 'recalculate' })}>
-                        Recalcular
+                        {t('scope_kpis.actions.recalculate')}
                       </button>
                       {item.status === 'closed' ? (
                         <button type="button" className="action-button reopen" onClick={() => actionMutation.mutate({ id: item.id, action: 'reopen' })}>
-                          Reabrir
+                          {t('scope_kpis.actions.reopen')}
                         </button>
                       ) : (
                         <button type="button" className="action-button reject" onClick={() => actionMutation.mutate({ id: item.id, action: 'close' })}>
-                          Cerrar
+                          {t('scope_kpis.actions.close')}
                         </button>
                       )}
                       <button type="button" className="action-button delete" onClick={() => deleteMutation.mutate(item.id)}>
-                        Eliminar
+                        {t('scope_kpis.actions.delete')}
                       </button>
                     </div>
                   </td>

@@ -1,6 +1,7 @@
 import { useQuery } from 'react-query'
 import { useNavigate } from 'react-router-dom'
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../hooks/useAuth'
 import api from '../services/api'
 import OnboardingWizard from '../components/OnboardingWizard'
@@ -94,27 +95,28 @@ function OkrWidget({
   title: string
   onNavigate: () => void
 }) {
+  const { t } = useTranslation('dashboard')
   return (
     <div className="okr-widget">
       <div className="okr-widget-header">
         <h3>{title}</h3>
-        <button className="okr-widget-link" onClick={onNavigate}>Ver todos →</button>
+        <button className="okr-widget-link" onClick={onNavigate}>{t('okr_widget.see_all')}</button>
       </div>
       <div className="okr-widget-stats">
         <div className="okr-widget-stat">
           <span className="okr-widget-value">{summary.active}</span>
-          <span className="okr-widget-label">Objetivos activos</span>
+          <span className="okr-widget-label">{t('okr_widget.active_objectives')}</span>
         </div>
         <div className="okr-widget-stat">
           <span className="okr-widget-value" style={{ color: progressColor(summary.avgProgress) }}>
             {summary.avgProgress}%
           </span>
-          <span className="okr-widget-label">Progreso promedio</span>
+          <span className="okr-widget-label">{t('okr_widget.avg_progress')}</span>
         </div>
         {summary.atRisk > 0 && (
           <div className="okr-widget-stat">
             <span className="okr-widget-value" style={{ color: '#dc2626' }}>{summary.atRisk}</span>
-            <span className="okr-widget-label">En riesgo (&lt;40%)</span>
+            <span className="okr-widget-label">{t('okr_widget.at_risk')}</span>
           </div>
         )}
       </div>
@@ -198,6 +200,8 @@ interface CollaboratorKPI {
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
+  const { t, i18n } = useTranslation('dashboard')
+  const locale = i18n.resolvedLanguage?.startsWith('en') ? 'en-US' : 'es-AR'
   const navigate = useNavigate()
   const { user, isLoading: authLoading, isHR, isLeadership, isCollaborator, canConfig } = useAuth()
   const [wizardDismissed, setWizardDismissed] = useState(
@@ -208,7 +212,7 @@ export default function Dashboard() {
     setWizardDismissed(true)
   }
   const formatNumber = (value: number, digits = 2) =>
-    new Intl.NumberFormat('es-ES', { maximumFractionDigits: digits }).format(value)
+    new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(value)
   const formatPercent = (value: number, digits = 1) => `${formatNumber(value, digits)}%`
 
   const { data: stats } = useQuery<DashboardStats>(
@@ -399,7 +403,7 @@ export default function Dashboard() {
   if (authLoading) {
     return (
       <div className="dashboard">
-        <div className="loading">Cargando dashboard...</div>
+        <div className="loading">{t('loading')}</div>
       </div>
     )
   }
@@ -411,15 +415,15 @@ export default function Dashboard() {
       <div className="dashboard">
         <div className="dashboard-header">
           <div>
-            <h1>Dashboard - Recursos Humanos</h1>
-            <p className="subtitle">Vista global del sistema de gestion de KPIs</p>
+            <h1>{t('hr.title')}</h1>
+            <p className="subtitle">{t('hr.subtitle')}</p>
           </div>
           <div className="user-info">
             <span className="user-name">
               <span className="user-icon"><UserIcon /></span>
               {user?.name}
             </span>
-            <span className="user-role">Recursos Humanos</span>
+            <span className="user-role">{t('hr.role')}</span>
           </div>
         </div>
 
@@ -429,34 +433,34 @@ export default function Dashboard() {
 
         {(stats || notificationSummary) && (
           <div className="pending-actions-panel">
-            <h3>Acciones pendientes</h3>
+            <h3>{t('notifications.pending_actions')}</h3>
             <div className="pending-actions-list">
               {(stats?.pendingAssignments ?? 0) > 0 ? (
                 <div className="pending-action-item warning">
-                  <span>{stats!.pendingAssignments} asignaciones sin completar en el período activo</span>
-                  <button className="pending-action-link" onClick={() => navigate('/asignaciones')}>Ver asignaciones →</button>
+                  <span>{t('notifications.pending_assignments_many', { count: stats!.pendingAssignments })}</span>
+                  <button className="pending-action-link" onClick={() => navigate('/asignaciones')}>{t('notifications.see_assignments')}</button>
                 </div>
               ) : stats ? (
                 <div className="pending-action-item success">
-                  <span>Todas las asignaciones del período activo están completas</span>
+                  <span>{t('notifications.all_assignments_complete')}</span>
                 </div>
               ) : null}
               {(notificationSummary?.totals.missingActual ?? 0) > 0 && (
                 <div className="pending-action-item warning">
-                  <span>{notificationSummary!.totals.missingActual} colaboradores sin datos cargados</span>
-                  <button className="pending-action-link" onClick={() => navigate('/input-datos')}>Ir a Input →</button>
+                  <span>{t('notifications.missing_actual', { count: notificationSummary!.totals.missingActual })}</span>
+                  <button className="pending-action-link" onClick={() => navigate('/input-datos')}>{t('notifications.go_to_input')}</button>
                 </div>
               )}
               {(notificationSummary?.totals.atRisk ?? 0) > 0 && (
                 <div className="pending-action-item error">
-                  <span>{notificationSummary!.totals.atRisk} KPIs en riesgo (cumplimiento &lt;80%)</span>
-                  <button className="pending-action-link" onClick={() => navigate('/asignaciones')}>Ver KPIs →</button>
+                  <span>{t('notifications.at_risk', { count: notificationSummary!.totals.atRisk })}</span>
+                  <button className="pending-action-link" onClick={() => navigate('/asignaciones')}>{t('notifications.see_kpis')}</button>
                 </div>
               )}
               {(notificationSummary?.totals.periodsExpiring ?? 0) > 0 && (
                 <div className="pending-action-item info">
-                  <span>{notificationSummary!.totals.periodsExpiring} período(s) por vencer pronto</span>
-                  <button className="pending-action-link" onClick={() => navigate('/periodos')}>Ver períodos →</button>
+                  <span>{t('notifications.periods_expiring', { count: notificationSummary!.totals.periodsExpiring })}</span>
+                  <button className="pending-action-link" onClick={() => navigate('/periodos')}>{t('notifications.see_periods')}</button>
                 </div>
               )}
             </div>
@@ -467,63 +471,63 @@ export default function Dashboard() {
           <div className="stat-card">
             <div className="stat-icon"><StatIcon name="users" /></div>
             <div className="stat-content">
-              <h3>Colaboradores</h3>
+              <h3>{t('hr.stats.collaborators')}</h3>
               <p className="stat-value">{stats?.totalCollaborators || 0}</p>
-              <p className="stat-label">Total registrados</p>
+              <p className="stat-label">{t('hr.stats.collaborators_label')}</p>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon"><StatIcon name="calendar" /></div>
             <div className="stat-content">
-              <h3>Periodos Activos</h3>
+              <h3>{t('hr.stats.periods')}</h3>
               <p className="stat-value">{stats?.activePeriods || 0}</p>
-              <p className="stat-label">En evaluacion</p>
+              <p className="stat-label">{t('hr.stats.periods_label')}</p>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon"><StatIcon name="target" /></div>
             <div className="stat-content">
-              <h3>KPIs</h3>
+              <h3>{t('hr.stats.kpis')}</h3>
               <p className="stat-value">{stats?.totalKPIs || 0}</p>
-              <p className="stat-label">Definidos</p>
+              <p className="stat-label">{t('hr.stats.kpis_label')}</p>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon"><StatIcon name="chart" /></div>
             <div className="stat-content">
-              <h3>Cumplimiento</h3>
+              <h3>{t('hr.stats.compliance')}</h3>
               <p className="stat-value">{stats?.averageCompliance?.toFixed(1) || 0}%</p>
-              <p className="stat-label">Promedio general</p>
+              <p className="stat-label">{t('hr.stats.compliance_label')}</p>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon"><StatIcon name="clipboard" /></div>
             <div className="stat-content">
-              <h3>Asignaciones</h3>
+              <h3>{t('hr.stats.assignments')}</h3>
               <p className="stat-value">{stats?.totalAssignments || 0}</p>
-              <p className="stat-label">Total</p>
+              <p className="stat-label">{t('hr.stats.assignments_label')}</p>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon"><StatIcon name="clock" /></div>
             <div className="stat-content">
-              <h3>Pendientes</h3>
+              <h3>{t('hr.stats.pending')}</h3>
               <p className="stat-value">{stats?.pendingAssignments || 0}</p>
-              <p className="stat-label">Por completar</p>
+              <p className="stat-label">{t('hr.stats.pending_label')}</p>
             </div>
           </div>
         </div>
 
         {okrSummary && okrSummary.active > 0 && (
           <div className="dashboard-section">
-            <OkrWidget summary={okrSummary} title="OKRs activos" onNavigate={() => navigate('/okr')} />
+            <OkrWidget summary={okrSummary} title={t('okr_widget.hr_title')} onNavigate={() => navigate('/okr')} />
           </div>
         )}
 
         <div className="charts-grid">
           {areaStats && areaStats.length > 0 && (
             <div className="chart-card">
-              <h3>Cumplimiento por Area</h3>
+              <h3>{t('hr.charts.compliance_by_area')}</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={areaStats}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -531,7 +535,7 @@ export default function Dashboard() {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="averageCompliance" fill="#6366f1" name="Cumplimiento %" />
+                  <Bar dataKey="averageCompliance" fill="#6366f1" name={t('charts.compliance_pct')} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -539,7 +543,7 @@ export default function Dashboard() {
 
           {complianceByPeriod && complianceByPeriod.length > 0 && (
             <div className="chart-card">
-              <h3>Evolucion de Cumplimiento</h3>
+              <h3>{t('hr.charts.compliance_evolution')}</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={complianceByPeriod}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -547,7 +551,7 @@ export default function Dashboard() {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="compliance" stroke="#0ea5e9" name="Cumplimiento %" />
+                  <Line type="monotone" dataKey="compliance" stroke="#0ea5e9" name={t('charts.compliance_pct')} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -555,7 +559,7 @@ export default function Dashboard() {
 
           {areaStats && areaStats.length > 0 && (
             <div className="chart-card">
-              <h3>Distribucion de Colaboradores por Area</h3>
+              <h3>{t('hr.charts.collaborators_by_area')}</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie
@@ -581,14 +585,14 @@ export default function Dashboard() {
         </div>
 
         <div className="dashboard-section">
-          <h2>Accesos Rapidos</h2>
+          <h2>{t('hr.quick_actions.title')}</h2>
           <div className="quick-actions">
-            <button className="action-btn" onClick={() => navigate('/periodos')}>Crear Periodo</button>
-            <button className="action-btn" onClick={() => navigate('/colaboradores')}>Agregar Colaborador</button>
-            <button className="action-btn" onClick={() => navigate('/kpis')}>Definir KPI</button>
-            <button className="action-btn" onClick={() => navigate('/asignaciones')}>Nueva Asignacion</button>
-            <button className="action-btn" onClick={() => navigate('/vistas-agregadas')}>Vistas Agregadas</button>
-            <button className="action-btn" onClick={() => navigate('/auditoria')}>Auditoria</button>
+            <button className="action-btn" onClick={() => navigate('/periodos')}>{t('hr.quick_actions.create_period')}</button>
+            <button className="action-btn" onClick={() => navigate('/colaboradores')}>{t('hr.quick_actions.add_collaborator')}</button>
+            <button className="action-btn" onClick={() => navigate('/kpis')}>{t('hr.quick_actions.define_kpi')}</button>
+            <button className="action-btn" onClick={() => navigate('/asignaciones')}>{t('hr.quick_actions.new_assignment')}</button>
+            <button className="action-btn" onClick={() => navigate('/vistas-agregadas')}>{t('hr.quick_actions.aggregate_views')}</button>
+            <button className="action-btn" onClick={() => navigate('/auditoria')}>{t('hr.quick_actions.audit')}</button>
           </div>
         </div>
       </div>
@@ -602,48 +606,48 @@ export default function Dashboard() {
       <div className="dashboard">
         <div className="dashboard-header">
           <div>
-            <h1>Dashboard - Liderazgo</h1>
-            <p className="subtitle">Gestion de tu equipo y estadisticas</p>
+            <h1>{t('leadership.title')}</h1>
+            <p className="subtitle">{t('leadership.subtitle')}</p>
           </div>
           <div className="user-info">
             <span className="user-name">
               <span className="user-icon"><UserIcon /></span>
               {user?.name}
             </span>
-            <span className="user-role">Lider</span>
+            <span className="user-role">{t('leadership.role')}</span>
           </div>
         </div>
 
         {(teamStats || notificationSummary) && (
           <div className="pending-actions-panel">
-            <h3>Acciones pendientes</h3>
+            <h3>{t('notifications.pending_actions')}</h3>
             <div className="pending-actions-list">
               {(teamStats?.teamPendingKPIs ?? 0) > 0 ? (
                 <div className="pending-action-item warning">
-                  <span>{teamStats!.teamPendingKPIs} KPIs del equipo pendientes de completar</span>
-                  <button className="pending-action-link" onClick={() => navigate('/input-datos')}>Cargar datos →</button>
+                  <span>{t('notifications.team_pending_many', { count: teamStats!.teamPendingKPIs })}</span>
+                  <button className="pending-action-link" onClick={() => navigate('/input-datos')}>{t('notifications.load_data')}</button>
                 </div>
               ) : teamStats ? (
                 <div className="pending-action-item success">
-                  <span>Tu equipo tiene todos los KPIs al día</span>
+                  <span>{t('notifications.team_all_complete')}</span>
                 </div>
               ) : null}
               {(notificationSummary?.totals.missingActual ?? 0) > 0 && (
                 <div className="pending-action-item warning">
-                  <span>{notificationSummary!.totals.missingActual} colaboradores sin datos cargados</span>
-                  <button className="pending-action-link" onClick={() => navigate('/input-datos')}>Ir a Input →</button>
+                  <span>{t('notifications.missing_actual', { count: notificationSummary!.totals.missingActual })}</span>
+                  <button className="pending-action-link" onClick={() => navigate('/input-datos')}>{t('notifications.go_to_input')}</button>
                 </div>
               )}
               {(notificationSummary?.totals.atRisk ?? 0) > 0 && (
                 <div className="pending-action-item error">
-                  <span>{notificationSummary!.totals.atRisk} KPIs en riesgo (cumplimiento &lt;80%)</span>
-                  <button className="pending-action-link" onClick={() => navigate('/asignaciones')}>Ver KPIs →</button>
+                  <span>{t('notifications.at_risk', { count: notificationSummary!.totals.atRisk })}</span>
+                  <button className="pending-action-link" onClick={() => navigate('/asignaciones')}>{t('notifications.see_kpis')}</button>
                 </div>
               )}
               {(notificationSummary?.totals.periodsExpiring ?? 0) > 0 && (
                 <div className="pending-action-item info">
-                  <span>{notificationSummary!.totals.periodsExpiring} período(s) por vencer pronto</span>
-                  <button className="pending-action-link" onClick={() => navigate('/periodos')}>Ver períodos →</button>
+                  <span>{t('notifications.periods_expiring', { count: notificationSummary!.totals.periodsExpiring })}</span>
+                  <button className="pending-action-link" onClick={() => navigate('/periodos')}>{t('notifications.see_periods')}</button>
                 </div>
               )}
             </div>
@@ -654,47 +658,47 @@ export default function Dashboard() {
           <div className="stat-card">
             <div className="stat-icon"><StatIcon name="users" /></div>
             <div className="stat-content">
-              <h3>Miembros del Equipo</h3>
+              <h3>{t('leadership.stats.team_members')}</h3>
               <p className="stat-value">{teamStats?.teamMembers || 0}</p>
-              <p className="stat-label">Colaboradores</p>
+              <p className="stat-label">{t('leadership.stats.team_members_label')}</p>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon"><StatIcon name="chart" /></div>
             <div className="stat-content">
-              <h3>Cumplimiento del Equipo</h3>
+              <h3>{t('leadership.stats.team_compliance')}</h3>
               <p className="stat-value">{teamStats?.teamAverageCompliance?.toFixed(1) || 0}%</p>
-              <p className="stat-label">Promedio</p>
+              <p className="stat-label">{t('leadership.stats.team_compliance_label')}</p>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon"><StatIcon name="clipboard" /></div>
             <div className="stat-content">
-              <h3>KPIs Completados</h3>
+              <h3>{t('leadership.stats.completed_kpis')}</h3>
               <p className="stat-value">{teamStats?.teamCompletedKPIs || 0}</p>
-              <p className="stat-label">Del equipo</p>
+              <p className="stat-label">{t('leadership.stats.completed_label')}</p>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon"><StatIcon name="clock" /></div>
             <div className="stat-content">
-              <h3>KPIs Pendientes</h3>
+              <h3>{t('leadership.stats.pending_kpis')}</h3>
               <p className="stat-value">{teamStats?.teamPendingKPIs || 0}</p>
-              <p className="stat-label">Por completar</p>
+              <p className="stat-label">{t('leadership.stats.pending_label')}</p>
             </div>
           </div>
         </div>
 
         {okrSummary && okrSummary.active > 0 && (
           <div className="dashboard-section">
-            <OkrWidget summary={okrSummary} title="OKRs activos" onNavigate={() => navigate('/okr')} />
+            <OkrWidget summary={okrSummary} title={t('okr_widget.leadership_title')} onNavigate={() => navigate('/okr')} />
           </div>
         )}
 
         {teamComplianceByPeriod && teamComplianceByPeriod.length > 0 && (
           <div className="charts-grid">
             <div className="chart-card">
-              <h3>Evolucion de Cumplimiento del Equipo</h3>
+              <h3>{t('leadership.charts.team_compliance_evolution')}</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={teamComplianceByPeriod}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -702,7 +706,7 @@ export default function Dashboard() {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="compliance" stroke="#10b981" name="Cumplimiento %" />
+                  <Line type="monotone" dataKey="compliance" stroke="#10b981" name={t('charts.compliance_pct')} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -710,12 +714,12 @@ export default function Dashboard() {
         )}
 
         <div className="dashboard-section">
-          <h2>Acciones Rapidas</h2>
+          <h2>{t('leadership.quick_actions.title')}</h2>
           <div className="quick-actions">
-            <button className="action-btn" onClick={() => navigate('/asignaciones')}>Gestionar Asignaciones</button>
-            <button className="action-btn" onClick={() => navigate('/mi-parrilla')}>Mi Parrilla</button>
-            <button className="action-btn" onClick={() => navigate('/vistas-agregadas')}>Estadisticas</button>
-            <button className="action-btn" onClick={() => navigate('/colaboradores')}>Ver Colaboradores</button>
+            <button className="action-btn" onClick={() => navigate('/asignaciones')}>{t('leadership.quick_actions.manage_assignments')}</button>
+            <button className="action-btn" onClick={() => navigate('/mi-parrilla')}>{t('leadership.quick_actions.my_grid')}</button>
+            <button className="action-btn" onClick={() => navigate('/vistas-agregadas')}>{t('leadership.quick_actions.stats')}</button>
+            <button className="action-btn" onClick={() => navigate('/colaboradores')}>{t('leadership.quick_actions.view_collaborators')}</button>
           </div>
         </div>
       </div>
@@ -728,41 +732,45 @@ export default function Dashboard() {
     <div className="dashboard">
       <div className="dashboard-header">
         <div>
-          <h1>Mi Dashboard</h1>
-          <p className="subtitle">Mis avances y los de mi equipo</p>
+          <h1>{t('collab.title')}</h1>
+          <p className="subtitle">{t('collab.subtitle')}</p>
         </div>
         <div className="user-info">
           <span className="user-name">
             <span className="user-icon"><UserIcon /></span>
             {user?.name}
           </span>
-          <span className="user-role">Colaborador</span>
+          <span className="user-role">{t('collab.role')}</span>
         </div>
       </div>
 
       {progressInsights && (
         <div className="pending-actions-panel">
-          <h3>Acciones pendientes</h3>
+          <h3>{t('notifications.pending_actions')}</h3>
           <div className="pending-actions-list">
             {progressInsights.withoutActual > 0 ? (
               <div className="pending-action-item warning">
-                <span>{progressInsights.withoutActual} KPI{progressInsights.withoutActual > 1 ? 's' : ''} sin datos cargados este período</span>
-                <button className="pending-action-link" onClick={() => navigate('/input-datos')}>Cargar datos →</button>
+                <span>{progressInsights.withoutActual > 1
+                  ? t('notifications.collab_without_actual_many', { count: progressInsights.withoutActual })
+                  : t('notifications.collab_without_actual_one', { count: progressInsights.withoutActual })}</span>
+                <button className="pending-action-link" onClick={() => navigate('/input-datos')}>{t('notifications.load_data')}</button>
               </div>
             ) : (
               <div className="pending-action-item success">
-                <span>Todos tus KPIs tienen datos cargados</span>
+                <span>{t('notifications.collab_all_data_loaded')}</span>
               </div>
             )}
             {progressInsights.atRisk > 0 && (
               <div className="pending-action-item error">
-                <span>{progressInsights.atRisk} KPI{progressInsights.atRisk > 1 ? 's' : ''} en riesgo — cumplimiento por debajo del 80%</span>
-                <button className="pending-action-link" onClick={() => navigate('/mi-parrilla')}>Ver mi parrilla →</button>
+                <span>{progressInsights.atRisk > 1
+                  ? t('notifications.collab_at_risk_many', { count: progressInsights.atRisk })
+                  : t('notifications.collab_at_risk_one', { count: progressInsights.atRisk })}</span>
+                <button className="pending-action-link" onClick={() => navigate('/mi-parrilla')}>{t('notifications.see_grid')}</button>
               </div>
             )}
             {progressInsights.onTrack === progressInsights.total && progressInsights.total > 0 && (
               <div className="pending-action-item success">
-                <span>Todos tus KPIs están en camino (≥100% de cumplimiento)</span>
+                <span>{t('notifications.collab_all_on_track')}</span>
               </div>
             )}
           </div>
@@ -770,26 +778,26 @@ export default function Dashboard() {
       )}
 
       <div className="dashboard-section">
-        <h2>Mi resumen</h2>
+        <h2>{t('collab.section_summary')}</h2>
         <div className="collab-summary-grid">
           <div className="collab-card">
-            <p className="stat-label">KPIs asignados</p>
+            <p className="stat-label">{t('collab.summary.assigned_kpis')}</p>
             <p className="stat-value">{summaryKPIs.length}</p>
           </div>
           <div className="collab-card">
-            <p className="stat-label">Progreso ponderado</p>
+            <p className="stat-label">{t('collab.summary.weighted_progress')}</p>
             <p className="stat-value">
               {collaboratorSummary ? formatPercent(collaboratorSummary.overall, 1) : '0.0%'}
             </p>
           </div>
           <div className="collab-card">
-            <p className="stat-label">Gap anual (objetivo - actual)</p>
+            <p className="stat-label">{t('collab.summary.annual_gap')}</p>
             <p className="stat-value">
               {collaboratorSummary ? formatNumber(collaboratorSummary.totalGap, 2) : '0'}
             </p>
           </div>
           <div className="collab-card">
-            <p className="stat-label">Peso total</p>
+            <p className="stat-label">{t('collab.summary.total_weight')}</p>
             <p className="stat-value">
               {collaboratorSummary ? formatPercent(collaboratorSummary.totalWeight, 1) : '0.0%'}
             </p>
@@ -798,18 +806,18 @@ export default function Dashboard() {
       </div>
 
       <div className="dashboard-section">
-        <h2>Mis KPIs y avances</h2>
+        <h2>{t('collab.section_kpis')}</h2>
         {summaryKPIs.length > 0 ? (
           <div className="table-wrapper">
             <table className="collab-kpi-table">
               <thead>
                 <tr>
-                  <th>KPI</th>
-                  <th>Objetivo</th>
-                  <th>Actual</th>
-                  <th>Avance</th>
-                  <th>Gap</th>
-                  <th>Peso</th>
+                  <th>{t('collab.table.kpi')}</th>
+                  <th>{t('collab.table.target')}</th>
+                  <th>{t('collab.table.actual')}</th>
+                  <th>{t('collab.table.progress')}</th>
+                  <th>{t('collab.table.gap')}</th>
+                  <th>{t('collab.table.weight')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -837,7 +845,7 @@ export default function Dashboard() {
                     <tr key={kpi.id}>
                       <td>{kpi.kpiName || `KPI ${kpi.kpiId}`}</td>
                       <td>{formatNumber(targetValue, 2)}</td>
-                      <td>{actualValue === null ? 'No registrado' : formatNumber(actualValue, 2)}</td>
+                      <td>{actualValue === null ? t('collab.table.no_actual') : formatNumber(actualValue, 2)}</td>
                       <td>
                         <span
                           className={`compliance-badge ${
@@ -863,35 +871,35 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="empty-state">
-            <p>No tienes KPIs asignados aun</p>
+            <p>{t('collab.empty')}</p>
           </div>
         )}
       </div>
 
       {progressInsights && (
         <div className="dashboard-section">
-          <h2>Mi progreso</h2>
+          <h2>{t('collab.section_progress')}</h2>
           <div className="progress-grid">
             <div className="progress-card">
-              <p className="progress-label">KPIs al dia</p>
+              <p className="progress-label">{t('collab.progress.on_track')}</p>
               <p className="progress-value">{progressInsights.onTrack}/{progressInsights.total}</p>
-              <p className="progress-caption">Cumpliendo o superando objetivo</p>
+              <p className="progress-caption">{t('collab.progress.on_track_caption')}</p>
             </div>
             <div className="progress-card">
-              <p className="progress-label">KPIs sin carga</p>
+              <p className="progress-label">{t('collab.progress.without_actual')}</p>
               <p className="progress-value">{progressInsights.withoutActual}</p>
-              <p className="progress-caption">Pendientes de actualizacion</p>
+              <p className="progress-caption">{t('collab.progress.without_actual_caption')}</p>
             </div>
             <div className="progress-card">
-              <p className="progress-label">KPIs en riesgo</p>
+              <p className="progress-label">{t('collab.progress.at_risk')}</p>
               <p className="progress-value">{progressInsights.atRisk}</p>
-              <p className="progress-caption">Por debajo del 80%</p>
+              <p className="progress-caption">{t('collab.progress.at_risk_caption')}</p>
             </div>
           </div>
 
           <div className="progress-detail">
             <div className="detail-card">
-              <h3>Metas criticas</h3>
+              <h3>{t('collab.progress_detail.critical_targets')}</h3>
               {progressInsights.topRisk.length > 0 ? (
                 <ul className="risk-list">
                   {progressInsights.topRisk.map((kpi) => (
@@ -904,20 +912,20 @@ export default function Dashboard() {
                   ))}
                 </ul>
               ) : (
-                <p className="empty-note">No hay KPIs en riesgo por ahora.</p>
+                <p className="empty-note">{t('collab.progress_detail.no_at_risk')}</p>
               )}
             </div>
             <div className="detail-card highlight">
-              <h3>Proximo paso</h3>
+              <h3>{t('collab.progress_detail.next_step_title')}</h3>
               <p>
                 {progressInsights.withoutActual > 0
-                  ? 'Carga los avances pendientes para reflejar el progreso real.'
+                  ? t('collab.progress_detail.next_step_pending')
                   : progressInsights.atRisk > 0
-                  ? 'Prioriza los KPIs en riesgo y ajusta tu plan.'
-                  : 'Buen ritmo. Mantene el seguimiento para cerrar el periodo fuerte.'}
+                  ? t('collab.progress_detail.next_step_risk')
+                  : t('collab.progress_detail.next_step_ok')}
               </p>
               <button className="btn-primary ghost" onClick={() => navigate('/mi-parrilla')}>
-                Ver mi parrilla
+                {t('collab.progress_detail.see_grid')}
               </button>
             </div>
           </div>
@@ -926,7 +934,7 @@ export default function Dashboard() {
 
       {collaboratorSummary && collaboratorSummary.monthly.length > 0 && (
         <div className="dashboard-section">
-          <h2>Ponderacion y avances mensuales</h2>
+          <h2>{t('collab.section_monthly')}</h2>
           <div className="mini-grid">
             {collaboratorSummary.monthly.map((m) => {
               const monthlyProgress = m.variationWeight > 0 ? m.weightedVariation / m.variationWeight : null
@@ -937,10 +945,10 @@ export default function Dashboard() {
                     <span className="mini-weight">{formatPercent(m.weight, 2)} peso</span>
                   </div>
                   <div className="mini-body">
-                    <div><span className="detail-label">Objetivo:</span> {formatNumber(m.target, 2)}</div>
-                    <div><span className="detail-label">Actual:</span> {formatNumber(m.actual, 2)}</div>
+                    <div><span className="detail-label">{t('collab.monthly.target')}</span> {formatNumber(m.target, 2)}</div>
+                    <div><span className="detail-label">{t('collab.monthly.actual')}</span> {formatNumber(m.actual, 2)}</div>
                     <div>
-                      <span className="detail-label">Avance:</span>{' '}
+                      <span className="detail-label">{t('collab.monthly.progress')}</span>{' '}
                       {monthlyProgress === null ? '-' : formatPercent(monthlyProgress, 1)}
                     </div>
                   </div>
@@ -953,7 +961,7 @@ export default function Dashboard() {
 
       {teamKPIs && teamKPIs.length > 0 && (
         <div className="dashboard-section">
-          <h2>Avances del Equipo</h2>
+          <h2>{t('collab.section_team_kpis')}</h2>
           <div className="chart-card">
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={teamKPIs}>
@@ -962,8 +970,8 @@ export default function Dashboard() {
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="target" fill="#cbd5e1" name="Objetivo" />
-                <Bar dataKey="actual" fill="#6366f1" name="Actual" />
+                <Bar dataKey="target" fill="#cbd5e1" name={t('collab.team_chart.target')} />
+                <Bar dataKey="actual" fill="#6366f1" name={t('collab.team_chart.actual')} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -972,16 +980,16 @@ export default function Dashboard() {
 
       {okrSummary && okrSummary.active > 0 && (
         <div className="dashboard-section">
-          <OkrWidget summary={okrSummary} title="Mis OKRs" onNavigate={() => navigate('/okr')} />
+          <OkrWidget summary={okrSummary} title={t('okr_widget.collab_title')} onNavigate={() => navigate('/okr')} />
         </div>
       )}
 
       <div className="dashboard-section">
-        <h2>Acciones Rapidas</h2>
+        <h2>{t('collab.quick_actions.title')}</h2>
         <div className="quick-actions">
-          <button className="action-btn" onClick={() => navigate('/mi-parrilla')}>Ver Mi Parrilla</button>
-          <button className="action-btn" onClick={() => navigate('/historial')}>Mi Historial</button>
-          <button className="action-btn" onClick={() => navigate('/okr')}>Mis OKRs</button>
+          <button className="action-btn" onClick={() => navigate('/mi-parrilla')}>{t('collab.quick_actions.my_grid')}</button>
+          <button className="action-btn" onClick={() => navigate('/historial')}>{t('collab.quick_actions.my_history')}</button>
+          <button className="action-btn" onClick={() => navigate('/okr')}>{t('collab.quick_actions.my_okrs')}</button>
         </div>
       </div>
     </div>

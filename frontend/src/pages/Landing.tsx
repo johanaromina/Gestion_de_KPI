@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { contactDemoSubject, contactEmail, contactPhones } from '../config/runtime'
+import { Trans, useTranslation } from 'react-i18next'
+import { contactEmail, contactPhones } from '../config/runtime'
 import api from '../services/api'
+import { resolveApiErrorMessage } from '../utils/apiErrors'
 import './Landing.css'
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
@@ -9,29 +11,28 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 const HERO_CONTROLS = [
   {
     key: 'sales',
-    label: 'Tracción comercial',
-    hint: 'Pipeline y cierre',
     min: 45,
     max: 100,
     initial: 82,
   },
   {
     key: 'delivery',
-    label: 'Entrega operativa',
-    hint: 'Cumplimiento y lead time',
     min: 45,
     max: 100,
     initial: 74,
   },
   {
     key: 'engagement',
-    label: 'Compromiso del equipo',
-    hint: 'Clima y seguimiento',
     min: 45,
     max: 100,
     initial: 79,
   },
 ] as const
+
+const CONTACT_API_ERROR_KEYS: Record<string, string> = {
+  CONTACT_DEMO_INVALID: 'landing:contact.api_errors.invalid_form',
+  CONTACT_DEMO_SUBMIT_FAILED: 'landing:contact.api_errors.submit_failed',
+}
 
 type DemoFormState = {
   name: string
@@ -50,216 +51,93 @@ const INITIAL_DEMO_FORM: DemoFormState = {
 }
 
 const FEATURES = [
-  {
-    icon: '📊',
-    title: 'Dashboard ejecutivo en tiempo real',
-    desc: 'Visualizá el estado de todos tus KPIs en un semáforo organizacional. Verde, amarillo y rojo para entender prioridades sin abrir múltiples reportes.',
-    tag: 'Tablero + árbol de objetivos',
-  },
-  {
-    icon: '🤖',
-    title: 'Curaduría con detección de outliers',
-    desc: 'El sistema detecta automáticamente valores atípicos usando z-score estadístico y alerta antes de aprobar un dato sospechoso.',
-    tag: 'Controles antes de aprobar',
-  },
-  {
-    icon: '📅',
-    title: 'Check-ins semanales',
-    desc: 'Tres preguntas rápidas cada semana para capturar avance, bloqueos y foco. Los líderes ganan contexto sin sumar reuniones.',
-    tag: 'Seguimiento continuo',
-  },
-  {
-    icon: '🔗',
-    title: 'Integraciones externas',
-    desc: 'Conectá Google Sheets, APIs REST o archivos CSV para que los KPIs se actualicen según el calendario operativo que definas.',
-    tag: 'Google Sheets · REST · CSV',
-  },
-  {
-    icon: '🧪',
-    title: 'Simulación de escenarios',
-    desc: 'Probá cambios en KPIs clave y estimá cómo impactan en el estado general del equipo o la compañía.',
-    tag: 'Análisis de impacto',
-  },
-  {
-    icon: '📦',
-    title: 'Marketplace de templates',
-    desc: 'Partí de KPIs listos para importar y acelerá la implementación con estructuras ya pensadas para distintas áreas.',
-    tag: '36 templates · 6 industrias',
-  },
-  {
-    icon: '📄',
-    title: 'Reportes ejecutivos en PDF',
-    desc: 'Generá reportes con narrativa automática en español para dirección, comités y reuniones de seguimiento.',
-    tag: 'Salida ejecutiva',
-  },
-  {
-    icon: '🛡️',
-    title: 'Seguridad y auditoría',
-    desc: 'Roles, MFA, SSO, auditoría completa y credenciales protegidas para operar con estándares corporativos.',
-    tag: 'Enterprise-ready',
-  },
-]
+  { key: 'dashboard', icon: '📊' },
+  { key: 'outlier', icon: '🤖' },
+  { key: 'checkins', icon: '📅' },
+  { key: 'integrations', icon: '🔗' },
+  { key: 'simulator', icon: '🧪' },
+  { key: 'marketplace', icon: '📦' },
+  { key: 'pdf', icon: '📄' },
+  { key: 'security', icon: '🛡️' },
+] as const
 
 const COMMERCIAL_STEPS = [
   {
     step: '01',
-    title: 'Demo',
-    desc: 'Recorremos el tablero ejecutivo, la detección de desvíos y el simulador de escenarios con un caso cercano a tu operación.',
+    key: 'demo',
   },
   {
     step: '02',
-    title: 'Relevamiento',
-    desc: 'Validamos usuarios, áreas, KPIs, seguridad, SSO e integraciones para definir el alcance real de implementación.',
+    key: 'survey',
   },
   {
     step: '03',
-    title: 'Implementación',
-    desc: 'Onboarding guiado con acompañamiento hasta que el equipo opera con autonomía completa.',
+    key: 'impl',
   },
   {
     step: '04',
-    title: 'Tomás decisiones',
-    desc: 'Con datos confiables, trazabilidad completa y contexto centralizado, la dirección interviene antes de que los problemas escalen.',
+    key: 'decide',
   },
-]
-
-const PROBLEMS = [
-  'KPIs dispersos en múltiples herramientas',
-  'Reportes que llegan tarde',
-  'Equipos alineados en métricas, no en acciones',
-  'Decisiones basadas en intuición o información parcial',
-]
+ ] as const
 
 const VALUE_PILLARS = [
   {
-    title: 'Visibilidad ejecutiva',
-    desc: 'Estado real del negocio en un solo lugar',
+    key: 'visibility',
     icon: '👁',
   },
   {
-    title: 'Detección de desvíos',
-    desc: 'Identificá riesgos antes de que escalen',
+    key: 'deviation',
     icon: '⚡',
   },
   {
-    title: 'Acción guiada',
-    desc: 'Intervenís con contexto y trazabilidad completa',
+    key: 'action',
     icon: '🎯',
   },
-]
+ ] as const
 
-const IMPACT_METRICS = [
-  { value: '+20–30%', label: 'mejora en cumplimiento de objetivos' },
-  { value: '−15–25%', label: 'desvíos operativos no detectados' },
-  { value: '1–2 sem', label: 'menos en tiempo de reacción' },
-]
+const IMPACT_METRICS = [1, 2, 3, 4] as const
 
 const PLANS = [
   {
-    name: 'Starter',
-    desc: 'Para equipos pequeños que quieren ordenar sus KPIs con una implementación ágil.',
-    amount: 'USD 100',
-    period: '/ mes',
+    key: 'starter',
     featured: false,
-    cta: 'Solicitar demo',
     ctaStyle: 'outline' as const,
-    features: [
-      { text: 'Hasta 10 colaboradores', included: true },
-      { text: 'KPIs individuales y grupales', included: true },
-      { text: 'Dashboard ejecutivo', included: true },
-      { text: 'Check-ins semanales', included: true },
-      { text: 'Templates del marketplace', included: true },
-      { text: 'Integraciones externas', included: false },
-      { text: 'Simulador de escenarios', included: false },
-      { text: 'SSO / MFA', included: false },
-    ],
+    features: [true, true, true, true, true, false, false, false],
   },
   {
-    name: 'Professional',
-    desc: 'Para organizaciones que necesitan visibilidad completa y automatización operativa.',
-    amount: 'USD 200',
-    period: '/ mes',
+    key: 'pro',
     featured: true,
-    cta: 'Coordinar demo',
     ctaStyle: 'primary' as const,
-    features: [
-      { text: 'Hasta 50 colaboradores', included: true },
-      { text: 'KPIs individuales y grupales', included: true },
-      { text: 'Dashboard ejecutivo + árbol de objetivos', included: true },
-      { text: 'Check-ins semanales', included: true },
-      { text: 'Templates del marketplace', included: true },
-      { text: 'Integraciones Google Sheets, REST y CSV', included: true },
-      { text: 'Simulador de escenarios', included: true },
-      { text: 'SSO / MFA', included: false },
-    ],
+    features: [true, true, true, true, true, true, true, false],
   },
   {
-    name: 'Enterprise',
-    desc: 'Para estructuras complejas con mayores requisitos de seguridad y acompañamiento.',
-    amount: 'USD 400',
-    period: '/ mes',
+    key: 'enterprise',
     featured: false,
-    cta: 'Hablar con ventas',
     ctaStyle: 'outline' as const,
-    features: [
-      { text: 'Colaboradores ilimitados', included: true },
-      { text: 'Todo lo de Professional', included: true },
-      { text: 'SSO corporativo (SAML / OAuth2)', included: true },
-      { text: 'MFA obligatorio por política', included: true },
-      { text: 'Auditoría completa de acciones', included: true },
-      { text: 'Exportación PDF con narrativa', included: true },
-      { text: 'Soporte dedicado y SLA', included: true },
-      { text: 'Onboarding personalizado', included: true },
-    ],
+    features: [true, true, true, true, true, true, true, true],
   },
-]
+ ] as const
 
 const TESTIMONIALS = [
   {
-    quote: 'Antes tardábamos horas en armar el reporte mensual de KPIs. Ahora lo tenemos en un click con el PDF ejecutivo. El tablero de semáforos cambió cómo ve los números toda la dirección.',
-    name: 'Martina R.',
-    role: 'Directora de RRHH · Empresa de servicios',
+    key: 't1',
     color: '#15803d',
     initials: 'MR',
   },
   {
-    quote: 'La detección de outliers nos ahorró aprobar datos incorrectos al menos tres veces en el primer mes. El sistema marca la anomalía antes de que llegue a la curaduría.',
-    name: 'Leandro M.',
-    role: 'Head of Operations · SaaS B2B',
+    key: 't2',
     color: '#1d4ed8',
     initials: 'LM',
   },
   {
-    quote: 'Los check-ins semanales cambiaron la cultura del equipo. Antes nadie reportaba nada, ahora tenemos contexto de cada área cada semana sin reuniones extra.',
-    name: 'Sofía G.',
-    role: 'CEO · Consultora de gestión',
+    key: 't3',
     color: '#7c3aed',
     initials: 'SG',
   },
-]
+ ] as const
 
-const FAQS = [
-  {
-    q: '¿Puedo importar mis KPIs existentes?',
-    a: 'Sí. El marketplace incluye templates listos para importar y también podés crear KPIs personalizados con fórmulas propias desde el módulo de configuración.',
-  },
-  {
-    q: '¿Cómo funciona la integración con Google Sheets?',
-    a: 'Configurás la URL de la hoja, el rango de celdas y la frecuencia de actualización. El sistema toma el valor automáticamente y lo registra como medición del KPI correspondiente.',
-  },
-  {
-    q: '¿El sistema es multiempresa?',
-    a: 'Cada instancia es single-tenant: una empresa, una base de datos, sin mezcla de datos. Eso garantiza aislamiento y control operativo.',
-  },
-  {
-    q: '¿Qué pasa si un colaborador propone un valor muy fuera de lo normal?',
-    a: 'El sistema calcula el z-score del valor respecto al historial y muestra una advertencia visual antes de que el líder apruebe. Para muestras pequeñas usa desvío porcentual.',
-  },
-  {
-    q: '¿Cómo solicito una demo y avanzo con la compra?',
-    a: 'Coordinamos una demo, relevamos cantidad de usuarios, integraciones y requisitos de seguridad, y luego armamos la propuesta comercial e implementación.',
-  },
-]
+const PROBLEM_KEYS = ['p1', 'p2', 'p3', 'p4'] as const
+const FAQ_IDS = [1, 2, 3, 4, 5] as const
 
 const normalizePhoneHref = (value: string) => {
   const trimmed = String(value || '').trim()
@@ -270,6 +148,7 @@ const normalizePhoneHref = (value: string) => {
 }
 
 export default function Landing() {
+  const { t } = useTranslation('landing')
   const [openFaq, setOpenFaq] = useState<number | null>(null)
   const [heroControls, setHeroControls] = useState(() => ({
     sales: HERO_CONTROLS[0].initial,
@@ -282,13 +161,13 @@ export default function Landing() {
 
   const demoHref = '#contacto'
   const contactMailHref = contactEmail
-    ? `mailto:${contactEmail}?subject=${encodeURIComponent(contactDemoSubject)}`
+    ? `mailto:${contactEmail}?subject=${encodeURIComponent(t('contact.mail_subject'))}`
     : '#contacto'
 
   const phoneCards = contactPhones.map((value, index) => {
     const normalized = normalizePhoneHref(value)
     return {
-      label: index === 0 ? 'Teléfono comercial' : `Teléfono ${index + 1}`,
+      label: index === 0 ? t('hero.phone_label_0') : t('hero.phone_label_n', { n: index + 1 }),
       value,
       href: normalized ? `tel:${normalized}` : '#contacto',
     }
@@ -298,7 +177,7 @@ export default function Landing() {
     ...(contactEmail
       ? [
           {
-            label: 'Email comercial',
+            label: t('hero.email_label'),
             value: contactEmail,
             href: contactMailHref,
           },
@@ -323,43 +202,49 @@ export default function Landing() {
   const normalizedGreenPct = 100 - riskPct - criticalPct
   const summaryTone = overallScore >= 80 ? 'green' : overallScore >= 65 ? 'yellow' : 'red'
   const summaryLabel = summaryTone === 'green'
-    ? 'Escenario sólido'
+    ? t('hero.summary.green')
     : summaryTone === 'yellow'
-      ? 'Atención operativa'
-      : 'Riesgo ejecutivo'
-  const scenarioLabel = volatility <= 8 ? 'Escenario balanceado' : volatility <= 16 ? 'Escenario sensible' : 'Escenario inestable'
+      ? t('hero.summary.yellow')
+      : t('hero.summary.red')
+  const scenarioLabel = volatility <= 8 ? t('hero.scenario.balanced') : volatility <= 16 ? t('hero.scenario.sensitive') : t('hero.scenario.unstable')
   const weakestDriver = [
-    { key: 'sales', label: 'la tracción comercial', value: sales },
-    { key: 'delivery', label: 'la capacidad de entrega', value: delivery },
-    { key: 'engagement', label: 'el compromiso del equipo', value: engagement },
+    { key: 'sales', label: t('hero.driver_sales'), value: sales },
+    { key: 'delivery', label: t('hero.driver_delivery'), value: delivery },
+    { key: 'engagement', label: t('hero.driver_engagement'), value: engagement },
   ].sort((a, b) => a.value - b.value)[0]
 
-  let insightTitle = 'Dirección con visibilidad inmediata'
-  let insightText = 'Los tres frentes se sostienen y el tablero puede usarse para decidir sin reconstruir el contexto manualmente.'
+  let insightTitle = t('hero.insight.green_title')
+  let insightText = t('hero.insight.green_text')
   if (summaryTone === 'yellow') {
-    insightTitle = `Conviene intervenir en ${weakestDriver.label}`
-    insightText = `El escenario sigue siendo gestionable, pero ${weakestDriver.label} ya empieza a empujar indicadores al amarillo y a exigir seguimiento más fino.`
+    insightTitle = t('hero.insight.yellow_title', { driver: weakestDriver.label })
+    insightText = t('hero.insight.yellow_text', { driver: weakestDriver.label })
   }
   if (summaryTone === 'red') {
-    insightTitle = `La presión se concentra en ${weakestDriver.label}`
-    insightText = `Al caer ${weakestDriver.label}, aumenta el peso de KPIs críticos y la dirección pierde margen para esperar al cierre del período.`
+    insightTitle = t('hero.insight.red_title', { driver: weakestDriver.label })
+    insightText = t('hero.insight.red_text', { driver: weakestDriver.label })
   }
+
+  const heroControlLabels = HERO_CONTROLS.map((control) => ({
+    ...control,
+    label: t(`hero.controls.${control.key}_label`),
+    hint: t(`hero.controls.${control.key}_hint`),
+  }))
 
   const heroRows = [
     {
-      label: 'Tracción comercial · Q2 2026',
+      label: t('hero.rows.sales_label'),
       value: sales,
       tone: sales >= 80 ? 'green' : sales >= 65 ? 'yellow' : 'red',
       prefix: sales >= 80 ? '↑' : sales >= 65 ? '◎' : '↓',
     },
     {
-      label: 'Entrega comprometida',
+      label: t('hero.rows.delivery_label'),
       value: delivery,
       tone: delivery >= 80 ? 'green' : delivery >= 65 ? 'yellow' : 'red',
       prefix: delivery >= 80 ? '↑' : delivery >= 65 ? '◎' : '↓',
     },
     {
-      label: 'Compromiso del equipo',
+      label: t('hero.rows.engagement_label'),
       value: engagement,
       tone: engagement >= 80 ? 'green' : engagement >= 65 ? 'yellow' : 'red',
       prefix: engagement >= 80 ? '↑' : engagement >= 65 ? '◎' : '↓',
@@ -367,11 +252,59 @@ export default function Landing() {
   ]
 
   const departmentBars = [
-    { label: 'Comercial', pct: clamp(Math.round(sales + 6 - volatility * 0.12), 38, 98) },
-    { label: 'Tecnología', pct: clamp(Math.round(delivery * 0.72 + engagement * 0.28), 35, 96) },
-    { label: 'Operaciones', pct: clamp(Math.round(delivery * 0.78 + sales * 0.22 - 4), 32, 95) },
-    { label: 'RRHH', pct: clamp(Math.round(engagement * 0.8 + delivery * 0.2 + 4), 36, 97) },
+    { label: t('hero.depts.commercial'), pct: clamp(Math.round(sales + 6 - volatility * 0.12), 38, 98) },
+    { label: t('hero.depts.technology'), pct: clamp(Math.round(delivery * 0.72 + engagement * 0.28), 35, 96) },
+    { label: t('hero.depts.operations'), pct: clamp(Math.round(delivery * 0.78 + sales * 0.22 - 4), 32, 95) },
+    { label: t('hero.depts.hr'), pct: clamp(Math.round(engagement * 0.8 + delivery * 0.2 + 4), 36, 97) },
   ]
+
+  const impactMetrics = IMPACT_METRICS.map((metric) => ({
+    value: t(`stats.metric_${metric}_value`),
+    label: t(`stats.metric_${metric}_label`),
+  }))
+  const problems = PROBLEM_KEYS.map((key) => t(`problem.items.${key}`))
+  const valuePillars = VALUE_PILLARS.map((pillar) => {
+    return {
+      ...pillar,
+      title: t(`problem.pillars.${pillar.key}_title`),
+      desc: t(`problem.pillars.${pillar.key}_desc`),
+    }
+  })
+  const commercialSteps = COMMERCIAL_STEPS.map((step) => {
+    return {
+      ...step,
+      title: t(`process.steps.${step.key}_title`),
+      desc: t(`process.steps.${step.key}_desc`),
+    }
+  })
+  const features = FEATURES.map((feature) => ({
+    ...feature,
+    title: t(`features.${feature.key}_title`),
+    desc: t(`features.${feature.key}_desc`),
+    tag: t(`features.${feature.key}_tag`),
+  }))
+  const plans = PLANS.map((plan) => ({
+    ...plan,
+    name: t(`pricing.plans.${plan.key}_name`),
+    desc: t(`pricing.plans.${plan.key}_desc`),
+    amount: t(`pricing.plans.${plan.key}_amount`),
+    period: t(`pricing.plans.${plan.key}_period`),
+    cta: t(`pricing.plans.${plan.key}_cta`),
+    features: plan.features.map((included, index) => ({
+      included,
+      text: t(`pricing.plans.${plan.key}_f${index + 1}`),
+    })),
+  }))
+  const testimonials = TESTIMONIALS.map((testimonial) => ({
+    ...testimonial,
+    quote: t(`testimonials.${testimonial.key}_quote`),
+    name: t(`testimonials.${testimonial.key}_name`),
+    role: t(`testimonials.${testimonial.key}_role`),
+  }))
+  const faqs = FAQ_IDS.map((id) => ({
+    q: t(`faq.q${id}`),
+    a: t(`faq.a${id}`),
+  }))
 
   const handleHeroControlChange = (key: 'sales' | 'delivery' | 'engagement', value: number) => {
     setHeroControls((current) => ({
@@ -407,13 +340,16 @@ export default function Landing() {
       setDemoForm(INITIAL_DEMO_FORM)
       setDemoSubmitMessage(
         response.data?.delivery === 'manual'
-          ? 'Recibimos tu solicitud. En este entorno la derivación automática no está configurada; usá también los teléfonos para acelerar el contacto.'
-          : response.data?.message || 'Recibimos tu solicitud. El equipo comercial te va a contactar pronto.'
+          ? t('contact.success_manual')
+          : response.data?.message || t('contact.success_default')
       )
     } catch (error: any) {
       setDemoSubmitState('error')
       setDemoSubmitMessage(
-        error.response?.data?.error || 'No pudimos enviar la solicitud. Probá nuevamente o usá los canales directos.'
+        resolveApiErrorMessage(error, t, {
+          codeMap: CONTACT_API_ERROR_KEYS,
+          fallbackKey: 'contact.error_default',
+        })
       )
     }
   }
@@ -426,8 +362,8 @@ export default function Landing() {
           <span className="landing-nav-name">KPI Manager</span>
         </a>
         <div className="landing-nav-actions">
-          <Link to="/login" className="landing-btn-ghost">Iniciar sesión</Link>
-          <a href={demoHref} className="landing-btn-primary">Solicitar demo</a>
+          <Link to="/login" className="landing-btn-ghost">{t('nav.login')}</Link>
+          <a href={demoHref} className="landing-btn-primary">{t('nav.demo_btn')}</a>
         </div>
       </nav>
 
@@ -436,21 +372,21 @@ export default function Landing() {
           <div className="landing-hero-copy">
             <div className="landing-hero-eyebrow">
               <span className="landing-hero-eyebrow-dot" />
-              Demo guiada + propuesta comercial
+              {t('hero.eyebrow')}
             </div>
             <h1 className="landing-hero-title">
-              Convertí información en<br />
-              <span>decisiones ejecutivas que mueven resultados</span>
+              {t('hero.title_line1')}<br />
+              <span>{t('hero.title_line2')}</span>
             </h1>
             <p className="landing-hero-subtitle">
-              Centralizá KPIs, detectá desvíos críticos y simulá escenarios antes de que impacten el negocio. Alineá a tu equipo con datos confiables. Pasá de reportar a intervenir con trazabilidad completa.
+              {t('hero.subtitle')}
             </p>
             <div className="landing-hero-ctas">
               <a href={demoHref} className="landing-hero-cta-primary">
-                Coordinar demo →
+                {t('hero.cta_demo')}
               </a>
               <a href="#como-funciona" className="landing-hero-cta-secondary">
-                Ver cómo funciona
+                {t('hero.cta_how')}
               </a>
             </div>
             <div className="landing-hero-trust">
@@ -460,7 +396,7 @@ export default function Landing() {
                 <div className="landing-hero-trust-avatar">SG</div>
                 <div className="landing-hero-trust-avatar">+</div>
               </div>
-              <span>Implementación guiada para dirección, operaciones, RRHH y finanzas</span>
+              <span>{t('hero.trust')}</span>
             </div>
             {contactCards.length > 0 && (
               <div className="landing-hero-contact-rail">
@@ -484,21 +420,21 @@ export default function Landing() {
               </div>
               <div className="landing-mockup-body">
                 <div className="landing-mockup-live-strip">
-                  <span className="landing-mockup-live-badge">Demo interactiva</span>
-                  <span className="landing-mockup-live-note">Mové los drivers y mirá cómo cambia el semáforo</span>
+                  <span className="landing-mockup-live-badge">{t('hero.mockup.live_badge')}</span>
+                  <span className="landing-mockup-live-note">{t('hero.mockup.live_note')}</span>
                 </div>
                 <div className="landing-mockup-metrics">
                   <div className={`landing-mockup-metric ${summaryTone}`}>
                     <div className="landing-mockup-metric-val">{normalizedGreenPct}%</div>
-                    <div className="landing-mockup-metric-label">En verde</div>
+                    <div className="landing-mockup-metric-label">{t('hero.mockup.green_label')}</div>
                   </div>
                   <div className="landing-mockup-metric yellow">
                     <div className="landing-mockup-metric-val">{riskPct}%</div>
-                    <div className="landing-mockup-metric-label">En riesgo</div>
+                    <div className="landing-mockup-metric-label">{t('hero.mockup.risk_label')}</div>
                   </div>
                   <div className="landing-mockup-metric red">
                     <div className="landing-mockup-metric-val">{criticalPct}%</div>
-                    <div className="landing-mockup-metric-label">Crítico</div>
+                    <div className="landing-mockup-metric-label">{t('hero.mockup.critical_label')}</div>
                   </div>
                 </div>
 
@@ -509,7 +445,7 @@ export default function Landing() {
                   </div>
                   <div className="landing-mockup-insight-score">
                     <span className="landing-mockup-insight-score-value">{overallScore}%</span>
-                    <span className="landing-mockup-insight-score-label">salud operativa proyectada</span>
+                    <span className="landing-mockup-insight-score-label">{t('hero.mockup.score_label')}</span>
                   </div>
                   <div className="landing-mockup-insight-title">{insightTitle}</div>
                   <p className="landing-mockup-insight-text">{insightText}</p>
@@ -537,13 +473,13 @@ export default function Landing() {
                 <div className="landing-mockup-controls">
                   <div className="landing-mockup-controls-head">
                     <div>
-                      <div className="landing-mockup-controls-title">Probá el impacto de tus drivers</div>
-                      <div className="landing-mockup-controls-subtitle">Simulá un escenario comercial antes de pedir la demo</div>
+                      <div className="landing-mockup-controls-title">{t('hero.mockup.controls_title')}</div>
+                      <div className="landing-mockup-controls-subtitle">{t('hero.mockup.controls_subtitle')}</div>
                     </div>
                     <div className={`landing-mockup-controls-score ${summaryTone}`}>{overallScore}%</div>
                   </div>
                   <div className="landing-mockup-controls-grid">
-                    {HERO_CONTROLS.map((control) => (
+                    {heroControlLabels.map((control) => (
                       <label className="landing-mockup-slider-card" key={control.key}>
                         <div className="landing-mockup-slider-topline">
                           <div>
@@ -572,28 +508,26 @@ export default function Landing() {
       </section>
 
       <section className="landing-stats">
-        <div className="landing-stats-eyebrow">Impacto directo en la gestión del negocio</div>
+        <div className="landing-stats-eyebrow">{t('stats.eyebrow')}</div>
         <div className="landing-stats-inner">
-          {IMPACT_METRICS.map((m) => (
+          {impactMetrics.map((m) => (
             <div className="landing-stat" key={m.value}>
               <div className="landing-stat-value">{m.value}</div>
               <div className="landing-stat-label">{m.label}</div>
             </div>
           ))}
-          <div className="landing-stat">
-            <div className="landing-stat-value">&lt;1min</div>
-            <div className="landing-stat-label">Para generar un reporte ejecutivo</div>
-          </div>
         </div>
       </section>
 
       <section className="landing-problem">
         <div className="landing-problem-inner">
           <div className="landing-problem-left">
-            <div className="landing-section-eyebrow">Problema que resolvemos</div>
-            <h2 className="landing-problem-title">"El problema no es la falta de datos.<br />Es la falta de decisión."</h2>
+            <div className="landing-section-eyebrow">{t('problem.eyebrow')}</div>
+            <h2 className="landing-problem-title">
+              <Trans ns="landing" i18nKey="problem.quote" components={{ br: <br /> }} />
+            </h2>
             <ul className="landing-problem-list">
-              {PROBLEMS.map((p) => (
+              {problems.map((p) => (
                 <li key={p} className="landing-problem-item">
                   <span className="landing-problem-bullet">✗</span>
                   {p}
@@ -602,10 +536,12 @@ export default function Landing() {
             </ul>
           </div>
           <div className="landing-problem-right">
-            <div className="landing-section-eyebrow">Propuesta de valor</div>
-            <h2 className="landing-problem-title">"Un sistema diseñado para decidir,<br />no solo para reportar"</h2>
+            <div className="landing-section-eyebrow">{t('problem.value_eyebrow')}</div>
+            <h2 className="landing-problem-title">
+              <Trans ns="landing" i18nKey="problem.value_quote" components={{ br: <br /> }} />
+            </h2>
             <div className="landing-pillars">
-              {VALUE_PILLARS.map((p) => (
+              {valuePillars.map((p) => (
                 <div key={p.title} className="landing-pillar">
                   <span className="landing-pillar-icon">{p.icon}</span>
                   <div>
@@ -621,14 +557,16 @@ export default function Landing() {
 
       <section className="landing-process" id="como-funciona">
         <div className="landing-section-header">
-          <div className="landing-section-eyebrow">Flujo experiencial</div>
-          <h2 className="landing-section-title">De métricas a decisiones.<br />De seguimiento a resultados.</h2>
+          <div className="landing-section-eyebrow">{t('process.eyebrow')}</div>
+          <h2 className="landing-section-title">
+            <Trans ns="landing" i18nKey="process.title" components={{ br: <br /> }} />
+          </h2>
           <p className="landing-section-subtitle">
-            Implementación guiada para asegurar impacto real. Cuatro pasos para que tu equipo pase de reportar a intervenir.
+            {t('process.subtitle')}
           </p>
         </div>
         <div className="landing-process-grid">
-          {COMMERCIAL_STEPS.map((step) => (
+          {commercialSteps.map((step) => (
             <article className="landing-process-card" key={step.step}>
               <div className="landing-process-step">{step.step}</div>
               <h3 className="landing-process-title">{step.title}</h3>
@@ -640,14 +578,14 @@ export default function Landing() {
 
       <section className="landing-features">
         <div className="landing-section-header">
-          <div className="landing-section-eyebrow">Funcionalidades</div>
-          <h2 className="landing-section-title">Todo lo que necesitás para gestionar KPIs en serio</h2>
+          <div className="landing-section-eyebrow">{t('features.eyebrow')}</div>
+          <h2 className="landing-section-title">{t('features.title')}</h2>
           <p className="landing-section-subtitle">
-            Desde la captura del dato hasta el reporte ejecutivo, cubrimos todo el ciclo de vida de tus indicadores.
+            {t('features.subtitle')}
           </p>
         </div>
         <div className="landing-features-grid">
-          {FEATURES.map((feature) => (
+          {features.map((feature) => (
             <div className="landing-feature-card" key={feature.title}>
               <div className="landing-feature-icon">{feature.icon}</div>
               <h3 className="landing-feature-title">{feature.title}</h3>
@@ -660,16 +598,16 @@ export default function Landing() {
 
       <section className="landing-pricing" id="planes">
         <div className="landing-section-header">
-          <div className="landing-section-eyebrow">Planes y alcance</div>
-          <h2 className="landing-section-title">Diseñado para adaptarse a tu estructura</h2>
+          <div className="landing-section-eyebrow">{t('pricing.eyebrow')}</div>
+          <h2 className="landing-section-title">{t('pricing.title')}</h2>
           <p className="landing-section-subtitle">
-            Implementación guiada para asegurar impacto real. La activación se coordina con demo previa según usuarios, integraciones y requisitos de seguridad.
+            {t('pricing.subtitle')}
           </p>
         </div>
         <div className="landing-pricing-grid">
-          {PLANS.map((plan) => (
+          {plans.map((plan) => (
             <div className={`landing-plan ${plan.featured ? 'featured' : ''}`} key={plan.name}>
-              {plan.featured && <div className="landing-plan-badge">Más solicitado</div>}
+              {plan.featured && <div className="landing-plan-badge">{t('pricing.featured_badge')}</div>}
               <div>
                 <h3 className="landing-plan-name">{plan.name}</h3>
                 <p className="landing-plan-desc">{plan.desc}</p>
@@ -696,17 +634,17 @@ export default function Landing() {
           ))}
         </div>
         <p className="landing-pricing-note">
-          La compra y el acceso se gestionan con el equipo comercial luego de la demo. · <a href={demoHref} className="landing-pricing-note-link">Solicitar demo →</a>
+          {t('pricing.note')} · <a href={demoHref} className="landing-pricing-note-link">{t('pricing.note_link')}</a>
         </p>
       </section>
 
       <section className="landing-proof">
         <div className="landing-section-header">
-          <div className="landing-section-eyebrow">Testimonios</div>
-          <h2 className="landing-section-title">Lo que dicen los equipos que ya lo usan</h2>
+          <div className="landing-section-eyebrow">{t('testimonials.eyebrow')}</div>
+          <h2 className="landing-section-title">{t('testimonials.title')}</h2>
         </div>
         <div className="landing-proof-grid">
-          {TESTIMONIALS.map((testimonial) => (
+          {testimonials.map((testimonial) => (
             <div className="landing-proof-card" key={testimonial.name}>
               <div className="landing-proof-stars">★★★★★</div>
               <p className="landing-proof-quote">"{testimonial.quote}"</p>
@@ -724,11 +662,11 @@ export default function Landing() {
 
       <section className="landing-faq">
         <div className="landing-section-header">
-          <div className="landing-section-eyebrow">Preguntas frecuentes</div>
-          <h2 className="landing-section-title">Todo lo que querés saber</h2>
+          <div className="landing-section-eyebrow">{t('faq.eyebrow')}</div>
+          <h2 className="landing-section-title">{t('faq.title')}</h2>
         </div>
         <div className="landing-faq-list">
-          {FAQS.map((faq, index) => (
+          {faqs.map((faq, index) => (
             <div className={`landing-faq-item ${openFaq === index ? 'open' : ''}`} key={faq.q}>
               <button className="landing-faq-q" onClick={() => setOpenFaq(openFaq === index ? null : index)}>
                 {faq.q}
@@ -742,77 +680,77 @@ export default function Landing() {
 
       <section className="landing-cta-section" id="contacto">
         <div className="landing-cta-inner">
-          <div className="landing-section-eyebrow landing-section-eyebrow-light">Contacto comercial</div>
+          <div className="landing-section-eyebrow landing-section-eyebrow-light">{t('contact.eyebrow')}</div>
           <h2 className="landing-cta-title">
-            Solicitá una demo y<br />
-            <span>gestionamos la compra con tu equipo</span>
+            {t('contact.title_line1')}<br />
+            <span>{t('contact.title_line2')}</span>
           </h2>
           <p className="landing-cta-subtitle">
-            Completá el formulario y relevamos usuarios, KPIs, seguridad, integraciones y modalidad de implementación.
+            {t('contact.subtitle')}
           </p>
           <div className="landing-contact-layout">
             <form className="landing-demo-form" onSubmit={handleDemoRequestSubmit}>
               <div className="landing-demo-form-header">
-                <div className="landing-demo-form-title">Pedí una demo guiada</div>
+                <div className="landing-demo-form-title">{t('contact.form_title')}</div>
                 <div className="landing-demo-form-copy">
-                  Te contactamos para coordinar una reunión breve y revisar el alcance comercial.
+                  {t('contact.form_copy')}
                 </div>
               </div>
               <div className="landing-demo-form-grid">
                 <label className="landing-demo-field">
-                  <span className="landing-demo-label">Nombre</span>
+                  <span className="landing-demo-label">{t('contact.field_name')}</span>
                   <input
                     className="landing-demo-input"
                     type="text"
                     value={demoForm.name}
                     onChange={(event) => handleDemoFormChange('name', event.target.value)}
-                    placeholder="Tu nombre"
+                    placeholder={t('contact.field_name_placeholder')}
                     autoComplete="name"
                     maxLength={120}
                     required
                   />
                 </label>
                 <label className="landing-demo-field">
-                  <span className="landing-demo-label">Empresa</span>
+                  <span className="landing-demo-label">{t('contact.field_company')}</span>
                   <input
                     className="landing-demo-input"
                     type="text"
                     value={demoForm.company}
                     onChange={(event) => handleDemoFormChange('company', event.target.value)}
-                    placeholder="Nombre de la empresa"
+                    placeholder={t('contact.field_company_placeholder')}
                     autoComplete="organization"
                     maxLength={160}
                     required
                   />
                 </label>
                 <label className="landing-demo-field">
-                  <span className="landing-demo-label">Mail</span>
+                  <span className="landing-demo-label">{t('contact.field_email')}</span>
                   <input
                     className="landing-demo-input"
                     type="email"
                     value={demoForm.email}
                     onChange={(event) => handleDemoFormChange('email', event.target.value)}
-                    placeholder="nombre@empresa.com"
+                    placeholder={t('contact.field_email_placeholder')}
                     autoComplete="email"
                     maxLength={180}
                     required
                   />
                 </label>
                 <label className="landing-demo-field">
-                  <span className="landing-demo-label">Teléfono</span>
+                  <span className="landing-demo-label">{t('contact.field_phone')}</span>
                   <input
                     className="landing-demo-input"
                     type="tel"
                     value={demoForm.phone}
                     onChange={(event) => handleDemoFormChange('phone', event.target.value)}
-                    placeholder="+54 9 ..."
+                    placeholder={t('contact.field_phone_placeholder')}
                     autoComplete="tel"
                     maxLength={40}
                     required
                   />
                 </label>
                 <label className="landing-demo-field landing-demo-field-full">
-                  <span className="landing-demo-label">Cantidad de usuarios</span>
+                  <span className="landing-demo-label">{t('contact.field_users')}</span>
                   <input
                     className="landing-demo-input"
                     type="number"
@@ -821,7 +759,7 @@ export default function Landing() {
                     step="1"
                     value={demoForm.usersCount}
                     onChange={(event) => handleDemoFormChange('usersCount', event.target.value)}
-                    placeholder="Ej: 35"
+                    placeholder={t('contact.field_users_placeholder')}
                     inputMode="numeric"
                     required
                   />
@@ -834,15 +772,15 @@ export default function Landing() {
               )}
               <div className="landing-demo-form-actions">
                 <button className="landing-cta-primary landing-demo-submit" type="submit" disabled={demoSubmitState === 'loading'}>
-                  {demoSubmitState === 'loading' ? 'Enviando solicitud...' : 'Enviar solicitud de demo →'}
+                  {demoSubmitState === 'loading' ? t('contact.submit_loading') : t('contact.submit')}
                 </button>
-                <div className="landing-demo-form-note">Respuesta comercial estimada: dentro de 1 día hábil.</div>
+                <div className="landing-demo-form-note">{t('contact.form_note')}</div>
               </div>
             </form>
             <div className="landing-contact-side">
-              <div className="landing-contact-side-title">Canales directos</div>
+              <div className="landing-contact-side-title">{t('contact.side_title')}</div>
               <p className="landing-contact-side-copy">
-                Si preferís avanzar por llamada o correo, también podés usar estos datos de contacto.
+                {t('contact.side_copy')}
               </p>
               <div className="landing-contact-grid">
                 {contactCards.map((contact) => (
@@ -853,8 +791,8 @@ export default function Landing() {
                 ))}
               </div>
               <div className="landing-cta-actions landing-contact-actions">
-                <a href={contactMailHref} className="landing-cta-secondary">Escribir por mail</a>
-                <a href={primaryPhone.href} className="landing-cta-secondary">Llamar al equipo comercial</a>
+                <a href={contactMailHref} className="landing-cta-secondary">{t('contact.btn_email')}</a>
+                <a href={primaryPhone.href} className="landing-cta-secondary">{t('contact.btn_call')}</a>
               </div>
             </div>
           </div>
@@ -864,7 +802,7 @@ export default function Landing() {
       <footer className="landing-footer">
         <div className="landing-footer-brand-block">
           <div className="landing-footer-brand">KPI Manager</div>
-          <div className="landing-footer-copy">© {new Date().getFullYear()} KPI Manager. Todos los derechos reservados.</div>
+          <div className="landing-footer-copy">{t('footer.copyright', { year: new Date().getFullYear() })}</div>
         </div>
         {contactCards.length > 0 && (
           <div className="landing-footer-contacts">
@@ -875,7 +813,7 @@ export default function Landing() {
             ))}
           </div>
         )}
-        <Link to="/login" className="landing-footer-link">Iniciar sesión →</Link>
+        <Link to="/login" className="landing-footer-link">{t('footer.login')}</Link>
       </footer>
     </div>
   )

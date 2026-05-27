@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
 import './PeriodForm.css'
@@ -42,6 +43,7 @@ export default function PeriodForm({ period, onClose, onSuccess }: PeriodFormPro
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const queryClient = useQueryClient()
+  const { t } = useTranslation('periods')
 
   useEffect(() => {
     setFormData({
@@ -85,15 +87,15 @@ export default function PeriodForm({ period, onClose, onSuccess }: PeriodFormPro
     const newErrors: Record<string, string> = {}
 
     if (!formData.name.trim()) {
-      newErrors.name = 'El nombre del período es requerido'
+      newErrors.name = t('form.errors.name_required')
     }
 
     if (!formData.startDate) {
-      newErrors.startDate = 'La fecha de inicio es requerida'
+      newErrors.startDate = t('form.errors.start_required')
     }
 
     if (!formData.endDate) {
-      newErrors.endDate = 'La fecha de fin es requerida'
+      newErrors.endDate = t('form.errors.end_required')
     }
 
     if (formData.startDate && formData.endDate) {
@@ -101,7 +103,7 @@ export default function PeriodForm({ period, onClose, onSuccess }: PeriodFormPro
       const end = new Date(formData.endDate)
 
       if (start >= end) {
-        newErrors.endDate = 'La fecha de fin debe ser posterior a la fecha de inicio'
+        newErrors.endDate = t('form.errors.end_after_start')
       }
 
       // Validar duración mínima y máxima (permitir trimestres de ~3-4 meses y hasta 14 meses)
@@ -109,7 +111,7 @@ export default function PeriodForm({ period, onClose, onSuccess }: PeriodFormPro
         (end.getMonth() - start.getMonth()) + 1
 
       if (monthsDiffInclusive < 3 || monthsDiffInclusive > 14) {
-        newErrors.endDate = 'El período debe durar entre 3 y 14 meses'
+        newErrors.endDate = t('form.errors.duration')
       }
     }
 
@@ -139,19 +141,19 @@ export default function PeriodForm({ period, onClose, onSuccess }: PeriodFormPro
     >
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{period?.id ? 'Editar Período' : 'Crear Período'}</h2>
+          <h2>{period?.id ? t('form.title_edit') : t('form.title_create')}</h2>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
 
         <form onSubmit={handleSubmit} className="period-form">
           <div className="form-group">
-            <label htmlFor="name">Nombre del Período *</label>
+            <label htmlFor="name">{t('form.name_label')}</label>
             <input
               type="text"
               id="name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Ej: 2025-03-01 a 2026-02-01"
+              placeholder={t('form.name_placeholder')}
               className={errors.name ? 'error' : ''}
             />
             {errors.name && <span className="error-message">{errors.name}</span>}
@@ -159,7 +161,7 @@ export default function PeriodForm({ period, onClose, onSuccess }: PeriodFormPro
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="startDate">Fecha de Inicio *</label>
+              <label htmlFor="startDate">{t('form.start_date_label')}</label>
               <input
                 type="date"
                 id="startDate"
@@ -173,7 +175,7 @@ export default function PeriodForm({ period, onClose, onSuccess }: PeriodFormPro
             </div>
 
             <div className="form-group">
-              <label htmlFor="endDate">Fecha de Fin *</label>
+              <label htmlFor="endDate">{t('form.end_date_label')}</label>
               <input
                 type="date"
                 id="endDate"
@@ -188,7 +190,7 @@ export default function PeriodForm({ period, onClose, onSuccess }: PeriodFormPro
           </div>
 
           <div className="form-group">
-            <label htmlFor="status">Estado</label>
+            <label htmlFor="status">{t('form.status_label')}</label>
             <select
               id="status"
               value={formData.status}
@@ -199,15 +201,15 @@ export default function PeriodForm({ period, onClose, onSuccess }: PeriodFormPro
                 })
               }
             >
-              <option value="open">Abierto</option>
-              <option value="in_review">En Revisión</option>
-              <option value="closed">Cerrado</option>
+              <option value="open">{t('status.open')}</option>
+              <option value="in_review">{t('status.in_review')}</option>
+              <option value="closed">{t('status.closed')}</option>
             </select>
           </div>
 
           <div className="form-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>
-              Cancelar
+              {t('form.cancel')}
             </button>
             <button
               type="submit"
@@ -215,10 +217,10 @@ export default function PeriodForm({ period, onClose, onSuccess }: PeriodFormPro
               disabled={createMutation.isLoading || updateMutation.isLoading}
             >
               {createMutation.isLoading || updateMutation.isLoading
-                ? 'Guardando...'
+                ? t('form.saving')
                 : period?.id
-                ? 'Actualizar'
-                : 'Crear'}
+                ? t('form.update')
+                : t('form.create')}
             </button>
           </div>
         </form>
@@ -226,4 +228,3 @@ export default function PeriodForm({ period, onClose, onSuccess }: PeriodFormPro
     </div>
   )
 }
-

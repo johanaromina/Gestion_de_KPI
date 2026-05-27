@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { ScopeKPILink } from '../types'
 import './MacroKPIForm.css'
@@ -12,6 +13,7 @@ type ScopeKPILinksFormProps = {
 }
 
 export default function ScopeKPILinksForm({ scopeKpiId, periodId, onClose }: ScopeKPILinksFormProps) {
+  const { t } = useTranslation(['config', 'common'])
   const queryClient = useQueryClient()
   const [editingLink, setEditingLink] = useState<ScopeKPILink | null>(null)
   const [formData, setFormData] = useState({
@@ -88,28 +90,34 @@ export default function ScopeKPILinksForm({ scopeKpiId, periodId, onClose }: Sco
     },
   })
 
+  const childTypeLabel = (type: string) =>
+    t(`config:scope_kpi_links.type_labels.${type}`, { defaultValue: type })
+
+  const aggregationMethodLabel = (method: string) =>
+    t(`config:scope_kpi_links.aggregation_methods.${method}`, { defaultValue: method })
+
   return (
     <div className="macro-form-overlay">
       <div className="macro-form-modal macro-links-modal">
         <div className="macro-form-header">
-          <h2>Contribuciones del KPI Grupal</h2>
+          <h2>{t('config:scope_kpi_links.title')}</h2>
           <button type="button" className="btn-secondary" onClick={onClose}>
-            Cerrar
+            {t('common:close')}
           </button>
         </div>
         <div className="macro-form-grid">
           <label>
-            Tipo de hijo
+            {t('config:scope_kpi_links.child_type_label')}
             <select value={formData.childType} onChange={(e) => setFormData((prev) => ({ ...prev, childType: e.target.value }))}>
-              <option value="collaborator">KPI colaborador</option>
-              <option value="scope">KPI Grupal</option>
+              <option value="collaborator">{t('config:scope_kpi_links.child_types.collaborator')}</option>
+              <option value="scope">{t('config:scope_kpi_links.child_types.scope')}</option>
             </select>
           </label>
           {formData.childType === 'collaborator' ? (
             <label className="macro-form-span">
-              Asignación colaborador
+              {t('config:scope_kpi_links.collaborator_assignment_label')}
               <select value={formData.collaboratorAssignmentId} onChange={(e) => setFormData((prev) => ({ ...prev, collaboratorAssignmentId: e.target.value }))}>
-                <option value="">Selecciona una asignación</option>
+                <option value="">{t('config:scope_kpi_links.collaborator_assignment_placeholder')}</option>
                 {(collaboratorAssignments || []).map((item: any) => (
                   <option key={item.id} value={item.id}>
                     {item.collaboratorName || item.collaboratorId} - {item.kpiName || item.kpiId}
@@ -119,9 +127,9 @@ export default function ScopeKPILinksForm({ scopeKpiId, periodId, onClose }: Sco
             </label>
           ) : (
             <label className="macro-form-span">
-              KPI Grupal hijo
+              {t('config:scope_kpi_links.child_scope_label')}
               <select value={formData.childScopeKpiId} onChange={(e) => setFormData((prev) => ({ ...prev, childScopeKpiId: e.target.value }))}>
-                <option value="">Seleccioná un KPI Grupal</option>
+                <option value="">{t('config:scope_kpi_links.child_scope_placeholder')}</option>
                 {(availableScopeOptions || []).map((item: any) => (
                   <option key={item.id} value={item.id}>
                     {item.name} - {item.orgScopeName || item.orgScopeId}
@@ -131,51 +139,55 @@ export default function ScopeKPILinksForm({ scopeKpiId, periodId, onClose }: Sco
             </label>
           )}
           <label>
-            Método
+            {t('config:scope_kpi_links.aggregation_method_label')}
             <select value={formData.aggregationMethod} onChange={(e) => setFormData((prev) => ({ ...prev, aggregationMethod: e.target.value }))}>
-              <option value="weighted_avg">Weighted avg</option>
-              <option value="avg">Avg</option>
-              <option value="sum">Sum</option>
+              <option value="weighted_avg">{t('config:scope_kpi_links.aggregation_methods.weighted_avg')}</option>
+              <option value="avg">{t('config:scope_kpi_links.aggregation_methods.avg')}</option>
+              <option value="sum">{t('config:scope_kpi_links.aggregation_methods.sum')}</option>
             </select>
           </label>
           <label>
-            Peso de contribución
+            {t('config:scope_kpi_links.contribution_weight_label')}
             <input value={formData.contributionWeight} onChange={(e) => setFormData((prev) => ({ ...prev, contributionWeight: e.target.value }))} />
           </label>
           <label>
-            Orden
+            {t('config:scope_kpi_links.sort_order_label')}
             <input type="number" value={formData.sortOrder} onChange={(e) => setFormData((prev) => ({ ...prev, sortOrder: Number(e.target.value) }))} />
           </label>
         </div>
         <div className="macro-form-actions">
           <button type="button" className="btn-secondary" onClick={resetForm}>
-            Limpiar
+            {t('config:scope_kpi_links.reset')}
           </button>
           <button type="button" className="btn-primary" onClick={() => mutation.mutate()} disabled={mutation.isLoading}>
-            {mutation.isLoading ? 'Guardando...' : editingLink ? 'Actualizar link' : 'Agregar link'}
+            {mutation.isLoading
+              ? t('config:scope_kpi_links.saving')
+              : editingLink
+                ? t('config:scope_kpi_links.update')
+                : t('config:scope_kpi_links.add')}
           </button>
           <button type="button" className="btn-primary" onClick={() => recalcMutation.mutate()} disabled={recalcMutation.isLoading}>
-            {recalcMutation.isLoading ? 'Recalculando...' : 'Recalcular'}
+            {recalcMutation.isLoading ? t('config:scope_kpi_links.recalculating') : t('config:scope_kpi_links.recalculate')}
           </button>
         </div>
         <div className="table-container">
           <table className="data-table compact">
             <thead>
               <tr>
-                <th>Tipo</th>
-                <th>Origen</th>
-                <th>Método</th>
-                <th>Peso</th>
-                <th>Orden</th>
-                <th className="actions-column">Acciones</th>
+                <th>{t('config:scope_kpi_links.table.type')}</th>
+                <th>{t('config:scope_kpi_links.table.origin')}</th>
+                <th>{t('config:scope_kpi_links.table.method')}</th>
+                <th>{t('config:scope_kpi_links.table.weight')}</th>
+                <th>{t('config:scope_kpi_links.table.order')}</th>
+                <th className="actions-column">{t('config:scope_kpi_links.table.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {(links || []).map((link: ScopeKPILink) => (
                 <tr key={link.id}>
-                  <td>{link.childType}</td>
+                  <td>{childTypeLabel(link.childType)}</td>
                   <td>{link.childType === 'collaborator' ? `${link.collaboratorName || '-'} / ${link.collaboratorKpiName || '-'}` : link.childScopeKpiName || '-'}</td>
-                  <td>{link.aggregationMethod}</td>
+                  <td>{aggregationMethodLabel(link.aggregationMethod)}</td>
                   <td>{link.contributionWeight ?? '-'}</td>
                   <td>{link.sortOrder ?? 0}</td>
                   <td className="actions-column">
@@ -195,10 +207,10 @@ export default function ScopeKPILinksForm({ scopeKpiId, periodId, onClose }: Sco
                           })
                         }}
                       >
-                        Editar
+                        {t('common:edit')}
                       </button>
                       <button type="button" className="action-button delete" onClick={() => deleteMutation.mutate(link.id)}>
-                        Eliminar
+                        {t('common:delete')}
                       </button>
                     </div>
                   </td>

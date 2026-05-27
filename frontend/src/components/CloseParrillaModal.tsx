@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
 import './CloseParrillaModal.css'
@@ -21,8 +22,9 @@ export default function CloseParrillaModal({
   onClose,
   onSuccess,
 }: CloseParrillaModalProps) {
+  const { t } = useTranslation(['assignments', 'common'])
   const [confirmText, setConfirmText] = useState('')
-  const requiredText = 'CERRAR'
+  const requiredText = t('assignments:close_grid_modal.confirm_word').toUpperCase()
 
   const queryClient = useQueryClient()
 
@@ -64,45 +66,46 @@ export default function CloseParrillaModal({
     >
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header warning">
-          <h2>⚠️ Cerrar Parrilla</h2>
+          <h2>{`⚠️ ${t('assignments:close_grid_modal.title')}`}</h2>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
 
         <form onSubmit={handleSubmit} className="close-parrilla-form">
           <div className="warning-message">
             <p>
-              <strong>¿Estás seguro de cerrar esta parrilla?</strong>
+              <strong>{t('assignments:close_grid_modal.warning_title')}</strong>
             </p>
             <p>
-              Una vez cerrada, no se podrán realizar ediciones a menos que un
-              administrador o director la reabra.
+              {t('assignments:close_grid_modal.warning_body')}
             </p>
           </div>
 
           <div className="parrilla-info">
             <div className="info-row">
-              <span className="info-label">Período:</span>
-              <span className="info-value">{periodName || `Período #${periodId}`}</span>
+              <span className="info-label">{t('assignments:close_grid_modal.period_label')}</span>
+              <span className="info-value">
+                {periodName || t('assignments:close_grid_modal.fallback_period', { id: periodId })}
+              </span>
             </div>
             {collaboratorId && (
               <div className="info-row">
-                <span className="info-label">Colaborador:</span>
+                <span className="info-label">{t('assignments:close_grid_modal.collaborator_label')}</span>
                 <span className="info-value">
-                  {collaboratorName || `Colaborador #${collaboratorId}`}
+                  {collaboratorName || t('assignments:close_grid_modal.fallback_collaborator', { id: collaboratorId })}
                 </span>
               </div>
             )}
             {!collaboratorId && (
               <div className="info-row">
-                <span className="info-label">Alcance:</span>
-                <span className="info-value">Todos los colaboradores del período</span>
+                <span className="info-label">{t('assignments:close_grid_modal.scope_label')}</span>
+                <span className="info-value">{t('assignments:close_grid_modal.all_collaborators')}</span>
               </div>
             )}
           </div>
 
           <div className="form-group">
             <label htmlFor="confirm">
-              Escribe <strong>{requiredText}</strong> para confirmar:
+              {t('assignments:close_grid_modal.confirm_label', { word: requiredText })}
             </label>
             <input
               type="text"
@@ -114,21 +117,23 @@ export default function CloseParrillaModal({
             />
             {!isConfirmValid && confirmText && (
               <span className="error-message">
-                Debes escribir exactamente "{requiredText}"
+                {t('assignments:close_grid_modal.confirm_error', { word: requiredText })}
               </span>
             )}
           </div>
 
           <div className="form-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>
-              Cancelar
+              {t('common:cancel')}
             </button>
             <button
               type="submit"
               className="btn-danger"
               disabled={!isConfirmValid || closeMutation.isLoading}
             >
-              {closeMutation.isLoading ? 'Cerrando...' : 'Cerrar Parrilla'}
+              {closeMutation.isLoading
+                ? t('assignments:close_grid_modal.submitting')
+                : t('assignments:close_grid_modal.submit')}
             </button>
           </div>
         </form>

@@ -2,6 +2,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from 'react-query'
 import { Navigate, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { useAuth } from '../hooks/useAuth'
 import { CollaboratorKPI } from '../types'
@@ -13,6 +14,7 @@ const toNumber = (val: any): number | null => {
 }
 
 export default function ParrillaGeneral() {
+  const { t } = useTranslation(['grid', 'common'])
   const { user } = useAuth()
   const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null)
   const [selectedCollaboratorId, setSelectedCollaboratorId] = useState<number | null>(null)
@@ -127,6 +129,27 @@ export default function ParrillaGeneral() {
     return 'var-bad'
   }
 
+  const getStatusLabel = (status?: string) => {
+    if (!status) return '-'
+    const normalized = status.toLowerCase()
+    if (normalized === 'proposed') return t('grid:status.proposed')
+    const commonStatuses = ['draft', 'approved', 'closed', 'pending', 'in_review', 'rejected', 'changes_requested', 'open']
+    if (commonStatuses.includes(normalized)) {
+      return t(`common:${normalized}`)
+    }
+    return status
+  }
+
+  const getKpiTypeLabel = (type?: string) => {
+    if (!type) return t('grid:general.types.kpi')
+    const normalized = type.toLowerCase()
+    const knownTypes = ['kpi', 'manual', 'count', 'ratio', 'sla', 'value', 'growth', 'reduction', 'exact']
+    if (knownTypes.includes(normalized)) {
+      return t(`grid:general.types.${normalized}`)
+    }
+    return type
+  }
+
   if (!canView) {
     return <Navigate to="/" replace />
   }
@@ -135,31 +158,31 @@ export default function ParrillaGeneral() {
     <div className="parrilla-general-page">
       <div className="page-header">
         <div>
-          <h1>Parrilla General (solo superpoderes)</h1>
-          <p className="subtitle">Resumen de KPI por colaborador</p>
+          <h1>{t('general.title')}</h1>
+          <p className="subtitle">{t('general.subtitle')}</p>
         </div>
       </div>
 
       <div className="filters-section">
         <div className="filter-group">
-          <label htmlFor="pg-search">Buscar</label>
+          <label htmlFor="pg-search">{t('general.filters.search_label')}</label>
           <input
             id="pg-search"
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por colaborador o KPI..."
+            placeholder={t('general.filters.search_placeholder')}
           />
         </div>
 
         <div className="filter-group">
-          <label htmlFor="pg-period">Período</label>
+          <label htmlFor="pg-period">{t('general.filters.period_label')}</label>
           <select
             id="pg-period"
             value={selectedPeriodId || ''}
             onChange={(e) => setSelectedPeriodId(e.target.value ? parseInt(e.target.value) : null)}
           >
-            <option value="">Todos</option>
+            <option value="">{t('general.filters.all')}</option>
             {periods?.map((p: any) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -169,13 +192,13 @@ export default function ParrillaGeneral() {
         </div>
 
         <div className="filter-group">
-          <label htmlFor="pg-collab">Colaborador</label>
+          <label htmlFor="pg-collab">{t('general.filters.collaborator_label')}</label>
           <select
             id="pg-collab"
             value={selectedCollaboratorId || ''}
             onChange={(e) => setSelectedCollaboratorId(e.target.value ? parseInt(e.target.value) : null)}
           >
-            <option value="">Todos</option>
+            <option value="">{t('general.filters.all')}</option>
             {collaborators?.map((c: any) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -192,17 +215,17 @@ export default function ParrillaGeneral() {
             className={`summary-card ${data.weightSum === 100 ? 'ok' : data.weightSum > 100 ? 'error' : 'warn'}`}
           >
             <div className="card-title">{data.collabName}</div>
-            <div className="card-meta">KPIs: {data.totalKpis}</div>
+            <div className="card-meta">{t('general.card.kpis', { count: data.totalKpis })}</div>
             <div className="card-row">
-              <span>Peso total</span>
+              <span>{t('general.card.total_weight')}</span>
               <strong>{data.weightSum.toFixed(1)}%</strong>
             </div>
             <div className="card-row">
-              <span>Avg variación</span>
+              <span>{t('general.card.avg_variation')}</span>
               <strong className={variationClass(data.avgVariation)}>{data.avgVariation ?? '-'}%</strong>
             </div>
             <div className="card-row">
-              <span>Peor variación</span>
+              <span>{t('general.card.worst_variation')}</span>
               <strong className={variationClass(data.worstVariation)}>{data.worstVariation ?? '-'}%</strong>
             </div>
           </div>
@@ -212,31 +235,31 @@ export default function ParrillaGeneral() {
       <div className="table-container">
         {!selectedPeriodId && !selectedCollaboratorId ? (
           <div className="empty-state">
-            <h3>Seleccioná un período o colaborador</h3>
-            <p>Elegí un período o colaborador en los filtros de arriba para ver los datos.</p>
+            <h3>{t('general.empty.select_filter_title')}</h3>
+            <p>{t('general.empty.select_filter_text')}</p>
           </div>
         ) : isLoading ? (
-          <div className="loading">Cargando…</div>
+          <div className="loading">{t('general.loading')}</div>
         ) : filtered.length === 0 ? (
           <div className="empty-state">
-            <h3>Sin datos</h3>
-            <p>Prueba con otros filtros</p>
+            <h3>{t('general.empty.no_data_title')}</h3>
+            <p>{t('general.empty.no_data_text')}</p>
           </div>
         ) : (
           <table className="data-table">
             <thead>
               <tr>
-                <th>Colaborador</th>
-                <th>KPI</th>
-                <th>Período</th>
-                <th>Tipo</th>
-                <th>Target</th>
-                <th>Actual</th>
-                <th>Peso</th>
-                <th>Variación</th>
-                <th>Estado</th>
-                <th>Tendencia</th>
-                <th>Acciones</th>
+                <th>{t('general.table.collaborator')}</th>
+                <th>{t('general.table.kpi')}</th>
+                <th>{t('general.table.period')}</th>
+                <th>{t('general.table.type')}</th>
+                <th>{t('general.table.target')}</th>
+                <th>{t('general.table.actual')}</th>
+                <th>{t('general.table.weight')}</th>
+                <th>{t('general.table.variation')}</th>
+                <th>{t('general.table.status')}</th>
+                <th>{t('general.table.trend')}</th>
+                <th>{t('general.table.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -248,7 +271,7 @@ export default function ParrillaGeneral() {
                   <td>
                     {(() => {
                       const kpiType = (a as any).kpiType || (a as any).type || 'kpi'
-                      return <span className={`badge-type ${kpiType}`}>{kpiType}</span>
+                      return <span className={`badge-type ${kpiType}`}>{getKpiTypeLabel(kpiType)}</span>
                     })()}
                   </td>
                   <td className="number-cell">{toNumber(a.target) ?? '-'}</td>
@@ -257,7 +280,7 @@ export default function ParrillaGeneral() {
                   <td className={`number-cell ${variationClass(toNumber((a as any).variation))}`}>
                     {toNumber(a.variation) !== null ? `${toNumber(a.variation)?.toFixed(1)}%` : '-'}
                   </td>
-                  <td>{a.status}</td>
+                  <td>{getStatusLabel(a.status)}</td>
                   <td>
                     <div className="sparkline">
                       {(monthlyByKey.get(`${a.collaboratorId}-${a.kpiId}-${a.periodId}`) || []).map((m: any) => {
@@ -276,7 +299,7 @@ export default function ParrillaGeneral() {
                         )
                       }
                     >
-                      Ver detalle
+                      {t('general.table.view_detail')}
                     </button>
                   </td>
                 </tr>

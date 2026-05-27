@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from 'react-query'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import './OKRAlineacion.css'
 
@@ -25,6 +26,7 @@ const progressColor = (p: number) => {
 
 function ObjectiveNode({ node, depth = 0 }: { node: ObjNode; depth?: number }) {
   const navigate = useNavigate()
+  const { t } = useTranslation('okr')
   const [expanded, setExpanded] = useState(true)
   const hasChildren = node.children && node.children.length > 0
 
@@ -66,7 +68,7 @@ function ObjectiveNode({ node, depth = 0 }: { node: ObjNode; depth?: number }) {
             </span>
           </div>
           <span className={`tree-status-pill tree-status-pill--${node.status}`}>
-            {node.status === 'active' ? 'Activo' : node.status === 'draft' ? 'Borrador' : 'Cerrado'}
+            {t(`status.${node.status}`)}
           </span>
         </div>
       </div>
@@ -84,6 +86,7 @@ function ObjectiveNode({ node, depth = 0 }: { node: ObjNode; depth?: number }) {
 
 export default function OKRAlineacion() {
   const navigate = useNavigate()
+  const { t } = useTranslation('okr')
   const [selectedPeriod, setSelectedPeriod] = useState<number | ''>('')
 
   const { data: periods = [] } = useQuery<Period[]>('periods', () =>
@@ -105,11 +108,11 @@ export default function OKRAlineacion() {
     <div className="okr-alineacion">
       <div className="okr-alineacion-header">
         <div>
-          <h2>Arbol de Alineacion OKR</h2>
-          <p className="okr-alineacion-subtitle">Cascada empresa → area → equipo → individuo</p>
+          <h2>{t('alignment.title')}</h2>
+          <p className="okr-alineacion-subtitle">{t('alignment.subtitle')}</p>
         </div>
         <button className="btn-primary" onClick={() => navigate('/okr/nuevo')}>
-          + Nuevo objetivo
+          {t('new_objective')}
         </button>
       </div>
 
@@ -118,7 +121,7 @@ export default function OKRAlineacion() {
           value={selectedPeriod}
           onChange={(e) => setSelectedPeriod(e.target.value ? Number(e.target.value) : '')}
         >
-          <option value="">Seleccionar periodo...</option>
+          <option value="">{t('alignment.select_period')}</option>
           {periods.map((p) => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
@@ -129,30 +132,30 @@ export default function OKRAlineacion() {
         <div className="okr-alineacion-summary">
           <div className="summary-stat">
             <span className="summary-value">{totalObjectives}</span>
-            <span className="summary-label">Objetivos</span>
+            <span className="summary-label">{t('alignment.summary.objectives')}</span>
           </div>
           <div className="summary-stat">
             <span className="summary-value" style={{ color: progressColor(avgProgress) }}>
               {avgProgress}%
             </span>
-            <span className="summary-label">Progreso promedio</span>
+            <span className="summary-label">{t('alignment.summary.avg_progress')}</span>
           </div>
         </div>
       )}
 
       {!selectedPeriod && (
-        <div className="okr-empty">Selecciona un periodo para ver el arbol de alineacion.</div>
+        <div className="okr-empty">{t('alignment.no_period_selected')}</div>
       )}
 
       {selectedPeriod && isLoading && (
-        <div className="okr-loading">Cargando arbol...</div>
+        <div className="okr-loading">{t('alignment.loading')}</div>
       )}
 
       {selectedPeriod && !isLoading && tree.length === 0 && (
         <div className="okr-empty">
-          <p>No hay objetivos en este periodo.</p>
+          <p>{t('alignment.empty.message')}</p>
           <button className="btn-primary" onClick={() => navigate('/okr/nuevo')}>
-            Crear primer objetivo
+            {t('empty.create')}
           </button>
         </div>
       )}

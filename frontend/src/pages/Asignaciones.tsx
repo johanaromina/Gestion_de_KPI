@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { CollaboratorKPI } from '../types'
 import { resolveDirection } from '../utils/kpi'
@@ -12,6 +13,7 @@ import ReviewModal from '../components/ReviewModal'
 import ConsistencyAlerts from '../components/ConsistencyAlerts'
 import BulkKPIAssignmentModal from '../components/BulkKPIAssignmentModal'
 import { useDialog } from '../components/Dialog'
+import { resolveApiErrorMessage } from '../utils/apiErrors'
 import './Asignaciones.css'
 
 const toNumber = (value: any): number | null => {
@@ -19,15 +21,19 @@ const toNumber = (value: any): number | null => {
   return Number.isFinite(n) ? n : null
 }
 
-const roleLabel: Record<string, string> = {
-  collaborator: 'Colaborador',
-  leader: 'Líder',
-  manager: 'Gerente',
-  director: 'Director',
-  admin: 'Administrador',
+const ASSIGNMENT_ACTION_API_ERROR_KEYS: Record<string, string> = {
+  ASSIGNMENT_NOT_FOUND: 'assignments:error.api_errors.not_found',
+  ASSIGNMENT_CLOSE_FORBIDDEN: 'assignments:error.api_errors.close_forbidden',
+  ASSIGNMENT_ALREADY_CLOSED: 'assignments:error.api_errors.already_closed',
+  ASSIGNMENT_REOPEN_FORBIDDEN: 'assignments:error.api_errors.reopen_forbidden',
+  ASSIGNMENT_NOT_CLOSED: 'assignments:error.api_errors.not_closed',
 }
 
 export default function Asignaciones() {
+  const { t } = useTranslation(['assignments', 'common'])
+
+  const getRoleLabel = (role: string) => t(`common:roles.${role}`, { defaultValue: role })
+
   const [showForm, setShowForm] = useState(false)
   const [editingAssignment, setEditingAssignment] = useState<CollaboratorKPI | undefined>(undefined)
   const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null)
@@ -128,9 +134,9 @@ export default function Asignaciones() {
   }, [collaborators])
 
   const activeSubPeriodsLabel = useMemo(() => {
-    if (!subPeriods || subPeriods.length === 0) return 'Sin subperíodos activos.'
+    if (!subPeriods || subPeriods.length === 0) return t('filters.subperiod') + ': —'
     const active = subPeriods.filter((sp: any) => sp.status !== 'closed')
-    if (active.length === 0) return 'Sin subperíodos activos.'
+    if (active.length === 0) return t('filters.subperiod') + ': —'
     return active
       .map((sp: any) => `${sp.name}${sp.weight ? ` (${sp.weight}%)` : ''}`)
       .join('\n')
@@ -181,7 +187,13 @@ export default function Asignaciones() {
         queryClient.invalidateQueries('collaborator-kpis')
       },
       onError: (error: any) => {
-        void dialog.alert(error?.response?.data?.error || 'No se pudo cerrar la asignación', { title: 'Error', variant: 'danger' })
+        void dialog.alert(
+          resolveApiErrorMessage(error, t, {
+            codeMap: ASSIGNMENT_ACTION_API_ERROR_KEYS,
+            fallbackKey: 'error.close_assignment',
+          }),
+          { title: t('common:error_title'), variant: 'danger' }
+        )
       },
     }
   )
@@ -195,19 +207,25 @@ export default function Asignaciones() {
         queryClient.invalidateQueries('collaborator-kpis')
       },
       onError: (error: any) => {
-        void dialog.alert(error?.response?.data?.error || 'No se pudo reabrir la asignación', { title: 'Error', variant: 'danger' })
+        void dialog.alert(
+          resolveApiErrorMessage(error, t, {
+            codeMap: ASSIGNMENT_ACTION_API_ERROR_KEYS,
+            fallbackKey: 'error.reopen_assignment',
+          }),
+          { title: t('common:error_title'), variant: 'danger' }
+        )
       },
     }
   )
 
   const handleCreate = async () => {
     if (!selectedPeriodId) {
-      await dialog.alert('Por favor seleccioná un período primero.', { title: 'Período requerido', variant: 'warning' })
+      await dialog.alert(t('dialogs.period_required_msg'), { title: t('dialogs.period_required_title'), variant: 'warning' })
       return
     }
     const selectedPeriod = periods?.find((p: any) => p.id === selectedPeriodId)
     if (selectedPeriod?.status === 'closed') {
-      await dialog.alert('No se pueden crear asignaciones en períodos cerrados.', { title: 'Período cerrado', variant: 'warning' })
+      await dialog.alert(t('dialogs.period_closed_create_msg'), { title: t('dialogs.period_closed_title'), variant: 'warning' })
       return
     }
     setEditingAssignment(undefined)
@@ -217,39 +235,38 @@ export default function Asignaciones() {
   const handleEdit = async (assignment: CollaboratorKPI) => {
     const period = periods?.find((p: any) => p.id === assignment.periodId)
     if (period?.status === 'closed') {
-      await dialog.alert('Período cerrado. Solo se puede editar alcance con permisos especiales.', { title: 'Período cerrado', variant: 'warning' })
+      await dialog.alert(t('dialogs.period_closed_edit_msg'), { title: t('dialogs.period_closed_title'), variant: 'warning' })
     }
     setEditingAssignment(assignment)
     setShowForm(true)
   }
 
   const handleDelete = async (id: number) => {
-    const ok = await dialog.confirm('¿Estás seguro de eliminar esta asignación?', {
-      title: 'Eliminar asignación', confirmLabel: 'Eliminar', variant: 'danger'
+    const ok = await dialog.confirm(t('dialogs.confirm_delete_msg'), {
+      title: t('dialogs.confirm_delete_title'), confirmLabel: t('dialogs.confirm_delete_label'), variant: 'danger'
     })
     if (ok) deleteMutation.mutate(id)
   }
 
   const handleCloseAssignment = async (assignment: CollaboratorKPI) => {
     if (isAssignmentClosed(assignment)) return
-    const ok = await dialog.confirm(
-      '¿Cerrar este KPI para el período? Se bloquearán ediciones sobre esta asignación.',
-      { title: 'Cerrar KPI', confirmLabel: 'Cerrar', variant: 'warning' }
-    )
+    const ok = await dialog.confirm(t('dialogs.confirm_close_msg'), {
+      title: t('dialogs.confirm_close_title'), confirmLabel: t('dialogs.confirm_close_label'), variant: 'warning'
+    })
     if (ok) closeAssignmentMutation.mutate(assignment.id)
   }
 
   const handleReopenAssignment = async (assignment: CollaboratorKPI) => {
     if (!isAssignmentClosed(assignment)) return
-    const ok = await dialog.confirm('¿Reabrir este KPI? Volverá a ser editable.', {
-      title: 'Reabrir KPI', confirmLabel: 'Reabrir', variant: 'info'
+    const ok = await dialog.confirm(t('dialogs.confirm_reopen_msg'), {
+      title: t('dialogs.confirm_reopen_title'), confirmLabel: t('dialogs.confirm_reopen_label'), variant: 'info'
     })
     if (ok) reopenAssignmentMutation.mutate(assignment.id)
   }
 
   const handleCloseParrilla = async () => {
     if (!selectedPeriodId) {
-      await dialog.alert('Seleccioná un período primero.', { title: 'Período requerido', variant: 'warning' })
+      await dialog.alert(t('dialogs.period_required_msg'), { title: t('dialogs.period_required_title'), variant: 'warning' })
       return
     }
     setClosingCollaboratorId(selectedCollaboratorId)
@@ -271,37 +288,38 @@ export default function Asignaciones() {
 
   const getStatusBadge = (status: CollaboratorKPI['status']) => {
     const statusConfig = {
-      draft: { label: 'Borrador', class: 'status-draft' },
-      proposed: { label: 'Propuesto', class: 'status-proposed' },
-      approved: { label: 'Aprobado', class: 'status-approved' },
-      closed: { label: 'Cerrado', class: 'status-closed' },
+      draft: { label: t('status.draft'), class: 'status-draft' },
+      proposed: { label: t('status.proposed'), class: 'status-proposed' },
+      approved: { label: t('status.approved'), class: 'status-approved' },
+      closed: { label: t('status.closed'), class: 'status-closed' },
     } as const
     const config = status ? statusConfig[status] : undefined
-    if (!config) return <span className="status-badge status-unknown">{status || 'Sin estado'}</span>
+    if (!config) return <span className="status-badge status-unknown">{status || t('status.unknown')}</span>
     return <span className={`status-badge ${config.class}`}>{config.label}</span>
   }
 
   const getCurationBadge = (assignment: CollaboratorKPI) => {
     if (isAssignmentClosed(assignment)) {
-      return <span className="curation-badge locked">Bloqueado</span>
+      return <span className="curation-badge locked">{t('curation.locked')}</span>
     }
     const status = assignment.curationStatus || 'pending'
     const config = {
-      pending: { label: 'Pendiente', class: 'curation-pending' },
-      in_review: { label: 'En revision', class: 'curation-review' },
-      approved: { label: 'Aprobada', class: 'curation-approved' },
-      rejected: { label: 'Rechazada', class: 'curation-rejected' },
+      pending: { label: t('curation.pending'), class: 'curation-pending' },
+      in_review: { label: t('curation.in_review'), class: 'curation-review' },
+      approved: { label: t('curation.approved'), class: 'curation-approved' },
+      rejected: { label: t('curation.rejected'), class: 'curation-rejected' },
+      changes_requested: { label: t('curation.changes_requested'), class: 'curation-changes-requested' },
     } as const
     const entry = config[status as keyof typeof config]
-    return <span className={`curation-badge ${entry.class}`}>{entry.label}</span>
+    return <span className={`curation-badge ${entry?.class ?? ''}`}>{entry?.label ?? status}</span>
   }
 
   const getInputBadge = (mode?: CollaboratorKPI['inputMode']) => {
     const normalized = mode || 'manual'
     const config = {
-      manual: { label: 'Manual', class: 'input-manual' },
-      import: { label: 'Import', class: 'input-import' },
-      auto: { label: 'Auto', class: 'input-auto' },
+      manual: { label: t('input.manual'), class: 'input-manual' },
+      import: { label: t('input.import'), class: 'input-import' },
+      auto: { label: t('input.auto'), class: 'input-auto' },
     } as const
     const entry = config[normalized]
     return <span className={`input-badge ${entry.class}`}>{entry.label}</span>
@@ -367,8 +385,8 @@ export default function Asignaciones() {
           .map((c: any) => String(c.role || ''))
           .filter(Boolean)
       )
-    ).sort((a, b) => String(roleLabel[a] || a).localeCompare(String(roleLabel[b] || b)))
-  , [collaborators])
+    ).sort((a, b) => getRoleLabel(a).localeCompare(getRoleLabel(b)))
+  , [collaborators, t])
 
   const collaboratorMatchesScope = (collaborator: any) => {
     if (!selectedScopeId) return true
@@ -506,35 +524,35 @@ export default function Asignaciones() {
     <div className="asignaciones-page">
       <div className="page-header">
         <div>
-          <h1>Asignaciones de KPIs</h1>
-          <p className="subtitle">Gestiona las asignaciones de KPIs a colaboradores</p>
+          <h1>{t('title')}</h1>
+          <p className="subtitle">{t('subtitle')}</p>
         </div>
         <div className="header-actions">
           <button className="btn-secondary" onClick={() => setShowGenerateModal(true)}>
-            Generar Parrillas Base
+            {t('header.generate_grids')}
           </button>
           <button className="btn-secondary" onClick={handleCloseParrilla}>
-            Cerrar Parrilla
+            {t('header.close_grid')}
           </button>
           <button
             className="btn-secondary"
             onClick={() => { setBulkPrefill(undefined); setShowBulkModal(true) }}
           >
-            Asignación masiva
+            {t('header.bulk')}
           </button>
           <button className="btn-primary" onClick={handleCreate}>
-            Nueva Asignación
+            {t('header.new')}
           </button>
         </div>
       </div>
 
       <div className="filters-section">
         <div className="search-group">
-          <label htmlFor="search">Buscar:</label>
+          <label htmlFor="search">{t('filters.search_label')}</label>
           <input
             type="text"
             id="search"
-            placeholder="Buscar por colaborador o KPI..."
+            placeholder={t('filters.search_placeholder')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="search-input"
@@ -542,14 +560,14 @@ export default function Asignaciones() {
         </div>
 
         <div className="filter-group">
-          <label htmlFor="period-filter">Período:</label>
+          <label htmlFor="period-filter">{t('filters.period')}</label>
           <select
             id="period-filter"
             value={selectedPeriodId || ''}
             onChange={(e) => setSelectedPeriodId(e.target.value ? parseInt(e.target.value) : null)}
             className="filter-select"
           >
-            <option value="">Todos</option>
+            <option value="">{t('filters.all_option')}</option>
             {periods?.map((period: any) => (
               <option key={period.id} value={period.id}>
                 {period.name}
@@ -559,14 +577,14 @@ export default function Asignaciones() {
         </div>
 
         <div className="filter-group">
-          <label htmlFor="collaborator-filter">Colaborador:</label>
+          <label htmlFor="collaborator-filter">{t('filters.collaborator')}</label>
           <select
             id="collaborator-filter"
             value={selectedCollaboratorId || ''}
             onChange={(e) => setSelectedCollaboratorId(e.target.value ? parseInt(e.target.value) : null)}
             className="filter-select"
           >
-            <option value="">Todos</option>
+            <option value="">{t('filters.all_option')}</option>
             {collaboratorsInFilters.map((collaborator: any) => (
               <option key={collaborator.id} value={collaborator.id}>
                 {collaborator.name}
@@ -576,14 +594,14 @@ export default function Asignaciones() {
         </div>
 
         <div className="filter-group">
-          <label htmlFor="kpi-filter">KPI:</label>
+          <label htmlFor="kpi-filter">{t('filters.kpi')}</label>
           <select
             id="kpi-filter"
             value={selectedKPIId || ''}
             onChange={(e) => setSelectedKPIId(e.target.value ? parseInt(e.target.value) : null)}
             className="filter-select"
           >
-            <option value="">Todos</option>
+            <option value="">{t('filters.all_option')}</option>
             {kpis?.map((kpi: any) => (
               <option key={kpi.id} value={kpi.id}>
                 {kpi.name}
@@ -593,14 +611,14 @@ export default function Asignaciones() {
         </div>
 
         <div className="filter-group">
-          <label htmlFor="scope-filter">Scope:</label>
+          <label htmlFor="scope-filter">{t('filters.scope')}</label>
           <select
             id="scope-filter"
             value={selectedScopeId || ''}
             onChange={(e) => setSelectedScopeId(e.target.value ? parseInt(e.target.value, 10) : null)}
             className="filter-select"
           >
-            <option value="">Todos</option>
+            <option value="">{t('filters.all_option')}</option>
             {areaScopes.map((scope: any) => (
               <option key={scope.id} value={scope.id}>
                 {scope.label}
@@ -610,17 +628,17 @@ export default function Asignaciones() {
         </div>
 
         <div className="filter-group">
-          <label htmlFor="role-filter">Rol:</label>
+          <label htmlFor="role-filter">{t('filters.role')}</label>
           <select
             id="role-filter"
             value={selectedRole}
             onChange={(e) => setSelectedRole(e.target.value)}
             className="filter-select"
           >
-            <option value="">Todos</option>
+            <option value="">{t('filters.all_option')}</option>
             {availableRoles.map((role) => (
               <option key={role} value={role}>
-                {roleLabel[role] || role}
+                {getRoleLabel(role)}
               </option>
             ))}
           </select>
@@ -628,7 +646,7 @@ export default function Asignaciones() {
 
         <div className="filter-group">
           <label htmlFor="subperiod-filter">
-            Subperiodo:
+            {t('filters.subperiod')}
             <span className="info-icon" title={activeSubPeriodsLabel}>ℹ</span>
           </label>
           <select
@@ -638,7 +656,7 @@ export default function Asignaciones() {
             className="filter-select"
             disabled={!selectedPeriodId}
           >
-            <option value="">Todos</option>
+            <option value="">{t('filters.all_option')}</option>
             {subPeriods?.map((sp: any) => (
               <option key={sp.id as number} value={sp.id as number}>
                 {sp.name}
@@ -648,21 +666,19 @@ export default function Asignaciones() {
         </div>
 
         <div className="filter-group toggle-group">
-          <label>Ver mensuales:</label>
+          <label>{t('filters.show_monthly')}</label>
           <input
             type="checkbox"
             checked={showMonthly}
             onChange={(e) => setShowMonthly(e.target.checked)}
-            title="Mostrar/ocultar asignaciones por subperiodo"
           />
         </div>
         <div className="filter-group toggle-group">
-          <label>Vista compacta:</label>
+          <label>{t('filters.compact_view')}</label>
           <input
             type="checkbox"
             checked={compactView}
             onChange={(e) => setCompactView(e.target.checked)}
-            title="Oculta columnas secundarias para evitar scroll horizontal"
           />
         </div>
 
@@ -680,7 +696,7 @@ export default function Asignaciones() {
               setShowMonthly(true)
             }}
           >
-            Limpiar Filtros
+            {t('filters.clear')}
           </button>
         )}
       </div>
@@ -693,15 +709,15 @@ export default function Asignaciones() {
         <div className="info-banner">
           {pendingMonthly.length === 0 ? (
             <div className="banner-ok">
-              ✅ Todos los subperiodos con fecha vencida tienen valor cargado.
+              {t('banner.all_subperiods_ok')}
             </div>
           ) : (
             <div className="banner-warn">
-              ⚠️ Faltan {pendingMonthly.length} subperiodos con fecha vencida sin “Actual”.
+              {t('banner.missing_subperiods', { count: pendingMonthly.length })}
               <div className="pending-list">
                 {pendingMonthly.slice(0, 4).map((p) => (
                   <div key={p.id}>
-                    {(p as any).subPeriodName || 'Subperiodo'} · {(p as any).kpiName || `KPI #${p.kpiId}`}
+                    {(p as any).subPeriodName || t('table.subperiod')} · {(p as any).kpiName || `KPI #${p.kpiId}`}
                   </div>
                 ))}
                 {pendingMonthly.length > 4 && <div>+ {pendingMonthly.length - 4} más</div>}
@@ -710,7 +726,7 @@ export default function Asignaciones() {
           )}
           {Object.values(growthReductionTotals).length > 0 && (
             <div className="banner-totals">
-              Totales al día para KPIs de crecimiento/reducción:
+              {t('banner.totals_header')}
               {Object.entries(growthReductionTotals).map(([kpiId, info]) => (
                 <div key={kpiId}>
                   {info.name}: <strong>{info.total.toFixed(2)}</strong>
@@ -723,32 +739,32 @@ export default function Asignaciones() {
 
       <div className={`table-container ${compactView ? 'compact' : ''}`}>
         {isLoading ? (
-          <div className="loading">Cargando asignaciones...</div>
+          <div className="loading">{t('loading')}</div>
         ) : filteredAssignments && filteredAssignments.length > 0 ? (
           <>
             <div className="results-info">
               {totalPages > 1
-                ? `Mostrando ${currentPage * PAGE_SIZE + 1}–${Math.min((currentPage + 1) * PAGE_SIZE, totalFiltered)} de ${totalFiltered} asignaciones`
-                : `Mostrando ${totalFiltered} de ${assignments?.length || 0} asignaciones`}
+                ? t('results.showing_range', { from: currentPage * PAGE_SIZE + 1, to: Math.min((currentPage + 1) * PAGE_SIZE, totalFiltered), total: totalFiltered })
+                : t('results.showing_total', { shown: totalFiltered, total: assignments?.length || 0 })}
             </div>
             <table className={`data-table ${compactView ? 'compact' : ''}`}>
               <thead>
                 <tr>
-                  <th className="col-id">ID</th>
-                  <th>Colaborador</th>
-                  <th>KPI</th>
-                  <th>Período</th>
-                  <th className="col-subperiod">Subperiodo</th>
-                  <th>Target</th>
-                  <th>Actual</th>
-                  <th className="col-peso">Peso</th>
-                  <th>Variación</th>
-                  <th>Estado</th>
-                  <th>Curaduría</th>
-                  <th>Input</th>
-                  <th className="col-last">Última medición</th>
-                  <th className="col-comments">Comentarios</th>
-                  <th className="actions-column">Acciones</th>
+                  <th className="col-id">{t('table.id')}</th>
+                  <th>{t('table.collaborator')}</th>
+                  <th>{t('table.kpi')}</th>
+                  <th>{t('table.period')}</th>
+                  <th className="col-subperiod">{t('table.subperiod')}</th>
+                  <th>{t('table.target')}</th>
+                  <th>{t('table.actual')}</th>
+                  <th className="col-peso">{t('table.weight')}</th>
+                  <th>{t('table.variation')}</th>
+                  <th>{t('table.status')}</th>
+                  <th>{t('table.curation')}</th>
+                  <th>{t('table.input')}</th>
+                  <th className="col-last">{t('table.last_measurement')}</th>
+                  <th className="col-comments">{t('table.comments')}</th>
+                  <th className="actions-column">{t('table.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -781,8 +797,8 @@ export default function Asignaciones() {
                         {(assignment as any).subPeriodName
                           ? (assignment as any).subPeriodName
                           : (assignment as any).subPeriodId
-                          ? `Subperiodo #${(assignment as any).subPeriodId}`
-                          : 'Resumen'}
+                          ? `${t('table.subperiod')} #${(assignment as any).subPeriodId}`
+                          : t('table.summary')}
                       </td>
                       <td className="number-cell">
                         {toNumber(assignment.target) !== null ? toNumber(assignment.target) : assignment.target}
@@ -844,9 +860,9 @@ export default function Asignaciones() {
                                     action: 'approve',
                                   })
                                 }
-                                title="Aprobar asignación"
+                                title={t('row_actions.approve')}
                               >
-                                Aprobar
+                                {t('row_actions.approve')}
                               </button>
                               <button
                                 className="btn-reject-small"
@@ -856,15 +872,15 @@ export default function Asignaciones() {
                                     action: 'reject',
                                   })
                                 }
-                                title="Rechazar asignación"
+                                title={t('row_actions.reject')}
                               >
-                                Rechazar
+                                {t('row_actions.reject')}
                               </button>
                             </>
                           )}
                           <button
                             className="btn-icon"
-                            title="Replicar a otros colaboradores"
+                            title={t('row_actions.replicate')}
                             onClick={() => {
                               const kpi = kpis?.find((k: any) => k.id === assignment.kpiId)
                               const period = periods?.find((p: any) => p.id === assignment.periodId)
@@ -879,61 +895,61 @@ export default function Asignaciones() {
                               setShowBulkModal(true)
                             }}
                           >
-                            Replicar
+                            {t('row_actions.replicate')}
                           </button>
                           {canEditAssignment(assignment) && assignment.status !== 'proposed' && (
                             <>
-                              <button className="btn-icon" onClick={() => handleEdit(assignment)} title="Editar">
-                                Editar
+                              <button className="btn-icon" onClick={() => handleEdit(assignment)} title={t('row_actions.edit')}>
+                                {t('row_actions.edit')}
                               </button>
-                              <button className="btn-icon" onClick={() => handleDelete(assignment.id)} title="Eliminar">
-                                Eliminar
+                              <button className="btn-icon" onClick={() => handleDelete(assignment.id)} title={t('row_actions.delete')}>
+                                {t('row_actions.delete')}
                               </button>
                               {canCloseAssignment(assignment) && (
                                 <button
                                   className="btn-icon"
                                   onClick={() => handleCloseAssignment(assignment)}
-                                  title="Cerrar KPI"
+                                  title={t('row_actions.close_kpi')}
                                 >
-                                  Cerrar KPI
+                                  {t('row_actions.close_kpi')}
                                 </button>
                               )}
                             </>
                           )}
                           {!canEditAssignment(assignment) && assignment.status !== 'proposed' && (
-                            <span className="locked-badge" title="Parrilla cerrada - No se puede editar">
-                              Cerrada
+                            <span className="locked-badge" title={t('row_actions.locked')}>
+                              {t('row_actions.locked')}
                             </span>
                           )}
                           {canReopenAssignment(assignment) && (
                             <button
                               className="btn-icon"
                               onClick={() => handleReopenAssignment(assignment)}
-                              title="Reabrir KPI"
+                              title={t('row_actions.reopen_kpi')}
                             >
-                              Reabrir KPI
+                              {t('row_actions.reopen_kpi')}
                             </button>
                           )}
                           <button
                             className="btn-icon"
                             onClick={() => navigate(`/curaduria?assignmentId=${assignment.id}`)}
-                            title="Abrir curaduría"
+                            title={t('row_actions.curation')}
                           >
-                            Curaduría
+                            {t('row_actions.curation')}
                           </button>
                           <button
                             className="btn-icon"
                             onClick={() => navigate(`/input-datos?assignmentId=${assignment.id}`)}
-                            title="Ver mediciones"
+                            title={t('row_actions.measurements')}
                           >
-                            Mediciones
+                            {t('row_actions.measurements')}
                           </button>
                           <button
                             className="btn-icon"
-                            onClick={() => void dialog.alert('Recálculo solicitado.', { title: 'Recalcular', variant: 'info' })}
-                            title="Forzar recalculo"
+                            onClick={() => void dialog.alert(t('dialogs.recalculate_msg'), { title: t('dialogs.recalculate_title'), variant: 'info' })}
+                            title={t('row_actions.recalculate')}
                           >
-                            Recalcular
+                            {t('row_actions.recalculate')}
                           </button>
                         </div>
                       </td>
@@ -950,24 +966,24 @@ export default function Asignaciones() {
                   onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
                   disabled={currentPage === 0}
                 >
-                  Anterior
+                  {t('pagination.prev')}
                 </button>
                 <span className="pagination-info">
-                  Página {currentPage + 1} de {totalPages}
+                  {t('pagination.page_of', { page: currentPage + 1, total: totalPages })}
                 </span>
                 <button
                   className="btn-secondary"
                   onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
                   disabled={currentPage >= totalPages - 1}
                 >
-                  Siguiente
+                  {t('pagination.next')}
                 </button>
               </div>
             )}
 
             {selectedPeriodId && (
               <div className="weight-summary">
-                <h3>Resumen de Ponderaciones por Colaborador</h3>
+                <h3>{t('weight_summary.title')}</h3>
                 <div className="summary-table">
                   {collaborators
                     ?.filter((c: any) =>
@@ -984,12 +1000,12 @@ export default function Asignaciones() {
                         >
                           <span className="summary-name">{collaborator.name}</span>
                           <span className="summary-weight">{totalWeight.toFixed(1)}%</span>
-                          {totalWeight === 100 && <span className="summary-status">Válido</span>}
+                          {totalWeight === 100 && <span className="summary-status">{t('weight_summary.valid')}</span>}
                           {totalWeight > 100 && (
-                            <span className="summary-status">Excede por {(totalWeight - 100).toFixed(1)}%</span>
+                            <span className="summary-status">{t('weight_summary.exceeds', { amount: (totalWeight - 100).toFixed(1) })}</span>
                           )}
                           {totalWeight < 100 && (
-                            <span className="summary-status">Falta {(100 - totalWeight).toFixed(1)}%</span>
+                            <span className="summary-status">{t('weight_summary.missing', { amount: (100 - totalWeight).toFixed(1) })}</span>
                           )}
                         </div>
                       )
@@ -1001,28 +1017,25 @@ export default function Asignaciones() {
         ) : !shouldLoadAssignments ? (
           <div className="empty-state">
             <div className="empty-icon">🔍</div>
-            <h3>Seleccioná filtros para ver asignaciones</h3>
-            <p>Podés buscar por período, colaborador, KPI, área o rol desde los filtros de arriba.</p>
+            <h3>{t('empty.no_filters_title')}</h3>
+            <p>{t('empty.no_filters_subtitle')}</p>
           </div>
         ) : (assignments?.length ?? 0) > 0 ? (
           <div className="empty-state">
             <div className="empty-icon">🧭</div>
-            <h3>No hay resultados con los filtros actuales</h3>
-            <p>Ajustá período, área, rol o búsqueda para ver asignaciones coincidentes.</p>
+            <h3>{t('empty.no_results_title')}</h3>
+            <p>{t('empty.no_results_subtitle')}</p>
           </div>
         ) : (
           <div className="empty-state">
             <div className="empty-icon">📋</div>
-            <h3>No hay asignaciones para la selección actual</h3>
-            <p>La combinación elegida no tiene asignaciones registradas todavía.</p>
+            <h3>{t('empty.no_assignments_title')}</h3>
+            <p>{t('empty.no_assignments_subtitle')}</p>
             <p className="empty-state-hint">
-              Para crear asignaciones necesitás tener:
-              &nbsp;✓ <a href="/colaboradores">Colaboradores</a> cargados &nbsp;
-              ✓ <a href="/kpis">KPIs</a> definidos &nbsp;
-              ✓ Un <a href="/periodos">período activo</a>
+              {t('empty.no_assignments_hint')}
             </p>
             <button className="btn-primary" onClick={handleCreate}>
-              Nueva asignación
+              {t('empty.create_btn')}
             </button>
           </div>
         )}
@@ -1085,8 +1098,10 @@ export default function Asignaciones() {
             boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
           }}
         >
-          ✓ {bulkResult.created} asignación{bulkResult.created !== 1 ? 'es' : ''} creada{bulkResult.created !== 1 ? 's' : ''}
-          {bulkResult.skipped > 0 && ` · ${bulkResult.skipped} ya existían`}
+          {bulkResult.created !== 1
+            ? t('bulk_result.created_many', { count: bulkResult.created })
+            : t('bulk_result.created_one', { count: bulkResult.created })}
+          {bulkResult.skipped > 0 && ` ${t('bulk_result.skipped', { count: bulkResult.skipped })}`}
           <button
             onClick={() => setBulkResult(null)}
             style={{ marginLeft: 12, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, color: '#065f46' }}

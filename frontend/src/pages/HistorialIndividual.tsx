@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from 'react-query'
 import { useParams, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { useAuth } from '../hooks/useAuth'
@@ -97,6 +98,8 @@ export default function HistorialIndividual() {
   const { collaboratorId } = useParams<{ collaboratorId: string }>()
   const [searchParams] = useSearchParams()
   const { user } = useAuth()
+  const { t, i18n } = useTranslation('history')
+  const locale = i18n.resolvedLanguage?.startsWith('en') ? 'en-US' : 'es-AR'
   const isGlobalView = collaboratorId === 'all' || collaboratorId === 'global'
   const resolvedId = useMemo(() => {
     if (isGlobalView) return ''
@@ -183,13 +186,13 @@ export default function HistorialIndividual() {
       if (!seen.has(kpi.periodId)) {
         seen.set(kpi.periodId, {
           id: kpi.periodId,
-          name: kpi.periodName || `Periodo ${kpi.periodId}`,
+          name: kpi.periodName || t('individual.filter_period_fallback', { id: kpi.periodId }),
           status: (kpi as any).periodStatus,
         })
       }
     })
     return Array.from(seen.values())
-  }, [kpis])
+  }, [kpis, t])
 
   const optionsPeriods =
     availablePeriods.length > 0
@@ -275,7 +278,7 @@ export default function HistorialIndividual() {
     <div className="historial-individual-page">
       <div className="historial-header">
         <div>
-          <h1>{isGlobalView ? 'Historico - Resumen anual' : 'Historico Individual'}</h1>
+          <h1>{isGlobalView ? t('individual.title_global') : t('individual.title_individual')}</h1>
           {!isGlobalView && collaborator && (
             <div className="collaborator-info">
               <p className="collaborator-name">{collaborator.name}</p>
@@ -284,12 +287,12 @@ export default function HistorialIndividual() {
               </p>
               <div className="status-line">
                 <span className={`status-pill ${collaborator.status === 'inactive' ? 'inactive' : 'active'}`}>
-                  {collaborator.status === 'inactive' ? 'Inactivo' : 'Activo'}
+                  {collaborator.status === 'inactive' ? t('individual.status_inactive') : t('individual.status_active')}
                 </span>
                 {collaborator.status === 'inactive' && collaborator.inactiveAt && (
-                  <span className="muted">Desde: {new Date(collaborator.inactiveAt).toLocaleDateString('es-ES')}</span>
+                  <span className="muted">{t('individual.since_prefix')} {new Date(collaborator.inactiveAt).toLocaleDateString(locale)}</span>
                 )}
-                {collaborator.inactiveReason && <span className="muted">Motivo: {collaborator.inactiveReason}</span>}
+                {collaborator.inactiveReason && <span className="muted">{t('individual.reason_prefix')} {collaborator.inactiveReason}</span>}
               </div>
             </div>
           )}
@@ -298,29 +301,29 @@ export default function HistorialIndividual() {
 
       {!isGlobalView && events && events.length > 0 && (
         <div className="event-timeline">
-          <h3>Eventos del colaborador</h3>
+          <h3>{t('individual.events_title')}</h3>
           <ul>
             {events.map((event) => (
               <li key={event.id}>
                 <span className="event-date">
-                  {new Date(event.createdAt).toLocaleDateString('es-ES', {
+                  {new Date(event.createdAt).toLocaleDateString(locale, {
                     year: 'numeric',
                     month: 'short',
                     day: '2-digit',
                   })}
                 </span>
                 <span className="event-desc">
-                  {event.eventType === 'termination' && 'Desvinculacion'}
-                  {event.eventType === 'reactivation' && 'Reactivacion'}
-                  {event.eventType === 'role_change' && 'Cambio de rol'}
+                  {event.eventType === 'termination' && t('individual.event_termination')}
+                  {event.eventType === 'reactivation' && t('individual.event_reactivation')}
+                  {event.eventType === 'role_change' && t('individual.event_role_change')}
                 </span>
                 {event.oldValue && event.newValue && (
                   <span className="muted">
                     {event.oldValue} → {event.newValue}
                   </span>
                 )}
-                {event.reason && <span className="muted">Motivo: {event.reason}</span>}
-                {event.createdByName && <span className="muted">Por: {event.createdByName}</span>}
+                {event.reason && <span className="muted">{t('individual.reason_prefix')} {event.reason}</span>}
+                {event.createdByName && <span className="muted">{t('individual.by_prefix')} {event.createdByName}</span>}
               </li>
             ))}
           </ul>
@@ -329,14 +332,14 @@ export default function HistorialIndividual() {
 
       <div className="filters-section">
         <div className="filter-group">
-          <label htmlFor="period-select">Periodo:</label>
+          <label htmlFor="period-select">{t('individual.filter_period_label')}</label>
           <select
             id="period-select"
             value={selectedPeriodId || ''}
             onChange={(e) => handlePeriodChange(e.target.value)}
             className="filter-select"
           >
-            <option value="">Seleccione un periodo</option>
+            <option value="">{t('individual.filter_period_placeholder')}</option>
             {optionsPeriods.map((period) => (
               <option key={period.id} value={period.id}>
                 {period.name}
@@ -347,14 +350,14 @@ export default function HistorialIndividual() {
 
         {selectedPeriodId && subPeriods && subPeriods.length > 0 && (
           <div className="filter-group">
-            <label htmlFor="subperiod-select">Subperiodo (opcional):</label>
+            <label htmlFor="subperiod-select">{t('individual.filter_subperiod_label')}</label>
             <select
               id="subperiod-select"
               value={selectedSubPeriodId || ''}
               onChange={(e) => handleSubPeriodChange(e.target.value)}
               className="filter-select"
             >
-              <option value="">Todos los subperiodos</option>
+              <option value="">{t('individual.filter_all_subperiods')}</option>
               {subPeriods.map((subPeriod) => (
                 <option key={subPeriod.id} value={subPeriod.id}>
                   {subPeriod.name} ({subPeriod.weight ? `${subPeriod.weight}%` : ''})
@@ -368,13 +371,13 @@ export default function HistorialIndividual() {
       {!selectedPeriodId && (
         <div className="empty-state">
           <div className="empty-icon">:/</div>
-          <h3>Selecciona un periodo</h3>
-          <p>Elige un periodo para ver el historico de resultados</p>
+          <h3>{t('individual.empty_select_period_title')}</h3>
+          <p>{t('individual.empty_select_period_subtitle')}</p>
         </div>
       )}
 
       {selectedPeriodId && loadingKPIs && !isGlobalView && (
-        <div className="loading">Cargando resultados...</div>
+        <div className="loading">{t('individual.loading')}</div>
       )}
 
       {isGlobalView && selectedPeriodId && (
@@ -382,16 +385,16 @@ export default function HistorialIndividual() {
           {periodSummary && periodSummary.summaries?.length > 0 ? (
             <div className="annual-summary-card">
               <div className="summary-header">
-                <h2>Resumen anual por colaborador</h2>
+                <h2>{t('individual.annual_summary_title')}</h2>
               </div>
               <div className="summary-table-container">
                 <table className="summary-table">
                   <thead>
                     <tr>
-                      <th>Colaborador</th>
-                      <th>Peso total</th>
-                      <th>Resultado ponderado</th>
-                      <th>Resultado final</th>
+                      <th>{t('individual.summary_table_collaborator')}</th>
+                      <th>{t('individual.summary_table_total_weight')}</th>
+                      <th>{t('individual.summary_table_weighted_result')}</th>
+                      <th>{t('individual.summary_table_final_result')}</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -411,7 +414,7 @@ export default function HistorialIndividual() {
                               )
                             }
                           >
-                            Ver detalle
+                            {t('individual.summary_detail_btn')}
                           </button>
                         </td>
                       </tr>
@@ -423,8 +426,8 @@ export default function HistorialIndividual() {
           ) : (
             <div className="empty-state">
               <div className="empty-icon">:/</div>
-              <h3>Sin resumen anual</h3>
-              <p>Cierra el periodo para generar el resumen anual.</p>
+              <h3>{t('individual.no_annual_summary_title')}</h3>
+              <p>{t('individual.no_annual_summary_subtitle')}</p>
             </div>
           )}
         </>
@@ -435,20 +438,20 @@ export default function HistorialIndividual() {
           {summaryForCollaborator && (
             <div className="annual-summary-card">
               <div className="summary-header">
-                <h2>Resumen anual (al cierre del periodo)</h2>
+                <h2>{t('individual.annual_summary_closed_title')}</h2>
                 <span className="summary-pill">
                   {summaryForCollaborator.summary.overallResult.toFixed(1)}%
                 </span>
               </div>
               <div className="summary-metrics">
                 <div>
-                  <span className="metric-label">Peso total</span>
+                  <span className="metric-label">{t('individual.metric_total_weight')}</span>
                   <span className="metric-value">
                     {summaryForCollaborator.summary.totalWeight.toFixed(1)}%
                   </span>
                 </div>
                 <div>
-                  <span className="metric-label">Resultado ponderado</span>
+                  <span className="metric-label">{t('individual.metric_weighted_result')}</span>
                   <span className="metric-value">
                     {summaryForCollaborator.summary.totalWeightedResult.toFixed(1)}
                   </span>
@@ -459,12 +462,12 @@ export default function HistorialIndividual() {
                   <table className="summary-table">
                     <thead>
                       <tr>
-                        <th>KPI</th>
-                        <th>Target</th>
-                        <th>Actual</th>
-                        <th>Variacion</th>
-                        <th>Peso</th>
-                        <th>Ponderado</th>
+                        <th>{t('individual.kpi_table_kpi')}</th>
+                        <th>{t('individual.kpi_table_target')}</th>
+                        <th>{t('individual.kpi_table_actual')}</th>
+                        <th>{t('individual.kpi_table_variation')}</th>
+                        <th>{t('individual.kpi_table_weight')}</th>
+                        <th>{t('individual.kpi_table_weighted')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -499,7 +502,7 @@ export default function HistorialIndividual() {
 
           <div className="global-result-card">
             <div className="result-content">
-              <h2>Resultado Global del Periodo</h2>
+              <h2>{t('individual.global_result_title')}</h2>
               <div className="result-value">
                 <span className="result-number">{globalResult.toFixed(1)}%</span>
                 <div className="result-bar">
@@ -510,29 +513,29 @@ export default function HistorialIndividual() {
                 </div>
               </div>
               <p className="result-description">
-                Promedio ponderado de todos los KPIs del periodo seleccionado
-                {selectedSubPeriodId && ' (filtrado por subperiodo)'}
+                {t('individual.global_result_desc')}
+                {selectedSubPeriodId && t('individual.global_result_subperiod_suffix')}
               </p>
             </div>
           </div>
 
           <div className="kpis-section">
-            <h2>KPIs del Periodo</h2>
-            <div className="read-only-badge">Modo Solo Lectura</div>
+            <h2>{t('individual.kpis_title')}</h2>
+            <div className="read-only-badge">{t('individual.read_only_badge')}</div>
             <div className="kpis-table-container">
               <table className="kpis-table">
                 <thead>
                   <tr>
-                    <th>KPI</th>
-                    <th>Descripcion</th>
-                    <th>Target</th>
-                    <th>Alcance</th>
-                    <th>Variacion</th>
-                    <th>Ponderacion</th>
-                    <th>Alcance Ponderado</th>
-                    <th>Criterio</th>
-                    <th>Estado</th>
-                    {selectedSubPeriodId && <th>Subperiodo</th>}
+                    <th>{t('individual.table_kpi')}</th>
+                    <th>{t('individual.table_description')}</th>
+                    <th>{t('individual.table_target')}</th>
+                    <th>{t('individual.table_actual')}</th>
+                    <th>{t('individual.table_variation')}</th>
+                    <th>{t('individual.table_weight')}</th>
+                    <th>{t('individual.table_weighted')}</th>
+                    <th>{t('individual.table_criteria')}</th>
+                    <th>{t('individual.table_status')}</th>
+                    {selectedSubPeriodId && <th>{t('individual.table_subperiod')}</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -567,10 +570,10 @@ export default function HistorialIndividual() {
                       <td className="kpi-criteria">{kpi.kpiCriteria || '-'}</td>
                       <td>
                         <span className={`kpi-status kpi-status-${kpi.status}`}>
-                          {kpi.status === 'draft' && 'Borrador'}
-                          {kpi.status === 'proposed' && 'Propuesto'}
-                          {kpi.status === 'approved' && 'Aprobado'}
-                          {kpi.status === 'closed' && 'Cerrado'}
+                          {kpi.status === 'draft' && t('individual.status_draft')}
+                          {kpi.status === 'proposed' && t('individual.status_proposed')}
+                          {kpi.status === 'approved' && t('individual.status_approved')}
+                          {kpi.status === 'closed' && t('individual.status_closed')}
                         </span>
                       </td>
                       {selectedSubPeriodId && <td>{kpi.subPeriodName || '-'}</td>}
@@ -584,7 +587,7 @@ export default function HistorialIndividual() {
 
           {chartData.length > 0 && (
             <div className="chart-section">
-              <h2>Grafico de Resultados</h2>
+              <h2>{t('individual.chart_title')}</h2>
               <div className="chart-container">
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={chartData}>
@@ -592,8 +595,8 @@ export default function HistorialIndividual() {
                     <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
                     <YAxis />
                     <Tooltip />
-                    <Bar dataKey="target" fill="#e5e7eb" name="Target" />
-                    <Bar dataKey="actual" fill="#f97316" name="Actual" />
+                    <Bar dataKey="target" fill="#e5e7eb" name={t('individual.bar_target')} />
+                    <Bar dataKey="actual" fill="#f97316" name={t('individual.bar_actual')} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -605,8 +608,8 @@ export default function HistorialIndividual() {
       {selectedPeriodId && !loadingKPIs && (!filteredKPIs || filteredKPIs.length === 0) && (
         <div className="empty-state">
           <div className="empty-icon">:/</div>
-          <h3>No hay resultados para este periodo</h3>
-          <p>No se encontraron KPIs asignados para el periodo seleccionado</p>
+          <h3>{t('individual.no_results_title')}</h3>
+          <p>{t('individual.no_results_subtitle')}</p>
         </div>
       )}
     </div>

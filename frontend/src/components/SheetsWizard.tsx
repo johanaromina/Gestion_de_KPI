@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
+import { resolveApiErrorMessage } from '../utils/apiErrors'
 import './SheetsWizard.css'
 
 interface SheetsWizardProps {
@@ -24,13 +26,14 @@ interface AssignmentOption {
 }
 
 const SCHEDULE_OPTIONS = [
-  { label: 'Cada día a las 6am', value: '0 6 * * *' },
-  { label: 'Cada hora', value: '0 * * * *' },
-  { label: 'Cada semana (lunes 6am)', value: '0 6 * * 1' },
-  { label: 'Solo manual', value: '' },
+  { labelKey: 'config:sheets_wizard.schedule_options.daily', value: '0 6 * * *' },
+  { labelKey: 'config:sheets_wizard.schedule_options.hourly', value: '0 * * * *' },
+  { labelKey: 'config:sheets_wizard.schedule_options.weekly', value: '0 6 * * 1' },
+  { labelKey: 'config:sheets_wizard.schedule_options.manual', value: '' },
 ]
 
 export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) {
+  const { t } = useTranslation(['config', 'common'])
   const [step, setStep] = useState<Step>('url')
   const [sheetUrl, setSheetUrl] = useState('')
   const [apiKey, setApiKey] = useState('')
@@ -47,6 +50,9 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
   const [preview, setPreview] = useState<PreviewResult | null>(null)
   const [error, setError] = useState('')
   const [createdResult, setCreatedResult] = useState<any>(null)
+
+  const defaultWizardName = (tab: string) =>
+    t('config:sheets_wizard.defaults.integration_name', { tab })
 
   // Cargar asignaciones disponibles
   const { data: assignments } = useQuery<any[]>(
@@ -70,12 +76,12 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
   const allKpiOptions: AssignmentOption[] = [
     ...(assignments || []).map((a: any) => ({
       id: a.id,
-      label: `${a.collaboratorName || 'Colaborador'} — ${a.kpiName || `KPI #${a.kpiId}`} (${a.periodName || 'período'})`,
+      label: `${a.collaboratorName || t('config:sheets_wizard.kpi_option_fallbacks.collaborator')} - ${a.kpiName || t('config:sheets_wizard.kpi_option_fallbacks.kpi', { id: a.kpiId })} (${a.periodName || t('config:sheets_wizard.kpi_option_fallbacks.period')})`,
       type: 'assignment' as const,
     })),
     ...(scopeKpis || []).map((s: any) => ({
       id: s.id,
-      label: `[Área] ${s.name} (${s.periodName || 'período'})`,
+      label: `${t('config:sheets_wizard.kpi_option_fallbacks.scope_prefix')} ${s.name} (${s.periodName || t('config:sheets_wizard.kpi_option_fallbacks.period')})`,
       type: 'scope_kpi' as const,
     })),
   ]
@@ -96,7 +102,11 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
         setError('')
       },
       onError: (err: any) => {
-        setError(err?.response?.data?.error || 'No se pudo leer la planilla')
+        setError(
+          resolveApiErrorMessage(err, t, {
+            fallbackKey: 'config:sheets_wizard.errors.preview',
+          })
+        )
       },
     }
   )
@@ -106,7 +116,7 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
   const wizardMutation = useMutation(
     async () => {
       const base: any = {
-        name: wizardName || `Google Sheets — ${selectedTab}`,
+        name: wizardName || defaultWizardName(selectedTab),
         sheetUrl,
         tab: selectedTab,
         valueColumn: selectedColumn,
@@ -133,14 +143,18 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
         setStep('done')
       },
       onError: (err: any) => {
-        setError(err?.response?.data?.error || 'Error al crear la integración')
+        setError(
+          resolveApiErrorMessage(err, t, {
+            fallbackKey: 'config:sheets_wizard.errors.create',
+          })
+        )
       },
     }
   )
 
   const handleUrlNext = async () => {
     if (!sheetUrl.trim()) {
-      setError('Pegá la URL de la planilla de Google Sheets')
+      setError(t('config:sheets_wizard.errors.url_required'))
       return
     }
     setError('')
@@ -150,7 +164,7 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
 
   const handleTabNext = async () => {
     if (!selectedTab) {
-      setError('Seleccioná una pestaña')
+      setError(t('config:sheets_wizard.errors.tab_required'))
       return
     }
     setError('')
@@ -160,7 +174,7 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
 
   const handleColumnNext = () => {
     if (!selectedColumn) {
-      setError('Seleccioná la columna con el valor del KPI')
+      setError(t('config:sheets_wizard.errors.column_required'))
       return
     }
     setError('')
@@ -169,19 +183,19 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
 
   const handleKpiNext = () => {
     if (isBulkMode) {
-      if (selectedKpis.length === 0) { setError('Seleccioná al menos un colaborador'); return }
-      if (selectedKpis.some((k) => !k.agentValue.trim())) { setError('Completá el nombre en planilla de todos los colaboradores'); return }
+      if (selectedKpis.length === 0) { setError(t('config:sheets_wizard.errors.bulk_required')); return }
+      if (selectedKpis.some((k) => !k.agentValue.trim())) { setError(t('config:sheets_wizard.errors.bulk_name_required')); return }
     } else {
-      if (!selectedKpi) { setError('Seleccioná el KPI destino'); return }
+      if (!selectedKpi) { setError(t('config:sheets_wizard.errors.kpi_required')); return }
     }
-    if (!wizardName) setWizardName(`Google Sheets — ${selectedTab}`)
+    if (!wizardName) setWizardName(defaultWizardName(selectedTab))
     setError('')
     setStep('schedule')
   }
 
   const handleCreate = () => {
     if (!wizardName.trim()) {
-      setWizardName(`Google Sheets — ${selectedTab}`)
+      setWizardName(defaultWizardName(selectedTab))
     }
     wizardMutation.mutate()
   }
@@ -196,8 +210,8 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
           <div className="sheets-wizard-title">
             <span className="sheets-wizard-icon">📊</span>
             <div>
-              <h2>Conectar Google Sheets</h2>
-              <p>Importá valores de KPI directamente desde tu planilla</p>
+              <h2>{t('config:sheets_wizard.title')}</h2>
+              <p>{t('config:sheets_wizard.subtitle')}</p>
             </div>
           </div>
           <button className="sheets-wizard-close" onClick={onClose}>✕</button>
@@ -211,7 +225,7 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
                 className={`progress-dot ${n < stepIndex[step] ? 'done' : n === stepIndex[step] ? 'active' : ''}`}
               />
             ))}
-            <span className="progress-label">Paso {stepIndex[step]} de {totalSteps}</span>
+            <span className="progress-label">{t('config:sheets_wizard.progress', { current: stepIndex[step], total: totalSteps })}</span>
           </div>
         )}
 
@@ -222,48 +236,48 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
           {/* PASO 1: URL */}
           {step === 'url' && (
             <div className="wizard-step">
-              <h3>¿Cuál es la planilla?</h3>
+              <h3>{t('config:sheets_wizard.steps.url_title')}</h3>
               <p className="step-hint">
-                Abrí tu Google Sheets y copiá la URL completa desde la barra del navegador.
+                {t('config:sheets_wizard.steps.url_hint')}
               </p>
-              <label className="field-label">URL de Google Sheets</label>
+              <label className="field-label">{t('config:sheets_wizard.fields.sheet_url')}</label>
               <input
                 className="wizard-input"
                 type="text"
-                placeholder="https://docs.google.com/spreadsheets/d/..."
+                placeholder={t('config:sheets_wizard.placeholders.sheet_url')}
                 value={sheetUrl}
                 onChange={(e) => setSheetUrl(e.target.value)}
                 autoFocus
               />
               <label className="field-label" style={{ marginTop: 16 }}>
-                API Key de Google{' '}
-                <span className="field-optional">(opcional si está configurada en el servidor)</span>
+                {t('config:sheets_wizard.fields.api_key')}{' '}
+                <span className="field-optional">{t('config:sheets_wizard.fields.api_key_optional')}</span>
               </label>
               <input
                 className="wizard-input"
                 type="password"
-                placeholder="AIza..."
+                placeholder={t('config:sheets_wizard.placeholders.api_key')}
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
               />
               <p className="step-hint step-hint-sm">
-                La planilla debe ser pública o tu API key debe tener acceso a ella.{' '}
+                {t('config:sheets_wizard.hints.public_or_api_key')}{' '}
                 <a
                   href="https://developers.google.com/sheets/api/guides/authorizing"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  Cómo obtener una API Key ↗
+                  {t('config:sheets_wizard.hints.api_key_help')}
                 </a>
               </p>
               <div className="wizard-actions">
-                <button className="btn-wizard-secondary" onClick={onClose}>Cancelar</button>
+                <button className="btn-wizard-secondary" onClick={onClose}>{t('common:cancel')}</button>
                 <button
                   className="btn-wizard-primary"
                   onClick={handleUrlNext}
                   disabled={previewMutation.isLoading}
                 >
-                  {previewMutation.isLoading ? 'Conectando…' : 'Conectar →'}
+                  {previewMutation.isLoading ? t('config:sheets_wizard.actions.connecting') : t('config:sheets_wizard.actions.connect')}
                 </button>
               </div>
             </div>
@@ -272,12 +286,12 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
           {/* PASO 2: PESTAÑA */}
           {step === 'tab' && (
             <div className="wizard-step">
-              <h3>¿En qué pestaña están los datos?</h3>
+              <h3>{t('config:sheets_wizard.steps.tab_title')}</h3>
               <p className="step-hint">
-                Seleccioná la hoja (pestaña) de tu planilla que tiene los valores del KPI.
+                {t('config:sheets_wizard.steps.tab_hint')}
               </p>
               {previewMutation.isLoading ? (
-                <div className="wizard-loading">Leyendo planilla…</div>
+                <div className="wizard-loading">{t('config:sheets_wizard.loading.sheet')}</div>
               ) : (
                 <div className="tab-grid">
                   {(preview?.tabs || []).map((tab) => (
@@ -290,18 +304,18 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
                     </button>
                   ))}
                   {(!preview?.tabs || preview.tabs.length === 0) && (
-                    <p className="step-hint">No se encontraron pestañas. Verificá la URL y la API key.</p>
+                    <p className="step-hint">{t('config:sheets_wizard.hints.no_tabs')}</p>
                   )}
                 </div>
               )}
               <div className="wizard-actions">
-                <button className="btn-wizard-secondary" onClick={() => setStep('url')}>← Atrás</button>
+                <button className="btn-wizard-secondary" onClick={() => setStep('url')}>{t('common:back')}</button>
                 <button
                   className="btn-wizard-primary"
                   onClick={handleTabNext}
                   disabled={!selectedTab || previewMutation.isLoading}
                 >
-                  {previewMutation.isLoading ? 'Cargando…' : 'Siguiente →'}
+                  {previewMutation.isLoading ? t('common:loading') : t('common:next')}
                 </button>
               </div>
             </div>
@@ -310,12 +324,12 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
           {/* PASO 3: COLUMNA */}
           {step === 'column' && (
             <div className="wizard-step">
-              <h3>¿Qué columna tiene el valor del KPI?</h3>
+              <h3>{t('config:sheets_wizard.steps.column_title')}</h3>
               <p className="step-hint">
-                Elegí la columna que contiene el número que querés usar como medición.
+                {t('config:sheets_wizard.steps.column_hint')}
               </p>
               {previewMutation.isLoading ? (
-                <div className="wizard-loading">Cargando columnas…</div>
+                <div className="wizard-loading">{t('config:sheets_wizard.loading.columns')}</div>
               ) : (
                 <>
                   <div className="column-grid">
@@ -335,7 +349,7 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
                   </div>
                   {preview?.preview && preview.preview.length > 0 && (
                     <div className="preview-table-wrap">
-                      <p className="preview-label">Vista previa (primeras filas):</p>
+                      <p className="preview-label">{t('config:sheets_wizard.hints.preview_label')}</p>
                       <div className="preview-scroll">
                         <table className="preview-table">
                           <thead>
@@ -369,51 +383,51 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
                     </div>
                   )}
                   <div className="agg-row">
-                    <label className="field-label">Si hay múltiples filas, usar:</label>
+                    <label className="field-label">{t('config:sheets_wizard.fields.aggregation')}</label>
                     <select
                       className="wizard-select"
                       value={aggregation}
                       onChange={(e) => setAggregation(e.target.value)}
                     >
-                      <option value="FIRST">El primer valor encontrado</option>
-                      <option value="SUM">Suma de todos</option>
-                      <option value="AVG">Promedio</option>
-                      <option value="MAX">Valor máximo</option>
-                      <option value="MIN">Valor mínimo</option>
+                      <option value="FIRST">{t('config:sheets_wizard.aggregation_options.FIRST')}</option>
+                      <option value="SUM">{t('config:sheets_wizard.aggregation_options.SUM')}</option>
+                      <option value="AVG">{t('config:sheets_wizard.aggregation_options.AVG')}</option>
+                      <option value="MAX">{t('config:sheets_wizard.aggregation_options.MAX')}</option>
+                      <option value="MIN">{t('config:sheets_wizard.aggregation_options.MIN')}</option>
                     </select>
                   </div>
 
                   <div className="agent-col-row">
                     <label className="field-label">
-                      ¿Hay una columna que identifica a cada persona?{' '}
-                      <span className="field-optional">(opcional — para conectar varios agentes a la vez)</span>
+                      {t('config:sheets_wizard.fields.agent_column')}{' '}
+                      <span className="field-optional">{t('config:sheets_wizard.fields.agent_column_optional')}</span>
                     </label>
                     <select
                       className="wizard-select"
                       value={agentColumn}
                       onChange={(e) => { setAgentColumn(e.target.value); setSelectedKpis([]) }}
                     >
-                      <option value="">— No, la planilla tiene un solo valor —</option>
+                      <option value="">{t('config:sheets_wizard.placeholders.single_value_option')}</option>
                       {(preview?.headers || []).map((h) => (
                         <option key={String(h)} value={String(h)}>{String(h)}</option>
                       ))}
                     </select>
                     {agentColumn && (
                       <p className="agent-col-hint">
-                        El sistema va a filtrar cada fila por el nombre del agente. En el siguiente paso elegís qué colaboradores conectar.
+                        {t('config:sheets_wizard.hints.agent_column_hint')}
                       </p>
                     )}
                   </div>
                 </>
               )}
               <div className="wizard-actions">
-                <button className="btn-wizard-secondary" onClick={() => setStep('tab')}>← Atrás</button>
+                <button className="btn-wizard-secondary" onClick={() => setStep('tab')}>{t('common:back')}</button>
                 <button
                   className="btn-wizard-primary"
                   onClick={handleColumnNext}
                   disabled={!selectedColumn}
                 >
-                  Siguiente →
+                  {t('common:next')}
                 </button>
               </div>
             </div>
@@ -422,7 +436,7 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
           {/* PASO 4: KPI DESTINO */}
           {step === 'kpi' && (
             <div className="wizard-step">
-              <h3>¿A qué KPI van los datos?</h3>
+              <h3>{t('config:sheets_wizard.steps.kpi_title')}</h3>
 
               {/* Tabs de tipo */}
               <div className="kpi-type-tabs">
@@ -431,25 +445,25 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
                   onClick={() => { setKpiTab('assignment'); setSelectedKpi(null); setSelectedKpis([]); setKpiSearch('') }}
                 >
                   <span className="kpi-type-tab-icon">👤</span>
-                  <span className="kpi-type-tab-label">KPI individual</span>
+                  <span className="kpi-type-tab-label">{t('config:sheets_wizard.kpi_tabs.assignment')}</span>
                 </button>
                 <button
                   className={`kpi-type-tab ${kpiTab === 'scope_kpi' ? 'active' : ''}`}
                   onClick={() => { setKpiTab('scope_kpi'); setSelectedKpi(null); setSelectedKpis([]); setKpiSearch('') }}
                 >
                   <span className="kpi-type-tab-icon">🏢</span>
-                  <span className="kpi-type-tab-label">KPI de área o equipo</span>
+                  <span className="kpi-type-tab-label">{t('config:sheets_wizard.kpi_tabs.scope_kpi')}</span>
                 </button>
               </div>
 
               {/* Descripción contextual */}
               <div className="kpi-type-hint">
                 {kpiTab === 'scope_kpi' ? (
-                  <p>Los datos van al <strong>KPI consolidado del área o equipo</strong>. Usalo cuando una sola planilla tiene el dato agregado de todo el grupo.</p>
+                  <p>{t('config:sheets_wizard.hints.scope_destination')}</p>
                 ) : isBulkMode ? (
-                  <p>Seleccioná los colaboradores a conectar. El sistema va a filtrar la fila de cada uno por la columna <strong>{agentColumn}</strong>. Podés editar el nombre si no coincide exactamente con la planilla.</p>
+                  <p>{t('config:sheets_wizard.hints.bulk_destination', { column: agentColumn })}</p>
                 ) : (
-                  <p>Los datos van a <strong>una persona específica</strong>. Usalo cuando la planilla tiene un único valor.</p>
+                  <p>{t('config:sheets_wizard.hints.single_destination')}</p>
                 )}
               </div>
 
@@ -459,14 +473,14 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
                   <input
                     className="wizard-input"
                     type="search"
-                    placeholder="Buscar por colaborador o KPI…"
+                    placeholder={t('config:sheets_wizard.placeholders.search_assignment')}
                     value={kpiSearch}
                     onChange={(e) => setKpiSearch(e.target.value)}
                     autoFocus
                   />
                   <div className="kpi-list">
                     {filteredKpis.length === 0 && (
-                      <p className="step-hint">No se encontraron KPIs con ese nombre.</p>
+                      <p className="step-hint">{t('config:sheets_wizard.hints.empty_search')}</p>
                     )}
                     {filteredKpis.map((opt) => {
                       const isChecked = selectedKpis.some((k) => k.id === opt.id)
@@ -481,7 +495,7 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
                             checked={isChecked}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                const rawName = opt.label.split(' — ')[0]
+                                const rawName = opt.label.split(' - ')[0]
                                 setSelectedKpis((prev) => [...prev, { id: opt.id, label: opt.label, agentValue: rawName }])
                               } else {
                                 setSelectedKpis((prev) => prev.filter((k) => k.id !== opt.id))
@@ -494,7 +508,7 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
                               <input
                                 className="wizard-input agent-value-input"
                                 type="text"
-                                placeholder="Nombre exacto en la planilla"
+                                placeholder={t('config:sheets_wizard.placeholders.agent_name')}
                                 value={entry?.agentValue || ''}
                                 onChange={(e) => setSelectedKpis((prev) =>
                                   prev.map((k) => k.id === opt.id ? { ...k, agentValue: e.target.value } : k)
@@ -509,7 +523,7 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
                   </div>
                   {selectedKpis.length > 0 && (
                     <p className="agent-col-hint">
-                      {selectedKpis.length} colaborador{selectedKpis.length !== 1 ? 'es' : ''} seleccionado{selectedKpis.length !== 1 ? 's' : ''} — se van a crear {selectedKpis.length} integración{selectedKpis.length !== 1 ? 'es' : ''}.
+                      {t('config:sheets_wizard.bulk_selection', { count: selectedKpis.length })}
                     </p>
                   )}
                 </>
@@ -519,14 +533,16 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
                   <input
                     className="wizard-input"
                     type="search"
-                    placeholder={kpiTab === 'assignment' ? 'Buscar por colaborador o KPI…' : 'Buscar por área o nombre del KPI…'}
+                    placeholder={kpiTab === 'assignment'
+                      ? t('config:sheets_wizard.placeholders.search_assignment')
+                      : t('config:sheets_wizard.placeholders.search_scope')}
                     value={kpiSearch}
                     onChange={(e) => setKpiSearch(e.target.value)}
                     autoFocus
                   />
                   <div className="kpi-list">
                     {filteredKpis.length === 0 && (
-                      <p className="step-hint">No se encontraron KPIs con ese nombre.</p>
+                      <p className="step-hint">{t('config:sheets_wizard.hints.empty_search')}</p>
                     )}
                     {filteredKpis.map((opt) => (
                       <button
@@ -542,13 +558,13 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
               )}
 
               <div className="wizard-actions">
-                <button className="btn-wizard-secondary" onClick={() => setStep('column')}>← Atrás</button>
+                <button className="btn-wizard-secondary" onClick={() => setStep('column')}>{t('common:back')}</button>
                 <button
                   className="btn-wizard-primary"
                   onClick={handleKpiNext}
                   disabled={isBulkMode ? selectedKpis.length === 0 : !selectedKpi}
                 >
-                  Siguiente →
+                  {t('common:next')}
                 </button>
               </div>
             </div>
@@ -557,48 +573,48 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
           {/* PASO 5: FRECUENCIA + NOMBRE */}
           {step === 'schedule' && (
             <div className="wizard-step">
-              <h3>¿Cada cuánto se sincroniza?</h3>
+              <h3>{t('config:sheets_wizard.steps.schedule_title')}</h3>
               <p className="step-hint">
-                La app va a leer automáticamente la planilla con esa frecuencia y actualizar el KPI.
+                {t('config:sheets_wizard.steps.schedule_hint')}
               </p>
               <div className="schedule-grid">
                 {SCHEDULE_OPTIONS.map((opt) => (
                   <button
-                    key={opt.value}
+                    key={opt.labelKey}
                     className={`schedule-option ${schedule === opt.value ? 'selected' : ''}`}
                     onClick={() => setSchedule(opt.value)}
                   >
-                    {opt.label}
+                    {t(opt.labelKey)}
                   </button>
                 ))}
               </div>
-              <label className="field-label" style={{ marginTop: 20 }}>Nombre de esta integración</label>
+              <label className="field-label" style={{ marginTop: 20 }}>{t('config:sheets_wizard.fields.integration_name')}</label>
               <input
                 className="wizard-input"
                 type="text"
-                placeholder={`Google Sheets — ${selectedTab}`}
+                placeholder={defaultWizardName(selectedTab)}
                 value={wizardName}
                 onChange={(e) => setWizardName(e.target.value)}
               />
               <div className="wizard-summary">
-                <p><strong>Planilla:</strong> {sheetUrl.slice(0, 60)}{sheetUrl.length > 60 ? '…' : ''}</p>
-                <p><strong>Pestaña:</strong> {selectedTab}</p>
-                <p><strong>Columna:</strong> {selectedColumn}</p>
+                <p><strong>{t('config:sheets_wizard.summary.sheet')}</strong> {sheetUrl.slice(0, 60)}{sheetUrl.length > 60 ? '…' : ''}</p>
+                <p><strong>{t('config:sheets_wizard.summary.tab')}</strong> {selectedTab}</p>
+                <p><strong>{t('config:sheets_wizard.summary.column')}</strong> {selectedColumn}</p>
                 {isBulkMode ? (
-                  <p><strong>Colaboradores:</strong> {selectedKpis.map((k) => k.agentValue).join(', ')}</p>
+                  <p><strong>{t('config:sheets_wizard.summary.collaborators')}</strong> {selectedKpis.map((k) => k.agentValue).join(', ')}</p>
                 ) : (
-                  <p><strong>KPI destino:</strong> {selectedKpi?.label}</p>
+                  <p><strong>{t('config:sheets_wizard.summary.destination_kpi')}</strong> {selectedKpi?.label}</p>
                 )}
               </div>
               {error && <div className="sheets-wizard-error">{error}</div>}
               <div className="wizard-actions">
-                <button className="btn-wizard-secondary" onClick={() => setStep('kpi')}>← Atrás</button>
+                <button className="btn-wizard-secondary" onClick={() => setStep('kpi')}>{t('common:back')}</button>
                 <button
                   className="btn-wizard-primary"
                   onClick={handleCreate}
                   disabled={wizardMutation.isLoading}
                 >
-                  {wizardMutation.isLoading ? 'Creando integración…' : '✓ Crear integración'}
+                  {wizardMutation.isLoading ? t('config:sheets_wizard.actions.creating') : t('config:sheets_wizard.actions.create')}
                 </button>
               </div>
             </div>
@@ -608,28 +624,27 @@ export default function SheetsWizard({ onClose, onSuccess }: SheetsWizardProps) 
           {step === 'done' && (
             <div className="wizard-step wizard-done">
               <div className="done-icon">✅</div>
-              <h3>{isBulkMode ? `¡${selectedKpis.length} integraciones creadas!` : '¡Integración creada!'}</h3>
+              <h3>{t('config:sheets_wizard.steps.done_title', { count: isBulkMode ? selectedKpis.length : 1 })}</h3>
               <p>
                 {isBulkMode
-                  ? <>Tu planilla <strong>{selectedTab}</strong> quedó conectada a <strong>{selectedKpis.length} colaboradores</strong> filtrando por la columna <strong>{agentColumn}</strong>.</>
-                  : <>Tu planilla <strong>{selectedTab}</strong> ya está conectada al KPI <strong>{selectedKpi?.label}</strong>.</>
+                  ? t('config:sheets_wizard.done.bulk_message', { tab: selectedTab, count: selectedKpis.length, column: agentColumn })
+                  : t('config:sheets_wizard.done.single_message', { tab: selectedTab, kpi: selectedKpi?.label || '-' })
                 }
               </p>
               <p className="step-hint">
-                La próxima sincronización automática ocurrirá según el horario configurado.
-                También podés ejecutarla manualmente desde la sección de Integraciones.
+                {t('config:sheets_wizard.hints.next_sync')} {t('config:sheets_wizard.hints.manual_run')}
               </p>
               {createdResult && (
                 <div className="done-ids">
-                  <span>Template #{createdResult.templateId}</span>
+                  <span>{t('config:sheets_wizard.done.template_id', { id: createdResult.templateId })}</span>
                   {createdResult.targetIds
-                    ? <span>{createdResult.targetIds.length} targets creados</span>
-                    : <span>Target #{createdResult.targetId}</span>
+                    ? <span>{t('config:sheets_wizard.done.targets_created', { count: createdResult.targetIds.length })}</span>
+                    : <span>{t('config:sheets_wizard.done.target_id', { id: createdResult.targetId })}</span>
                   }
                 </div>
               )}
               <div className="wizard-actions">
-                <button className="btn-wizard-primary" onClick={onSuccess}>Listo</button>
+                <button className="btn-wizard-primary" onClick={onSuccess}>{t('config:sheets_wizard.actions.done')}</button>
               </div>
             </div>
           )}

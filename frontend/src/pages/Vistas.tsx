@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../hooks/useAuth'
 import VistasAgregadas from './VistasAgregadas'
 import VistasReduccion from './VistasReduccion'
@@ -6,6 +7,7 @@ import ParrillaGeneral from './ParrillaGeneral'
 import './Vistas.css'
 
 export default function Vistas() {
+  const { t } = useTranslation('views')
   const { user } = useAuth()
   const hasSuperpowers = Boolean(user?.hasSuperpowers)
   const [activeTab, setActiveTab] = useState<'agregadas' | 'reduccion' | 'parrilla'>('agregadas')
@@ -14,11 +16,11 @@ export default function Vistas() {
     <div className="vistas-page">
       <div className="page-header">
         <div>
-          <h1>Vistas</h1>
+          <h1>{t('title')}</h1>
           <p className="subtitle">
             {hasSuperpowers
-              ? 'Equipo y compañía en un solo lugar.'
-              : 'Vista general de tu equipo.'}
+              ? t('subtitle_superpowers')
+              : t('subtitle_team')}
           </p>
         </div>
       </div>
@@ -27,20 +29,20 @@ export default function Vistas() {
           className={`tab-button ${activeTab === 'agregadas' ? 'active' : ''}`}
           onClick={() => setActiveTab('agregadas')}
         >
-          Equipo · Agregadas
+          {t('tabs.aggregated')}
         </button>
         <button
           className={`tab-button ${activeTab === 'reduccion' ? 'active' : ''}`}
           onClick={() => setActiveTab('reduccion')}
         >
-          Equipo · Reducción
+          {t('tabs.reduction')}
         </button>
         {hasSuperpowers && (
           <button
             className={`tab-button ${activeTab === 'parrilla' ? 'active' : ''}`}
             onClick={() => setActiveTab('parrilla')}
           >
-            Compañía · Parrilla
+            {t('tabs.company_grid')}
           </button>
         )}
       </div>

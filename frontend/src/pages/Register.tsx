@@ -1,11 +1,23 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
+import { resolveApiErrorMessage } from '../utils/apiErrors'
 import { selfRegisterEnabled } from '../config/runtime'
 import './Login.css'
 
+const REGISTER_API_ERROR_KEYS: Record<string, string> = {
+  AUTH_SELF_REGISTER_DISABLED: 'register.api_errors.self_register_disabled',
+  AUTH_REGISTER_ALL_FIELDS_REQUIRED: 'register.error_all_required',
+  AUTH_REGISTER_INVALID_EMAIL: 'register.api_errors.invalid_email',
+  AUTH_REGISTER_PASSWORD_TOO_SHORT: 'register.error_password_length',
+  AUTH_REGISTER_EMAIL_ALREADY_EXISTS: 'register.api_errors.email_exists',
+  AUTH_REGISTER_FAILED: 'register.error_default',
+}
+
 export default function Register() {
+  const { t } = useTranslation('auth')
   const [companyName, setCompanyName] = useState('')
   const [adminName, setAdminName] = useState('')
   const [email, setEmail] = useState('')
@@ -21,15 +33,15 @@ export default function Register() {
     setError(null)
 
     if (!companyName || !adminName || !email || !password || !confirmPassword) {
-      setError('Todos los campos son requeridos.')
+      setError(t('register.error_all_required'))
       return
     }
     if (password.length < 8) {
-      setError('La contraseña debe tener al menos 8 caracteres.')
+      setError(t('register.error_password_length'))
       return
     }
     if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden.')
+      setError(t('register.error_passwords_mismatch'))
       return
     }
 
@@ -38,7 +50,10 @@ export default function Register() {
       await api.post('/auth/register', { companyName, adminName, email, password })
       navigate('/')
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Error al crear la cuenta. Intentá más tarde.')
+      setError(resolveApiErrorMessage(err, t, {
+        codeMap: REGISTER_API_ERROR_KEYS,
+        fallbackKey: 'register.error_default',
+      }))
     } finally {
       setLoading(false)
     }
@@ -51,21 +66,21 @@ export default function Register() {
         <section className="login-panel" style={{ width: '100%' }}>
           <div className="login-card" style={{ transform: 'none', minHeight: 'auto' }}>
             <div className="login-header">
-              <h2>{selfRegisterEnabled ? 'Crear instancia' : 'Alta deshabilitada'}</h2>
+              <h2>{selfRegisterEnabled ? t('register.title_create') : t('register.title_disabled')}</h2>
               <p className="subtitle">
                 {selfRegisterEnabled ? (
                   <>
-                    ¿Ya tenés cuenta?{' '}
+                    {t('register.subtitle_has_account')}{' '}
                     <a href="/login" style={{ color: '#f97316', fontWeight: 600, textDecoration: 'none' }}>
-                      Ingresar →
+                      {t('register.subtitle_link_login')}
                     </a>
                   </>
                 ) : (
                   <>
-                    Esta instalación es single-tenant. El alta inicial se hace por despliegue o bootstrap del cliente.
+                    {t('register.subtitle_single_tenant')}
                     {' '}
                     <a href="/login" style={{ color: '#f97316', fontWeight: 600, textDecoration: 'none' }}>
-                      Volver al login →
+                      {t('register.subtitle_back_login')}
                     </a>
                   </>
                 )}
@@ -74,50 +89,50 @@ export default function Register() {
             {selfRegisterEnabled ? (
               <form onSubmit={handleSubmit} className="login-form">
                 <div className="field">
-                  <label htmlFor="companyName">Nombre de la empresa</label>
+                  <label htmlFor="companyName">{t('register.company_label')}</label>
                   <input
                     id="companyName"
                     type="text"
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
-                    placeholder="Ej: Acme S.A."
+                    placeholder={t('register.company_placeholder')}
                     autoComplete="organization"
                     required
                   />
                 </div>
                 <div className="field">
-                  <label htmlFor="adminName">Tu nombre completo</label>
+                  <label htmlFor="adminName">{t('register.admin_name_label')}</label>
                   <input
                     id="adminName"
                     type="text"
                     value={adminName}
                     onChange={(e) => setAdminName(e.target.value)}
-                    placeholder="Ej: Juan Pérez"
+                    placeholder={t('register.admin_name_placeholder')}
                     autoComplete="name"
                     required
                   />
                 </div>
                 <div className="field">
-                  <label htmlFor="email">Email</label>
+                  <label htmlFor="email">{t('register.email_label')}</label>
                   <input
                     id="email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="admin@empresa.com"
+                    placeholder={t('register.email_placeholder')}
                     autoComplete="email"
                     required
                   />
                 </div>
                 <div className="field">
-                  <label htmlFor="password">Contraseña</label>
+                  <label htmlFor="password">{t('register.password_label')}</label>
                   <div className="input-wrap">
                     <input
                       id="password"
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Mínimo 8 caracteres"
+                      placeholder={t('register.password_placeholder')}
                       autoComplete="new-password"
                       required
                     />
@@ -125,39 +140,36 @@ export default function Register() {
                       type="button"
                       className="toggle-visibility"
                       onClick={() => setShowPassword((prev) => !prev)}
-                      aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      aria-label={showPassword ? t('login.hide_password') : t('login.show_password')}
                     >
-                      {showPassword ? 'Ocultar' : 'Mostrar'}
+                      {showPassword ? t('login.hide_password') : t('login.show_password')}
                     </button>
                   </div>
                 </div>
                 <div className="field">
-                  <label htmlFor="confirmPassword">Confirmar contraseña</label>
+                  <label htmlFor="confirmPassword">{t('register.confirm_label')}</label>
                   <input
                     id="confirmPassword"
                     type={showPassword ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Repetí tu contraseña"
+                    placeholder={t('register.confirm_placeholder')}
                     autoComplete="new-password"
                     required
                   />
                 </div>
                 {error && <div className="login-error">{error}</div>}
                 <button type="submit" className="btn-primary" disabled={loading}>
-                  {loading ? 'Creando instancia...' : 'Crear instancia'}
+                  {loading ? t('register.submit_creating') : t('register.submit')}
                 </button>
               </form>
             ) : (
               <div className="login-form">
                 <div className="login-help" style={{ marginTop: 0 }}>
-                  <span>
-                    Esta URL corresponde a una única empresa. Si necesitás una instancia nueva o acceso inicial,
-                    hacelo por el flujo operativo de despliegue y bootstrap del cliente.
-                  </span>
+                  <span>{t('register.disabled_text')}</span>
                 </div>
                 <button type="button" className="btn-primary" onClick={() => navigate('/login')}>
-                  Ir al login
+                  {t('register.go_login')}
                 </button>
               </div>
             )}

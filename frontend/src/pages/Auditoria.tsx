@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useState } from 'react'
 import { useQuery } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import './Auditoria.css'
 
@@ -24,6 +25,7 @@ interface AuditLog {
 }
 
 export default function Auditoria() {
+  const { t } = useTranslation('audit')
   const [filters, setFilters] = useState({
     entityType: '',
     entityId: '',
@@ -65,35 +67,27 @@ export default function Auditoria() {
 
   const totalPages = Math.max(1, Math.ceil((auditData?.total || 0) / limit))
 
-  const actionConfig: Record<
-    string,
-    { label: string; class: string; critical?: boolean }
-  > = {
-    CREATE: { label: 'Crear', class: 'badge-success' },
-    UPDATE: { label: 'Actualizar', class: 'badge-info' },
-    DELETE: { label: 'Eliminar', class: 'badge-critical', critical: true },
-    CLOSE: { label: 'Cerrar', class: 'badge-critical', critical: true },
-    REOPEN: { label: 'Reabrir', class: 'badge-info' },
-    APPROVE: { label: 'Aprobar', class: 'badge-success' },
-    REJECT: { label: 'Rechazar', class: 'badge-warn' },
+  const actionConfig: Record<string, { class: string; critical?: boolean }> = {
+    CREATE: { class: 'badge-success' },
+    UPDATE: { class: 'badge-info' },
+    DELETE: { class: 'badge-critical', critical: true },
+    CLOSE: { class: 'badge-critical', critical: true },
+    REOPEN: { class: 'badge-info' },
+    APPROVE: { class: 'badge-success' },
+    REJECT: { class: 'badge-warn' },
   }
 
   const getActionBadge = (action: string) => {
-    const cfg = actionConfig[action] || { label: action, class: 'badge-info' }
-    return <span className={`badge-action ${cfg.class}`}>{cfg.label}</span>
+    const cfg = actionConfig[action] || { class: 'badge-info' }
+    return (
+      <span className={`badge-action ${cfg.class}`}>
+        {t(`actions.${action}`, { defaultValue: action })}
+      </span>
+    )
   }
 
-  const getEntityTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      collaborators: 'Colaboradores',
-      kpis: 'KPIs',
-      collaborator_kpis: 'Asignaciones',
-      periods: 'Períodos',
-      calendar_subperiods: 'Subperíodos',
-      objective_trees: 'Árbol de Objetivos',
-    }
-    return labels[type] || type
-  }
+  const getEntityTypeLabel = (type: string) =>
+    t(`entity_types.${type}`, { defaultValue: type })
 
   const formatChanges = (log: AuditLog) => {
     const changes = log.changes
@@ -117,14 +111,14 @@ export default function Auditoria() {
     <div className="auditoria-page">
       <div className="page-header">
         <div>
-          <h1>Auditoría</h1>
-          <p className="subtitle">Historial de cambios en el sistema</p>
+          <h1>{t('title')}</h1>
+          <p className="subtitle">{t('subtitle')}</p>
         </div>
       </div>
 
       <div className="filters-section">
         <div className="filter-group">
-          <label htmlFor="entity-type">Tipo de Entidad:</label>
+          <label htmlFor="entity-type">{t('filters.entity_type_label')}</label>
           <select
             id="entity-type"
             value={filters.entityType}
@@ -133,18 +127,18 @@ export default function Auditoria() {
               setPage(1)
             }}
           >
-            <option value="">Todos</option>
-            <option value="collaborators">Colaboradores</option>
-            <option value="kpis">KPIs</option>
-            <option value="collaborator_kpis">Asignaciones</option>
-            <option value="periods">Períodos</option>
-            <option value="calendar_subperiods">Subperíodos</option>
-            <option value="objective_trees">Árbol de Objetivos</option>
+            <option value="">{t('filters.entity_type_all')}</option>
+            <option value="collaborators">{t('entity_types.collaborators')}</option>
+            <option value="kpis">{t('entity_types.kpis')}</option>
+            <option value="collaborator_kpis">{t('entity_types.collaborator_kpis')}</option>
+            <option value="periods">{t('entity_types.periods')}</option>
+            <option value="calendar_subperiods">{t('entity_types.calendar_subperiods')}</option>
+            <option value="objective_trees">{t('entity_types.objective_trees')}</option>
           </select>
         </div>
 
         <div className="filter-group">
-          <label htmlFor="action">Acción:</label>
+          <label htmlFor="action">{t('filters.action_label')}</label>
           <select
             id="action"
             value={filters.action}
@@ -153,19 +147,19 @@ export default function Auditoria() {
               setPage(1)
             }}
           >
-            <option value="">Todas</option>
-            <option value="CREATE">Crear</option>
-            <option value="UPDATE">Actualizar</option>
-            <option value="DELETE">Eliminar</option>
-            <option value="CLOSE">Cerrar</option>
-            <option value="REOPEN">Reabrir</option>
-            <option value="APPROVE">Aprobar</option>
-            <option value="REJECT">Rechazar</option>
+            <option value="">{t('filters.action_all')}</option>
+            <option value="CREATE">{t('actions.CREATE')}</option>
+            <option value="UPDATE">{t('actions.UPDATE')}</option>
+            <option value="DELETE">{t('actions.DELETE')}</option>
+            <option value="CLOSE">{t('actions.CLOSE')}</option>
+            <option value="REOPEN">{t('actions.REOPEN')}</option>
+            <option value="APPROVE">{t('actions.APPROVE')}</option>
+            <option value="REJECT">{t('actions.REJECT')}</option>
           </select>
         </div>
 
         <div className="filter-group">
-          <label htmlFor="entity-id">ID de Entidad:</label>
+          <label htmlFor="entity-id">{t('filters.entity_id_label')}</label>
           <input
             type="number"
             id="entity-id"
@@ -174,12 +168,12 @@ export default function Auditoria() {
               setFilters({ ...filters, entityId: e.target.value })
               setPage(1)
             }}
-            placeholder="Ej: 123"
+            placeholder={t('filters.entity_id_placeholder')}
           />
         </div>
 
         <div className="filter-group">
-          <label htmlFor="user-id">Usuario ID:</label>
+          <label htmlFor="user-id">{t('filters.user_id_label')}</label>
           <input
             type="number"
             id="user-id"
@@ -188,12 +182,12 @@ export default function Auditoria() {
               setFilters({ ...filters, userId: e.target.value })
               setPage(1)
             }}
-            placeholder="Ej: 12"
+            placeholder={t('filters.user_id_placeholder')}
           />
         </div>
 
         <div className="filter-group">
-          <label htmlFor="success">Resultado:</label>
+          <label htmlFor="success">{t('filters.result_label')}</label>
           <select
             id="success"
             value={filters.success}
@@ -202,14 +196,14 @@ export default function Auditoria() {
               setPage(1)
             }}
           >
-            <option value="">Todos</option>
-            <option value="true">Éxito</option>
-            <option value="false">Error</option>
+            <option value="">{t('filters.result_all')}</option>
+            <option value="true">{t('result_success')}</option>
+            <option value="false">{t('result_error')}</option>
           </select>
         </div>
 
         <div className="filter-group">
-          <label htmlFor="kpi-id">KPI ID:</label>
+          <label htmlFor="kpi-id">{t('filters.kpi_id_label')}</label>
           <input
             type="number"
             id="kpi-id"
@@ -218,12 +212,12 @@ export default function Auditoria() {
               setFilters({ ...filters, kpiId: e.target.value })
               setPage(1)
             }}
-            placeholder="Ej: 28"
+            placeholder={t('filters.kpi_id_placeholder')}
           />
         </div>
 
         <div className="filter-group">
-          <label htmlFor="collab-id">Colaborador ID:</label>
+          <label htmlFor="collab-id">{t('filters.collab_id_label')}</label>
           <input
             type="number"
             id="collab-id"
@@ -232,12 +226,12 @@ export default function Auditoria() {
               setFilters({ ...filters, collaboratorId: e.target.value })
               setPage(1)
             }}
-            placeholder="Ej: 63"
+            placeholder={t('filters.collab_id_placeholder')}
           />
         </div>
 
         <div className="filter-group">
-          <label htmlFor="period-id">Período ID:</label>
+          <label htmlFor="period-id">{t('filters.period_id_label')}</label>
           <input
             type="number"
             id="period-id"
@@ -246,12 +240,12 @@ export default function Auditoria() {
               setFilters({ ...filters, periodId: e.target.value })
               setPage(1)
             }}
-            placeholder="Ej: 1"
+            placeholder={t('filters.period_id_placeholder')}
           />
         </div>
 
         <div className="filter-group">
-          <label htmlFor="start-date">Fecha Inicio:</label>
+          <label htmlFor="start-date">{t('filters.start_date_label')}</label>
           <input
             type="date"
             id="start-date"
@@ -264,7 +258,7 @@ export default function Auditoria() {
         </div>
 
         <div className="filter-group">
-          <label htmlFor="end-date">Fecha Fin:</label>
+          <label htmlFor="end-date">{t('filters.end_date_label')}</label>
           <input
             type="date"
             id="end-date"
@@ -277,7 +271,7 @@ export default function Auditoria() {
         </div>
 
         <div className="filter-group">
-          <label htmlFor="search">Buscar</label>
+          <label htmlFor="search">{t('filters.search_label')}</label>
           <input
             id="search"
             type="text"
@@ -286,7 +280,7 @@ export default function Auditoria() {
               setSearch(e.target.value)
               setPage(1)
             }}
-            placeholder="Usuario, KPI, comentario..."
+            placeholder={t('filters.search_placeholder')}
           />
         </div>
 
@@ -310,33 +304,33 @@ export default function Auditoria() {
               setPage(1)
             }}
           >
-            Limpiar Filtros
+            {t('filters.clear_btn')}
           </button>
         </div>
       </div>
 
       <div className="table-section">
         {isLoading ? (
-          <div className="loading">Cargando logs de auditoría...</div>
+          <div className="loading">{t('loading')}</div>
         ) : filteredLogs.length > 0 ? (
           <>
             <div className="table-info">
-              Mostrando {filteredLogs.length} de {auditData?.total || 0} registros
+              {t('showing', { shown: filteredLogs.length, total: auditData?.total || 0 })}
             </div>
             <div className="table-container">
               <table className="audit-table">
                 <thead>
                   <tr>
-                    <th>Fecha</th>
-                    <th>Usuario</th>
-                    <th>Acción</th>
-                    <th>Entidad</th>
-                    <th>ID</th>
-                    <th>Resultado</th>
-                    <th>Duración</th>
-                    <th>IP</th>
-                    <th>UA</th>
-                    <th>Cambios</th>
+                    <th>{t('table.date')}</th>
+                    <th>{t('table.user')}</th>
+                    <th>{t('table.action')}</th>
+                    <th>{t('table.entity')}</th>
+                    <th>{t('table.id')}</th>
+                    <th>{t('table.result')}</th>
+                    <th>{t('table.duration')}</th>
+                    <th>{t('table.ip')}</th>
+                    <th>{t('table.ua')}</th>
+                    <th>{t('table.changes')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -346,12 +340,12 @@ export default function Auditoria() {
                       <tr key={log.id}>
                         <td className="date-cell">{new Date(log.createdAt).toLocaleString()}</td>
                         <td>
-                          <div>{log.userName || `User #${log.userId ?? '-'}`}</div>
+                          <div>{log.userName || t('user_fallback', { id: log.userId ?? '-' })}</div>
                           <div className="text-muted">#{log.userId ?? '-'}</div>
                         </td>
                         <td>
                           {getActionBadge(log.action)}
-                          {isCritical && <span className="pill">Crítico</span>}
+                          {isCritical && <span className="pill">{t('critical_badge')}</span>}
                         </td>
                         <td>{getEntityTypeLabel(log.entityType)}</td>
                         <td>{log.entityId}</td>
@@ -359,12 +353,12 @@ export default function Auditoria() {
                           {log.success === undefined ? (
                             '-'
                           ) : log.success ? (
-                            <span className="badge-action badge-success">Éxito</span>
+                            <span className="badge-action badge-success">{t('result_success')}</span>
                           ) : (
-                            <span className="badge-action badge-critical">Error</span>
+                            <span className="badge-action badge-critical">{t('result_error')}</span>
                           )}
                         </td>
-                        <td>{log.durationMs ? `${log.durationMs} ms` : '-'}</td>
+                        <td>{log.durationMs ? t('duration_ms', { value: log.durationMs }) : '-'}</td>
                         <td className="ip-cell">{log.ipAddress || '-'}</td>
                         <td className="text-muted">{log.userAgent ? log.userAgent.slice(0, 25) + '…' : '-'}</td>
                         <td className="changes-cell">{formatChanges(log) || <span className="text-muted">-</span>}</td>
@@ -381,25 +375,25 @@ export default function Auditoria() {
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
               >
-                Anterior
+                {t('pagination.prev')}
               </button>
               <span className="page-info">
-                Página {page} de {totalPages}
+                {t('pagination.page_of', { page, total: totalPages })}
               </span>
               <button
                 className="btn-pagination"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
               >
-                Siguiente
+                {t('pagination.next')}
               </button>
             </div>
           </>
         ) : (
           <div className="empty-state">
             <div className="empty-icon">:(</div>
-            <h3>Sin registros</h3>
-            <p>Prueba ajustando los filtros</p>
+            <h3>{t('empty_title')}</h3>
+            <p>{t('empty_subtitle')}</p>
           </div>
         )}
       </div>

@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from 'react-query'
+import { useTranslation } from 'react-i18next'
+import i18n from '../i18n'
 import api from '../services/api'
 import { useAuth } from '../hooks/useAuth'
 import { Period, ScopeKPI, SubPeriod } from '../types'
@@ -84,8 +86,25 @@ type ExecutiveTrendsResponse = {
   subPeriodSeries: ExecutiveTrendPoint[]
 }
 
+const currentLocale = () => ((i18n.resolvedLanguage || i18n.language || 'es').startsWith('en') ? 'en-US' : 'es-AR')
+
 const formatNumber = (value?: number | null, digits = 2) =>
-  value == null ? '-' : new Intl.NumberFormat('es-AR', { maximumFractionDigits: digits }).format(value)
+  value == null ? '-' : new Intl.NumberFormat(currentLocale(), { maximumFractionDigits: digits }).format(value)
+
+const getScopeTypeLabel = (scopeType?: string | null) =>
+  scopeType
+    ? i18n.t(`executive:labels.scope_types.${scopeType}`, { defaultValue: scopeType.replace(/_/g, ' ') })
+    : '-'
+
+const getSourceModeLabel = (sourceMode?: string | null) =>
+  sourceMode
+    ? i18n.t(`executive:labels.source_modes.${sourceMode}`, { defaultValue: sourceMode })
+    : '-'
+
+const getRoleLabel = (role?: string | null) =>
+  role
+    ? i18n.t(`executive:labels.roles.${role}`, { defaultValue: role })
+    : i18n.t('executive:tablero.user_fallback_role')
 
 const uniqueStrings = (values: string[]) => Array.from(new Set(values.filter(Boolean)))
 
@@ -137,13 +156,6 @@ const projectionRiskClass = (value: number | null): string => {
   if (value >= 100) return 'projection-ok'
   if (value >= 80) return 'projection-warning'
   return 'projection-danger'
-}
-
-const projectionRiskLabel = (value: number | null): string => {
-  if (value == null) return 'Sin datos'
-  if (value >= 100) return 'En track'
-  if (value >= 80) return 'Atención'
-  return 'En riesgo'
 }
 
 const sortScopeKpis = (scopeKpis: ScopeKPI[]) =>
@@ -218,57 +230,60 @@ const ExecutiveKpiCard = ({
 }: {
   scopeKpi: ScopeKPI
   onOpenDetail: (scopeKpi: ScopeKPI) => void
-}) => (
-  <article className="executive-kpi-card">
-    <div className="executive-kpi-header">
-      <div>
-        <h4>{scopeKpi.name}</h4>
-        <p>
-          {scopeKpi.kpiName || 'KPI'} · {scopeKpi.sourceMode}
-        </p>
+}) => {
+  const { t } = useTranslation('executive')
+  return (
+    <article className="executive-kpi-card">
+      <div className="executive-kpi-header">
+        <div>
+          <h4>{scopeKpi.name}</h4>
+          <p>
+            {scopeKpi.kpiName || t('labels.kpi_fallback')} · {getSourceModeLabel(scopeKpi.sourceMode)}
+          </p>
+        </div>
+        <div className="executive-kpi-header-right">
+          <span className={`executive-semaphore-badge ${semaphoreClass(scopeKpi.variation)}`}>{formatNumber(scopeKpi.variation, 1)}%</span>
+          <button type="button" className="link-button" onClick={() => onOpenDetail(scopeKpi)}>
+            {t('kpi_card.detail_btn')}
+          </button>
+        </div>
       </div>
-      <div className="executive-kpi-header-right">
-        <span className={`executive-semaphore-badge ${semaphoreClass(scopeKpi.variation)}`}>{formatNumber(scopeKpi.variation, 1)}%</span>
-        <button type="button" className="link-button" onClick={() => onOpenDetail(scopeKpi)}>
-          Ver detalle
-        </button>
+      <div className="executive-kpi-metrics">
+        <div>
+          <span>{t('kpi_card.actual_label')}</span>
+          <strong>{formatNumber(scopeKpi.actual)}</strong>
+        </div>
+        <div>
+          <span>{t('kpi_card.target_label')}</span>
+          <strong>{formatNumber(scopeKpi.target)}</strong>
+        </div>
+        <div>
+          <span>{t('kpi_card.result_label')}</span>
+          <strong>{formatNumber(scopeKpi.weightedResult)}</strong>
+        </div>
       </div>
-    </div>
-    <div className="executive-kpi-metrics">
-      <div>
-        <span>Actual</span>
-        <strong>{formatNumber(scopeKpi.actual)}</strong>
-      </div>
-      <div>
-        <span>Target</span>
-        <strong>{formatNumber(scopeKpi.target)}</strong>
-      </div>
-      <div>
-        <span>Resultado</span>
-        <strong>{formatNumber(scopeKpi.weightedResult)}</strong>
-      </div>
-    </div>
-    {scopeKpi.objectiveNames?.length ? (
-      <div className="executive-tag-row">
-        {scopeKpi.objectiveNames.slice(0, 3).map((objective) => (
-          <span key={`scope-kpi-objective-${scopeKpi.id}-${objective}`} className="executive-tag">
-            {objective}
+      {scopeKpi.objectiveNames?.length ? (
+        <div className="executive-tag-row">
+          {scopeKpi.objectiveNames.slice(0, 3).map((objective) => (
+            <span key={`scope-kpi-objective-${scopeKpi.id}-${objective}`} className="executive-tag">
+              {objective}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {scopeKpi.sourceMode === 'mixed' ? (
+        <div className="executive-kpi-mix">
+          <span>
+            {scopeKpi.mixedConfig?.directLabel || t('kpi_card.direct_fallback')}: {formatNumber(scopeKpi.directActual)}
           </span>
-        ))}
-      </div>
-    ) : null}
-    {scopeKpi.sourceMode === 'mixed' ? (
-      <div className="executive-kpi-mix">
-        <span>
-          {scopeKpi.mixedConfig?.directLabel || 'Directo'}: {formatNumber(scopeKpi.directActual)}
-        </span>
-        <span>
-          {scopeKpi.mixedConfig?.aggregatedLabel || 'Agregado'}: {formatNumber(scopeKpi.aggregatedActual)}
-        </span>
-      </div>
-    ) : null}
-  </article>
-)
+          <span>
+            {scopeKpi.mixedConfig?.aggregatedLabel || t('kpi_card.aggregated_fallback')}: {formatNumber(scopeKpi.aggregatedActual)}
+          </span>
+        </div>
+      ) : null}
+    </article>
+  )
+}
 
 const ExecutiveNodeCard = ({
   node,
@@ -283,6 +298,7 @@ const ExecutiveNodeCard = ({
   onSelect: () => void
   onOpenDetail: (scopeKpi: ScopeKPI) => void
 }) => {
+  const { t } = useTranslation('executive')
   const rollup = useMemo(() => buildNodeRollup(node, objectiveFilter), [node, objectiveFilter])
   const topKpis = rollup.ownScopeKpis.slice(0, 3)
 
@@ -292,7 +308,7 @@ const ExecutiveNodeCard = ({
         <div>
           <h3>{node.scope.name}</h3>
           <p>
-            {node.scope.type} · {rollup.allScopeKpis.length} KPIs visibles
+            {getScopeTypeLabel(node.scope.type)} · {t('node_card.kpis_visible', { count: rollup.allScopeKpis.length })}
           </p>
         </div>
         <span className={`executive-node-badge ${semaphoreClass(rollup.averageVariation)}`}>{formatNumber(rollup.averageVariation, 1)}%</span>
@@ -300,15 +316,15 @@ const ExecutiveNodeCard = ({
 
       <div className="executive-node-stats">
         <div>
-          <span>Resultado</span>
+          <span>{t('node_card.result_label')}</span>
           <strong>{formatNumber(rollup.weightedResultTotal)}</strong>
         </div>
         <div>
-          <span>Propios</span>
+          <span>{t('node_card.own_label')}</span>
           <strong>{rollup.ownScopeKpis.length}</strong>
         </div>
         <div>
-          <span>Desc.</span>
+          <span>{t('node_card.desc_label')}</span>
           <strong>{rollup.descendantScopeKpis.length}</strong>
         </div>
       </div>
@@ -341,7 +357,7 @@ const ExecutiveNodeCard = ({
           ))}
         </div>
       ) : (
-        <div className="executive-empty compact">Sin KPIs Grupales propios bajo este lente.</div>
+        <div className="executive-empty compact">{t('node_card.no_own_kpis')}</div>
       )}
     </article>
   )
@@ -360,6 +376,7 @@ const ExecutiveTrendCard = ({
   getLabel: (point: ExecutiveTrendPoint) => string
   isCurrent?: (point: ExecutiveTrendPoint) => boolean
 }) => {
+  const { t } = useTranslation('executive')
   const maxWeightedResult = Math.max(...points.map((point) => Math.max(point.weightedResultTotal, 0)), 0)
 
   return (
@@ -379,22 +396,22 @@ const ExecutiveTrendCard = ({
               >
                 <div className="executive-trend-heading">
                   <strong>{getLabel(point)}</strong>
-                  <span>{point.totalScopeKpis} KPIs</span>
+                  <span>{t('trend_card.kpis_count', { count: point.totalScopeKpis })}</span>
                 </div>
                 <div className="executive-trend-bar">
                   <div className="executive-trend-fill" style={{ width }} />
                 </div>
                 <div className="executive-trend-metrics">
-                  <span>Resultado {formatNumber(point.weightedResultTotal)}</span>
-                  <span>Cobertura {formatNumber(point.completionRate, 0)}%</span>
-                  <span className={semaphoreClass(point.averageVariation)}>Variación {formatNumber(point.averageVariation, 1)}%</span>
+                  <span>{t('trend_card.result_label', { value: formatNumber(point.weightedResultTotal) })}</span>
+                  <span>{t('trend_card.coverage_label', { value: formatNumber(point.completionRate, 0) })}</span>
+                  <span className={semaphoreClass(point.averageVariation)}>{t('trend_card.variation_label', { value: formatNumber(point.averageVariation, 1) })}</span>
                 </div>
               </div>
             )
           })}
         </div>
       ) : (
-        <div className="executive-empty compact">No hay puntos para construir esta tendencia.</div>
+        <div className="executive-empty compact">{t('trend_card.empty')}</div>
       )}
     </article>
   )
@@ -406,6 +423,7 @@ const PeriodComparePanel = ({
   periodSeries: ExecutiveTrendPoint[]
   currentPeriodId?: number | null
 }) => {
+  const { t } = useTranslation('executive')
   const slice = periodSeries.slice(-3)
   if (slice.length < 2) return null
 
@@ -414,16 +432,16 @@ const PeriodComparePanel = ({
   const twoBack = slice.length >= 3 ? slice[slice.length - 3] : null
 
   const compareCols = [
-    twoBack ? { point: twoBack, label: twoBack.periodName || 'Período -2', isCurrent: false } : null,
-    previous ? { point: previous, label: previous.periodName || 'Período anterior', isCurrent: false } : null,
-    { point: current, label: current.periodName || 'Período actual', isCurrent: true },
+    twoBack ? { point: twoBack, label: twoBack.periodName || t('compare.period_minus_2'), isCurrent: false } : null,
+    previous ? { point: previous, label: previous.periodName || t('compare.period_previous'), isCurrent: false } : null,
+    { point: current, label: current.periodName || t('compare.period_current'), isCurrent: true },
   ].filter(Boolean) as Array<{ point: ExecutiveTrendPoint; label: string; isCurrent: boolean }>
 
   return (
     <article className="executive-compare-panel">
       <div className="executive-section-header">
-        <h3>Comparativa entre períodos</h3>
-        <span>Evolución de variación y resultado — últimos {slice.length} períodos</span>
+        <h3>{t('compare.title')}</h3>
+        <span>{t('compare.subtitle', { count: slice.length })}</span>
       </div>
       <div className="executive-compare-grid">
         {compareCols.map(({ point, label, isCurrent }, i) => {
@@ -434,24 +452,24 @@ const PeriodComparePanel = ({
             <div key={`compare-${point.periodId || i}`} className={`executive-compare-col${isCurrent ? ' current' : ''}${i === 0 && !isCurrent ? ' older' : ''}`}>
               <div className="executive-compare-label">
                 {label}
-                {isCurrent && <span className="executive-compare-badge">Actual</span>}
+                {isCurrent && <span className="executive-compare-badge">{t('compare.current_badge')}</span>}
               </div>
               <div className={`executive-compare-value ${semaphoreClass(point.averageVariation)}`}>
                 {formatNumber(point.averageVariation, 1)}%
               </div>
               <div className="executive-compare-sub">
-                <span>Resultado: <strong>{formatNumber(point.weightedResultTotal)}</strong></span>
-                <span>KPIs: <strong>{point.totalScopeKpis}</strong></span>
-                <span>Cobertura: <strong>{formatNumber(point.completionRate, 0)}%</strong></span>
+                <span>{t('compare.result_label')} <strong>{formatNumber(point.weightedResultTotal)}</strong></span>
+                <span>{t('compare.kpis_label')} <strong>{point.totalScopeKpis}</strong></span>
+                <span>{t('compare.coverage_label')} <strong>{formatNumber(point.completionRate, 0)}%</strong></span>
               </div>
               {delta != null && (
                 <div className={`executive-compare-delta ${deltaClass(delta)}`}>
-                  {deltaArrow(delta)} {formatNumber(Math.abs(delta), 1)}% variación vs anterior
+                  {t('compare.delta_variation', { arrow: deltaArrow(delta), value: formatNumber(Math.abs(delta), 1) })}
                 </div>
               )}
               {deltaResult != null && (
                 <div className={`executive-compare-delta small ${deltaClass(deltaResult)}`}>
-                  {deltaArrow(deltaResult)} {formatNumber(Math.abs(deltaResult), 1)}% resultado vs anterior
+                  {t('compare.delta_result', { arrow: deltaArrow(deltaResult), value: formatNumber(Math.abs(deltaResult), 1) })}
                 </div>
               )}
             </div>
@@ -469,6 +487,15 @@ const ProjectionPanel = ({
   subPeriodSeries: ExecutiveTrendPoint[]
   currentSubPeriodId: number | null
 }) => {
+  const { t } = useTranslation('executive')
+
+  const getRiskLabel = (value: number | null): string => {
+    if (value == null) return t('risk.no_data')
+    if (value >= 100) return t('risk.on_track')
+    if (value >= 80) return t('risk.warning')
+    return t('risk.at_risk')
+  }
+
   const dataPoints = subPeriodSeries.filter((p) => p.totalScopeKpis > 0)
   const completedValues = dataPoints
     .map((p) => toFinite(p.averageVariation))
@@ -482,21 +509,24 @@ const ProjectionPanel = ({
 
   const projected = linearProject(completedValues, totalSubPeriods - 1)
   const riskCls = projectionRiskClass(projected)
-  const riskLbl = projectionRiskLabel(projected)
+  const riskLbl = getRiskLabel(projected)
   const trend = (completedValues[completedValues.length - 1] - completedValues[0]) / (completedValues.length - 1)
 
   return (
     <article className={`executive-projection-panel ${riskCls}`}>
       <div className="executive-projection-header">
         <div>
-          <h3>Proyección al cierre</h3>
+          <h3>{t('projection.title')}</h3>
           <p>
-            {completedCount} de {totalSubPeriods} subperíodos completados ·
-            Tendencia {trend >= 0 ? '+' : ''}{formatNumber(trend, 1)}% por subperíodo
+            {t('projection.subtitle', {
+              completed: completedCount,
+              total: totalSubPeriods,
+              trend: `${trend >= 0 ? '+' : ''}${formatNumber(trend, 1)}`,
+            })}
           </p>
         </div>
         <span className={`executive-projection-badge ${riskCls}`}>
-          {riskLbl} — cierre estimado: {formatNumber(projected, 0)}%
+          {t('projection.badge', { riskLabel: riskLbl, value: formatNumber(projected, 0) })}
         </span>
       </div>
       <div className="executive-projection-rows">
@@ -525,7 +555,7 @@ const ProjectionPanel = ({
               <span className="executive-projection-val">
                 {projectedValue != null ? `${formatNumber(projectedValue, 0)}%` : '-'}
               </span>
-              {!hasData && <span className="executive-projection-tag">proy.</span>}
+              {!hasData && <span className="executive-projection-tag">{t('projection.projected_tag')}</span>}
             </div>
           )
         })}
@@ -536,6 +566,7 @@ const ProjectionPanel = ({
 
 export default function TableroEjecutivo() {
   const { isCollaborator, user } = useAuth()
+  const { t } = useTranslation('executive')
   const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null)
   const [selectedSubPeriodId, setSelectedSubPeriodId] = useState<number | null>(null)
   const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null)
@@ -731,7 +762,7 @@ export default function TableroEjecutivo() {
   if (isCollaborator) {
     return (
       <div className="executive-dashboard">
-        <div className="executive-empty">Este tablero está disponible para liderazgo y administración.</div>
+        <div className="executive-empty">{t('tablero.restricted')}</div>
       </div>
     )
   }
@@ -740,14 +771,13 @@ export default function TableroEjecutivo() {
     <div className="executive-dashboard">
       <div className="executive-header">
         <div>
-          <h1>Tablero Ejecutivo</h1>
-          <p className="subtitle">
-            Vista real company → area → team con KPIs organizacionales, lentes por objetivo y navegación ejecutiva
-            sobre la misma capa de KPIs Grupales.
-          </p>
+          <h1>{t('tablero.title')}</h1>
+          <p className="subtitle">{t('tablero.subtitle')}</p>
         </div>
         <div className="executive-header-right">
-          <div className="executive-user-pill">{user?.name || 'Usuario'} · {user?.role || 'rol'}</div>
+          <div className="executive-user-pill">
+            {user?.name || t('tablero.user_fallback_name')} · {getRoleLabel(user?.role)}
+          </div>
           {selectedCompany && !isLoading && (
             <button
               className="btn-secondary executive-export-btn"
@@ -795,7 +825,7 @@ export default function TableroEjecutivo() {
                 })
               }}
             >
-              Exportar PDF
+              {t('tablero.export_btn')}
             </button>
           )}
         </div>
@@ -803,7 +833,7 @@ export default function TableroEjecutivo() {
 
       <div className="executive-filters">
         <label>
-          Periodo
+          {t('tablero.filter_period')}
           <select
             value={selectedPeriodId || ''}
             onChange={(e) => {
@@ -811,7 +841,7 @@ export default function TableroEjecutivo() {
               setSelectedSubPeriodId(null)
             }}
           >
-            <option value="">Auto</option>
+            <option value="">{t('tablero.filter_period_auto')}</option>
             {(periods || []).map((period) => (
               <option key={period.id} value={period.id}>
                 {period.name}
@@ -820,12 +850,12 @@ export default function TableroEjecutivo() {
           </select>
         </label>
         <label>
-          Subperiodo
+          {t('tablero.filter_subperiod')}
           <select
             value={selectedSubPeriodId || ''}
             onChange={(e) => setSelectedSubPeriodId(e.target.value ? Number(e.target.value) : null)}
           >
-            <option value="">Auto</option>
+            <option value="">{t('tablero.filter_period_auto')}</option>
             {(subPeriods || []).map((subPeriod) => (
               <option key={subPeriod.id} value={subPeriod.id}>
                 {subPeriod.name}
@@ -834,7 +864,7 @@ export default function TableroEjecutivo() {
           </select>
         </label>
         <label>
-          Company
+          {t('tablero.filter_company')}
           <select
             value={selectedCompanyId || ''}
             onChange={(e) => {
@@ -854,9 +884,9 @@ export default function TableroEjecutivo() {
       </div>
 
       {isLoading ? (
-        <div className="executive-empty">Cargando tablero ejecutivo...</div>
+        <div className="executive-empty">{t('tablero.loading')}</div>
       ) : !selectedCompany || !selectedCompanyRollup ? (
-        <div className="executive-empty">No hay datos ejecutivos para el período seleccionado.</div>
+        <div className="executive-empty">{t('tablero.no_data')}</div>
       ) : (
         <>
           <section className="executive-hero">
@@ -889,15 +919,15 @@ export default function TableroEjecutivo() {
               </div>
               <h2>{focusNode?.scope.name || selectedCompany.scope.name}</h2>
               <p>
-                Periodo: {executiveTree?.periodName || '-'}
-                {executiveTree?.subPeriodName ? ` · ${executiveTree.subPeriodName}` : ''}
-                {selectedObjective ? ` · Objetivo: ${selectedObjective}` : ''}
+                {t('tablero.period_info', { period: executiveTree?.periodName || '-' })}
+                {executiveTree?.subPeriodName ? t('tablero.period_subperiod', { subperiod: executiveTree.subPeriodName }) : ''}
+                {selectedObjective ? t('tablero.period_objective', { objective: selectedObjective }) : ''}
               </p>
 
               <div className="executive-lens-panel">
                 <div className="executive-lens-header">
-                  <h3>Lente estratégico</h3>
-                  <span>{selectedObjective ? 'Filtrado por un objetivo' : 'Vista transversal completa'}</span>
+                  <h3>{t('tablero.lens_title')}</h3>
+                  <span>{selectedObjective ? t('tablero.lens_filtered') : t('tablero.lens_all_view')}</span>
                 </div>
                 {companyObjectiveOptions.length ? (
                   <div className="executive-lens-chips">
@@ -906,7 +936,7 @@ export default function TableroEjecutivo() {
                       className={`executive-lens-chip ${selectedObjective === null ? 'active' : ''}`}
                       onClick={() => setSelectedObjective(null)}
                     >
-                      Todos
+                      {t('tablero.lens_all_btn')}
                     </button>
                     {companyObjectiveOptions.map((objective) => (
                       <button
@@ -923,34 +953,34 @@ export default function TableroEjecutivo() {
                     ))}
                   </div>
                 ) : (
-                  <div className="executive-empty compact">La compañía seleccionada todavía no tiene objetivos vinculados.</div>
+                  <div className="executive-empty compact">{t('tablero.lens_no_objectives')}</div>
                 )}
               </div>
             </div>
 
             <div className="executive-hero-stats">
               <div className="executive-hero-stat">
-                <span>Resultado total</span>
+                <span>{t('tablero.stat_total_result')}</span>
                 <strong>{formatNumber(selectedCompanyRollup.weightedResultTotal)}</strong>
               </div>
               <div className="executive-hero-stat">
-                <span>Variación media</span>
+                <span>{t('tablero.stat_avg_variation')}</span>
                 <strong>{formatNumber(selectedCompanyRollup.averageVariation, 1)}%</strong>
               </div>
               <div className="executive-hero-stat">
-                <span>KPIs visibles</span>
+                <span>{t('tablero.stat_visible_kpis')}</span>
                 <strong>{selectedCompanyRollup.allScopeKpis.length}</strong>
               </div>
               <div className="executive-hero-stat">
-                <span>Cobertura</span>
+                <span>{t('tablero.stat_coverage')}</span>
                 <strong>{formatNumber(selectedCompanyRollup.completionRate, 0)}%</strong>
               </div>
               <div className="executive-hero-stat">
-                <span>Áreas / BU</span>
+                <span>{t('tablero.stat_areas_bu')}</span>
                 <strong>{selectedCompanyRollup.areaCount + selectedCompanyRollup.businessUnitCount}</strong>
               </div>
               <div className="executive-hero-stat">
-                <span>Teams</span>
+                <span>{t('tablero.stat_teams')}</span>
                 <strong>{selectedCompanyRollup.teamCount}</strong>
               </div>
             </div>
@@ -959,8 +989,8 @@ export default function TableroEjecutivo() {
           {objectiveHighlights.length ? (
             <section className="executive-section">
               <div className="executive-section-header">
-                <h3>Objetivos con más impacto</h3>
-                <span>Lectura rápida para orientar el foco ejecutivo</span>
+                <h3>{t('tablero.objectives_title')}</h3>
+                <span>{t('tablero.objectives_subtitle')}</span>
               </div>
               <div className="executive-objective-grid">
                 {objectiveHighlights.map((objective) => (
@@ -976,7 +1006,7 @@ export default function TableroEjecutivo() {
                     <span className="executive-objective-label">{objective.objective}</span>
                     <strong>{formatNumber(objective.weightedResultTotal)}</strong>
                     <small>
-                      {objective.scopeKpiCount} KPIs · {objective.teamCount} teams
+                      {t('tablero.objectives_kpi_count', { count: objective.scopeKpiCount, teams: objective.teamCount })}
                     </small>
                   </button>
                 ))}
@@ -986,8 +1016,8 @@ export default function TableroEjecutivo() {
 
           <section className="executive-section">
             <div className="executive-section-header">
-              <h3>KPIs Company</h3>
-              <span>{filteredCompanyKpis.length} Scope KPIs propios bajo este lente</span>
+              <h3>{t('tablero.company_kpis_title')}</h3>
+              <span>{t('tablero.company_kpis_subtitle', { count: filteredCompanyKpis.length })}</span>
             </div>
             {filteredCompanyKpis.length ? (
               <div className="executive-kpi-grid">
@@ -996,19 +1026,19 @@ export default function TableroEjecutivo() {
                 ))}
               </div>
             ) : (
-              <div className="executive-empty">No hay KPIs company para este filtro.</div>
+              <div className="executive-empty">{t('tablero.company_kpis_empty')}</div>
             )}
           </section>
 
           <section className="executive-section">
             <div className="executive-section-header">
-              <h3>Navegación por niveles</h3>
-              <span>Seleccioná contexto y bajá de company a teams sin salir del tablero.</span>
+              <h3>{t('tablero.nav_title')}</h3>
+              <span>{t('tablero.nav_subtitle')}</span>
             </div>
             <div className="executive-level-grid">
               <div className="executive-level-column">
                 <div className="executive-side-card executive-level-card current">
-                  <h4>Company actual</h4>
+                  <h4>{t('tablero.nav_current_company')}</h4>
                   <button
                     type="button"
                     className="executive-level-item selected"
@@ -1021,16 +1051,16 @@ export default function TableroEjecutivo() {
                     <strong>{formatNumber(selectedCompanyRollup.weightedResultTotal)}</strong>
                   </button>
                   <div className="executive-level-meta">
-                    <span>{selectedCompanyRollup.ownScopeKpis.length} KPIs propios</span>
-                    <span>{selectedCompanyRollup.descendantScopeKpis.length} descendientes</span>
+                    <span>{t('tablero.nav_company_own_kpis', { count: selectedCompanyRollup.ownScopeKpis.length })}</span>
+                    <span>{t('tablero.nav_company_desc_kpis', { count: selectedCompanyRollup.descendantScopeKpis.length })}</span>
                   </div>
                 </div>
               </div>
 
               <div className="executive-level-column">
                 <div className="executive-level-header">
-                  <h4>Áreas / Business Units</h4>
-                  <span>{filteredAreaNodes.length} visibles</span>
+                  <h4>{t('tablero.nav_areas_title')}</h4>
+                  <span>{t('tablero.nav_areas_visible', { count: filteredAreaNodes.length })}</span>
                 </div>
                 {filteredAreaNodes.length ? (
                   <div className="executive-level-list">
@@ -1049,21 +1079,21 @@ export default function TableroEjecutivo() {
                           <span>{area.scope.name}</span>
                           <strong>{formatNumber(rollup.weightedResultTotal)}</strong>
                           <small>
-                            {rollup.ownScopeKpis.length} propios · {rollup.teamCount} teams
+                            {t('tablero.nav_areas_own', { own: rollup.ownScopeKpis.length, teams: rollup.teamCount })}
                           </small>
                         </button>
                       )
                     })}
                   </div>
                 ) : (
-                  <div className="executive-empty compact">No hay áreas bajo este filtro estratégico.</div>
+                  <div className="executive-empty compact">{t('tablero.nav_areas_empty')}</div>
                 )}
               </div>
 
               <div className="executive-level-column">
                 <div className="executive-level-header">
-                  <h4>Teams</h4>
-                  <span>{filteredTeamNodes.length} visibles</span>
+                  <h4>{t('tablero.nav_teams_title')}</h4>
+                  <span>{t('tablero.nav_teams_visible', { count: filteredTeamNodes.length })}</span>
                 </div>
                 {selectedArea ? (
                   filteredTeamNodes.length ? (
@@ -1079,16 +1109,16 @@ export default function TableroEjecutivo() {
                           >
                             <span>{team.scope.name}</span>
                             <strong>{formatNumber(rollup.weightedResultTotal)}</strong>
-                            <small>{rollup.ownScopeKpis.length} KPIs propios</small>
+                            <small>{t('tablero.nav_teams_own', { count: rollup.ownScopeKpis.length })}</small>
                           </button>
                         )
                       })}
                     </div>
                   ) : (
-                    <div className="executive-empty compact">El área seleccionada no tiene teams visibles para este lente.</div>
+                    <div className="executive-empty compact">{t('tablero.nav_teams_no_teams')}</div>
                   )
                 ) : (
-                  <div className="executive-empty compact">Seleccioná un área para explorar sus teams.</div>
+                  <div className="executive-empty compact">{t('tablero.nav_teams_select_area')}</div>
                 )}
               </div>
             </div>
@@ -1097,8 +1127,8 @@ export default function TableroEjecutivo() {
           {filteredAreaNodes.length ? (
             <section className="executive-section">
               <div className="executive-section-header">
-                <h3>Áreas destacadas</h3>
-                <span>Lectura resumida por nivel intermedio</span>
+                <h3>{t('tablero.areas_section_title')}</h3>
+                <span>{t('tablero.areas_section_subtitle')}</span>
               </div>
               <div className="executive-node-grid">
                 {filteredAreaNodes.map((area) => (
@@ -1121,7 +1151,7 @@ export default function TableroEjecutivo() {
           {focusNode && focusTrends ? (
             <section className="executive-section">
               <div className="executive-section-header">
-                <h3>Evolución del foco</h3>
+                <h3>{t('tablero.focus_evolution_title')}</h3>
                 <span>
                   {focusTrends.scope?.name || focusNode.scope.name}
                   {selectedObjective ? ` · ${selectedObjective}` : ''}
@@ -1129,17 +1159,17 @@ export default function TableroEjecutivo() {
               </div>
               <div className="executive-trend-grid">
                 <ExecutiveTrendCard
-                  title="Últimos períodos"
-                  subtitle="Resultado total del foco por período"
+                  title={t('tablero.focus_trend_periods_title')}
+                  subtitle={t('tablero.focus_trend_periods_subtitle')}
                   points={focusTrends.periodSeries}
-                  getLabel={(point) => point.periodName || 'Periodo'}
+                  getLabel={(point) => point.periodName || t('tablero.focus_period_fallback')}
                   isCurrent={(point) => point.periodId === executiveTree?.periodId}
                 />
                 <ExecutiveTrendCard
-                  title="Subperíodos del período actual"
-                  subtitle={focusTrends.periodName || 'Período actual'}
+                  title={t('tablero.focus_trend_subperiods_title')}
+                  subtitle={focusTrends.periodName || t('tablero.focus_trend_current_period')}
                   points={focusTrends.subPeriodSeries}
-                  getLabel={(point) => point.subPeriodName || 'Subperíodo'}
+                  getLabel={(point) => point.subPeriodName || t('tablero.focus_subperiod_fallback')}
                   isCurrent={(point) => point.subPeriodId === executiveTree?.subPeriodId}
                 />
               </div>
@@ -1164,10 +1194,10 @@ export default function TableroEjecutivo() {
             <section className="executive-section executive-focus">
               <div className="executive-section-header">
                 <h3>
-                  Foco actual: {focusNode.scope.name} <small>({focusNode.scope.type})</small>
+                  {t('tablero.focus_title', { name: focusNode.scope.name })} <small>({getScopeTypeLabel(focusNode.scope.type)})</small>
                 </h3>
                 <span>
-                  {focusRollup.ownScopeKpis.length} KPIs propios · {focusRollup.descendantScopeKpis.length} descendientes
+                  {t('tablero.focus_kpi_count', { own: focusRollup.ownScopeKpis.length, desc: focusRollup.descendantScopeKpis.length })}
                 </span>
               </div>
 
@@ -1175,31 +1205,31 @@ export default function TableroEjecutivo() {
                 <div className="executive-focus-panel">
                   <div className="executive-focus-stats wide">
                     <div className="executive-focus-stat">
-                      <span>Resultado propio</span>
+                      <span>{t('tablero.focus_own_result')}</span>
                       <strong>{formatNumber(focusRollup.ownWeightedResult)}</strong>
                     </div>
                     <div className="executive-focus-stat">
-                      <span>Resultado total</span>
+                      <span>{t('tablero.focus_total_result')}</span>
                       <strong>{formatNumber(focusRollup.weightedResultTotal)}</strong>
                     </div>
                     <div className="executive-focus-stat">
-                      <span>KPIs propios</span>
+                      <span>{t('tablero.focus_own_kpis_stat')}</span>
                       <strong>{focusRollup.ownScopeKpis.length}</strong>
                     </div>
                     <div className="executive-focus-stat">
-                      <span>KPIs descendientes</span>
+                      <span>{t('tablero.focus_desc_kpis_stat')}</span>
                       <strong>{focusRollup.descendantScopeKpis.length}</strong>
                     </div>
                     <div className="executive-focus-stat">
-                      <span>Variación media</span>
+                      <span>{t('tablero.focus_avg_variation')}</span>
                       <strong>{formatNumber(focusRollup.averageVariation, 1)}%</strong>
                     </div>
                   </div>
 
                   <div className="executive-panel-group">
                     <div className="executive-section-header">
-                      <h3>KPIs propios del foco</h3>
-                      <span>{focusOwnKpis.length} elementos</span>
+                      <h3>{t('tablero.focus_own_kpis_section')}</h3>
+                      <span>{t('tablero.focus_own_kpis_count', { count: focusOwnKpis.length })}</span>
                     </div>
                     {focusOwnKpis.length ? (
                       <div className="executive-kpi-grid compact">
@@ -1208,14 +1238,14 @@ export default function TableroEjecutivo() {
                         ))}
                       </div>
                     ) : (
-                      <div className="executive-empty">Este nivel todavía no tiene Scope KPIs propios bajo el filtro actual.</div>
+                      <div className="executive-empty">{t('tablero.focus_own_kpis_empty')}</div>
                     )}
                   </div>
 
                   <div className="executive-panel-group">
                     <div className="executive-section-header">
-                      <h3>KPIs descendientes más relevantes</h3>
-                      <span>{focusDescendantKpis.length} visibles</span>
+                      <h3>{t('tablero.focus_desc_kpis_section')}</h3>
+                      <span>{t('tablero.focus_desc_kpis_count', { count: focusDescendantKpis.length })}</span>
                     </div>
                     {focusDescendantKpis.length ? (
                       <div className="executive-kpi-grid compact">
@@ -1228,36 +1258,36 @@ export default function TableroEjecutivo() {
                         ))}
                       </div>
                     ) : (
-                      <div className="executive-empty">No hay KPIs descendientes que cumplan este filtro.</div>
+                      <div className="executive-empty">{t('tablero.focus_desc_kpis_empty')}</div>
                     )}
                   </div>
                 </div>
 
                 <div className="executive-side-panel">
                   <div className="executive-side-card">
-                    <h4>Resumen descendiente</h4>
+                    <h4>{t('tablero.descendant_summary_title')}</h4>
                     <div className="executive-side-metrics">
                       <div>
-                        <span>Nodos</span>
+                        <span>{t('tablero.descendant_nodes')}</span>
                         <strong>{focusRollup.descendantNodes.length}</strong>
                       </div>
                       <div>
-                        <span>Áreas</span>
+                        <span>{t('tablero.descendant_areas')}</span>
                         <strong>{focusRollup.areaCount + focusRollup.businessUnitCount}</strong>
                       </div>
                       <div>
-                        <span>Teams</span>
+                        <span>{t('tablero.descendant_teams')}</span>
                         <strong>{focusRollup.teamCount}</strong>
                       </div>
                       <div>
-                        <span>Cobertura</span>
+                        <span>{t('tablero.descendant_coverage')}</span>
                         <strong>{formatNumber(focusRollup.completionRate, 0)}%</strong>
                       </div>
                     </div>
                   </div>
 
                   <div className="executive-side-card">
-                    <h4>Objetivos activos</h4>
+                    <h4>{t('tablero.active_objectives_title')}</h4>
                     {focusRollup.objectiveNames.length ? (
                       <div className="executive-tag-row">
                         {focusRollup.objectiveNames.map((objective) => (
@@ -1275,12 +1305,12 @@ export default function TableroEjecutivo() {
                         ))}
                       </div>
                     ) : (
-                      <div className="executive-empty compact">Sin objetivos vinculados.</div>
+                      <div className="executive-empty compact">{t('tablero.active_objectives_empty')}</div>
                     )}
                   </div>
 
                   <div className="executive-side-card">
-                    <h4>Siguientes niveles</h4>
+                    <h4>{t('tablero.next_levels_title')}</h4>
                     {focusChildNodes.length ? (
                       <div className="executive-team-list">
                         {focusChildNodes.map((child) => {
@@ -1303,7 +1333,7 @@ export default function TableroEjecutivo() {
                             >
                               <span>
                                 {child.scope.name}
-                                <small>{child.scope.type}</small>
+                                <small>{getScopeTypeLabel(child.scope.type)}</small>
                               </span>
                               <strong>{formatNumber(rollup.weightedResultTotal)}</strong>
                             </button>
@@ -1311,7 +1341,7 @@ export default function TableroEjecutivo() {
                         })}
                       </div>
                     ) : (
-                      <div className="executive-empty compact">No hay un nivel inferior navegable para este foco.</div>
+                      <div className="executive-empty compact">{t('tablero.next_levels_empty')}</div>
                     )}
                   </div>
                 </div>

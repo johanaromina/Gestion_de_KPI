@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
@@ -30,14 +31,6 @@ type CurationItem = {
   createdByName?: string
 }
 
-const STATUS_LABEL: Record<CurationStatus, string> = {
-  pending: 'Pendiente',
-  in_review: 'En revision',
-  approved: 'Aprobado',
-  rejected: 'Rechazado',
-  changes_requested: 'Cambios solicitados',
-}
-
 const STATUS_PILL_CLASS: Record<CurationStatus, string> = {
   pending: 'review',
   in_review: 'review',
@@ -64,6 +57,9 @@ export default function Curaduria() {
   const [searchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const assignmentId = searchParams.get('assignmentId')
+  const { t } = useTranslation('curation')
+
+  const getStatusLabel = (status: CurationStatus) => t(`status.${status}`)
 
   const { data: periods } = useQuery('periods', async () => {
     const response = await api.get('/periods')
@@ -127,7 +123,7 @@ export default function Curaduria() {
   const createCriteria = useMutation(
     async () => {
       if (!criteriaAssignmentId || !criteriaDataSource.trim() || !criteriaText.trim()) {
-        setCriteriaError('Completá asignación, fuente y criterio antes de enviar.')
+        setCriteriaError(t('criteria_modal.validation_error'))
         return
       }
       await api.post(`/curation/assignments/${criteriaAssignmentId}/criteria`, {
@@ -267,18 +263,18 @@ export default function Curaduria() {
   }, [assignments, selectedScopeName, periodFilter, kpiFilter, collaboratorFilter])
 
   const tabOptions = [
-    { key: 'pending', label: 'Pendientes' },
-    { key: 'in_review', label: 'En revision' },
-    { key: 'changes_requested', label: 'Cambios solicitados' },
-    { key: 'approved', label: 'Aprobadas' },
-    { key: 'rejected', label: 'Rechazadas' },
-    { key: 'all', label: 'Cambios recientes' },
+    { key: 'pending', label: t('tabs.pending') },
+    { key: 'in_review', label: t('tabs.in_review') },
+    { key: 'changes_requested', label: t('tabs.changes_requested') },
+    { key: 'approved', label: t('tabs.approved') },
+    { key: 'rejected', label: t('tabs.rejected') },
+    { key: 'all', label: t('tabs.all') },
   ]
 
   const formatSource = (item: CurationItem) => {
     const source = item.dataSource || item.assignmentDataSource
     const config = item.sourceConfig || item.assignmentSourceConfig
-    if (!source) return 'Sin fuente'
+    if (!source) return t('source_none')
     return config ? `${source} · ${config}` : source
   }
 
@@ -413,12 +409,12 @@ export default function Curaduria() {
     <div className="curaduria-page">
       <div className="page-header">
         <div>
-          <h1>Curaduria</h1>
-          <p className="subtitle">Validá de dónde viene cada dato y cómo se calcula. Un KPI solo aparece en los dashboards cuando su criterio está aprobado.</p>
+          <h1>{t('title')}</h1>
+          <p className="subtitle">{t('subtitle')}</p>
         </div>
         <div className="header-actions">
-          <button className="btn-secondary" onClick={exportCsv}>Exportar CSV</button>
-          <button className="btn-secondary" onClick={exportExcel}>Exportar Excel</button>
+          <button className="btn-secondary" onClick={exportCsv}>{t('header.export_csv')}</button>
+          <button className="btn-secondary" onClick={exportExcel}>{t('header.export_excel')}</button>
           <button
             className="btn-primary"
             onClick={() => {
@@ -428,7 +424,7 @@ export default function Curaduria() {
               setShowCriteriaModal(true)
             }}
           >
-            Nuevo criterio
+            {t('header.new_criteria')}
           </button>
         </div>
       </div>
@@ -447,14 +443,14 @@ export default function Curaduria() {
 
       <div className="curaduria-toolbar">
         <div className="filter-group">
-          <label htmlFor="period-filter">Período:</label>
+          <label htmlFor="period-filter">{t('filters.period')}</label>
           <select
             id="period-filter"
             value={periodFilter}
             onChange={(e) => setPeriodFilter(e.target.value ? Number(e.target.value) : '')}
             className="filter-select"
           >
-            <option value="">Todos</option>
+            <option value="">{t('filters.all')}</option>
             {periods?.map((period: any) => (
               <option key={period.id} value={period.id}>
                 {period.name}
@@ -463,14 +459,14 @@ export default function Curaduria() {
           </select>
         </div>
         <div className="filter-group">
-          <label htmlFor="kpi-filter">KPI:</label>
+          <label htmlFor="kpi-filter">{t('filters.kpi')}</label>
           <select
             id="kpi-filter"
             value={kpiFilter}
             onChange={(e) => setKpiFilter(e.target.value ? Number(e.target.value) : '')}
             className="filter-select"
           >
-            <option value="">Todos</option>
+            <option value="">{t('filters.all')}</option>
             {filteredKpis?.map((kpi: any, index: number) => (
               <option key={kpi.id || kpi?.name || index} value={kpi.id || ''}>
                 {typeof kpi === 'string' ? kpi : kpi.name || kpi.title || `KPI #${kpi.id}`}
@@ -479,14 +475,14 @@ export default function Curaduria() {
           </select>
         </div>
         <div className="filter-group">
-          <label htmlFor="collaborator-filter">Colaborador:</label>
+          <label htmlFor="collaborator-filter">{t('filters.collaborator')}</label>
           <select
             id="collaborator-filter"
             value={collaboratorFilter}
             onChange={(e) => setCollaboratorFilter(e.target.value ? Number(e.target.value) : '')}
             className="filter-select"
           >
-            <option value="">Todos</option>
+            <option value="">{t('filters.all')}</option>
             {filteredCollaborators?.map((collaborator: any) => (
               <option key={collaborator.id} value={collaborator.id}>
                 {collaborator.name}
@@ -495,14 +491,14 @@ export default function Curaduria() {
           </select>
         </div>
         <div className="filter-group">
-          <label htmlFor="scope-filter">Scope:</label>
+          <label htmlFor="scope-filter">{t('filters.scope')}</label>
           <select
             id="scope-filter"
             value={scopeFilter}
             onChange={(e) => setScopeFilter(e.target.value ? Number(e.target.value) : '')}
             className="filter-select"
           >
-            <option value="">Todos</option>
+            <option value="">{t('filters.all')}</option>
             {orgScopes
               ?.filter((scope: any) => scope.type === 'area' && scope.active !== 0 && scope.active !== false)
               .map((scope: any) => (
@@ -513,7 +509,7 @@ export default function Curaduria() {
           </select>
         </div>
         <div className="curaduria-hint">
-          El KPI visible solo usa datos aprobados.
+          {t('filters.hint')}
         </div>
       </div>
 
@@ -521,21 +517,21 @@ export default function Curaduria() {
         <table className="curaduria-table">
           <thead>
             <tr>
-              <th>Colaborador</th>
-              <th>KPI</th>
-              <th>Período</th>
-              <th>Fuente</th>
-              <th>Criterio</th>
-              <th>IA</th>
-              <th>Estado</th>
-              <th>Actualización</th>
-              <th>Acciones</th>
+              <th>{t('table.collaborator')}</th>
+              <th>{t('table.kpi')}</th>
+              <th>{t('table.period')}</th>
+              <th>{t('table.source')}</th>
+              <th>{t('table.criteria')}</th>
+              <th>{t('table.ai')}</th>
+              <th>{t('table.status')}</th>
+              <th>{t('table.updated')}</th>
+              <th>{t('table.actions')}</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={9} className="empty-row">Cargando bandeja...</td>
+                <td colSpan={9} className="empty-row">{t('loading')}</td>
               </tr>
             ) : (
               displayItems.map((item) => {
@@ -554,20 +550,20 @@ export default function Curaduria() {
                     <td className="outlier-td">
                       {(() => {
                         const o = outlierMap.get(item.assignmentId)
-                        if (!o || o.severity === 'none') return <span className="outlier-chip outlier-chip-ok" title="Sin anomalías detectadas">✓</span>
+                        if (!o || o.severity === 'none') return <span className="outlier-chip outlier-chip-ok" title={t('outlier.ok_title')}>✓</span>
                         return (
                           <span
                             className={`outlier-chip outlier-chip-${o.severity}`}
                             title={o.message || ''}
                           >
-                            {o.severity === 'high' ? '⚠ Inusual' : o.severity === 'medium' ? '🔍 Revisar' : 'ℹ Info'}
+                            {o.severity === 'high' ? t('outlier.unusual') : o.severity === 'medium' ? t('outlier.review') : t('outlier.info')}
                           </span>
                         )
                       })()}
                     </td>
                     <td>
                       <span className={`status-pill ${STATUS_PILL_CLASS[status]}`}>
-                        {STATUS_LABEL[status]}
+                        {getStatusLabel(status)}
                       </span>
                       {item.comment ? <div className="comment">{item.comment}</div> : null}
                     </td>
@@ -579,21 +575,21 @@ export default function Curaduria() {
                           onClick={() => handleReview(item, 'approve')}
                           disabled={status === 'approved'}
                         >
-                          Aprobar
+                          {t('actions.approve')}
                         </button>
                         <button
                           className="btn-reject-small"
                           onClick={() => handleReview(item, 'reject')}
                           disabled={status === 'rejected'}
                         >
-                          Rechazar
+                          {t('actions.reject')}
                         </button>
                         <button
                           className="btn-secondary"
                           onClick={() => handleReview(item, 'request')}
                           disabled={status === 'changes_requested' || !canReview}
                         >
-                          Pedir cambios
+                          {t('actions.request_changes')}
                         </button>
                         {!canReview && (
                           <button
@@ -606,7 +602,7 @@ export default function Curaduria() {
                               setShowCriteriaModal(true)
                             }}
                           >
-                            Crear criterio
+                            {t('actions.create_criteria')}
                           </button>
                         )}
                       </div>
@@ -618,7 +614,7 @@ export default function Curaduria() {
             {displayItems.length === 0 && !isLoading && (
               <tr>
                 <td colSpan={9} className="empty-row">
-                  No hay items para curar con este filtro.
+                  {t('empty')}
                 </td>
               </tr>
             )}
@@ -634,20 +630,20 @@ export default function Curaduria() {
         >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Nuevo criterio</h2>
+              <h2>{t('criteria_modal.title')}</h2>
               <button className="close-button" onClick={() => setShowCriteriaModal(false)}>
                 ×
               </button>
             </div>
             <div className="modal-body">
               <div className="form-group">
-                <label htmlFor="criteria-assignment">Asignación</label>
+                <label htmlFor="criteria-assignment">{t('criteria_modal.assignment_label')}</label>
                 <select
                   id="criteria-assignment"
                   value={criteriaAssignmentId}
                   onChange={(e) => setCriteriaAssignmentId(e.target.value ? Number(e.target.value) : '')}
                 >
-                  <option value="">Selecciona una asignación</option>
+                  <option value="">{t('criteria_modal.assignment_placeholder')}</option>
                   {filteredAssignments?.map((assignment: any) => (
                     <option key={assignment.id} value={assignment.id}>
                       {assignment.collaboratorName || `Colaborador #${assignment.collaboratorId}`} ·{' '}
@@ -659,7 +655,7 @@ export default function Curaduria() {
               </div>
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="criteria-source">Fuente</label>
+                  <label htmlFor="criteria-source">{t('criteria_modal.source_label')}</label>
                   <input
                     id="criteria-source"
                     type="text"
@@ -668,24 +664,24 @@ export default function Curaduria() {
                       setCriteriaDataSource(e.target.value)
                       setCriteriaError('')
                     }}
-                    placeholder="Jira, Google Sheet, DB, Manual, API..."
+                    placeholder={t('criteria_modal.source_placeholder')}
                   />
-                  <small className="form-hint">De dónde proviene el dato: sistema, herramienta o proceso que lo genera.</small>
+                  <small className="form-hint">{t('criteria_modal.source_hint')}</small>
                 </div>
                 <div className="form-group">
-                  <label htmlFor="criteria-config">Query / Endpoint (opcional)</label>
+                  <label htmlFor="criteria-config">{t('criteria_modal.config_label')}</label>
                   <input
                     id="criteria-config"
                     type="text"
                     value={criteriaSourceConfig}
                     onChange={(e) => setCriteriaSourceConfig(e.target.value)}
-                    placeholder="JQL, SQL, URL o nombre de pestaña"
+                    placeholder={t('criteria_modal.config_placeholder')}
                   />
-                  <small className="form-hint">Consulta o referencia exacta para obtener el dato (ej: filtro de Jira, nombre de hoja).</small>
+                  <small className="form-hint">{t('criteria_modal.config_hint')}</small>
                 </div>
               </div>
               <div className="form-group">
-                <label htmlFor="criteria-text">Criterio</label>
+                <label htmlFor="criteria-text">{t('criteria_modal.criteria_label')}</label>
                 <textarea
                   id="criteria-text"
                   value={criteriaText}
@@ -694,25 +690,25 @@ export default function Curaduria() {
                     setCriteriaError('')
                   }}
                   rows={4}
-                  placeholder="Ej: Suma de tickets cerrados con prioridad Alta en el período, excluyendo los cancelados."
+                  placeholder={t('criteria_modal.criteria_placeholder')}
                 />
-                <small className="form-hint">Explicá cómo se calcula el valor del KPI. Este texto queda registrado para auditoría y debe ser suficientemente claro para que otra persona pueda replicarlo.</small>
+                <small className="form-hint">{t('criteria_modal.criteria_hint')}</small>
               </div>
               <div className="form-group">
-                <label htmlFor="criteria-evidence">Evidencia (opcional)</label>
+                <label htmlFor="criteria-evidence">{t('criteria_modal.evidence_label')}</label>
                 <input
                   id="criteria-evidence"
                   type="text"
                   value={criteriaEvidenceUrl}
                   onChange={(e) => setCriteriaEvidenceUrl(e.target.value)}
-                  placeholder="Link o adjunto"
+                  placeholder={t('criteria_modal.evidence_placeholder')}
                 />
               </div>
               {criteriaError ? <div className="form-error">{criteriaError}</div> : null}
             </div>
             <div className="modal-actions">
               <button className="btn-secondary" onClick={() => setShowCriteriaModal(false)}>
-                Cancelar
+                {t('criteria_modal.cancel')}
               </button>
               <button
                 className="btn-primary"
@@ -724,7 +720,7 @@ export default function Curaduria() {
                   createCriteria.isLoading
                 }
               >
-                {createCriteria.isLoading ? 'Enviando...' : 'Enviar a curaduría'}
+                {createCriteria.isLoading ? t('criteria_modal.submitting') : t('criteria_modal.submit')}
               </button>
             </div>
           </div>
@@ -740,7 +736,7 @@ export default function Curaduria() {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>
-                {reviewModal.action === 'reject' ? 'Rechazar criterio' : 'Pedir cambios'}
+                {reviewModal.action === 'reject' ? t('review_modal.title_reject') : t('review_modal.title_request')}
               </h2>
               <button className="close-button" onClick={() => setReviewModal(null)}>×</button>
             </div>
@@ -755,8 +751,8 @@ export default function Curaduria() {
               <div className="form-group" style={{ marginTop: 12 }}>
                 <label htmlFor="review-comment">
                   {reviewModal.action === 'reject'
-                    ? 'Motivo del rechazo (obligatorio)'
-                    : 'Comentario para el ajuste (opcional)'}
+                    ? t('review_modal.comment_label_reject')
+                    : t('review_modal.comment_label_request')}
                 </label>
                 <textarea
                   id="review-comment"
@@ -765,21 +761,21 @@ export default function Curaduria() {
                   onChange={(e) => setReviewComment(e.target.value)}
                   placeholder={
                     reviewModal.action === 'reject'
-                      ? 'Ej: La fuente indicada no corresponde al sistema acordado.'
-                      : 'Ej: Falta especificar el rango de fechas del cálculo.'
+                      ? t('review_modal.comment_placeholder_reject')
+                      : t('review_modal.comment_placeholder_request')
                   }
                   autoFocus
                 />
                 {reviewModal.action === 'reject' && !reviewComment.trim() && (
                   <small className="form-hint" style={{ color: '#b91c1c' }}>
-                    Requerido: explicá el motivo para que el responsable pueda corregirlo.
+                    {t('review_modal.comment_required_hint')}
                   </small>
                 )}
               </div>
             </div>
             <div className="modal-actions">
               <button className="btn-secondary" onClick={() => setReviewModal(null)}>
-                Cancelar
+                {t('review_modal.cancel')}
               </button>
               <button
                 className={reviewModal.action === 'reject' ? 'btn-reject-small' : 'btn-secondary'}
@@ -790,10 +786,10 @@ export default function Curaduria() {
                 }
               >
                 {reviewMutation.isLoading
-                  ? 'Enviando...'
+                  ? t('review_modal.submitting')
                   : reviewModal.action === 'reject'
-                  ? 'Confirmar rechazo'
-                  : 'Enviar solicitud de cambios'}
+                  ? t('review_modal.confirm_reject')
+                  : t('review_modal.confirm_request')}
               </button>
             </div>
           </div>

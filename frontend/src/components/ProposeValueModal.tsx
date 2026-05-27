@@ -1,10 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react'
 import { useMutation, useQueryClient } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { useDialog } from './Dialog'
 import { useOutlierDetection } from '../hooks/useOutlierDetection'
 import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
+import { resolveApiErrorMessage } from '../utils/apiErrors'
 import './ProposeValueModal.css'
 
 interface ProposeValueModalProps {
@@ -31,6 +33,8 @@ export default function ProposeValueModal({
   onClose,
   onSuccess,
 }: ProposeValueModalProps) {
+  const { t, i18n } = useTranslation('assignments')
+  const locale = i18n.resolvedLanguage?.startsWith('en') ? 'en-US' : 'es-AR'
   const [actual, setActual] = useState<string>(
     assignment.actual?.toString() || ''
   )
@@ -66,9 +70,10 @@ export default function ProposeValueModal({
       },
       onError: (error: any) => {
         void dialog.alert(
-          error.response?.data?.error ||
-            'Error al proponer valores. Verificá que el período no esté cerrado.',
-          { title: 'Error', variant: 'danger' }
+          resolveApiErrorMessage(error, t, {
+            fallbackKey: 'propose.error_default',
+          }),
+          { title: t('common:error_title'), variant: 'danger' }
         )
       },
     }
@@ -78,16 +83,16 @@ export default function ProposeValueModal({
     const newErrors: Record<string, string> = {}
 
     if (!actual.trim()) {
-      newErrors.actual = 'El valor actual es requerido'
+      newErrors.actual = t('propose.error_actual_required')
     } else {
       const value = parseFloat(actual)
       if (isNaN(value)) {
-        newErrors.actual = 'Debe ser un número válido'
+        newErrors.actual = t('propose.error_actual_invalid')
       }
     }
 
     if (requiresReason && !reason.trim()) {
-      newErrors.reason = 'El motivo es requerido para override'
+      newErrors.reason = t('propose.error_reason_required')
     }
 
     setErrors(newErrors)
@@ -117,7 +122,7 @@ export default function ProposeValueModal({
     >
       <div className="modal-content propose-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Proponer Valores</h2>
+          <h2>{t('propose.title')}</h2>
           <button className="close-button" onClick={onClose}>
             ×
           </button>
@@ -126,10 +131,10 @@ export default function ProposeValueModal({
         <form onSubmit={handleSubmit} className="propose-form">
           <div className="propose-info">
             <p>
-              <strong>KPI:</strong> {assignment.kpiName || `KPI #${assignment.id}`}
+              <strong>{t('propose.kpi')}</strong> {assignment.kpiName || `KPI #${assignment.id}`}
             </p>
             <p>
-              <strong>Target:</strong> {assignment.target}
+              <strong>{t('propose.target')}</strong> {assignment.target}
             </p>
           </div>
 
@@ -141,17 +146,17 @@ export default function ProposeValueModal({
               <div className="outlier-body">
                 <span className="outlier-title">
                   {outlier.severity === 'high'
-                    ? 'Valor altamente inusual'
+                    ? t('propose.outlier_high')
                     : outlier.severity === 'medium'
-                    ? 'Valor fuera del rango habitual'
-                    : 'Aviso estadístico'}
+                    ? t('propose.outlier_medium')
+                    : t('propose.outlier_low')}
                 </span>
                 <span className="outlier-message">{outlier.message}</span>
                 {outlier.sampleSize > 0 && (
                   <span className="outlier-stats">
-                    Media histórica: {outlier.mean != null ? new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 }).format(outlier.mean) : '-'}
-                    {outlier.zScore != null && ` · Z-score: ${outlier.zScore.toFixed(2)}`}
-                    {` · Muestra: ${outlier.sampleSize} períodos`}
+                    {t('propose.outlier_mean')} {outlier.mean != null ? new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(outlier.mean) : '-'}
+                    {outlier.zScore != null && ` · ${t('propose.outlier_zscore')} ${outlier.zScore.toFixed(2)}`}
+                    {` · ${t('propose.outlier_sample', { count: outlier.sampleSize })}`}
                   </span>
                 )}
               </div>
@@ -159,14 +164,14 @@ export default function ProposeValueModal({
           )}
 
           <div className="form-group">
-            <label htmlFor="actual">Valor Actual (Alcance) *</label>
+            <label htmlFor="actual">{t('propose.actual_label')}</label>
             <input
               type="number"
               step="any"
               id="actual"
               value={actual}
               onChange={(e) => setActual(e.target.value)}
-              placeholder="Ingresa el valor alcanzado"
+              placeholder={t('propose.actual_placeholder')}
               className={errors.actual ? 'error' : ''}
               autoFocus
             />
@@ -174,33 +179,33 @@ export default function ProposeValueModal({
               <span className="error-message">{errors.actual}</span>
             )}
             <small className="form-hint">
-              Este valor será propuesto para revisión por tu jefe
+              {t('propose.actual_hint')}
             </small>
           </div>
 
           <div className="form-group">
-            <label htmlFor="comments">Comentarios (Opcional)</label>
+            <label htmlFor="comments">{t('propose.comments_label')}</label>
             <textarea
               id="comments"
               value={comments}
               onChange={(e) => setComments(e.target.value)}
-              placeholder="Agrega comentarios sobre este valor propuesto..."
+              placeholder={t('propose.comments_placeholder')}
               rows={4}
             />
             <small className="form-hint">
-              Explica el contexto o razones de este valor propuesto
+              {t('propose.comments_hint')}
             </small>
           </div>
 
           <div className="form-group">
             <label htmlFor="reason">
-              Motivo del override {requiresReason && '*'}
+              {t('propose.reason_label')} {requiresReason && t('propose.reason_required_suffix')}
             </label>
             <textarea
               id="reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Detalla por qué se propone un override"
+              placeholder={t('propose.reason_placeholder')}
               rows={3}
               className={errors.reason ? 'error' : ''}
             />
@@ -211,27 +216,27 @@ export default function ProposeValueModal({
 
           {evidenceEnabled && (
             <div className="form-group">
-              <label htmlFor="evidenceUrl">Evidencia (opcional)</label>
+              <label htmlFor="evidenceUrl">{t('propose.evidence_label')}</label>
               <input
                 type="text"
                 id="evidenceUrl"
                 value={evidenceUrl}
                 onChange={(e) => setEvidenceUrl(e.target.value)}
-                placeholder="Link o adjunto"
+                placeholder={t('propose.evidence_placeholder')}
               />
             </div>
           )}
 
           <div className="form-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>
-              Cancelar
+              {t('propose.cancel')}
             </button>
             <button
               type="submit"
               className="btn-primary"
               disabled={proposeMutation.isLoading}
             >
-              {proposeMutation.isLoading ? 'Proponiendo...' : 'Proponer Valores'}
+              {proposeMutation.isLoading ? t('propose.submitting') : t('propose.submit')}
             </button>
           </div>
         </form>

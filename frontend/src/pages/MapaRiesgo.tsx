@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useState } from 'react'
 import { useQuery } from 'react-query'
+import { useTranslation } from 'react-i18next'
+import i18n from '../i18n'
 import api from '../services/api'
 import { useAuth } from '../hooks/useAuth'
 import { Period, ScopeKPI, SubPeriod } from '../types'
@@ -36,15 +38,15 @@ const riskLevel = (variation: number | null): 'green' | 'yellow' | 'red' | 'none
   return 'red'
 }
 
-const riskLabel = (variation: number | null) => {
-  if (variation == null) return 'Sin datos'
-  if (variation >= 100) return 'En track'
-  if (variation >= 80) return 'Atención'
-  return 'En riesgo'
-}
+const currentLocale = () => ((i18n.resolvedLanguage || i18n.language || 'es').startsWith('en') ? 'en-US' : 'es-AR')
 
 const fmt = (v?: number | null, digits = 1) =>
-  v == null ? '-' : new Intl.NumberFormat('es-AR', { maximumFractionDigits: digits }).format(v)
+  v == null ? '-' : new Intl.NumberFormat(currentLocale(), { maximumFractionDigits: digits }).format(v)
+
+const getScopeTypeLabel = (scopeType?: string | null) =>
+  scopeType
+    ? i18n.t(`executive:labels.scope_types.${scopeType}`, { defaultValue: scopeType.replace(/_/g, ' ') })
+    : '-'
 
 /* Flatten all leaf-ish nodes (areas + teams) from the tree */
 const collectAreas = (nodes: ExecutiveTreeNode[]): ExecutiveTreeNode[] =>
@@ -121,11 +123,19 @@ const HeatCell = ({
 /* ── Main component ──────────────────────────────────────── */
 export default function MapaRiesgo() {
   const { isCollaborator } = useAuth()
+  const { t } = useTranslation('executive')
   const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null)
   const [selectedSubPeriodId, setSelectedSubPeriodId] = useState<number | null>(null)
   const [detailScopeKpi, setDetailScopeKpi] = useState<ScopeKPI | null>(null)
   const [filterRisk, setFilterRisk] = useState<'all' | 'red' | 'yellow'>('all')
   const [filterType, setFilterType] = useState<'all' | 'area' | 'business_unit' | 'team'>('all')
+
+  const getRiskLabel = (variation: number | null): string => {
+    if (variation == null) return t('risk.no_data')
+    if (variation >= 100) return t('risk.on_track')
+    if (variation >= 80) return t('risk.warning')
+    return t('risk.at_risk')
+  }
 
   const { data: periods } = useQuery<Period[]>('periods', async () => (await api.get('/periods')).data)
 
@@ -190,7 +200,7 @@ export default function MapaRiesgo() {
   if (isCollaborator) {
     return (
       <div className="mapa-riesgo-page">
-        <div className="mapa-empty">Este mapa está disponible para liderazgo y administración.</div>
+        <div className="mapa-empty">{t('mapa.restricted')}</div>
       </div>
     )
   }
@@ -200,23 +210,21 @@ export default function MapaRiesgo() {
       {/* Header */}
       <div className="mapa-header">
         <div>
-          <h1>Mapa de Riesgo Organizacional</h1>
-          <p className="subtitle">
-            Vista de calor: KPIs × Áreas — identificá dónde está el problema sin hacer drill-down.
-          </p>
+          <h1>{t('mapa.title')}</h1>
+          <p className="subtitle">{t('mapa.subtitle')}</p>
         </div>
         <div className="mapa-summary-pills">
-          <span className="mapa-pill green">{summary.green} en track</span>
-          <span className="mapa-pill yellow">{summary.yellow} atención</span>
-          <span className="mapa-pill red">{summary.red} en riesgo</span>
-          {summary.none > 0 && <span className="mapa-pill none">{summary.none} sin datos</span>}
+          <span className="mapa-pill green">{t('mapa.summary_on_track', { count: summary.green })}</span>
+          <span className="mapa-pill yellow">{t('mapa.summary_warning', { count: summary.yellow })}</span>
+          <span className="mapa-pill red">{t('mapa.summary_at_risk', { count: summary.red })}</span>
+          {summary.none > 0 && <span className="mapa-pill none">{t('mapa.summary_no_data', { count: summary.none })}</span>}
         </div>
       </div>
 
       {/* Filters */}
       <div className="mapa-filters">
         <label>
-          Período
+          {t('mapa.filter_period')}
           <select
             value={selectedPeriodId || ''}
             onChange={(e) => {
@@ -224,66 +232,66 @@ export default function MapaRiesgo() {
               setSelectedSubPeriodId(null)
             }}
           >
-            <option value="">Auto</option>
+            <option value="">{t('mapa.filter_auto')}</option>
             {(periods || []).map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
         </label>
         <label>
-          Subperíodo
+          {t('mapa.filter_subperiod')}
           <select
             value={selectedSubPeriodId || ''}
             onChange={(e) => setSelectedSubPeriodId(e.target.value ? Number(e.target.value) : null)}
           >
-            <option value="">Auto</option>
+            <option value="">{t('mapa.filter_auto')}</option>
             {(subPeriods || []).map((sp) => (
               <option key={sp.id} value={sp.id}>{sp.name}</option>
             ))}
           </select>
         </label>
         <label>
-          Mostrar
+          {t('mapa.filter_show')}
           <select value={filterRisk} onChange={(e) => setFilterRisk(e.target.value as any)}>
-            <option value="all">Todos los estados</option>
-            <option value="red">Solo en riesgo (&lt;80%)</option>
-            <option value="yellow">Solo atención (80-99%)</option>
+            <option value="all">{t('mapa.filter_show_all')}</option>
+            <option value="red">{t('mapa.filter_show_red')}</option>
+            <option value="yellow">{t('mapa.filter_show_yellow')}</option>
           </select>
         </label>
         <label>
-          Nivel
+          {t('mapa.filter_level')}
           <select value={filterType} onChange={(e) => setFilterType(e.target.value as any)}>
-            <option value="all">Todos los niveles</option>
-            <option value="area">Áreas</option>
-            <option value="business_unit">Business Units</option>
-            <option value="team">Teams</option>
+            <option value="all">{t('mapa.filter_level_all')}</option>
+            <option value="area">{t('mapa.filter_level_area')}</option>
+            <option value="business_unit">{t('mapa.filter_level_bu')}</option>
+            <option value="team">{t('mapa.filter_level_team')}</option>
           </select>
         </label>
       </div>
 
       {/* Legend */}
       <div className="mapa-legend">
-        <span className="legend-dot green" /> En track (≥100%)
-        <span className="legend-dot yellow" /> Atención (80–99%)
-        <span className="legend-dot red" /> En riesgo (&lt;80%)
-        <span className="legend-dot none" /> Sin datos
-        <span className="legend-hint">Hacé click en una celda para ver el detalle del KPI</span>
+        <span className="legend-dot green" /> {t('mapa.legend_on_track')}
+        <span className="legend-dot yellow" /> {t('mapa.legend_warning')}
+        <span className="legend-dot red" /> {t('mapa.legend_at_risk')}
+        <span className="legend-dot none" /> {t('mapa.legend_no_data')}
+        <span className="legend-hint">{t('mapa.legend_hint')}</span>
       </div>
 
       {isLoading ? (
-        <div className="mapa-empty">Cargando mapa de riesgo...</div>
+        <div className="mapa-empty">{t('mapa.loading')}</div>
       ) : !filteredAreas.length ? (
-        <div className="mapa-empty">No hay áreas que coincidan con los filtros.</div>
+        <div className="mapa-empty">{t('mapa.no_areas')}</div>
       ) : !allKpiNames.length ? (
-        <div className="mapa-empty">No hay KPIs grupales en el período seleccionado.</div>
+        <div className="mapa-empty">{t('mapa.no_kpis')}</div>
       ) : (
         <div className="mapa-table-wrap">
           <table className="mapa-table">
             <thead>
               <tr>
-                <th className="mapa-th-area">Área / Unidad</th>
-                <th className="mapa-th-type">Nivel</th>
-                <th className="mapa-th-avg">Promedio</th>
+                <th className="mapa-th-area">{t('mapa.table_area')}</th>
+                <th className="mapa-th-type">{t('mapa.table_level')}</th>
+                <th className="mapa-th-avg">{t('mapa.table_avg')}</th>
                 {allKpiNames.map((name) => (
                   <th key={`kpi-col-${name}`} className="mapa-th-kpi">
                     <span>{name}</span>
@@ -301,11 +309,11 @@ export default function MapaRiesgo() {
                       <span className="mapa-area-name">{area.scope.name}</span>
                     </td>
                     <td className="mapa-td-type">
-                      <span className="mapa-type-badge">{area.scope.type.replace('_', ' ')}</span>
+                      <span className="mapa-type-badge">{getScopeTypeLabel(area.scope.type)}</span>
                     </td>
                     <td className={`mapa-td-avg heat-cell-${lvl}`}>
                       <span className="mapa-avg-val">{fmt(avg)}%</span>
-                      <span className="mapa-avg-label">{riskLabel(avg)}</span>
+                      <span className="mapa-avg-label">{getRiskLabel(avg)}</span>
                     </td>
                     {allKpiNames.map((kpiName) => {
                       const kpi = findKpi(area, kpiName)
@@ -326,7 +334,7 @@ export default function MapaRiesgo() {
       {/* KPI column totals row */}
       {!isLoading && filteredAreas.length > 0 && allKpiNames.length > 0 && (
         <div className="mapa-column-summary">
-          <h3>KPIs con más áreas en riesgo</h3>
+          <h3>{t('mapa.risk_bars_title')}</h3>
           <div className="mapa-kpi-risk-bars">
             {allKpiNames
               .map((kpiName) => {
@@ -351,7 +359,7 @@ export default function MapaRiesgo() {
                       <div
                         className="mapa-kpi-bar-seg red"
                         style={{ flex: redCount }}
-                        title={`${redCount} en riesgo`}
+                        title={t('mapa.risk_tooltip_red', { count: redCount })}
                       >
                         {redCount}
                       </div>
@@ -360,7 +368,7 @@ export default function MapaRiesgo() {
                       <div
                         className="mapa-kpi-bar-seg yellow"
                         style={{ flex: yellowCount }}
-                        title={`${yellowCount} en atención`}
+                        title={t('mapa.risk_tooltip_yellow', { count: yellowCount })}
                       >
                         {yellowCount}
                       </div>
@@ -369,16 +377,16 @@ export default function MapaRiesgo() {
                       <div
                         className="mapa-kpi-bar-seg green"
                         style={{ flex: greenCount }}
-                        title={`${greenCount} en track`}
+                        title={t('mapa.risk_tooltip_green', { count: greenCount })}
                       >
                         {greenCount}
                       </div>
                     )}
                   </div>
                   <span className={`mapa-kpi-bar-avg heat-cell-${riskLevel(avgVal)}`}>
-                    {avgVal != null ? `${fmt(avgVal)}%` : '-'} prom.
+                    {avgVal != null ? t('mapa.risk_prom', { value: fmt(avgVal) }) : '-'}
                   </span>
-                  <span className="mapa-kpi-bar-total">{total} áreas</span>
+                  <span className="mapa-kpi-bar-total">{t('mapa.risk_areas', { count: total })}</span>
                 </div>
               ))}
           </div>

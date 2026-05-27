@@ -2,15 +2,21 @@
  * Generates an interpretive narrative from executive KPI tree data.
  * All logic is pure TypeScript — no AI API required.
  */
+import i18n from '../i18n'
 
-const fmt = (v: number | null | undefined, digits = 1) =>
-  v == null ? 'N/D' : new Intl.NumberFormat('es-AR', { maximumFractionDigits: digits }).format(v)
+const resolveLocale = (locale?: string) =>
+  locale || ((i18n.resolvedLanguage || i18n.language || 'es').startsWith('en') ? 'en-US' : 'es-AR')
+
+const fmt = (v: number | null | undefined, locale: string, digits = 1) =>
+  v == null
+    ? i18n.t('executive:narrative.not_available')
+    : new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(v)
 
 const riskLabel = (v: number | null | undefined) => {
-  if (v == null) return 'sin datos'
-  if (v >= 100) return 'en track'
-  if (v >= 80) return 'bajo seguimiento'
-  return 'en riesgo'
+  if (v == null) return i18n.t('executive:narrative.status.no_data')
+  if (v >= 100) return i18n.t('executive:narrative.status.on_track')
+  if (v >= 80) return i18n.t('executive:narrative.status.warning')
+  return i18n.t('executive:narrative.status.at_risk')
 }
 
 export interface NarrativeInput {
@@ -33,7 +39,7 @@ export interface NarrativeInput {
   topPerformers: Array<{ name: string; variation: number | null; scopeName: string }>
 }
 
-export function buildNarrative(input: NarrativeInput): string {
+export function buildNarrative(input: NarrativeInput, localeArg?: string): string {
   const {
     periodName,
     subPeriodName,
@@ -48,8 +54,11 @@ export function buildNarrative(input: NarrativeInput): string {
     topRisk,
     topPerformers,
   } = input
+  const locale = resolveLocale(localeArg)
+  const t = (key: string, options?: Record<string, unknown>) =>
+    i18n.t(`executive:narrative.${key}`, options)
 
-  const date = new Date().toLocaleDateString('es-AR', {
+  const date = new Date().toLocaleDateString(locale, {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -57,21 +66,46 @@ export function buildNarrative(input: NarrativeInput): string {
 
   const period = [periodName, subPeriodName].filter(Boolean).join(' · ')
   const status = riskLabel(averageVariation)
-  const pct = fmt(averageVariation)
+  const pct = fmt(averageVariation, locale)
+  const periodLabel = period || t('current_period')
+  const paragraphs: string[] = []
 
-  let narrative = `Al ${date}, la organización ${companyName} presenta una variación promedio de ${pct}% en el período ${period || 'actual'}, situándose ${status}.\n\n`
+  paragraphs.push(
+    t('opening', {
+      date,
+      company: companyName,
+      variation: pct,
+      period: periodLabel,
+      status,
+    })
+  )
 
   // Coverage
-  const coveragePct = fmt(completionRate, 0)
-  narrative += `De un total de ${totalScopeKpis} KPIs organizacionales, ${approvedScopeKpis} cuentan con datos aprobados (cobertura del ${coveragePct}%).`
+  const coveragePct = fmt(completionRate, locale, 0)
+  let coverageText = t('coverage.summary', {
+    total: totalScopeKpis,
+    approved: approvedScopeKpis,
+    coverage: coveragePct,
+    weighted: fmt(weightedResultTotal, locale, 1),
+  })
   if (completionRate != null && completionRate < 60) {
-    narrative += ` La baja cobertura limita la representatividad del análisis.`
+    coverageText += ` ${t('coverage.low')}`
   }
-  narrative += ` El resultado ponderado consolidado es de ${fmt(weightedResultTotal, 1)} puntos.\n\n`
+  paragraphs.push(coverageText)
 
   // Objectives
   if (objectiveNames.length > 0) {
-    narrative += `Los objetivos estratégicos activos son: ${objectiveNames.slice(0, 4).join(', ')}${objectiveNames.length > 4 ? ` y ${objectiveNames.length - 4} más` : ''}.\n\n`
+    const objectiveList = objectiveNames.slice(0, 4).join(', ')
+    if (objectiveNames.length > 4) {
+      paragraphs.push(
+        t('objectives_more', {
+          objectives: objectiveList,
+          count: objectiveNames.length - 4,
+        })
+      )
+    } else {
+      paragraphs.push(t('objectives', { objectives: objectiveList }))
+    }
   }
 
   // Area breakdown
@@ -84,47 +118,68 @@ export function buildNarrative(input: NarrativeInput): string {
     })
     const redAreas = areasWithData.filter((a) => (a.averageVariation ?? 0) < 80)
 
-    narrative += `Análisis por área:`
+    const parts: string[] = []
     if (greenAreas.length) {
-      narrative += ` ${greenAreas.length} unidad${greenAreas.length > 1 ? 'es' : ''} en track (${greenAreas.map((a) => a.name).slice(0, 3).join(', ')}).`
+      parts.push(
+        t('area_breakdown.on_track', {
+          count: greenAreas.length,
+          areas: greenAreas.map((a) => a.name).slice(0, 3).join(', '),
+        })
+      )
     }
     if (yellowAreas.length) {
-      narrative += ` ${yellowAreas.length} bajo seguimiento (${yellowAreas.map((a) => a.name).slice(0, 3).join(', ')}).`
+      parts.push(
+        t('area_breakdown.warning', {
+          count: yellowAreas.length,
+          areas: yellowAreas.map((a) => a.name).slice(0, 3).join(', '),
+        })
+      )
     }
     if (redAreas.length) {
-      narrative += ` ${redAreas.length} en riesgo (${redAreas.map((a) => a.name).slice(0, 3).join(', ')}).`
+      parts.push(
+        t('area_breakdown.at_risk', {
+          count: redAreas.length,
+          areas: redAreas.map((a) => a.name).slice(0, 3).join(', '),
+        })
+      )
     }
-    narrative += `\n\n`
+    if (parts.length) {
+      paragraphs.push(`${t('area_breakdown.title')} ${parts.join(' ')}`.trim())
+    }
   }
 
   // Top risk
   if (topRisk.length > 0) {
-    narrative += `KPIs con mayor rezago: `
-    narrative += topRisk
+    paragraphs.push(
+      t('top_risk', {
+        items: topRisk
       .slice(0, 3)
-      .map((k) => `${k.name} en ${k.scopeName} (${fmt(k.variation)}%)`)
-      .join('; ')
-    narrative += `. Se recomienda revisar causas raíz y plan de acción.\n\n`
+      .map((k) => `${k.name} ${t('in_scope', { scope: k.scopeName })} (${fmt(k.variation, locale)}%)`)
+      .join('; '),
+      })
+    )
   }
 
   // Top performers
   if (topPerformers.length > 0) {
-    narrative += `KPIs destacados: `
-    narrative += topPerformers
+    paragraphs.push(
+      t('top_performers', {
+        items: topPerformers
       .slice(0, 3)
-      .map((k) => `${k.name} en ${k.scopeName} (${fmt(k.variation)}%)`)
-      .join('; ')
-    narrative += `.\n\n`
+      .map((k) => `${k.name} ${t('in_scope', { scope: k.scopeName })} (${fmt(k.variation, locale)}%)`)
+      .join('; '),
+      })
+    )
   }
 
   // Closing recommendation
   if (averageVariation != null && averageVariation < 80) {
-    narrative += `Recomendación: el rendimiento organizacional está por debajo del umbral crítico (80%). Se sugiere convocar una revisión ejecutiva con los responsables de las áreas en riesgo antes del cierre del período.`
+    paragraphs.push(t('recommendation.at_risk'))
   } else if (averageVariation != null && averageVariation < 100) {
-    narrative += `Recomendación: el rendimiento está en zona de seguimiento. Se sugiere mantener el monitoreo semanal y asegurar cobertura completa de datos antes del cierre del subperíodo.`
+    paragraphs.push(t('recommendation.warning'))
   } else if (averageVariation != null) {
-    narrative += `La organización está cumpliendo sus objetivos KPI. Se sugiere documentar las prácticas exitosas para replicarlas en el próximo período.`
+    paragraphs.push(t('recommendation.on_track'))
   }
 
-  return narrative.trim()
+  return paragraphs.join('\n\n').trim()
 }

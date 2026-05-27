@@ -3,6 +3,7 @@
  * Uses z-score when N >= 4, percentage deviation for smaller samples.
  * No external API required — pure in-browser math.
  */
+import i18n from '../i18n'
 
 export type OutlierSeverity = 'none' | 'low' | 'medium' | 'high'
 
@@ -30,13 +31,21 @@ const EMPTY: OutlierAnalysis = {
   message: null,
 }
 
+const resolveLocale = (locale?: string) =>
+  locale || ((i18n.resolvedLanguage || i18n.language || 'es').startsWith('en') ? 'en-US' : 'es-AR')
+
+const tOutlier = (key: string, options?: Record<string, unknown>) =>
+  i18n.t(`assignments:outlier_messages.${key}`, options)
+
 /**
  * Detect whether `value` is an outlier relative to `historicalValues`.
  * Returns a full analysis including severity and human-readable message.
  */
 export function detectOutlier(
   value: number,
-  historicalValues: number[]
+  historicalValues: number[],
+  locale?: string,
+  sampleLabel?: (count: number) => string
 ): OutlierAnalysis {
   const valid = historicalValues.filter((v) => Number.isFinite(v))
   if (valid.length === 0) return EMPTY
@@ -63,7 +72,7 @@ export function detectOutlier(
         sampleSize: n,
         direction,
         percentageDeviation,
-        message: buildMessage('high', direction, abs, mean, n),
+        message: buildMessage('high', direction, abs, mean, n, locale, sampleLabel),
       }
     }
     if (abs >= 50) {
@@ -76,7 +85,7 @@ export function detectOutlier(
         sampleSize: n,
         direction,
         percentageDeviation,
-        message: buildMessage('medium', direction, abs, mean, n),
+        message: buildMessage('medium', direction, abs, mean, n, locale, sampleLabel),
       }
     }
     if (abs >= 30) {
@@ -89,7 +98,7 @@ export function detectOutlier(
         sampleSize: n,
         direction,
         percentageDeviation,
-        message: buildMessage('low', direction, abs, mean, n),
+        message: buildMessage('low', direction, abs, mean, n, locale, sampleLabel),
       }
     }
     return EMPTY
@@ -112,7 +121,7 @@ export function detectOutlier(
         sampleSize: n,
         direction,
         percentageDeviation,
-        message: buildMessage(severity, direction, abs, mean, n),
+        message: buildMessage(severity, direction, abs, mean, n, locale, sampleLabel),
       }
     }
     return EMPTY
@@ -131,7 +140,7 @@ export function detectOutlier(
       sampleSize: n,
       direction,
       percentageDeviation,
-      message: buildMessage('high', direction, abs, mean, n),
+      message: buildMessage('high', direction, abs, mean, n, locale, sampleLabel),
     }
   }
   if (zScore >= 2.5) {
@@ -144,7 +153,7 @@ export function detectOutlier(
       sampleSize: n,
       direction,
       percentageDeviation,
-      message: buildMessage('medium', direction, abs, mean, n),
+      message: buildMessage('medium', direction, abs, mean, n, locale, sampleLabel),
     }
   }
   if (zScore >= 2) {
@@ -157,7 +166,7 @@ export function detectOutlier(
       sampleSize: n,
       direction,
       percentageDeviation,
-      message: buildMessage('low', direction, abs, mean, n),
+      message: buildMessage('low', direction, abs, mean, n, locale, sampleLabel),
     }
   }
 
@@ -169,18 +178,38 @@ function buildMessage(
   direction: 'above' | 'below' | null,
   absDeviation: number,
   mean: number,
-  sampleSize: number
+  sampleSize: number,
+  locale?: string,
+  sampleLabel?: (count: number) => string
 ): string {
-  const dir = direction === 'above' ? 'por encima' : 'por debajo'
+  const resolvedLocale = resolveLocale(locale)
+  const dir = direction === 'below'
+    ? tOutlier('direction_below')
+    : tOutlier('direction_above')
   const dev = absDeviation.toFixed(0)
-  const meanFmt = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 }).format(mean)
-  const sample = `${sampleSize} período${sampleSize !== 1 ? 's' : ''} previo${sampleSize !== 1 ? 's' : ''}`
+  const meanFmt = new Intl.NumberFormat(resolvedLocale, { maximumFractionDigits: 1 }).format(mean)
+  const sample = sampleLabel?.(sampleSize) ?? tOutlier('sample', { count: sampleSize })
 
   if (severity === 'high') {
-    return `Valor inusualmente ${dir} del promedio histórico (${dev}% de desviación vs. media ${meanFmt} en ${sample}). Revisá si el dato es correcto antes de proponer.`
+    return tOutlier('high', {
+      direction: dir,
+      deviation: dev,
+      mean: meanFmt,
+      sample,
+    })
   }
   if (severity === 'medium') {
-    return `Valor fuera del rango habitual (${dev}% ${dir} de la media ${meanFmt} en ${sample}). Considerá agregar un comentario explicativo.`
+    return tOutlier('medium', {
+      direction: dir,
+      deviation: dev,
+      mean: meanFmt,
+      sample,
+    })
   }
-  return `Valor levemente alejado del historial (${dev}% ${dir} de la media ${meanFmt} en ${sample}).`
+  return tOutlier('low', {
+    direction: dir,
+    deviation: dev,
+    mean: meanFmt,
+    sample,
+  })
 }

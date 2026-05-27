@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import { Tree, TreeNode } from 'react-organizational-chart'
 import api from '../services/api'
 import './Organigrama.css'
@@ -27,13 +28,6 @@ type ScopeNode = OrgScope & {
   kpis: ScopeKPI[]
   collaboratorCount: number
   totalCollaboratorCount: number
-}
-
-const TYPE_LABEL: Record<string, string> = {
-  company: 'Empresa',
-  area: 'Área',
-  team: 'Equipo',
-  business_unit: 'Unidad de negocio',
 }
 
 const TYPE_COLOR: Record<string, string> = {
@@ -67,6 +61,7 @@ function ScopeCard({
   depth: number
   onDrill: (n: ScopeNode) => void
 }) {
+  const { t } = useTranslation('organigrama')
   const [expanded, setExpanded] = useState(false)
   const color = TYPE_COLOR[node.type] || '#374151'
   const avg = avgVariation(node.kpis)
@@ -75,7 +70,7 @@ function ScopeCard({
   return (
     <div className={`org-card org-card--d${Math.min(depth, 2)}`} style={{ borderTopColor: color }}>
       <div className="org-card-type" style={{ color }}>
-        {TYPE_LABEL[node.type] || node.type}
+        {t(`types.${node.type}`, { defaultValue: node.type })}
       </div>
       <div className="org-card-name">{node.name}</div>
 
@@ -83,7 +78,7 @@ function ScopeCard({
         <div className="org-card-meta">
           👤 {node.totalCollaboratorCount}
           {node.collaboratorCount !== node.totalCollaboratorCount && node.collaboratorCount > 0 && (
-            <span className="org-card-meta-dim"> ({node.collaboratorCount} dir.)</span>
+            <span className="org-card-meta-dim"> ({node.collaboratorCount} {t('card.dir_abbr')})</span>
           )}
         </div>
       )}
@@ -96,7 +91,9 @@ function ScopeCard({
 
       {node.kpis.length > 0 && (
         <button className="org-card-toggle" onClick={() => setExpanded((v) => !v)}>
-          {expanded ? '▲' : `▼ ${node.kpis.length} KPI${node.kpis.length !== 1 ? 's' : ''}`}
+          {expanded
+            ? t('card.kpi_toggle_hide')
+            : t('card.kpi_toggle_show', { count: node.kpis.length })}
         </button>
       )}
 
@@ -117,10 +114,9 @@ function ScopeCard({
         </div>
       )}
 
-      {/* Botón drill-down: solo en nivel 2 y si tiene hijos */}
       {depth >= 2 && hasDeeper && (
         <button className="org-card-drill" onClick={() => onDrill(node)}>
-          Ver {node.children.length} sub-unidad{node.children.length !== 1 ? 'es' : ''} →
+          {t('card.drill', { count: node.children.length })}
         </button>
       )}
     </div>
@@ -138,7 +134,6 @@ function renderTree(
 ): JSX.Element {
   const card = <ScopeCard node={node} depth={depth} onDrill={onDrill} />
 
-  // En el nivel máximo o sin hijos: nodo hoja (los hijos se acceden via drill)
   if (depth >= MAX_DEPTH || node.children.length === 0) {
     return <TreeNode key={node.id} label={card} />
   }
@@ -153,8 +148,7 @@ function renderTree(
 // ─── Página principal ─────────────────────────────────────────────────────────
 
 export default function Organigrama() {
-  // drillPath vacío = vista raíz del árbol completo
-  // drillPath con items = árbol desde ese nodo hacia abajo
+  const { t } = useTranslation('organigrama')
   const [drillPath, setDrillPath] = useState<ScopeNode[]>([])
 
   const { data: orgScopes, isLoading } = useQuery<OrgScope[]>('org-scopes', async () =>
@@ -233,7 +227,6 @@ export default function Organigrama() {
     setDrillPath((prev) => prev.slice(0, index + 1))
   }
 
-  // Raíces que se muestran en el árbol actual
   const currentRoots = drillPath.length === 0
     ? tree
     : drillPath[drillPath.length - 1].children
@@ -244,19 +237,22 @@ export default function Organigrama() {
   }, [tree])
 
   if (isLoading) {
-    return <div className="organigrama-page"><div className="org-loading">Cargando estructura…</div></div>
+    return <div className="organigrama-page"><div className="org-loading">{t('loading')}</div></div>
   }
 
   if (tree.length === 0) {
     return (
       <div className="organigrama-page">
         <div className="page-header">
-          <div><h1>Organigrama</h1><p className="subtitle">Estructura jerárquica</p></div>
+          <div><h1>{t('title')}</h1><p className="subtitle">{t('subtitle')}</p></div>
         </div>
         <div className="org-empty">
           <div className="org-empty-icon">🏢</div>
-          <h3>No hay unidades organizacionales</h3>
-          <p>Creá las áreas en <a href="/configuracion">Configuración → Estructura Organizacional</a>.</p>
+          <h3>{t('empty.title')}</h3>
+          <p>
+            {t('empty.text')}{' '}
+            <a href="/configuracion">{t('empty.link')}</a>.
+          </p>
         </div>
       </div>
     )
@@ -266,16 +262,15 @@ export default function Organigrama() {
     <div className="organigrama-page">
       <div className="page-header">
         <div>
-          <h1>Organigrama</h1>
-          <p className="subtitle">{totalNodes} unidades · vista árbol (3 niveles)</p>
+          <h1>{t('title')}</h1>
+          <p className="subtitle">{t('total_units', { count: totalNodes })}</p>
         </div>
       </div>
 
-      {/* Breadcrumb — solo cuando se hizo drill-down */}
       {drillPath.length > 0 && (
         <nav className="org-breadcrumb">
           <button className="org-breadcrumb-item" onClick={() => setDrillPath([])}>
-            🏠 Inicio
+            🏠 {t('breadcrumb_home')}
           </button>
           {drillPath.map((node, i) => (
             <span key={node.id} className="org-breadcrumb-entry">
@@ -291,21 +286,19 @@ export default function Organigrama() {
         </nav>
       )}
 
-      {/* Cabecera del nivel actual cuando es drill-down */}
       {drillPath.length > 0 && (() => {
         const parent = drillPath[drillPath.length - 1]
         const color = TYPE_COLOR[parent.type] || '#374151'
         return (
           <div className="org-level-header" style={{ borderLeftColor: color }}>
             <div className="org-level-header-type" style={{ color }}>
-              {TYPE_LABEL[parent.type] || parent.type}
+              {t(`types.${parent.type}`, { defaultValue: parent.type })}
             </div>
             <div className="org-level-header-name">{parent.name}</div>
           </div>
         )
       })()}
 
-      {/* Árbol */}
       <div className="org-tree-wrap">
         {currentRoots.map((root) => (
           <div key={root.id} className="org-tree-root">

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from 'react'
 import { useQuery } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { useAuth } from '../hooks/useAuth'
 import {
@@ -71,6 +72,7 @@ interface ReductionStatistic {
 }
 
 export default function VistasReduccion() {
+  const { t, i18n } = useTranslation(['views', 'grid', 'common'])
   const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null)
   const [selectedArea, setSelectedArea] = useState<string>('')
   const [selectedKPI, setSelectedKPI] = useState<number | null>(null)
@@ -78,6 +80,18 @@ export default function VistasReduccion() {
   const { user } = useAuth()
   const canViewCompany = Boolean(user?.hasSuperpowers)
   const teamArea = user?.area || ''
+  const locale = i18n.resolvedLanguage?.startsWith('en') ? 'en-US' : 'es-AR'
+
+  const getStatusLabel = (status?: string) => {
+    if (!status) return '-'
+    const normalized = status.toLowerCase()
+    if (normalized === 'proposed') return t('grid:status.proposed')
+    const commonStatuses = ['draft', 'approved', 'closed', 'pending', 'in_review', 'rejected', 'changes_requested', 'open']
+    if (commonStatuses.includes(normalized)) {
+      return t(`common:${normalized}`)
+    }
+    return status
+  }
 
   // Obtener períodos
   const { data: periods } = useQuery('periods', async () => {
@@ -150,7 +164,7 @@ export default function VistasReduccion() {
   const evolutionChartData =
     evolution?.map((item: any) => ({
       period: item.periodName,
-      fecha: new Date(item.periodStartDate).toLocaleDateString('es-ES', {
+      fecha: new Date(item.periodStartDate).toLocaleDateString(locale, {
         month: 'short',
         year: 'numeric',
       }),
@@ -172,17 +186,15 @@ export default function VistasReduccion() {
     <div className="vistas-reduccion-page">
       <div className="page-header">
         <div>
-          <h1>📉 Vistas de Reducción</h1>
-          <p className="subtitle">
-            Reportes y evolución temporal de objetivos de reducción
-          </p>
+          <h1>📉 {t('reduction.title')}</h1>
+          <p className="subtitle">{t('reduction.subtitle')}</p>
         </div>
       </div>
 
       {/* Filtros */}
       <div className="filters-section">
         <div className="filter-group">
-          <label htmlFor="period-filter">Período:</label>
+          <label htmlFor="period-filter">{t('reduction.filters.period_label')}:</label>
           <select
             id="period-filter"
             value={selectedPeriodId || ''}
@@ -192,7 +204,7 @@ export default function VistasReduccion() {
               )
             }
           >
-            <option value="">Todos los períodos</option>
+            <option value="">{t('reduction.filters.all_periods')}</option>
             {periods?.map((period: any) => (
               <option key={period.id} value={period.id}>
                 {period.name}
@@ -202,14 +214,14 @@ export default function VistasReduccion() {
         </div>
 
         <div className="filter-group">
-          <label htmlFor="area-filter">Área:</label>
+          <label htmlFor="area-filter">{t('reduction.filters.area_label')}:</label>
           <select
             id="area-filter"
             value={selectedArea}
             onChange={(e) => setSelectedArea(e.target.value)}
             disabled={!canViewCompany && !!teamArea}
           >
-            {!(!canViewCompany && teamArea) && <option value="">Todas las áreas</option>}
+            {!(!canViewCompany && teamArea) && <option value="">{t('reduction.filters.all_areas')}</option>}
             {(canViewCompany ? areas : teamArea ? [teamArea] : areas).map((area) => (
               <option key={area} value={area}>
                 {area}
@@ -219,7 +231,7 @@ export default function VistasReduccion() {
         </div>
 
         <div className="filter-group">
-          <label htmlFor="view-mode">Vista:</label>
+          <label htmlFor="view-mode">{t('reduction.filters.view_label')}:</label>
           <select
             id="view-mode"
             value={viewMode}
@@ -227,8 +239,8 @@ export default function VistasReduccion() {
               setViewMode(e.target.value as 'overview' | 'evolution')
             }
           >
-            <option value="overview">Resumen</option>
-            <option value="evolution">Evolución Temporal</option>
+            <option value="overview">{t('reduction.view_modes.overview')}</option>
+            <option value="evolution">{t('reduction.view_modes.evolution')}</option>
           </select>
         </div>
       </div>
@@ -237,9 +249,9 @@ export default function VistasReduccion() {
         <>
           {/* Estadísticas Generales */}
           <div className="stats-section">
-            <h2>Estadísticas Generales</h2>
+            <h2>{t('reduction.stats.title')}</h2>
             {isLoadingStats ? (
-              <div className="loading">Cargando estadísticas...</div>
+              <div className="loading">{t('reduction.stats.loading')}</div>
             ) : statistics && statistics.length > 0 ? (
               <div className="stats-grid">
                 {statistics.map((stat) => (
@@ -247,25 +259,25 @@ export default function VistasReduccion() {
                     <h3>{stat.kpiName}</h3>
                     <div className="stat-details">
                       <div className="stat-item">
-                        <span className="stat-label">Colaboradores:</span>
+                        <span className="stat-label">{t('reduction.stats.collaborators')}</span>
                         <span className="stat-value">
                           {stat.totalCollaborators}
                         </span>
                       </div>
                       <div className="stat-item">
-                        <span className="stat-label">Promedio Target:</span>
+                        <span className="stat-label">{t('reduction.stats.avg_target')}</span>
                         <span className="stat-value">
                           {stat.avgTarget.toFixed(2)}
                         </span>
                       </div>
                       <div className="stat-item">
-                        <span className="stat-label">Promedio Actual:</span>
+                        <span className="stat-label">{t('reduction.stats.avg_actual')}</span>
                         <span className="stat-value">
                           {stat.avgActual.toFixed(2)}
                         </span>
                       </div>
                       <div className="stat-item">
-                        <span className="stat-label">% Cumplimiento:</span>
+                        <span className="stat-label">{t('reduction.stats.compliance_pct')}</span>
                         <span
                           className={`stat-value ${
                             stat.avgVariation >= 100
@@ -279,7 +291,7 @@ export default function VistasReduccion() {
                         </span>
                       </div>
                       <div className="stat-item">
-                        <span className="stat-label">Completitud:</span>
+                        <span className="stat-label">{t('reduction.stats.completion_rate')}</span>
                         <span className="stat-value">
                           {stat.completionRate.toFixed(1)}%
                         </span>
@@ -290,7 +302,7 @@ export default function VistasReduccion() {
               </div>
             ) : (
               <div className="empty-state">
-                <p>No hay datos de reducción para los filtros seleccionados</p>
+                <p>{t('reduction.stats.empty')}</p>
               </div>
             )}
           </div>
@@ -298,7 +310,7 @@ export default function VistasReduccion() {
           {/* Gráfico de Comparación */}
           {statisticsChartData.length > 0 && (
             <div className="chart-section">
-              <h2>Comparación de KPIs de Reducción</h2>
+              <h2>{t('reduction.chart.comparison_title')}</h2>
               <ResponsiveContainer width="100%" height={400}>
                 <BarChart data={statisticsChartData}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -306,9 +318,9 @@ export default function VistasReduccion() {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="promedioTarget" fill="#8884d8" name="Target Promedio" />
-                  <Bar dataKey="promedioActual" fill="#82ca9d" name="Actual Promedio" />
-                  <Bar dataKey="cumplimiento" fill="#ffc658" name="% Cumplimiento" />
+                  <Bar dataKey="promedioTarget" fill="#8884d8" name={t('reduction.chart.target_avg')} />
+                  <Bar dataKey="promedioActual" fill="#82ca9d" name={t('reduction.chart.actual_avg')} />
+                  <Bar dataKey="cumplimiento" fill="#ffc658" name={t('reduction.chart.compliance_pct')} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -316,9 +328,9 @@ export default function VistasReduccion() {
 
           {/* Tabla de Detalles */}
           <div className="table-section">
-            <h2>Detalles por KPI y Colaborador</h2>
+            <h2>{t('reduction.table.title')}</h2>
             {isLoadingKPIs ? (
-              <div className="loading">Cargando datos...</div>
+              <div className="loading">{t('reduction.table.loading')}</div>
             ) : reductionKPIs && reductionKPIs.length > 0 ? (
               <div className="kpi-groups">
                 {reductionKPIs.map((kpiGroup) => (
@@ -332,13 +344,13 @@ export default function VistasReduccion() {
                     <table className="data-table">
                       <thead>
                         <tr>
-                          <th>Colaborador</th>
-                          <th>Área</th>
-                          <th>Período</th>
-                          <th>Target</th>
-                          <th>Actual</th>
-                          <th>% Cumplimiento</th>
-                          <th>Estado</th>
+                          <th>{t('reduction.table.header_collaborator')}</th>
+                          <th>{t('reduction.table.header_area')}</th>
+                          <th>{t('reduction.table.header_period')}</th>
+                          <th>{t('reduction.table.header_target')}</th>
+                          <th>{t('reduction.table.header_actual')}</th>
+                          <th>{t('reduction.table.header_compliance')}</th>
+                          <th>{t('reduction.table.header_status')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -372,7 +384,7 @@ export default function VistasReduccion() {
                               <span
                                 className={`status-badge status-${assignment.status}`}
                               >
-                                {assignment.status}
+                                {getStatusLabel(assignment.status)}
                               </span>
                             </td>
                           </tr>
@@ -384,7 +396,7 @@ export default function VistasReduccion() {
               </div>
             ) : (
               <div className="empty-state">
-                <p>No hay KPIs de reducción para los filtros seleccionados</p>
+                <p>{t('reduction.table.empty')}</p>
               </div>
             )}
           </div>
@@ -393,9 +405,9 @@ export default function VistasReduccion() {
         <>
           {/* Vista de Evolución Temporal */}
           <div className="evolution-section">
-            <h2>Evolución Temporal</h2>
+            <h2>{t('reduction.evolution.title')}</h2>
             <div className="kpi-selector">
-              <label htmlFor="kpi-select">Seleccionar KPI:</label>
+              <label htmlFor="kpi-select">{t('reduction.evolution.kpi_label')}</label>
               <select
                 id="kpi-select"
                 value={selectedKPI || ''}
@@ -405,7 +417,7 @@ export default function VistasReduccion() {
                   )
                 }
               >
-                <option value="">Selecciona un KPI</option>
+                <option value="">{t('reduction.evolution.select_kpi')}</option>
                 {reductionKPIs?.map((kpi) => (
                   <option key={kpi.kpiId} value={kpi.kpiId}>
                     {kpi.kpiName}
@@ -417,11 +429,11 @@ export default function VistasReduccion() {
             {selectedKPI && (
               <>
                 {isLoadingEvolution ? (
-                  <div className="loading">Cargando evolución...</div>
+                  <div className="loading">{t('reduction.evolution.loading')}</div>
                 ) : evolution && evolution.length > 0 ? (
                   <>
                     <div className="chart-section">
-                      <h3>Evolución de Target vs Actual</h3>
+                      <h3>{t('reduction.evolution.chart_target_actual')}</h3>
                       <ResponsiveContainer width="100%" height={400}>
                         <LineChart data={evolutionChartData}>
                           <CartesianGrid strokeDasharray="3 3" />
@@ -433,14 +445,14 @@ export default function VistasReduccion() {
                             type="monotone"
                             dataKey="target"
                             stroke="#8884d8"
-                            name="Target"
+                            name={t('reduction.evolution.table.target')}
                             strokeWidth={2}
                           />
                           <Line
                             type="monotone"
                             dataKey="actual"
                             stroke="#82ca9d"
-                            name="Actual"
+                            name={t('reduction.evolution.table.actual')}
                             strokeWidth={2}
                           />
                         </LineChart>
@@ -448,7 +460,7 @@ export default function VistasReduccion() {
                     </div>
 
                     <div className="chart-section">
-                      <h3>Evolución del % de Cumplimiento</h3>
+                      <h3>{t('reduction.evolution.chart_compliance')}</h3>
                       <ResponsiveContainer width="100%" height={300}>
                         <LineChart data={evolutionChartData}>
                           <CartesianGrid strokeDasharray="3 3" />
@@ -460,7 +472,7 @@ export default function VistasReduccion() {
                             type="monotone"
                             dataKey="variation"
                             stroke="#ffc658"
-                            name="% Cumplimiento"
+                            name={t('reduction.evolution.table.compliance')}
                             strokeWidth={2}
                           />
                         </LineChart>
@@ -468,15 +480,15 @@ export default function VistasReduccion() {
                     </div>
 
                     <div className="evolution-table">
-                      <h3>Datos de Evolución</h3>
+                      <h3>{t('reduction.evolution.data_title')}</h3>
                       <table className="data-table">
                         <thead>
                           <tr>
-                            <th>Período</th>
-                            <th>Target</th>
-                            <th>Actual</th>
-                            <th>% Cumplimiento</th>
-                            <th>Estado</th>
+                            <th>{t('reduction.evolution.table.period')}</th>
+                            <th>{t('reduction.evolution.table.target')}</th>
+                            <th>{t('reduction.evolution.table.actual')}</th>
+                            <th>{t('reduction.evolution.table.compliance')}</th>
+                            <th>{t('reduction.evolution.table.status')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -508,7 +520,7 @@ export default function VistasReduccion() {
                                 <span
                                   className={`status-badge status-${item.status}`}
                                 >
-                                  {item.status}
+                                  {getStatusLabel(item.status)}
                                 </span>
                               </td>
                             </tr>
@@ -519,7 +531,7 @@ export default function VistasReduccion() {
                   </>
                 ) : (
                   <div className="empty-state">
-                    <p>No hay datos de evolución para este KPI</p>
+                    <p>{t('reduction.evolution.empty')}</p>
                   </div>
                 )}
               </>

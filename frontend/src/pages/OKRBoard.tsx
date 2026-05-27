@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from 'react-query'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import './OKRBoard.css'
 
@@ -42,14 +43,6 @@ interface Period {
   status: string
 }
 
-const STATUS_LABEL: Record<KRStatus, string> = {
-  not_started: 'Sin iniciar',
-  on_track: 'En camino',
-  at_risk: 'En riesgo',
-  behind: 'Atrasado',
-  completed: 'Completado',
-}
-
 const STATUS_COLOR: Record<KRStatus, string> = {
   not_started: '#9ca3af',
   on_track: '#16a34a',
@@ -68,6 +61,7 @@ const PAGE_SIZE = 12
 
 export default function OKRBoard() {
   const navigate = useNavigate()
+  const { t } = useTranslation('okr')
   const [selectedPeriod, setSelectedPeriod] = useState<number | ''>('')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [page, setPage] = useState(1)
@@ -100,34 +94,34 @@ export default function OKRBoard() {
     <div className="okr-board">
       <div className="okr-board-header">
         <div>
-          <h2>OKRs</h2>
-          <p className="okr-board-subtitle">Objetivos y Resultados Clave</p>
+          <h2>{t('title')}</h2>
+          <p className="okr-board-subtitle">{t('subtitle')}</p>
         </div>
         <button className="btn-primary" onClick={() => navigate('/okr/nuevo')}>
-          + Nuevo objetivo
+          {t('new_objective')}
         </button>
       </div>
 
       <div className="okr-filters">
         <select value={selectedPeriod} onChange={(e) => handlePeriodChange(e.target.value)}>
-          <option value="">Todos los periodos</option>
+          <option value="">{t('filters.all_periods')}</option>
           {periods.map((p) => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
 
         <select value={statusFilter} onChange={(e) => handleStatusChange(e.target.value)}>
-          <option value="">Todos los estados</option>
-          <option value="active">Activo</option>
-          <option value="draft">Borrador</option>
-          <option value="closed">Cerrado</option>
+          <option value="">{t('filters.all_states')}</option>
+          <option value="active">{t('status.active')}</option>
+          <option value="draft">{t('status.draft')}</option>
+          <option value="closed">{t('status.closed')}</option>
         </select>
 
         {selectedPeriod && (
           <>
             <button
               className="btn-export btn-export-pdf"
-              title="Exportar período a PDF"
+              title={t('export.pdf_title')}
               onClick={() => window.open(
                 `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/export/okr/period/${selectedPeriod}/pdf`,
                 '_blank'
@@ -137,7 +131,7 @@ export default function OKRBoard() {
             </button>
             <button
               className="btn-export btn-export-excel"
-              title="Exportar período a Excel"
+              title={t('export.excel_title')}
               onClick={() => window.open(
                 `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/export/okr/period/${selectedPeriod}/excel`,
                 '_blank'
@@ -149,22 +143,22 @@ export default function OKRBoard() {
         )}
       </div>
 
-      {isLoading && <div className="okr-loading">Cargando objetivos...</div>}
+      {isLoading && <div className="okr-loading">{t('loading')}</div>}
 
       {!isLoading && displayed.length === 0 && (
         <div className="okr-empty">
-          <p>No hay objetivos todavia.</p>
+          <p>{t('empty.message')}</p>
           <button className="btn-primary" onClick={() => navigate('/okr/nuevo')}>
-            Crear primer objetivo
+            {t('empty.create')}
           </button>
         </div>
       )}
 
       {totalPages > 1 && (
         <div className="okr-pagination">
-          <button className="okr-page-btn" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>← Anterior</button>
-          <span className="okr-page-info">Página {page} de {totalPages} · {objectives.length} objetivos</span>
-          <button className="okr-page-btn" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Siguiente →</button>
+          <button className="okr-page-btn" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>{t('pagination.prev')}</button>
+          <span className="okr-page-info">{t('pagination.info', { page, totalPages, count: objectives.length })}</span>
+          <button className="okr-page-btn" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>{t('pagination.next')}</button>
         </div>
       )}
 
@@ -181,18 +175,18 @@ export default function OKRBoard() {
                 {obj.periodName && <span className="okr-badge okr-badge--period">{obj.periodName}</span>}
               </div>
               <span className={`okr-status-pill okr-status-pill--${obj.status}`}>
-                {obj.status === 'active' ? 'Activo' : obj.status === 'draft' ? 'Borrador' : 'Cerrado'}
+                {t(`status.${obj.status}`)}
               </span>
             </div>
 
             <h3 className="okr-card-title">{obj.title}</h3>
             {obj.description && <p className="okr-card-desc">{obj.description}</p>}
-            {obj.ownerName && <p className="okr-card-owner">Responsable: {obj.ownerName}</p>}
+            {obj.ownerName && <p className="okr-card-owner">{t('card.owner', { name: obj.ownerName })}</p>}
 
             {/* Progress bar */}
             <div className="okr-progress-section">
               <div className="okr-progress-label">
-                <span>Progreso</span>
+                <span>{t('card.progress')}</span>
                 <span style={{ color: progressColor(Number(obj.progress) || 0) }}>{Math.round(Number(obj.progress) || 0)}%</span>
               </div>
               <div className="okr-progress-track">
@@ -214,7 +208,7 @@ export default function OKRBoard() {
                         className="okr-kr-status"
                         style={{ color: STATUS_COLOR[kr.status] }}
                       >
-                        {STATUS_LABEL[kr.status]}
+                        {t(`status.${kr.status}`)}
                       </span>
                     </div>
                     <div className="okr-kr-progress-track">
@@ -258,9 +252,9 @@ export default function OKRBoard() {
 
       {totalPages > 1 && (
         <div className="okr-pagination okr-pagination--bottom">
-          <button className="okr-page-btn" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>← Anterior</button>
-          <span className="okr-page-info">Página {page} de {totalPages}</span>
-          <button className="okr-page-btn" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Siguiente →</button>
+          <button className="okr-page-btn" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>{t('pagination.prev')}</button>
+          <span className="okr-page-info">{t('pagination.info_short', { page, totalPages })}</span>
+          <button className="okr-page-btn" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>{t('pagination.next')}</button>
         </div>
       )}
     </div>

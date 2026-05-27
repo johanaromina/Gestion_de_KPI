@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { ObjectiveTree, KPI, ScopeKPI } from '../types'
 import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
@@ -17,6 +18,7 @@ export default function ObjectiveTreeForm({
   onClose,
   onSuccess,
 }: ObjectiveTreeFormProps) {
+  const { t } = useTranslation(['okr', 'common'])
   const [formData, setFormData] = useState<Partial<ObjectiveTree>>({
     name: objective?.name || '',
     level: objective?.level || 'individual',
@@ -102,11 +104,11 @@ export default function ObjectiveTreeForm({
     const newErrors: Record<string, string> = {}
 
     if (!formData.name?.trim()) {
-      newErrors.name = 'El nombre es requerido'
+      newErrors.name = t('okr:tree_form.errors.name_required')
     }
 
     if (!formData.level) {
-      newErrors.level = 'El nivel es requerido'
+      newErrors.level = t('okr:tree_form.errors.level_required')
     }
 
     setErrors(newErrors)
@@ -169,6 +171,9 @@ export default function ObjectiveTreeForm({
     const validLevels = levelHierarchy[formData.level || 'individual'] || []
     return validLevels.includes(parent.level)
   })
+  const levelLabel = (level: string) =>
+    t(`okr:tree_form.levels.${level}`, { defaultValue: level })
+  const isSaving = createMutation.isLoading || updateMutation.isLoading
 
   return (
     <div
@@ -179,7 +184,7 @@ export default function ObjectiveTreeForm({
       <div className="modal-content objective-tree-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>
-            {objective?.id ? 'Editar Objetivo' : 'Crear Objetivo'}
+            {objective?.id ? t('okr:tree_form.title_edit') : t('okr:tree_form.title_new')}
           </h2>
           <button className="close-button" onClick={onClose}>
             ×
@@ -188,7 +193,7 @@ export default function ObjectiveTreeForm({
 
         <form onSubmit={handleSubmit} className="objective-tree-form">
           <div className="form-group">
-            <label htmlFor="name">Nombre del Objetivo *</label>
+            <label htmlFor="name">{t('okr:tree_form.fields.name')}</label>
             <input
               type="text"
               id="name"
@@ -196,7 +201,7 @@ export default function ObjectiveTreeForm({
               onChange={(e) =>
                 setFormData({ ...formData, name: e.target.value })
               }
-              placeholder="Ej: Mejorar satisfacción del cliente"
+              placeholder={t('okr:tree_form.fields.name_placeholder')}
               className={errors.name ? 'error' : ''}
             />
             {errors.name && (
@@ -206,7 +211,7 @@ export default function ObjectiveTreeForm({
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="level">Nivel *</label>
+              <label htmlFor="level">{t('okr:tree_form.fields.level')}</label>
               <select
                 id="level"
                 value={formData.level || 'individual'}
@@ -219,11 +224,11 @@ export default function ObjectiveTreeForm({
                 }
                 className={errors.level ? 'error' : ''}
               >
-                <option value="company">Empresa</option>
-                <option value="direction">Dirección</option>
-                <option value="management">Gerencia</option>
-                <option value="leadership">Liderazgo</option>
-                <option value="individual">Individual</option>
+                <option value="company">{levelLabel('company')}</option>
+                <option value="direction">{levelLabel('direction')}</option>
+                <option value="management">{levelLabel('management')}</option>
+                <option value="leadership">{levelLabel('leadership')}</option>
+                <option value="individual">{levelLabel('individual')}</option>
               </select>
               {errors.level && (
                 <span className="error-message">{errors.level}</span>
@@ -231,7 +236,7 @@ export default function ObjectiveTreeForm({
             </div>
 
             <div className="form-group">
-              <label htmlFor="parentId">Objetivo Padre (Opcional)</label>
+              <label htmlFor="parentId">{t('okr:tree_form.fields.parent')}</label>
               <select
                 id="parentId"
                 value={formData.parentId || ''}
@@ -244,21 +249,21 @@ export default function ObjectiveTreeForm({
                   })
                 }
               >
-                <option value="">Sin objetivo padre</option>
+                <option value="">{t('okr:tree_form.fields.parent_placeholder')}</option>
                 {validParents.map((parent) => (
                   <option key={parent.id} value={parent.id}>
-                    [{parent.level}] {parent.name}
+                    [{levelLabel(parent.level)}] {parent.name}
                   </option>
                 ))}
               </select>
               <small className="form-hint">
-                Solo se pueden seleccionar objetivos de niveles superiores
+                {t('okr:tree_form.fields.parent_hint')}
               </small>
             </div>
           </div>
 
           <div className="form-group">
-            <label>KPIs Asociados</label>
+            <label>{t('okr:tree_form.fields.kpis')}</label>
             <div className="kpi-selection">
               {kpis && kpis.length > 0 ? (
                 kpis.map((kpi) => (
@@ -273,23 +278,23 @@ export default function ObjectiveTreeForm({
                       {kpi.macroKPIId && (
                         <span className="macro-indicator">
                           {' '}
-                          (Macro: KPI #{kpi.macroKPIId})
+                          ({t('okr:tree_form.badges.macro', { id: kpi.macroKPIId })})
                         </span>
                       )}
                     </span>
                   </label>
                 ))
               ) : (
-                <p className="no-kpis">No hay KPIs disponibles</p>
+                <p className="no-kpis">{t('okr:tree_form.empty.kpis')}</p>
               )}
             </div>
             <small className="form-hint">
-              Selecciona los KPIs que están relacionados con este objetivo
+              {t('okr:tree_form.fields.kpis_hint')}
             </small>
           </div>
 
           <div className="form-group">
-            <label>Scope KPIs Asociados</label>
+            <label>{t('okr:tree_form.fields.scope_kpis')}</label>
             <div className="kpi-selection">
               {scopeKpis && scopeKpis.length > 0 ? (
                 scopeKpis.map((scopeKpi) => (
@@ -303,34 +308,34 @@ export default function ObjectiveTreeForm({
                       {scopeKpi.name}
                       <span className="macro-indicator">
                         {' '}
-                        ({scopeKpi.orgScopeName || `Scope #${scopeKpi.orgScopeId}`})
+                        ({scopeKpi.orgScopeName || t('okr:tree_form.badges.scope', { id: scopeKpi.orgScopeId })})
                       </span>
                     </span>
                   </label>
                 ))
               ) : (
-                <p className="no-kpis">No hay Scope KPIs disponibles</p>
+                <p className="no-kpis">{t('okr:tree_form.empty.scope_kpis')}</p>
               )}
             </div>
             <small className="form-hint">
-              Selecciona los Scope KPIs organizacionales que contribuyen a este objetivo
+              {t('okr:tree_form.fields.scope_kpis_hint')}
             </small>
           </div>
 
           <div className="form-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>
-              Cancelar
+              {t('common:cancel')}
             </button>
             <button
               type="submit"
               className="btn-primary"
-              disabled={createMutation.isLoading || updateMutation.isLoading}
+              disabled={isSaving}
             >
-              {createMutation.isLoading || updateMutation.isLoading
-                ? 'Guardando...'
+              {isSaving
+                ? t('okr:tree_form.actions.saving')
                 : objective?.id
-                ? 'Actualizar'
-                : 'Crear'}
+                ? t('okr:tree_form.actions.update')
+                : t('okr:tree_form.actions.create')}
             </button>
           </div>
         </form>

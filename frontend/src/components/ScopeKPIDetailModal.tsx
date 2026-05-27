@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { ScopeKPI, ScopeKPILink } from '../types'
 import './ScopeKPIDetailModal.css'
@@ -37,18 +38,58 @@ type ScopeNavigationEntry = {
   label: string
 }
 
-const formatNumber = (value?: number | null) => (value == null ? '-' : Number(value).toFixed(2))
-
-const buildScopeLabel = (scopeKpiId: number, scopeKpi?: Pick<ScopeKPI, 'name'> | null) =>
-  scopeKpi?.name?.trim() || `Scope KPI #${scopeKpiId}`
-
-const formatDate = (value?: string) => {
-  if (!value) return '-'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('es-AR')
-}
-
 export default function ScopeKPIDetailModal({ scopeKpiId, initialScopeKpi, onClose }: ScopeKPIDetailModalProps) {
+  const { t, i18n } = useTranslation(['config', 'assignments', 'common'])
+  const locale = i18n.resolvedLanguage?.startsWith('en') ? 'en-US' : 'es-AR'
+  const formatNumber = (value?: number | null) =>
+    value == null
+      ? '-'
+      : new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(Number(value))
+
+  const buildScopeLabel = (id: number, scopeKpi?: Pick<ScopeKPI, 'name'> | null) =>
+    scopeKpi?.name?.trim() || t('config:scope_kpi_detail.fallbacks.scope_kpi', { id })
+
+  const formatDate = (value?: string) => {
+    if (!value) return '-'
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString(locale)
+  }
+
+  const ownerLevelLabel = (value?: string | null) =>
+    value
+      ? t(`assignments:scope_kpis.owner_levels.${value}`, { defaultValue: value })
+      : '-'
+
+  const sourceModeLabel = (value?: string | null) =>
+    value
+      ? t(`assignments:scope_kpis.source_modes.${value}`, { defaultValue: value })
+      : '-'
+
+  const statusLabel = (value?: string | null) =>
+    value
+      ? t(`assignments:status.${value}`, { defaultValue: value })
+      : '-'
+
+  const measurementModeLabel = (value?: string | null) =>
+    value
+      ? t(`assignments:input.${value}`, { defaultValue: value })
+      : '-'
+
+  const runStatusLabel = (value?: string | null) =>
+    value
+      ? t(`config:options.run_status.${value}`, { defaultValue: value })
+      : '-'
+
+  const childTypeLabel = (value?: string | null) =>
+    value
+      ? t(`config:scope_kpi_detail.child_types.${value}`, { defaultValue: value })
+      : '-'
+
+  const aggregationMethodLabel = (value?: string | null) =>
+    value
+      ? t(`config:scope_kpi_links.aggregation_methods.${value}`, { defaultValue: value })
+      : '-'
+
   const [navigationStack, setNavigationStack] = useState<ScopeNavigationEntry[]>([
     {
       id: scopeKpiId,
@@ -117,7 +158,7 @@ export default function ScopeKPIDetailModal({ scopeKpiId, initialScopeKpi, onClo
       if (existingIndex >= 0) {
         return current.slice(0, existingIndex + 1)
       }
-      return [...current, { id: childScopeId, label: label?.trim() || `Scope KPI #${childScopeId}` }]
+      return [...current, { id: childScopeId, label: label?.trim() || t('config:scope_kpi_detail.fallbacks.scope_kpi', { id: childScopeId }) }]
     })
   }
 
@@ -149,49 +190,49 @@ export default function ScopeKPIDetailModal({ scopeKpiId, initialScopeKpi, onClo
                 </div>
               ))}
             </div>
-            <h2>{scopeKpi?.name || 'Detalle Scope KPI'}</h2>
+            <h2>{scopeKpi?.name || t('config:scope_kpi_detail.title_fallback')}</h2>
             <div className="scope-detail-subtitle">
-              <span>{scopeKpi?.kpiName || 'KPI base'}</span>
-              <span>{scopeKpi?.orgScopeName || 'Scope'}</span>
-              <span>Owner: {scopeKpi?.ownerLevel || '-'}</span>
-              <span>Source: {scopeKpi?.sourceMode || '-'}</span>
-              <span>Estado: {scopeKpi?.status || '-'}</span>
+              <span>{scopeKpi?.kpiName || t('config:scope_kpi_detail.base_kpi')}</span>
+              <span>{scopeKpi?.orgScopeName || t('config:scope_kpi_detail.scope')}</span>
+              <span>{t('config:scope_kpi_detail.owner')}: {ownerLevelLabel(scopeKpi?.ownerLevel)}</span>
+              <span>{t('config:scope_kpi_detail.source')}: {sourceModeLabel(scopeKpi?.sourceMode)}</span>
+              <span>{t('config:scope_kpi_detail.status')}: {statusLabel(scopeKpi?.status)}</span>
             </div>
           </div>
           <div className="scope-detail-header-actions">
             {navigationStack.length > 1 ? (
               <button type="button" className="btn-secondary" onClick={navigateBack}>
-                Volver
+                {t('common:back')}
               </button>
             ) : null}
             <button type="button" className="btn-secondary" onClick={onClose}>
-              Cerrar
+              {t('common:close')}
             </button>
           </div>
         </div>
 
         {isLoadingScope && !scopeKpi ? (
-          <div className="scope-detail-empty">Cargando detalle...</div>
+          <div className="scope-detail-empty">{t('config:scope_kpi_detail.loading')}</div>
         ) : (
           <div className="scope-detail-grid">
             <div className="scope-detail-stack">
               <section className="scope-detail-section">
-                <h3>Resumen</h3>
+                <h3>{t('config:scope_kpi_detail.summary')}</h3>
                 <div className="scope-detail-summary">
                   <div className="scope-detail-stat">
-                    <span>Actual</span>
+                    <span>{t('config:scope_kpi_detail.actual')}</span>
                     <strong>{formatNumber(scopeKpi?.actual)}</strong>
                   </div>
                   <div className="scope-detail-stat">
-                    <span>Target</span>
+                    <span>{t('config:scope_kpi_detail.target')}</span>
                     <strong>{formatNumber(scopeKpi?.target)}</strong>
                   </div>
                   <div className="scope-detail-stat">
-                    <span>Variación</span>
+                    <span>{t('config:scope_kpi_detail.variation')}</span>
                     <strong>{formatNumber(scopeKpi?.variation)}</strong>
                   </div>
                   <div className="scope-detail-stat">
-                    <span>Resultado</span>
+                    <span>{t('config:scope_kpi_detail.result')}</span>
                     <strong>{formatNumber(scopeKpi?.weightedResult)}</strong>
                   </div>
                 </div>
@@ -199,28 +240,30 @@ export default function ScopeKPIDetailModal({ scopeKpiId, initialScopeKpi, onClo
 
               {scopeKpi?.sourceMode === 'mixed' ? (
                 <section className="scope-detail-section">
-                  <h3>Composición Mixed</h3>
+                  <h3>{t('config:scope_kpi_detail.mixed_title')}</h3>
                   <div className="scope-detail-mix">
                     <div className="scope-detail-empty">
-                      El valor final combina el componente directo y el agregado. Las mediciones manuales/importadas alimentan el directo; el
-                      recálculo desde links actualiza el agregado.
+                      {t('config:scope_kpi_detail.mixed_note')}
                     </div>
                     <div className="scope-detail-mix-grid">
                       <div className="scope-detail-mix-card">
-                        <span>{scopeKpi.mixedConfig?.directLabel || 'Componente directo'}</span>
+                        <span>{scopeKpi.mixedConfig?.directLabel || t('config:scope_kpi_detail.direct_component')}</span>
                         <strong>{formatNumber(scopeKpi.directActual)}</strong>
-                        <small>Peso: {scopeKpi.mixedConfig?.directWeight ?? 50}</small>
+                        <small>{t('config:scope_kpi_detail.weight', { value: scopeKpi.mixedConfig?.directWeight ?? 50 })}</small>
                       </div>
                       <div className="scope-detail-mix-card">
-                        <span>{scopeKpi.mixedConfig?.aggregatedLabel || 'Componente agregado'}</span>
+                        <span>{scopeKpi.mixedConfig?.aggregatedLabel || t('config:scope_kpi_detail.aggregated_component')}</span>
                         <strong>{formatNumber(scopeKpi.aggregatedActual)}</strong>
-                        <small>Peso: {scopeKpi.mixedConfig?.aggregatedWeight ?? 50}</small>
+                        <small>{t('config:scope_kpi_detail.weight', { value: scopeKpi.mixedConfig?.aggregatedWeight ?? 50 })}</small>
                       </div>
                       <div className="scope-detail-mix-card">
-                        <span>Resultado final</span>
+                        <span>{t('config:scope_kpi_detail.final_result')}</span>
                         <strong>{formatNumber(scopeKpi.actual)}</strong>
                         <small>
-                          Mix {scopeKpi.mixedConfig?.directWeight ?? 50}/{scopeKpi.mixedConfig?.aggregatedWeight ?? 50}
+                          {t('config:scope_kpi_detail.mix_ratio', {
+                            direct: scopeKpi.mixedConfig?.directWeight ?? 50,
+                            aggregated: scopeKpi.mixedConfig?.aggregatedWeight ?? 50,
+                          })}
                         </small>
                       </div>
                     </div>
@@ -229,7 +272,7 @@ export default function ScopeKPIDetailModal({ scopeKpiId, initialScopeKpi, onClo
               ) : null}
 
               <section className="scope-detail-section">
-                <h3>Contribuciones</h3>
+                <h3>{t('config:scope_kpi_detail.contributions')}</h3>
                 {links?.length ? (
                   <div className="scope-detail-list">
                     {links.map((link) => (
@@ -237,13 +280,13 @@ export default function ScopeKPIDetailModal({ scopeKpiId, initialScopeKpi, onClo
                         <div className="scope-detail-item-main">
                           <strong>
                             {link.childType === 'collaborator'
-                              ? `${link.collaboratorName || 'Colaborador'} · ${link.collaboratorKpiName || 'KPI'}`
-                              : `${link.childScopeKpiName || 'Scope KPI'}`}
+                              ? `${link.collaboratorName || t('config:scope_kpi_detail.fallbacks.collaborator')} · ${link.collaboratorKpiName || t('config:scope_kpi_detail.fallbacks.kpi')}`
+                              : `${link.childScopeKpiName || t('config:scope_kpi_detail.fallbacks.child_scope')}`}
                           </strong>
                           <div className="scope-detail-item-actions">
                             <span>
-                              {link.aggregationMethod}
-                              {link.contributionWeight != null ? ` · peso ${link.contributionWeight}` : ''}
+                              {aggregationMethodLabel(link.aggregationMethod)}
+                              {link.contributionWeight != null ? ` · ${t('common:weight').toLowerCase()} ${link.contributionWeight}` : ''}
                             </span>
                             {link.childType === 'scope' && link.childScopeKpiId ? (
                               <button
@@ -251,31 +294,31 @@ export default function ScopeKPIDetailModal({ scopeKpiId, initialScopeKpi, onClo
                                 className="scope-detail-link-button"
                                 onClick={() => openScopeChild(link.childScopeKpiId as number, link.childScopeKpiName)}
                               >
-                                Abrir hijo
+                                {t('config:scope_kpi_detail.open_child')}
                               </button>
                             ) : null}
                           </div>
                         </div>
                         <div className="scope-detail-item-meta">
-                          <span>Tipo: {link.childType}</span>
-                          <span>Orden: {link.sortOrder ?? 0}</span>
-                          {link.childType === 'scope' && link.childScopeKpiId ? <span>Scope hijo #{link.childScopeKpiId}</span> : null}
+                          <span>{t('config:scope_kpi_detail.type')}: {childTypeLabel(link.childType)}</span>
+                          <span>{t('config:scope_kpi_detail.order')}: {link.sortOrder ?? 0}</span>
+                          {link.childType === 'scope' && link.childScopeKpiId ? <span>{t('config:scope_kpi_detail.child_scope', { id: link.childScopeKpiId })}</span> : null}
                           {link.childType === 'collaborator' && link.collaboratorAssignmentId ? (
-                            <span>Asignación #{link.collaboratorAssignmentId}</span>
+                            <span>{t('config:scope_kpi_detail.assignment', { id: link.collaboratorAssignmentId })}</span>
                           ) : null}
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="scope-detail-empty">Este Scope KPI todavía no tiene links configurados.</div>
+                  <div className="scope-detail-empty">{t('config:scope_kpi_detail.no_links')}</div>
                 )}
               </section>
             </div>
 
             <div className="scope-detail-side">
               <section className="scope-detail-section">
-                <h3>Objetivos vinculados</h3>
+                <h3>{t('config:scope_kpi_detail.objectives')}</h3>
                 {scopeKpi?.objectiveNames?.length ? (
                   <div className="scope-detail-tags">
                     {scopeKpi.objectiveNames.map((objectiveName) => (
@@ -285,36 +328,36 @@ export default function ScopeKPIDetailModal({ scopeKpiId, initialScopeKpi, onClo
                     ))}
                   </div>
                 ) : (
-                  <div className="scope-detail-empty">Sin objetivos estratégicos asociados.</div>
+                  <div className="scope-detail-empty">{t('config:scope_kpi_detail.no_objectives')}</div>
                 )}
               </section>
 
               <section className="scope-detail-section">
-                <h3>Corridas de agregación</h3>
+                <h3>{t('config:scope_kpi_detail.runs')}</h3>
                 {recentRuns.length ? (
                   <div className="scope-detail-list">
                     {recentRuns.map((run) => (
                       <div key={run.id} className="scope-detail-item">
                         <div className="scope-detail-item-main">
                           <strong>{formatNumber(run.resultValue)}</strong>
-                          <span>{run.status}</span>
+                          <span>{runStatusLabel(run.status)}</span>
                         </div>
                         <div className="scope-detail-item-meta">
-                          <span>{run.message || 'Sin mensaje'}</span>
-                          <span>Inputs: {run.inputCount ?? 0}</span>
+                          <span>{run.message || t('config:scope_kpi_detail.no_message')}</span>
+                          <span>{t('config:scope_kpi_detail.inputs', { count: run.inputCount ?? 0 })}</span>
                           <span>{formatDate(run.createdAt)}</span>
-                          <span>{run.createdByName || 'Sistema'}</span>
+                          <span>{run.createdByName || t('config:scope_kpi_detail.system')}</span>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="scope-detail-empty">No hay corridas de agregación para este Scope KPI.</div>
+                  <div className="scope-detail-empty">{t('config:scope_kpi_detail.no_runs')}</div>
                 )}
               </section>
 
               <section className="scope-detail-section">
-                <h3>Mediciones recientes</h3>
+                <h3>{t('config:scope_kpi_detail.measurements')}</h3>
                 {recentMeasurements.length ? (
                   <div className="scope-detail-list">
                     {recentMeasurements.map((measurement) => (
@@ -322,19 +365,19 @@ export default function ScopeKPIDetailModal({ scopeKpiId, initialScopeKpi, onClo
                         <div className="scope-detail-item-main">
                           <strong>{formatNumber(measurement.value)}</strong>
                           <span>
-                            {measurement.mode} · {measurement.status}
+                            {measurementModeLabel(measurement.mode)} · {statusLabel(measurement.status)}
                           </span>
                         </div>
                         <div className="scope-detail-item-meta">
                           <span>{formatDate(measurement.capturedAt)}</span>
-                          <span>{measurement.capturedByName || measurement.sourceRunId || 'Sistema'}</span>
+                          <span>{measurement.capturedByName || measurement.sourceRunId || t('config:scope_kpi_detail.system')}</span>
                           {measurement.reason ? <span>{measurement.reason}</span> : null}
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="scope-detail-empty">No hay mediciones recientes para este Scope KPI.</div>
+                  <div className="scope-detail-empty">{t('config:scope_kpi_detail.no_measurements')}</div>
                 )}
               </section>
             </div>

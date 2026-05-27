@@ -1,44 +1,155 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { KPI } from '../types'
 import { KPI_TEMPLATE_CATEGORIES, KPITemplate } from '../data/kpiTemplates'
 import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
 import './MarketplaceKPI.css'
 
-const directionLabel = (d: KPITemplate['direction']) =>
-  d === 'growth' ? 'Crecimiento ↑' : d === 'reduction' ? 'Reducción ↓' : 'Exacto ='
+type MarketplaceTemplate = KPITemplate & {
+  templateId: string
+  categoryId: string
+  categoryLabel: string
+  categoryIcon: string
+  displayName: string
+  displayDescription: string
+  displayCriteria: string
+  displayUnit: string
+  matchNames: string[]
+}
 
-const typeLabel = (t: KPITemplate['type']) =>
-  ({ manual: 'Manual', count: 'Conteo', ratio: 'Ratio', sla: 'SLA', value: 'Valor' }[t] || t)
+const toCatalogKey = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '')
+
+const MARKETPLACE_TEMPLATE_PREFIX = '__marketplace_template__:'
+
+const normalizeTemplateName = (value: string) => value.trim().toLowerCase()
+
+const buildTemplateId = (categoryId: string, templateId: string) =>
+  `${categoryId}.${templateId}`
+
+const buildTemplateMarker = (templateId: string) =>
+  `${MARKETPLACE_TEMPLATE_PREFIX}${templateId}`
+
+const parseTemplateMarker = (value?: string | null) =>
+  value?.startsWith(MARKETPLACE_TEMPLATE_PREFIX)
+    ? value.slice(MARKETPLACE_TEMPLATE_PREFIX.length)
+    : null
 
 export default function MarketplaceKPI() {
+  const { t, i18n } = useTranslation('marketplace')
+  const locale = i18n.resolvedLanguage?.startsWith('en') ? 'en-US' : 'es-AR'
+
   const queryClient = useQueryClient()
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [preview, setPreview] = useState<KPITemplate | null>(null)
+  const [preview, setPreview] = useState<MarketplaceTemplate | null>(null)
   const [importResult, setImportResult] = useState<{ ok: string[]; skip: string[]; fail: string[] } | null>(null)
+
+  const directionLabel = (d: KPITemplate['direction']) =>
+    t(`direction.${d}`, { defaultValue: d })
+
+  const typeLabel = (kpiType: KPITemplate['type']) =>
+    t(`type.${kpiType}`, { defaultValue: kpiType })
+
+  const categoryLabel = (categoryId: string) =>
+    t(`catalog.${categoryId}.label`, { defaultValue: categoryId })
+
+  const templateText = (
+    categoryId: string,
+    templateId: string,
+    field: 'name' | 'description' | 'criteria',
+  ) =>
+    t(`catalog.${categoryId}.templates.${templateId}.${field}`, {
+      defaultValue: templateId,
+    })
+
+  const templateTextForLanguage = (
+    language: 'es' | 'en',
+    categoryId: string,
+    templateId: string,
+    field: 'name' | 'description' | 'criteria',
+  ) =>
+    i18n.getFixedT(language, 'marketplace')(`catalog.${categoryId}.templates.${templateId}.${field}`, {
+      defaultValue: templateId,
+    })
+
+  const unitLabel = (unit?: string) => {
+    if (!unit) return ''
+    const unitKey = toCatalogKey(unit)
+    return unitKey ? t(`units.${unitKey}`, { defaultValue: unit }) : unit
+  }
 
   const { data: existingKpis } = useQuery<KPI[]>('kpis', async () => (await api.get('/kpis')).data)
 
   const existingNames = useMemo(
-    () => new Set((existingKpis || []).map((k) => k.name.toLowerCase().trim())),
+    () => new Set((existingKpis || []).map((k) => normalizeTemplateName(k.name))),
+    [existingKpis]
+  )
+
+  const existingTemplateIds = useMemo(
+    () =>
+      new Set(
+        (existingKpis || [])
+          .map((k) => parseTemplateMarker(k.defaultCalcRule))
+          .filter((value): value is string => Boolean(value))
+      ),
     [existingKpis]
   )
 
   const allTemplates = useMemo(
-    () => KPI_TEMPLATE_CATEGORIES.flatMap((cat) => cat.templates.map((t) => ({ ...t, categoryId: cat.id, categoryLabel: cat.label, categoryIcon: cat.icon }))),
-    []
+    (): MarketplaceTemplate[] =>
+      KPI_TEMPLATE_CATEGORIES.flatMap((cat) =>
+        cat.templates.map((tmpl) => ({
+          ...tmpl,
+          templateId: buildTemplateId(cat.id, tmpl.id),
+          categoryId: cat.id,
+          categoryLabel: categoryLabel(cat.id),
+          categoryIcon: cat.icon,
+          displayName: templateText(cat.id, tmpl.id, 'name'),
+          displayDescription: templateText(cat.id, tmpl.id, 'description'),
+          displayCriteria: templateText(cat.id, tmpl.id, 'criteria'),
+          displayUnit: unitLabel(tmpl.unit),
+          matchNames: Array.from(
+            new Set([
+              templateText(cat.id, tmpl.id, 'name'),
+              templateTextForLanguage('es', cat.id, tmpl.id, 'name'),
+              templateTextForLanguage('en', cat.id, tmpl.id, 'name'),
+            ])
+          ),
+        }))
+      ),
+    [i18n.resolvedLanguage]
   )
+
+  const displayNameByTemplateId = useMemo(
+    () => new Map(allTemplates.map((tmpl) => [tmpl.templateId, tmpl.displayName])),
+    [allTemplates]
+  )
+
+  const templateAlreadyExists = (tmpl: MarketplaceTemplate) =>
+    existingTemplateIds.has(tmpl.templateId) ||
+    tmpl.matchNames.some((name) => existingNames.has(normalizeTemplateName(name)))
 
   const filtered = useMemo(() => {
     let list = allTemplates
-    if (selectedCategory !== 'all') list = list.filter((t) => t.categoryId === selectedCategory)
+    if (selectedCategory !== 'all') list = list.filter((tmpl) => tmpl.categoryId === selectedCategory)
     if (search.trim()) {
       const q = search.toLowerCase()
-      list = list.filter((t) => t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q))
+      list = list.filter(
+        (tmpl) =>
+          tmpl.displayName.toLowerCase().includes(q) ||
+          tmpl.displayDescription.toLowerCase().includes(q) ||
+          tmpl.categoryLabel.toLowerCase().includes(q)
+      )
     }
     return list
   }, [allTemplates, selectedCategory, search])
@@ -51,7 +162,7 @@ export default function MarketplaceKPI() {
     })
   }
 
-  const selectAll = () => setSelected(new Set(filtered.map((t) => t.name)))
+  const selectAll = () => setSelected(new Set(filtered.map((tmpl) => tmpl.templateId)))
   const clearAll = () => setSelected(new Set())
 
   const importMutation = useMutation(
@@ -60,23 +171,24 @@ export default function MarketplaceKPI() {
       const skip: string[] = []
       const fail: string[] = []
 
-      for (const t of templates) {
-        if (existingNames.has(t.name.toLowerCase().trim())) {
-          skip.push(t.name)
+      for (const tmpl of templates) {
+        if (templateAlreadyExists(tmpl)) {
+          skip.push(tmpl.templateId)
           continue
         }
         try {
           await api.post('/kpis', {
-            name: t.name,
-            description: t.description,
-            type: t.type,
-            direction: t.direction,
-            criteria: t.criteria,
-            formula: t.formula,
+            name: tmpl.displayName,
+            description: tmpl.displayDescription,
+            type: tmpl.type,
+            direction: tmpl.direction,
+            criteria: tmpl.displayCriteria,
+            formula: tmpl.formula,
+            defaultCalcRule: buildTemplateMarker(tmpl.templateId),
           })
-          ok.push(t.name)
+          ok.push(tmpl.templateId)
         } catch {
-          fail.push(t.name)
+          fail.push(tmpl.templateId)
         }
       }
       return { ok, skip, fail }
@@ -91,7 +203,7 @@ export default function MarketplaceKPI() {
   )
 
   const handleImport = () => {
-    const toImport = allTemplates.filter((t) => selected.has(t.name))
+    const toImport = allTemplates.filter((tmpl) => selected.has(tmpl.templateId))
     if (!toImport.length) return
     importMutation.mutate(toImport)
   }
@@ -101,9 +213,9 @@ export default function MarketplaceKPI() {
       {/* Header */}
       <div className="marketplace-header">
         <div>
-          <h1>Marketplace de KPI Templates</h1>
+          <h1>{t('title')}</h1>
           <p className="subtitle">
-            {allTemplates.length} templates por industria listos para importar. Seleccioná los que aplican a tu organización y se crean en un click.
+            {t('subtitle', { count: allTemplates.length })}
           </p>
         </div>
         {selected.size > 0 && (
@@ -112,7 +224,7 @@ export default function MarketplaceKPI() {
             onClick={handleImport}
             disabled={importMutation.isLoading}
           >
-            {importMutation.isLoading ? 'Importando...' : `Importar ${selected.size} KPI${selected.size > 1 ? 's' : ''}`}
+            {importMutation.isLoading ? t('importing') : t('import_btn', { count: selected.size })}
           </button>
         )}
       </div>
@@ -122,20 +234,29 @@ export default function MarketplaceKPI() {
         <div className="marketplace-result">
           {importResult.ok.length > 0 && (
             <div className="marketplace-result-row ok">
-              <span className="marketplace-result-icon">✓</span>
-              <span><strong>{importResult.ok.length} importados:</strong> {importResult.ok.join(', ')}</span>
+                <span className="marketplace-result-icon">✓</span>
+              <span>
+                <span dangerouslySetInnerHTML={{ __html: t('result.imported', { count: importResult.ok.length }) }} />
+                {' '}{importResult.ok.map((id) => displayNameByTemplateId.get(id) || id).join(', ')}
+              </span>
             </div>
           )}
           {importResult.skip.length > 0 && (
             <div className="marketplace-result-row skip">
-              <span className="marketplace-result-icon">⊘</span>
-              <span><strong>{importResult.skip.length} ya existían:</strong> {importResult.skip.join(', ')}</span>
+                <span className="marketplace-result-icon">⊘</span>
+              <span>
+                <span dangerouslySetInnerHTML={{ __html: t('result.skipped', { count: importResult.skip.length }) }} />
+                {' '}{importResult.skip.map((id) => displayNameByTemplateId.get(id) || id).join(', ')}
+              </span>
             </div>
           )}
           {importResult.fail.length > 0 && (
             <div className="marketplace-result-row fail">
-              <span className="marketplace-result-icon">✕</span>
-              <span><strong>{importResult.fail.length} fallaron:</strong> {importResult.fail.join(', ')}</span>
+                <span className="marketplace-result-icon">✕</span>
+              <span>
+                <span dangerouslySetInnerHTML={{ __html: t('result.failed', { count: importResult.fail.length }) }} />
+                {' '}{importResult.fail.map((id) => displayNameByTemplateId.get(id) || id).join(', ')}
+              </span>
             </div>
           )}
           <button className="marketplace-result-close" onClick={() => setImportResult(null)}>✕</button>
@@ -148,7 +269,7 @@ export default function MarketplaceKPI() {
           <input
             type="text"
             className="marketplace-search"
-            placeholder="Buscar templates..."
+            placeholder={t('search_placeholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -158,7 +279,7 @@ export default function MarketplaceKPI() {
             className={`marketplace-cat-btn ${selectedCategory === 'all' ? 'active' : ''}`}
             onClick={() => setSelectedCategory('all')}
           >
-            Todos ({allTemplates.length})
+            {t('cat_all', { count: allTemplates.length })}
           </button>
           {KPI_TEMPLATE_CATEGORIES.map((cat) => (
             <button
@@ -166,7 +287,7 @@ export default function MarketplaceKPI() {
               className={`marketplace-cat-btn ${selectedCategory === cat.id ? 'active' : ''}`}
               onClick={() => setSelectedCategory(cat.id)}
             >
-              {cat.icon} {cat.label} ({cat.templates.length})
+              {cat.icon} {categoryLabel(cat.id)} ({cat.templates.length})
             </button>
           ))}
         </div>
@@ -176,54 +297,58 @@ export default function MarketplaceKPI() {
       {filtered.length > 0 && (
         <div className="marketplace-selection-bar">
           <span className="marketplace-selection-count">
-            {selected.size > 0 ? `${selected.size} seleccionados` : 'Seleccioná los KPIs a importar'}
+            {selected.size > 0 ? t('selection.count', { count: selected.size }) : t('selection.none')}
           </span>
           <div className="marketplace-selection-actions">
-            <button className="marketplace-link-btn" onClick={selectAll}>Seleccionar todos ({filtered.length})</button>
-            {selected.size > 0 && <button className="marketplace-link-btn" onClick={clearAll}>Limpiar selección</button>}
+            <button className="marketplace-link-btn" onClick={selectAll}>
+              {t('selection.select_all', { count: filtered.length })}
+            </button>
+            {selected.size > 0 && (
+              <button className="marketplace-link-btn" onClick={clearAll}>{t('selection.clear')}</button>
+            )}
           </div>
         </div>
       )}
 
       {/* Grid */}
       {filtered.length === 0 ? (
-        <div className="marketplace-empty">No hay templates que coincidan con tu búsqueda.</div>
+        <div className="marketplace-empty">{t('empty')}</div>
       ) : (
         <div className="marketplace-grid">
-          {filtered.map((t) => {
-            const alreadyExists = existingNames.has(t.name.toLowerCase().trim())
-            const isSelected = selected.has(t.name)
+          {filtered.map((tmpl) => {
+            const alreadyExists = templateAlreadyExists(tmpl)
+            const isSelected = selected.has(tmpl.templateId)
             return (
               <div
-                key={`${t.categoryId}-${t.name}`}
+                key={tmpl.templateId}
                 className={`marketplace-card ${isSelected ? 'selected' : ''} ${alreadyExists ? 'exists' : ''}`}
-                onClick={() => !alreadyExists && toggleSelect(t.name)}
+                onClick={() => !alreadyExists && toggleSelect(tmpl.templateId)}
               >
                 <div className="marketplace-card-top">
-                  <span className="marketplace-card-category">{t.categoryIcon} {t.categoryLabel}</span>
+                  <span className="marketplace-card-category">{tmpl.categoryIcon} {tmpl.categoryLabel}</span>
                   {alreadyExists
-                    ? <span className="marketplace-card-badge exists">Ya existe</span>
+                    ? <span className="marketplace-card-badge exists">{t('card.exists_badge')}</span>
                     : isSelected
-                    ? <span className="marketplace-card-badge selected">✓ Seleccionado</span>
+                    ? <span className="marketplace-card-badge selected">{t('card.selected_badge')}</span>
                     : null
                   }
                 </div>
-                <h3 className="marketplace-card-name">{t.name}</h3>
-                <p className="marketplace-card-desc">{t.description}</p>
+                <h3 className="marketplace-card-name">{tmpl.displayName}</h3>
+                <p className="marketplace-card-desc">{tmpl.displayDescription}</p>
                 <div className="marketplace-card-meta">
-                  <span className={`marketplace-type-pill type-${t.type}`}>{typeLabel(t.type)}</span>
-                  <span className={`marketplace-dir-pill dir-${t.direction}`}>{directionLabel(t.direction)}</span>
-                  {t.suggestedTarget && (
+                  <span className={`marketplace-type-pill type-${tmpl.type}`}>{typeLabel(tmpl.type)}</span>
+                  <span className={`marketplace-dir-pill dir-${tmpl.direction}`}>{directionLabel(tmpl.direction)}</span>
+                  {tmpl.suggestedTarget && (
                     <span className="marketplace-target-pill">
-                      Meta sugerida: {new Intl.NumberFormat('es-AR').format(t.suggestedTarget)}{t.unit ? ` ${t.unit}` : ''}
+                      {t('modal.target_label')}: {new Intl.NumberFormat(locale).format(tmpl.suggestedTarget)}{tmpl.displayUnit ? ` ${tmpl.displayUnit}` : ''}
                     </span>
                   )}
                 </div>
                 <button
                   className="marketplace-preview-btn"
-                  onClick={(e) => { e.stopPropagation(); setPreview(t) }}
+                  onClick={(e) => { e.stopPropagation(); setPreview(tmpl) }}
                 >
-                  Ver detalle
+                  {t('card.preview_btn')}
                 </button>
               </div>
             )
@@ -241,53 +366,53 @@ export default function MarketplaceKPI() {
           <div className="marketplace-modal" onClick={(e) => e.stopPropagation()}>
             <div className="marketplace-modal-header">
               <div>
-                <span className="marketplace-modal-cat">{(preview as any).categoryIcon} {(preview as any).categoryLabel}</span>
-                <h2 className="marketplace-modal-name">{preview.name}</h2>
+                <span className="marketplace-modal-cat">{preview.categoryIcon} {preview.categoryLabel}</span>
+                <h2 className="marketplace-modal-name">{preview.displayName}</h2>
               </div>
               <button className="marketplace-modal-close" onClick={() => setPreview(null)}>✕</button>
             </div>
             <div className="marketplace-modal-body">
-              <p className="marketplace-modal-desc">{preview.description}</p>
+              <p className="marketplace-modal-desc">{preview.displayDescription}</p>
               <div className="marketplace-modal-grid">
                 <div className="marketplace-modal-field">
-                  <span className="marketplace-modal-label">Tipo</span>
+                  <span className="marketplace-modal-label">{t('modal.type_label')}</span>
                   <span>{typeLabel(preview.type)}</span>
                 </div>
                 <div className="marketplace-modal-field">
-                  <span className="marketplace-modal-label">Dirección</span>
+                  <span className="marketplace-modal-label">{t('modal.direction_label')}</span>
                   <span>{directionLabel(preview.direction)}</span>
                 </div>
                 {preview.suggestedTarget && (
                   <div className="marketplace-modal-field">
-                    <span className="marketplace-modal-label">Meta sugerida</span>
-                    <span>{new Intl.NumberFormat('es-AR').format(preview.suggestedTarget)} {preview.unit || ''}</span>
+                    <span className="marketplace-modal-label">{t('modal.target_label')}</span>
+                    <span>{new Intl.NumberFormat(locale).format(preview.suggestedTarget)} {preview.displayUnit || ''}</span>
                   </div>
                 )}
               </div>
               <div className="marketplace-modal-field full">
-                <span className="marketplace-modal-label">Criterio de medición</span>
-                <p className="marketplace-modal-criteria">{preview.criteria}</p>
+                <span className="marketplace-modal-label">{t('modal.criteria_label')}</span>
+                <p className="marketplace-modal-criteria">{preview.displayCriteria}</p>
               </div>
               {preview.formula && (
                 <div className="marketplace-modal-field full">
-                  <span className="marketplace-modal-label">Fórmula de variación</span>
+                  <span className="marketplace-modal-label">{t('modal.formula_label')}</span>
                   <code className="marketplace-modal-formula">{preview.formula}</code>
                 </div>
               )}
             </div>
             <div className="marketplace-modal-actions">
-              <button className="btn-secondary" onClick={() => setPreview(null)}>Cerrar</button>
-              {existingNames.has(preview.name.toLowerCase().trim()) ? (
-                <span className="marketplace-modal-exists">Ya existe en tu catálogo</span>
+              <button className="btn-secondary" onClick={() => setPreview(null)}>{t('modal.close')}</button>
+              {templateAlreadyExists(preview) ? (
+                <span className="marketplace-modal-exists">{t('modal.exists_in_catalog')}</span>
               ) : (
                 <button
                   className="btn-primary"
                   onClick={() => {
-                    toggleSelect(preview.name)
+                    toggleSelect(preview.templateId)
                     setPreview(null)
                   }}
                 >
-                  {selected.has(preview.name) ? 'Quitar selección' : 'Seleccionar para importar'}
+                  {selected.has(preview.templateId) ? t('modal.deselect') : t('modal.select_to_import')}
                 </button>
               )}
             </div>

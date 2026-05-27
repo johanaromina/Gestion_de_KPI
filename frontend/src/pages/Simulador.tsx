@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useState } from 'react'
 import { useQuery } from 'react-query'
+import { useTranslation } from 'react-i18next'
+import i18n from '../i18n'
 import api from '../services/api'
 import { Period, ScopeKPI, SubPeriod } from '../types'
 import './Simulador.css'
@@ -34,8 +36,15 @@ const riskLevel = (v: number | null): 'green' | 'yellow' | 'red' | 'none' => {
   return 'red'
 }
 
+const currentLocale = () => ((i18n.resolvedLanguage || i18n.language || 'es').startsWith('en') ? 'en-US' : 'es-AR')
+
 const fmt = (v: number | null, digits = 1) =>
-  v == null ? '-' : new Intl.NumberFormat('es-AR', { maximumFractionDigits: digits }).format(v)
+  v == null ? '-' : new Intl.NumberFormat(currentLocale(), { maximumFractionDigits: digits }).format(v)
+
+const getScopeTypeLabel = (scopeType?: string | null) =>
+  scopeType
+    ? i18n.t(`executive:labels.scope_types.${scopeType}`, { defaultValue: scopeType.replace(/_/g, ' ') })
+    : '-'
 
 /* Collect all scope KPIs from the entire tree */
 const collectAllKpis = (nodes: ExecutiveTreeNode[]): ScopeKPI[] =>
@@ -89,24 +98,30 @@ const LevelTransition = ({
   before: number | null
   after: number | null
 }) => {
+  const { t } = useTranslation('executive')
   const lvlBefore = riskLevel(before)
   const lvlAfter = riskLevel(after)
   if (lvlBefore === lvlAfter) return null
-  const labels: Record<string, string> = {
-    red: 'En riesgo',
-    yellow: 'Atención',
-    green: 'En track',
-    none: 'Sin datos',
+
+  const getLevelLabel = (lvl: string): string => {
+    switch (lvl) {
+      case 'red': return t('risk.at_risk')
+      case 'yellow': return t('risk.warning')
+      case 'green': return t('risk.on_track')
+      default: return t('risk.no_data')
+    }
   }
+
   return (
     <span className={`sim-transition sim-transition-${lvlAfter}`}>
-      {labels[lvlBefore]} → {labels[lvlAfter]}
+      {getLevelLabel(lvlBefore)} → {getLevelLabel(lvlAfter)}
     </span>
   )
 }
 
 /* ── Main component ──────────────────────────────────────── */
 export default function Simulador() {
+  const { t } = useTranslation('executive')
   const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null)
   const [selectedSubPeriodId, setSelectedSubPeriodId] = useState<number | null>(null)
   const [simValues, setSimValues] = useState<Record<number, number>>({})
@@ -198,14 +213,12 @@ export default function Simulador() {
       {/* Header */}
       <div className="sim-header">
         <div>
-          <h1>Simulador ¿Qué pasa si...?</h1>
-          <p className="sim-subtitle">
-            Ajustá los valores de cualquier KPI grupal y visualizá el impacto en cascada sobre toda la organización — sin modificar datos reales.
-          </p>
+          <h1>{t('simulador.title')}</h1>
+          <p className="sim-subtitle">{t('simulador.subtitle')}</p>
         </div>
         {hasChanges && (
           <button className="btn-secondary sim-reset-btn" onClick={handleReset}>
-            Reiniciar simulación
+            {t('simulador.reset_btn')}
           </button>
         )}
       </div>
@@ -213,7 +226,7 @@ export default function Simulador() {
       {/* Filters */}
       <div className="sim-filters">
         <label>
-          Período
+          {t('simulador.filter_period')}
           <select
             value={selectedPeriodId || ''}
             onChange={(e) => {
@@ -222,14 +235,14 @@ export default function Simulador() {
               setSimValues({})
             }}
           >
-            <option value="">Auto</option>
+            <option value="">{t('simulador.filter_auto')}</option>
             {(periods || []).map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
         </label>
         <label>
-          Subperíodo
+          {t('simulador.filter_subperiod')}
           <select
             value={selectedSubPeriodId || ''}
             onChange={(e) => {
@@ -237,16 +250,16 @@ export default function Simulador() {
               setSimValues({})
             }}
           >
-            <option value="">Auto</option>
+            <option value="">{t('simulador.filter_auto')}</option>
             {(subPeriods || []).map((sp) => (
               <option key={sp.id} value={sp.id}>{sp.name}</option>
             ))}
           </select>
         </label>
         <label>
-          Filtrar por KPI
+          {t('simulador.filter_kpi')}
           <select value={filterKpiName} onChange={(e) => setFilterKpiName(e.target.value)}>
-            <option value="all">Todos los KPIs</option>
+            <option value="all">{t('simulador.filter_all_kpis')}</option>
             {uniqueKpiNames.map((name) => (
               <option key={name} value={name}>{name}</option>
             ))}
@@ -255,31 +268,31 @@ export default function Simulador() {
       </div>
 
       {isLoading ? (
-        <div className="sim-empty">Cargando datos...</div>
+        <div className="sim-empty">{t('simulador.loading')}</div>
       ) : !allKpis.length ? (
-        <div className="sim-empty">No hay KPIs grupales en el período seleccionado.</div>
+        <div className="sim-empty">{t('simulador.no_kpis')}</div>
       ) : (
         <>
           {/* Impact summary bar */}
           {hasChanges && (
             <div className="sim-impact-summary">
-              <span className="sim-impact-title">Impacto simulado</span>
+              <span className="sim-impact-title">{t('simulador.impact_title')}</span>
               <div className="sim-impact-pills">
                 <div className="sim-impact-col">
-                  <span className="sim-impact-label">Antes</span>
+                  <span className="sim-impact-label">{t('simulador.impact_before')}</span>
                   <div className="sim-impact-row">
-                    <span className="mapa-pill green">{orgSummary.before.green} en track</span>
-                    <span className="mapa-pill yellow">{orgSummary.before.yellow} atención</span>
-                    <span className="mapa-pill red">{orgSummary.before.red} en riesgo</span>
+                    <span className="mapa-pill green">{t('simulador.pill_on_track', { count: orgSummary.before.green })}</span>
+                    <span className="mapa-pill yellow">{t('simulador.pill_warning', { count: orgSummary.before.yellow })}</span>
+                    <span className="mapa-pill red">{t('simulador.pill_at_risk', { count: orgSummary.before.red })}</span>
                   </div>
                 </div>
                 <span className="sim-arrow">→</span>
                 <div className="sim-impact-col">
-                  <span className="sim-impact-label">Después</span>
+                  <span className="sim-impact-label">{t('simulador.impact_after')}</span>
                   <div className="sim-impact-row">
-                    <span className="mapa-pill green">{orgSummary.after.green} en track</span>
-                    <span className="mapa-pill yellow">{orgSummary.after.yellow} atención</span>
-                    <span className="mapa-pill red">{orgSummary.after.red} en riesgo</span>
+                    <span className="mapa-pill green">{t('simulador.pill_on_track', { count: orgSummary.after.green })}</span>
+                    <span className="mapa-pill yellow">{t('simulador.pill_warning', { count: orgSummary.after.yellow })}</span>
+                    <span className="mapa-pill red">{t('simulador.pill_at_risk', { count: orgSummary.after.red })}</span>
                   </div>
                 </div>
               </div>
@@ -292,13 +305,15 @@ export default function Simulador() {
               className={`sim-tab ${activeTab === 'sliders' ? 'active' : ''}`}
               onClick={() => setActiveTab('sliders')}
             >
-              Ajustar KPIs {hasChanges ? `(${Object.keys(simValues).length} modificados)` : ''}
+              {hasChanges
+                ? t('simulador.tab_sliders_modified', { count: Object.keys(simValues).length })
+                : t('simulador.tab_sliders')}
             </button>
             <button
               className={`sim-tab ${activeTab === 'impact' ? 'active' : ''}`}
               onClick={() => setActiveTab('impact')}
             >
-              Ver impacto por área
+              {t('simulador.tab_impact')}
             </button>
           </div>
 
@@ -306,7 +321,7 @@ export default function Simulador() {
           {activeTab === 'sliders' && (
             <div className="sim-sliders-panel">
               {visibleKpis.length === 0 ? (
-                <div className="sim-empty">No hay KPIs para mostrar.</div>
+                <div className="sim-empty">{t('simulador.no_kpis_panel')}</div>
               ) : (
                 visibleKpis.map((kpi) => {
                   const originalVal = toFinite(kpi.variation)
@@ -325,7 +340,9 @@ export default function Simulador() {
                       </div>
                       <div className="sim-kpi-slider-wrap">
                         <span className="sim-kpi-original">
-                          Original: {originalVal != null ? `${fmt(originalVal)}%` : 'Sin datos'}
+                          {originalVal != null
+                            ? t('simulador.original_label', { value: fmt(originalVal) })
+                            : t('simulador.original_no_data')}
                         </span>
                         <input
                           type="range"
@@ -348,7 +365,7 @@ export default function Simulador() {
                             delete next[kpi.id]
                             setSimValues(next)
                           }}
-                          title="Restaurar valor original"
+                          title={t('simulador.restore_title')}
                         >
                           ↩
                         </button>
@@ -366,11 +383,11 @@ export default function Simulador() {
               <table className="sim-impact-table">
                 <thead>
                   <tr>
-                    <th>Área / Unidad</th>
-                    <th>Nivel</th>
-                    <th>Promedio actual</th>
-                    <th>Promedio simulado</th>
-                    <th>Variación</th>
+                    <th>{t('simulador.impact_table_area')}</th>
+                    <th>{t('simulador.impact_table_level')}</th>
+                    <th>{t('simulador.impact_table_before')}</th>
+                    <th>{t('simulador.impact_table_after')}</th>
+                    <th>{t('simulador.impact_table_delta')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -386,7 +403,7 @@ export default function Simulador() {
                         <td className="sim-td-name">{area.scope.name}</td>
                         <td>
                           <span className="mapa-type-badge">
-                            {area.scope.type.replace('_', ' ')}
+                            {getScopeTypeLabel(area.scope.type)}
                           </span>
                         </td>
                         <td>
@@ -409,9 +426,7 @@ export default function Simulador() {
                 </tbody>
               </table>
               {!hasChanges && (
-                <p className="sim-impact-hint">
-                  Ajustá los sliders en la pestaña "Ajustar KPIs" para ver el impacto aquí.
-                </p>
+                <p className="sim-impact-hint">{t('simulador.impact_hint')}</p>
               )}
             </div>
           )}

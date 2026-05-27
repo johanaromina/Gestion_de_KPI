@@ -1,7 +1,11 @@
+import i18n from '../i18n'
 import { buildNarrative, NarrativeInput } from './executiveNarrative'
 
-const fmt = (v: number | null | undefined, digits = 1) =>
-  v == null ? '-' : new Intl.NumberFormat('es-AR', { maximumFractionDigits: digits }).format(v)
+const resolveLocale = () =>
+  ((i18n.resolvedLanguage || i18n.language || 'es').startsWith('en') ? 'en-US' : 'es-AR')
+
+const fmt = (v: number | null | undefined, locale: string, digits = 1) =>
+  v == null ? '-' : new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(v)
 
 const riskColor = (v: number | null | undefined) => {
   if (v == null) return '#9ca3af'
@@ -18,10 +22,10 @@ const riskBg = (v: number | null | undefined) => {
 }
 
 const riskLabel = (v: number | null | undefined) => {
-  if (v == null) return 'Sin datos'
-  if (v >= 100) return 'En track'
-  if (v >= 80) return 'Atención'
-  return 'En riesgo'
+  if (v == null) return i18n.t('executive:risk.no_data')
+  if (v >= 100) return i18n.t('executive:risk.on_track')
+  if (v >= 80) return i18n.t('executive:risk.warning')
+  return i18n.t('executive:risk.at_risk')
 }
 
 export interface ExportArea {
@@ -48,8 +52,11 @@ export interface ExportData {
 }
 
 export function exportExecutivePDF(data: ExportData) {
+  const locale = resolveLocale()
+  const t = (key: string, options?: Record<string, unknown>) => i18n.t(`executive:${key}`, options)
   const period = [data.periodName, data.subPeriodName].filter(Boolean).join(' · ')
-  const date = new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
+  const periodLabel = period || t('pdf.current_period')
+  const date = new Date().toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })
 
   const topRisk = data.areas
     .flatMap((a) => a.kpis.map((k) => ({ ...k, scopeName: a.name })))
@@ -78,7 +85,7 @@ export function exportExecutivePDF(data: ExportData) {
     topPerformers,
   }
 
-  const narrative = buildNarrative(narrativeInput)
+  const narrative = buildNarrative(narrativeInput, locale)
 
   const areasRows = data.areas
     .map(
@@ -87,41 +94,41 @@ export function exportExecutivePDF(data: ExportData) {
         <div class="area-header" style="background:${riskBg(area.averageVariation)};border-left:4px solid ${riskColor(area.averageVariation)}">
           <div>
             <span class="area-name">${area.name}</span>
-            <span class="area-type">${area.type.replace('_', ' ')}</span>
+            <span class="area-type">${t(`labels.scope_types.${area.type}`, { defaultValue: area.type.replace(/_/g, ' ') })}</span>
           </div>
           <div class="area-avg" style="color:${riskColor(area.averageVariation)}">
-            ${fmt(area.averageVariation)}%
+            ${fmt(area.averageVariation, locale)}%
             <span class="area-risk-label">${riskLabel(area.averageVariation)}</span>
           </div>
         </div>
         ${
           area.kpis.length > 0
             ? `<table class="kpi-table">
-            <thead><tr><th>KPI</th><th>Target</th><th>Real</th><th>Variación</th></tr></thead>
+            <thead><tr><th>${t('pdf.table.kpi')}</th><th>${t('pdf.table.target')}</th><th>${t('pdf.table.actual')}</th><th>${t('pdf.table.variation')}</th></tr></thead>
             <tbody>
               ${area.kpis
                 .map(
                   (k) => `<tr>
                 <td>${k.name}</td>
-                <td>${fmt(k.target, 0)}</td>
-                <td>${k.actual != null ? fmt(k.actual, 1) : '-'}</td>
-                <td style="color:${riskColor(k.variation)};font-weight:700">${k.variation != null ? `${fmt(k.variation)}%` : '-'}</td>
+                <td>${fmt(k.target, locale, 0)}</td>
+                <td>${k.actual != null ? fmt(k.actual, locale, 1) : '-'}</td>
+                <td style="color:${riskColor(k.variation)};font-weight:700">${k.variation != null ? `${fmt(k.variation, locale)}%` : '-'}</td>
               </tr>`
                 )
                 .join('')}
             </tbody>
           </table>`
-            : '<p class="no-kpis">Sin KPIs registrados.</p>'
+            : `<p class="no-kpis">${t('pdf.no_kpis')}</p>`
         }
       </div>`
     )
     .join('')
 
   const html = `<!DOCTYPE html>
-<html lang="es">
+<html lang="${locale.startsWith('en') ? 'en' : 'es'}">
 <head>
   <meta charset="UTF-8"/>
-  <title>Reporte Ejecutivo — ${data.companyName} — ${period || date}</title>
+  <title>${t('pdf.report_title')} - ${data.companyName} - ${period || date}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #1f2937; background: #fff; }
@@ -176,54 +183,54 @@ export function exportExecutivePDF(data: ExportData) {
   <div class="page">
     <div class="report-header">
       <div>
-        <div class="report-title">Reporte Ejecutivo — ${data.companyName}</div>
-        <div class="report-meta">${period || 'Período actual'} · Generado el ${date}</div>
+        <div class="report-title">${t('pdf.report_title')} - ${data.companyName}</div>
+        <div class="report-meta">${periodLabel} · ${t('pdf.generated_on', { date })}</div>
       </div>
       <div class="report-logo">KPI Manager</div>
     </div>
 
     <div class="summary-grid">
       <div class="summary-card">
-        <div class="summary-label">Variación promedio</div>
-        <div class="summary-value" style="color:${riskColor(data.summary.averageVariation)}">${fmt(data.summary.averageVariation)}%</div>
+        <div class="summary-label">${t('pdf.summary.avg_variation')}</div>
+        <div class="summary-value" style="color:${riskColor(data.summary.averageVariation)}">${fmt(data.summary.averageVariation, locale)}%</div>
         <div class="summary-sub">${riskLabel(data.summary.averageVariation)}</div>
       </div>
       <div class="summary-card">
-        <div class="summary-label">Cobertura</div>
-        <div class="summary-value">${fmt(data.summary.completionRate, 0)}%</div>
-        <div class="summary-sub">${data.summary.approvedScopeKpis} / ${data.summary.totalScopeKpis} KPIs</div>
+        <div class="summary-label">${t('pdf.summary.coverage')}</div>
+        <div class="summary-value">${fmt(data.summary.completionRate, locale, 0)}%</div>
+        <div class="summary-sub">${t('pdf.summary.coverage_detail', { approved: data.summary.approvedScopeKpis, total: data.summary.totalScopeKpis })}</div>
       </div>
       <div class="summary-card">
-        <div class="summary-label">Resultado ponderado</div>
-        <div class="summary-value">${fmt(data.summary.weightedResultTotal)}</div>
-        <div class="summary-sub">puntos</div>
+        <div class="summary-label">${t('pdf.summary.weighted_result')}</div>
+        <div class="summary-value">${fmt(data.summary.weightedResultTotal, locale)}</div>
+        <div class="summary-sub">${t('pdf.summary.points')}</div>
       </div>
       <div class="summary-card">
-        <div class="summary-label">Áreas analizadas</div>
+        <div class="summary-label">${t('pdf.summary.areas_analyzed')}</div>
         <div class="summary-value">${data.areas.length}</div>
-        <div class="summary-sub">${data.objectiveNames.length} objetivos</div>
+        <div class="summary-sub">${t('pdf.summary.objectives', { count: data.objectiveNames.length })}</div>
       </div>
     </div>
 
     <div class="narrative-section">
-      <div class="narrative-title">Análisis ejecutivo automático</div>
+      <div class="narrative-title">${t('pdf.narrative_title')}</div>
       <div class="narrative-text">${narrative}</div>
     </div>
 
-    <div class="section-title">Detalle por área</div>
-    ${areasRows || '<p style="color:#9ca3af">Sin áreas con datos.</p>'}
+    <div class="section-title">${t('pdf.detail_by_area')}</div>
+    ${areasRows || `<p style="color:#9ca3af">${t('pdf.no_areas')}</p>`}
 
     <div class="report-footer">
-      <span>KPI Manager — Reporte generado el ${date}</span>
-      <span>${data.companyName} · ${period || 'Período actual'}</span>
+      <span>KPI Manager - ${t('pdf.footer_generated', { date })}</span>
+      <span>${data.companyName} · ${periodLabel}</span>
     </div>
 
     <div class="no-print" style="text-align:center;margin-top:28px">
       <button onclick="window.print()" style="background:#f97316;color:#fff;border:none;padding:12px 28px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">
-        Imprimir / Guardar PDF
+        ${t('pdf.print_btn')}
       </button>
       <button onclick="window.close()" style="background:#f3f4f6;color:#374151;border:none;padding:12px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-left:10px">
-        Cerrar
+        ${i18n.t('common:close')}
       </button>
     </div>
   </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import './Configuracion.css'
 import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
@@ -42,6 +43,7 @@ type UserRoleRow = {
 }
 
 export default function Seguridad() {
+  const { t } = useTranslation(['security', 'common'])
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<'roles' | 'groups' | 'users' | 'audit'>('roles')
   const [showRoleModal, setShowRoleModal] = useState(false)
@@ -75,6 +77,12 @@ export default function Seguridad() {
     const res = await api.get('/security/user-roles')
     return res.data
   })
+
+  const getScopeTypeLabel = (type?: string | null) =>
+    type ? t(`security:scope_types.${type}`, { defaultValue: type.replace(/_/g, ' ') }) : '-'
+
+  const getRoleSourceLabel = (source: 'usuario' | 'equipo' | 'legacy' | 'none') =>
+    t(`security:role_source.${source}`)
 
   const createRole = useMutation(
     async () => {
@@ -189,8 +197,8 @@ export default function Seguridad() {
   return (
     <div className="config-page">
       <header className="page-header">
-        <h1>Seguridad</h1>
-        <p className="subtitle">Gestiona roles, permisos por equipo y excepciones por usuario.</p>
+        <h1>{t('security:title')}</h1>
+        <p className="subtitle">{t('security:subtitle')}</p>
       </header>
 
       <div className="config-section">
@@ -200,25 +208,25 @@ export default function Seguridad() {
               className={`tab-button ${activeTab === 'roles' ? 'active' : ''}`}
               onClick={() => setActiveTab('roles')}
             >
-              Roles
+              {t('security:tabs.roles')}
             </button>
             <button
               className={`tab-button ${activeTab === 'groups' ? 'active' : ''}`}
               onClick={() => setActiveTab('groups')}
             >
-              Permisos por equipo
+              {t('security:tabs.groups')}
             </button>
             <button
               className={`tab-button ${activeTab === 'users' ? 'active' : ''}`}
               onClick={() => setActiveTab('users')}
             >
-              Excepciones por usuario
+              {t('security:tabs.users')}
             </button>
             <button
               className={`tab-button ${activeTab === 'audit' ? 'active' : ''}`}
               onClick={() => setActiveTab('audit')}
             >
-              Auditoría
+              {t('security:tabs.audit')}
             </button>
           </div>
 
@@ -226,8 +234,8 @@ export default function Seguridad() {
             <>
               <div className="card-header">
                 <div>
-                  <h3>Roles base</h3>
-                  <p className="muted">Crea, clona y ajusta roles sin tocar código.</p>
+                  <h3>{t('security:roles.title')}</h3>
+                  <p className="muted">{t('security:roles.subtitle')}</p>
                 </div>
                 <button
                   className="btn-primary"
@@ -237,7 +245,7 @@ export default function Seguridad() {
                     setShowRoleModal(true)
                   }}
                 >
-                  Nuevo rol
+                  {t('security:roles.new')}
                 </button>
               </div>
               <div className="roles-grid">
@@ -245,7 +253,7 @@ export default function Seguridad() {
                   <div key={role.id} className="role-card">
                     <div className="role-card-header">
                       <span className="role-name">{role.name}</span>
-                      <span className="role-count">{role.usersCount || 0} usuarios</span>
+                      <span className="role-count">{t('security:roles.users_count', { count: role.usersCount || 0 })}</span>
                     </div>
                     <div className="role-sub">{role.code}</div>
                     <div className="role-perms">
@@ -269,10 +277,10 @@ export default function Seguridad() {
                           setShowRoleModal(true)
                         }}
                       >
-                        Editar
+                        {t('common:edit')}
                       </button>
                       <button className="btn-secondary" onClick={() => cloneRole.mutate(role)}>
-                        Duplicar
+                        {t('security:roles.duplicate')}
                       </button>
                       <button
                         className="btn-danger"
@@ -281,7 +289,7 @@ export default function Seguridad() {
                           if (role.editable) deleteRole.mutate(role)
                         }}
                       >
-                        Eliminar
+                        {t('common:delete')}
                       </button>
                     </div>
                   </div>
@@ -294,23 +302,23 @@ export default function Seguridad() {
             <>
               <div className="card-header">
                 <div>
-                  <h3>Permisos por equipo</h3>
-                  <p className="muted">Define el rol por defecto de cada scope.</p>
+                  <h3>{t('security:groups.title')}</h3>
+                  <p className="muted">{t('security:groups.subtitle')}</p>
                 </div>
               </div>
               <table className="config-table">
                 <thead>
                   <tr>
-                    <th>Scope</th>
-                    <th>Tipo</th>
-                    <th>Rol por defecto</th>
+                    <th>{t('security:groups.scope')}</th>
+                    <th>{t('security:groups.type')}</th>
+                    <th>{t('security:groups.default_role')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {scopeRoles?.map((scope) => (
                     <tr key={scope.scopeId}>
                       <td>{scope.name}</td>
-                      <td>{scope.type}</td>
+                      <td>{getScopeTypeLabel(scope.type)}</td>
                       <td>
                         <select
                           value={scope.roleId ? String(scope.roleId) : ''}
@@ -318,7 +326,7 @@ export default function Seguridad() {
                             assignScopeRole.mutate({ scopeId: scope.scopeId, roleId: e.target.value })
                           }}
                         >
-                          <option value="">Sin rol</option>
+                          <option value="">{t('security:groups.no_role')}</option>
                           {roles?.map((role) => (
                             <option key={role.id} value={role.id}>
                               {role.name}
@@ -330,9 +338,9 @@ export default function Seguridad() {
                   ))}
                   {(!scopeRoles || scopeRoles.length === 0) && (
                     <tr>
-                      <td colSpan={3} className="empty-row">
-                        No hay scopes configurados.
-                      </td>
+                        <td colSpan={3} className="empty-row">
+                         {t('security:groups.empty')}
+                        </td>
                     </tr>
                   )}
                 </tbody>
@@ -344,23 +352,22 @@ export default function Seguridad() {
             <>
               <div className="card-header">
                 <div>
-                  <h3>Excepciones por usuario</h3>
-                  <p className="muted">El rol del equipo aplica por defecto. Acá definís overrides.</p>
+                  <h3>{t('security:users.title')}</h3>
+                  <p className="muted">{t('security:users.subtitle')}</p>
                 </div>
               </div>
               <table className="config-table">
                 <thead>
                   <tr>
-                    <th>Usuario</th>
-                    <th>Rol efectivo</th>
-                    <th>Overrides</th>
-                    <th>Acciones</th>
+                    <th>{t('security:users.user')}</th>
+                    <th>{t('security:users.effective_role')}</th>
+                    <th>{t('security:users.overrides')}</th>
+                    <th>{t('common:actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {userRoles?.map((user) => {
-                    const effectiveRole =
-                      user.userRoleName || user.scopeRoleName || user.legacyRole || 'Sin rol'
+                    const effectiveRole = user.userRoleName || user.scopeRoleName || (user.legacyRole ? t(`common:roles.${user.legacyRole}`, { defaultValue: user.legacyRole }) : t('security:users.no_role'))
                     const roleSource = user.userRoleName
                       ? 'usuario'
                       : user.scopeRoleName
@@ -376,14 +383,14 @@ export default function Seguridad() {
                         </td>
                         <td>
                           {effectiveRole}
-                          <span className="muted"> · {roleSource}</span>
+                          <span className="muted"> · {getRoleSourceLabel(roleSource)}</span>
                           {!!user.overridesCount && user.overridesCount > 0 && (
                             <span className="status-pill review" style={{ marginLeft: 8 }}>
-                              Overrides activos
+                              {t('security:users.active_overrides')}
                             </span>
                           )}
                         </td>
-                        <td>{user.overridesCount ? `${user.overridesCount} permisos` : '-'}</td>
+                        <td>{user.overridesCount ? t('security:users.permissions_count', { count: user.overridesCount }) : '-'}</td>
                         <td>
                           <div className="action-buttons">
                             <select
@@ -392,7 +399,7 @@ export default function Seguridad() {
                                 assignUserRole.mutate({ collaboratorId: user.id, roleId: e.target.value })
                               }}
                             >
-                              <option value="">Rol del equipo</option>
+                              <option value="">{t('security:users.team_role')}</option>
                               {roles?.map((role) => (
                                 <option key={role.id} value={role.id}>
                                   {role.name}
@@ -408,13 +415,13 @@ export default function Seguridad() {
                                 setShowOverrideModal(true)
                               }}
                             >
-                              Permisos
+                              {t('security:users.permissions')}
                             </button>
                             <button
                               className="btn-secondary"
                               onClick={() => resetUserOverrides.mutate(user.id)}
                             >
-                              Resetear
+                              {t('security:users.reset')}
                             </button>
                           </div>
                         </td>
@@ -428,7 +435,7 @@ export default function Seguridad() {
 
           {activeTab === 'audit' && (
             <div className="muted">
-              Usa la pantalla de Auditoría para ver cambios de roles y permisos.
+              {t('security:audit_hint')}
             </div>
           )}
         </div>
@@ -442,7 +449,7 @@ export default function Seguridad() {
         >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{editingRole ? 'Editar rol' : 'Nuevo rol'}</h2>
+              <h2>{editingRole ? t('security:role_modal.edit_title') : t('security:role_modal.new_title')}</h2>
               <button className="close-button" onClick={() => setShowRoleModal(false)}>
                 ×
               </button>
@@ -450,7 +457,7 @@ export default function Seguridad() {
             <div className="modal-body">
               <div className="form-row">
                 <div className="form-group">
-                  <label>Código</label>
+                  <label>{t('security:role_modal.code')}</label>
                   <input
                     value={roleForm.code}
                     onChange={(e) => setRoleForm((prev) => ({ ...prev, code: e.target.value }))}
@@ -458,7 +465,7 @@ export default function Seguridad() {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Nombre</label>
+                  <label>{t('common:name')}</label>
                   <input
                     value={roleForm.name}
                     onChange={(e) => setRoleForm((prev) => ({ ...prev, name: e.target.value }))}
@@ -466,14 +473,14 @@ export default function Seguridad() {
                 </div>
               </div>
               <div className="form-group">
-                <label>Descripción</label>
+                <label>{t('common:description')}</label>
                 <input
                   value={roleForm.description}
                   onChange={(e) => setRoleForm((prev) => ({ ...prev, description: e.target.value }))}
                 />
               </div>
               <div className="form-group">
-                <label>Permisos</label>
+                <label>{t('security:role_modal.permissions')}</label>
                 <div className="perms-list">
                   {permissions && permissions.length > 0 ? (
                     permissions.map((perm) => (
@@ -499,7 +506,7 @@ export default function Seguridad() {
                     ))
                   ) : (
                     <div className="empty-hint">
-                      No hay permisos configurados. Inicializa los permisos en el backend y recarga.
+                      {t('security:empty_permissions')}
                     </div>
                   )}
                 </div>
@@ -509,7 +516,7 @@ export default function Seguridad() {
                   className="btn-primary"
                   onClick={() => (editingRole ? updateRole.mutate() : createRole.mutate())}
                 >
-                  Guardar rol
+                  {t('security:role_modal.save')}
                 </button>
               </div>
             </div>
@@ -525,7 +532,7 @@ export default function Seguridad() {
         >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Permisos personalizados · {overrideUser.name}</h2>
+              <h2>{t('security:override_modal.title', { name: overrideUser.name })}</h2>
               <button className="close-button" onClick={() => setShowOverrideModal(false)}>
                 ×
               </button>
@@ -553,13 +560,13 @@ export default function Seguridad() {
                   ))
                 ) : (
                   <div className="empty-hint">
-                    No hay permisos configurados. Inicializa los permisos en el backend y recarga.
+                    {t('security:empty_permissions')}
                   </div>
                 )}
               </div>
               <div className="actions">
                 <button className="btn-primary" onClick={() => updateUserOverrides.mutate()}>
-                  Guardar permisos
+                  {t('security:override_modal.save')}
                 </button>
               </div>
             </div>

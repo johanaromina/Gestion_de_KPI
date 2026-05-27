@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import './BulkKPIAssignmentModal.css'
 
@@ -18,17 +19,11 @@ interface Props {
   onSuccess: (created: number, skipped: number) => void
 }
 
-const roleLabel: Record<string, string> = {
-  collaborator: 'Colaborador',
-  leader: 'Líder',
-  manager: 'Gerente',
-  director: 'Director',
-  admin: 'Administrador',
-}
-
 const dataSourceOptions = ['Jira', 'Xray', 'DB MySQL', 'CSV upload', 'Manual', 'Otro']
 
 export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: Props) {
+  const { t } = useTranslation(['assignments', 'common'])
+  const getRoleLabel = (role: string) => t(`common:roles.${role}`, { defaultValue: role })
   const queryClient = useQueryClient()
   const [step, setStep] = useState<1 | 2>(prefill ? 2 : 1)
 
@@ -121,7 +116,7 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
           .map((c: any) => String(c.role || ''))
           .filter(Boolean)
       )
-    ).sort((a, b) => String(roleLabel[a] || a).localeCompare(String(roleLabel[b] || b)))
+    ).sort((a, b) => getRoleLabel(a).localeCompare(getRoleLabel(b)))
   , [activeCollaborators])
 
   const scopeFilteredCollaborators = useMemo(() => {
@@ -236,9 +231,9 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
       <div className="bulk-modal">
         <div className="bulk-modal-header">
           <div>
-            <h2>{prefill ? 'Replicar KPI' : 'Asignación masiva de KPI'}</h2>
+            <h2>{prefill ? t('bulk.title_replicate') : t('bulk.title')}</h2>
             <p className="bulk-modal-sub">
-              {step === 1 ? 'Paso 1: configurar el KPI a asignar' : 'Paso 2: seleccionar destinatarios'}
+              {step === 1 ? t('bulk.step1_subtitle') : t('bulk.step2_subtitle')}
             </p>
           </div>
           <button className="bulk-modal-close" onClick={onClose}>×</button>
@@ -256,18 +251,18 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
             <div className="bulk-step">
               <div className="bulk-form-row">
                 <div className="bulk-field">
-                  <label>KPI *</label>
+                  <label>{t('bulk.kpi_label')}</label>
                   <select value={kpiId} onChange={e => setKpiId(e.target.value)}>
-                    <option value="">Seleccioná un KPI...</option>
+                    <option value="">{t('bulk.kpi_placeholder')}</option>
                     {kpis.map((k: any) => (
                       <option key={k.id} value={k.id}>{k.name}</option>
                     ))}
                   </select>
                 </div>
                 <div className="bulk-field">
-                  <label>Período *</label>
+                  <label>{t('bulk.period_label')}</label>
                   <select value={periodId} onChange={e => setPeriodId(e.target.value)}>
-                    <option value="">Seleccioná un período...</option>
+                    <option value="">{t('bulk.period_placeholder')}</option>
                     {periods.filter((p: any) => p.status !== 'closed').map((p: any) => (
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
@@ -276,19 +271,19 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
               </div>
               <div className="bulk-form-row">
                 <div className="bulk-field">
-                  <label>Meta (target) *</label>
+                  <label>{t('bulk.target_label')}</label>
                   <input
                     type="number"
                     min="0.01"
                     step="0.01"
                     value={target}
                     onChange={e => setTarget(e.target.value)}
-                    placeholder="Ej: 100"
+                    placeholder={t('form.target_placeholder')}
                   />
-                  <small>Misma meta para todos los seleccionados</small>
+                  <small>{t('bulk.target_hint')}</small>
                 </div>
                 <div className="bulk-field">
-                  <label>Ponderación (%)</label>
+                  <label>{t('bulk.weight_label')}</label>
                   <input
                     type="number"
                     min="0"
@@ -296,9 +291,9 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
                     step="1"
                     value={weight}
                     onChange={e => setWeight(e.target.value)}
-                    placeholder="Ej: 20"
+                    placeholder={t('form.weight_placeholder')}
                   />
-                  <small>Peso del KPI en el total del colaborador</small>
+                  <small>{t('bulk.weight_hint')}</small>
                 </div>
               </div>
 
@@ -309,80 +304,80 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
                     checked={applyAdvancedOptions}
                     onChange={(e) => setApplyAdvancedOptions(e.target.checked)}
                   />
-                  Aplicar configuración avanzada opcional a todas las asignaciones
+                  {t('bulk.advanced_toggle')}
                 </label>
-                <small>Permite definir estado, curaduría, modo de carga y criterio sin editar luego una por una.</small>
+                <small>{t('bulk.advanced_hint')}</small>
               </div>
 
               {applyAdvancedOptions && (
                 <div className="bulk-advanced-panel">
                   <div className="bulk-form-row">
                     <div className="bulk-field">
-                      <label>Estado</label>
+                      <label>{t('bulk.status_label')}</label>
                       <select value={assignmentStatus} onChange={e => setAssignmentStatus(e.target.value as any)}>
-                        <option value="draft">Borrador</option>
-                        <option value="proposed">Propuesto</option>
-                        <option value="approved">Aprobado</option>
-                        <option value="closed">Cerrado</option>
+                        <option value="draft">{t('status.draft')}</option>
+                        <option value="proposed">{t('status.proposed')}</option>
+                        <option value="approved">{t('status.approved')}</option>
+                        <option value="closed">{t('status.closed')}</option>
                       </select>
                     </div>
                     <div className="bulk-field">
-                      <label>Curaduría</label>
+                      <label>{t('bulk.curation_label')}</label>
                       <select value={curationStatus} onChange={e => setCurationStatus(e.target.value as any)}>
-                        <option value="pending">Pendiente</option>
-                        <option value="in_review">En revisión</option>
-                        <option value="approved">Aprobada</option>
-                        <option value="rejected">Rechazada</option>
+                        <option value="pending">{t('curation.pending')}</option>
+                        <option value="in_review">{t('curation.in_review')}</option>
+                        <option value="approved">{t('curation.approved')}</option>
+                        <option value="rejected">{t('curation.rejected')}</option>
                       </select>
                     </div>
                     <div className="bulk-field">
-                      <label>Modo de carga</label>
+                      <label>{t('bulk.input_mode_label')}</label>
                       <select value={inputMode} onChange={e => setInputMode(e.target.value as any)}>
-                        <option value="manual">Manual</option>
-                        <option value="import">Import</option>
-                        <option value="auto">Auto</option>
+                        <option value="manual">{t('input.manual')}</option>
+                        <option value="import">{t('input.import')}</option>
+                        <option value="auto">{t('input.auto')}</option>
                       </select>
                     </div>
                   </div>
 
                   <div className="bulk-form-row">
                     <div className="bulk-field">
-                      <label>Fuente del dato</label>
+                      <label>{t('bulk.data_source_label')}</label>
                       <select value={dataSource} onChange={e => setDataSource(e.target.value)}>
-                        <option value="">Sin definir</option>
+                        <option value="">{t('bulk.data_source_empty')}</option>
                         {dataSourceOptions.map((option) => (
                           <option key={option} value={option}>{option}</option>
                         ))}
                       </select>
                     </div>
                     <div className="bulk-field">
-                      <label>Origen / Query / Endpoint</label>
+                      <label>{t('bulk.source_config_label')}</label>
                       <input
                         type="text"
                         value={sourceConfig}
                         onChange={e => setSourceConfig(e.target.value)}
-                        placeholder="JQL / SQL / URL / reporte"
+                        placeholder={t('form.source_config_placeholder')}
                       />
                     </div>
                   </div>
 
                   <div className="bulk-field">
-                    <label>Criterio de cálculo</label>
+                    <label>{t('bulk.criteria_label')}</label>
                     <textarea
                       value={criteriaText}
                       onChange={e => setCriteriaText(e.target.value)}
                       rows={3}
-                      placeholder="Describe cómo se calcula target / alcance / variación"
+                      placeholder={t('form.criteria_placeholder')}
                     />
                   </div>
 
                   <div className="bulk-field">
-                    <label>Evidencia / adjunto</label>
+                    <label>{t('bulk.evidence_label')}</label>
                     <input
                       type="text"
                       value={evidenceUrl}
                       onChange={e => setEvidenceUrl(e.target.value)}
-                      placeholder="Link o referencia"
+                      placeholder={t('form.evidence_placeholder')}
                     />
                   </div>
                 </div>
@@ -395,30 +390,30 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
             <div className="bulk-step">
               {/* Resumen paso 1 */}
               <div className="bulk-summary-bar">
-                <span><strong>KPI:</strong> {selectedKpiName}</span>
-                <span><strong>Período:</strong> {selectedPeriodName}</span>
-                <span><strong>Meta:</strong> {target}</span>
-                <span><strong>Peso:</strong> {weight}%</span>
-                <button className="bulk-edit-step1" onClick={() => setStep(1)}>Editar</button>
+                <span><strong>{t('bulk.summary_kpi')}</strong> {selectedKpiName}</span>
+                <span><strong>{t('bulk.summary_period')}</strong> {selectedPeriodName}</span>
+                <span><strong>{t('bulk.summary_target')}</strong> {target}</span>
+                <span><strong>{t('bulk.summary_weight')}</strong> {weight}%</span>
+                <button className="bulk-edit-step1" onClick={() => setStep(1)}>{t('bulk.summary_edit')}</button>
               </div>
 
               {/* Filtros de destinatarios */}
               <div className="bulk-form-row" style={{ marginBottom: 12 }}>
                 <div className="bulk-field">
-                  <label>Filtrar por equipo / área</label>
+                  <label>{t('bulk.filter_scope_label')}</label>
                   <select value={scopeId} onChange={e => setScopeId(e.target.value)}>
-                    <option value="">Todos los colaboradores activos</option>
+                    <option value="">{t('bulk.filter_scope_all')}</option>
                     {assignableScopes.map((s: any) => (
                       <option key={s.id} value={s.id}>{s.label}</option>
                     ))}
                   </select>
                 </div>
                 <div className="bulk-field">
-                  <label>Filtrar por rol</label>
+                  <label>{t('bulk.filter_role_label')}</label>
                   <select value={selectedRole} onChange={e => setSelectedRole(e.target.value)}>
-                    <option value="">Todos los roles</option>
+                    <option value="">{t('bulk.filter_role_all')}</option>
                     {availableRoles.map((role) => (
-                      <option key={role} value={role}>{roleLabel[role] || role}</option>
+                      <option key={role} value={role}>{getRoleLabel(role)}</option>
                     ))}
                   </select>
                 </div>
@@ -427,13 +422,15 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
               {/* Controles selección */}
               <div className="bulk-select-controls">
                 <span className="bulk-count-label">
-                  {filteredCollaborators.length} colaboradores
-                  {filteredAlreadyAssignedCount > 0 && ` · ${filteredAlreadyAssignedCount} ya asignados`}
-                  {` · ${eligibleCount} disponibles`}
+                  {t('bulk.collaborators_count', {
+                    total: filteredCollaborators.length,
+                    already: filteredAlreadyAssignedCount,
+                    eligible: eligibleCount,
+                  })}
                 </span>
                 {eligibleCount > 0 && (
                   <button className="bulk-select-all" onClick={toggleAll}>
-                    {selectedIds.size === eligibleCount ? 'Deseleccionar todos' : 'Seleccionar todos'}
+                    {selectedIds.size === eligibleCount ? t('bulk.deselect_all') : t('bulk.select_all')}
                   </button>
                 )}
               </div>
@@ -441,13 +438,13 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
               {/* Lista de colaboradores */}
               <div className="bulk-collaborator-list">
                 {filteredCollaborators.length === 0 && (
-                  <div className="bulk-empty">No hay colaboradores activos con los filtros seleccionados.</div>
+                  <div className="bulk-empty">{t('bulk.empty')}</div>
                 )}
                 {filteredCollaborators.map((c: any) => {
                   const already = alreadyAssignedIds.has(c.id)
                   const checked = selectedIds.has(c.id)
                   const scopeName = c.orgScopeId ? scopeById.get(Number(c.orgScopeId))?.name : c.area
-                  const collaboratorRole = roleLabel[c.role] || c.role
+                  const collaboratorRole = getRoleLabel(c.role)
                   return (
                     <label
                       key={c.id}
@@ -469,7 +466,7 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
                         )}
                         {scopeName && <span className="bulk-collab-scope">{scopeName}</span>}
                       </div>
-                      {already && <span className="bulk-collab-taken">ya asignado</span>}
+                      {already && <span className="bulk-collab-taken">{t('bulk.already_assigned')}</span>}
                     </label>
                   )
                 })}
@@ -477,7 +474,9 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
 
               {selectedIds.size > 0 && (
                 <div className="bulk-selection-summary">
-                  {selectedIds.size} colaborador{selectedIds.size !== 1 ? 'es' : ''} seleccionado{selectedIds.size !== 1 ? 's' : ''}
+                  {selectedIds.size !== 1
+                    ? t('bulk.selection_many', { count: selectedIds.size })
+                    : t('bulk.selection_one', { count: selectedIds.size })}
                 </div>
               )}
             </div>
@@ -487,29 +486,31 @@ export default function BulkKPIAssignmentModal({ prefill, onClose, onSuccess }: 
         <div className="bulk-modal-footer">
           {step === 1 ? (
             <>
-              <button className="btn-secondary" onClick={onClose}>Cancelar</button>
+              <button className="btn-secondary" onClick={onClose}>{t('bulk.cancel')}</button>
               <button
                 className="btn-primary"
                 onClick={() => setStep(2)}
                 disabled={!step1Valid}
               >
-                Siguiente →
+                {t('bulk.next')}
               </button>
             </>
           ) : (
             <>
               {!prefill && (
-                <button className="btn-secondary" onClick={() => setStep(1)}>← Atrás</button>
+                <button className="btn-secondary" onClick={() => setStep(1)}>{t('bulk.back')}</button>
               )}
-              {prefill && <button className="btn-secondary" onClick={onClose}>Cancelar</button>}
+              {prefill && <button className="btn-secondary" onClick={onClose}>{t('bulk.cancel')}</button>}
               <button
                 className="btn-primary"
                 onClick={() => bulkMutation.mutate()}
                 disabled={selectedIds.size === 0 || bulkMutation.isLoading}
               >
                 {bulkMutation.isLoading
-                  ? 'Creando...'
-                  : `Asignar a ${selectedIds.size} colaborador${selectedIds.size !== 1 ? 'es' : ''}`}
+                  ? t('bulk.creating')
+                  : selectedIds.size !== 1
+                    ? t('bulk.assign_many', { count: selectedIds.size })
+                    : t('bulk.assign_one', { count: selectedIds.size })}
               </button>
             </>
           )}
