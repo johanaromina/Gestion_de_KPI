@@ -1,0 +1,111 @@
+{
+  "title": "Views",
+  "subtitle_superpowers": "Team and company in one place.",
+  "subtitle_team": "General view of your team.",
+  "tabs": {
+    "aggregated": "Team · Aggregate",
+    "reduction": "Team · Reduction",
+    "company_grid": "Company · Grid"
+  },
+  "aggregated": {
+    "title": "Aggregate Views",
+    "subtitle": "Compliance dashboards by organizational level",
+    "filters": {
+      "period_label": "Period",
+      "select_period": "Select a period"
+    },
+    "view_types": {
+      "area": "By Area",
+      "direction": "By Direction",
+      "management": "By Management",
+      "leadership": "By Leadership"
+    },
+    "chart": {
+      "avg_title": "Average Compliance - {{view}}",
+      "range_title": "Compliance Range - {{view}}",
+      "detailed_title": "Detailed Data - {{view}}",
+      "bar_avg": "Average %",
+      "bar_min": "Minimum %",
+      "bar_max": "Maximum %"
+    },
+    "table": {
+      "header_area": "Area",
+      "header_manager": "Manager",
+      "header_leader": "Leader",
+      "header_collaborators": "Collaborators",
+      "header_avg": "Average",
+      "header_min": "Minimum",
+      "header_max": "Maximum",
+      "header_dispersion": "Dispersion (σ)",
+      "header_range": "Range"
+    },
+    "no_name": "No name",
+    "loading": "Loading aggregate data...",
+    "empty": {
+      "no_period_title": "Select a period",
+      "no_period_text": "Choose a period to view aggregate data",
+      "no_data_title": "No data available",
+      "no_data_text": "No aggregate data found for the selected period"
+    }
+  },
+  "reduction": {
+    "title": "Reduction Views",
+    "subtitle": "Reports and time evolution of reduction objectives",
+    "filters": {
+      "period_label": "Period",
+      "all_periods": "All periods",
+      "area_label": "Area",
+      "all_areas": "All areas",
+      "view_label": "View"
+    },
+    "view_modes": {
+      "overview": "Summary",
+      "evolution": "Time Evolution"
+    },
+    "stats": {
+      "title": "General Statistics",
+      "loading": "Loading statistics...",
+      "collaborators": "Collaborators:",
+      "avg_target": "Average Target:",
+      "avg_actual": "Average Actual:",
+      "compliance_pct": "% Compliance:",
+      "completion_rate": "Completion rate:",
+      "empty": "No reduction data for the selected filters"
+    },
+    "chart": {
+      "comparison_title": "Reduction KPI Comparison",
+      "target_avg": "Average Target",
+      "actual_avg": "Average Actual",
+      "compliance_pct": "% Compliance"
+    },
+    "table": {
+      "title": "Details by KPI and Collaborator",
+      "loading": "Loading data...",
+      "header_collaborator": "Collaborator",
+      "header_area": "Area",
+      "header_period": "Period",
+      "header_target": "Target",
+      "header_actual": "Actual",
+      "header_compliance": "% Compliance",
+      "header_status": "Status",
+      "empty": "No reduction KPIs for the selected filters"
+    },
+    "evolution": {
+      "title": "Time Evolution",
+      "kpi_label": "Select KPI:",
+      "select_kpi": "Select a KPI",
+      "loading": "Loading evolution...",
+      "chart_target_actual": "Target vs Actual Evolution",
+      "chart_compliance": "Compliance % Evolution",
+      "data_title": "Evolution Data",
+      "table": {
+        "period": "Period",
+        "target": "Target",
+        "actual": "Actual",
+        "compliance": "% Compliance",
+        "status": "Status"
+      },
+      "empty": "No evolution data for this KPI"
+    }
+  }
+}

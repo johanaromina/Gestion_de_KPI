@@ -1,6 +1,9 @@
 import { useRef, useState } from 'react'
 import { useMutation } from 'react-query'
+import { useTranslation } from 'react-i18next'
+import { TFunction } from 'i18next'
 import api from '../services/api'
+import { resolveApiErrorMessage } from '../utils/apiErrors'
 import './ImportarDatos.css'
 
 type Tab = 'areas' | 'colaboradores'
@@ -8,24 +11,30 @@ type Tab = 'areas' | 'colaboradores'
 type AreaRow = { name: string; type: string; parentName: string; _errors?: string[] }
 type ColabRow = { name: string; email: string; position: string; role: string; areaName: string; _errors?: string[] }
 
-type ImportError = { row: number; message: string }
+type ImportError = { row: number; code?: string; message: string; values?: Record<string, unknown> }
 type ImportResult = { total: number; created: number; errors: ImportError[] }
 type ImportResponse = { total?: number; created?: number; errors?: ImportError[]; _submittedCount?: number }
 
 const AREA_TYPES = ['company', 'area', 'team', 'business_unit']
-const AREA_TYPE_LABEL: Record<string, string> = { company: 'Empresa', area: 'Área', team: 'Equipo', business_unit: 'Unidad de negocio' }
 const VALID_ROLES = ['collaborator', 'leader', 'director', 'admin']
 
-const AREA_TEMPLATE = `nombre,tipo,area_padre
-Empresa SA,company,
-Dirección Comercial,area,Empresa SA
-Ventas Norte,team,Dirección Comercial
-Ventas Sur,team,Dirección Comercial`
+const AREA_IMPORT_API_ERROR_KEYS: Record<string, string> = {
+  ORG_SCOPE_IMPORT_ROWS_REQUIRED: 'areas.api_errors.rows_required',
+  ORG_SCOPE_IMPORT_NAME_EMPTY: 'areas.api_errors.name_empty',
+  ORG_SCOPE_IMPORT_PARENT_NOT_FOUND: 'areas.api_errors.parent_not_found',
+  ORG_SCOPE_IMPORT_DUPLICATE: 'areas.api_errors.duplicate',
+  ORG_SCOPE_IMPORT_FAILED: 'areas.api_errors.import_failed',
+}
 
-const COLAB_TEMPLATE = `nombre,email,cargo,rol,area
-Juan Pérez,juan@empresa.com,Vendedor,collaborator,Ventas Norte
-Ana García,ana@empresa.com,Líder de Ventas,leader,Dirección Comercial
-Mario López,,Analista,collaborator,Ventas Sur`
+const COLLABORATOR_IMPORT_API_ERROR_KEYS: Record<string, string> = {
+  COLLABORATOR_IMPORT_FORBIDDEN: 'collaborators.api_errors.forbidden',
+  COLLABORATOR_IMPORT_ROWS_REQUIRED: 'collaborators.api_errors.rows_required',
+  COLLABORATOR_IMPORT_NAME_EMPTY: 'collaborators.api_errors.name_empty',
+  COLLABORATOR_IMPORT_ROLE_INVALID: 'collaborators.api_errors.role_invalid',
+  COLLABORATOR_IMPORT_EMAIL_EXISTS: 'collaborators.api_errors.email_exists',
+  COLLABORATOR_IMPORT_AREA_NOT_FOUND: 'collaborators.api_errors.area_not_found',
+  COLLABORATOR_IMPORT_FAILED: 'collaborators.api_errors.import_failed',
+}
 
 // ── Parser CSV simple ────────────────────────────────────────────────────────
 
@@ -71,7 +80,7 @@ function splitCsvLine(line: string, delimiter: string): string[] {
 
 function parseCsv(text: string): string[][] {
   const normalized = text
-    .replace(/^\uFEFF/, '')
+    .replace(/^﻿/, '')
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
 
@@ -108,10 +117,23 @@ function getRejectedCount(result: ImportResult) {
   return Math.max(result.total - result.created, result.errors.length)
 }
 
+function getImportErrorMessage(
+  error: ImportError,
+  t: TFunction,
+  codeMap: Record<string, string>
+) {
+  return resolveApiErrorMessage(error, t, { codeMap }) || error.message
+}
+
 // ── Componente principal ─────────────────────────────────────────────────────
 
 export default function ImportarDatos() {
+  const { t } = useTranslation(['import', 'common'])
   const [tab, setTab] = useState<Tab>('areas')
+  const areaTemplateCsv = t('areas.template_csv')
+  const areaTemplateFilename = t('areas.template_filename')
+  const collaboratorTemplateCsv = t('collaborators.template_csv')
+  const collaboratorTemplateFilename = t('collaborators.template_filename')
 
   // Areas
   const [areaRows, setAreaRows] = useState<AreaRow[]>([])
@@ -145,8 +167,8 @@ export default function ImportarDatos() {
           parentName: parentIdx >= 0 ? cols[parentIdx] || '' : cols[2] || '',
         }
         const errs: string[] = []
-        if (!row.name) errs.push('Nombre vacío')
-        if (row.type && !AREA_TYPES.includes(row.type.toLowerCase())) errs.push(`Tipo inválido: "${row.type}"`)
+        if (!row.name) errs.push(t('areas.err_name_empty'))
+        if (row.type && !AREA_TYPES.includes(row.type.toLowerCase())) errs.push(t('areas.err_type_invalid', { type: row.type }))
         if (errs.length) row._errors = errs
         return row
       })
@@ -183,9 +205,9 @@ export default function ImportarDatos() {
           areaName: areaIdx >= 0 ? cols[areaIdx] || '' : cols[4] || '',
         }
         const errs: string[] = []
-        if (!row.name) errs.push('Nombre vacío')
-        if (row.role && !VALID_ROLES.includes(row.role.toLowerCase())) errs.push(`Rol inválido: "${row.role}"`)
-        if (row.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) errs.push('Email inválido')
+        if (!row.name) errs.push(t('collaborators.err_name_empty'))
+        if (row.role && !VALID_ROLES.includes(row.role.toLowerCase())) errs.push(t('collaborators.err_role_invalid', { role: row.role }))
+        if (row.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) errs.push(t('collaborators.err_email_invalid'))
         if (errs.length) row._errors = errs
         return row
       })
@@ -215,7 +237,13 @@ export default function ImportarDatos() {
       onError: (err: any) => {
         setAreaResult(buildImportResult(areaRows.length, {
           created: 0,
-          errors: [{ row: 0, message: err?.response?.data?.error || 'Error al importar' }],
+          errors: [{
+            row: 0,
+            message: resolveApiErrorMessage(err, t, {
+              codeMap: AREA_IMPORT_API_ERROR_KEYS,
+              fallbackKey: 'areas.error_import',
+            }),
+          }],
         }))
       },
     }
@@ -241,7 +269,13 @@ export default function ImportarDatos() {
       onError: (err: any) => {
         setColabResult(buildImportResult(colabRows.length, {
           created: 0,
-          errors: [{ row: 0, message: err?.response?.data?.error || 'Error al importar' }],
+          errors: [{
+            row: 0,
+            message: resolveApiErrorMessage(err, t, {
+              codeMap: COLLABORATOR_IMPORT_API_ERROR_KEYS,
+              fallbackKey: 'collaborators.error_import',
+            }),
+          }],
         }))
       },
     }
@@ -254,8 +288,8 @@ export default function ImportarDatos() {
     <div className="importar-page">
       <div className="page-header">
         <div>
-          <h1>Importar datos</h1>
-          <p className="subtitle">Cargá áreas y colaboradores masivamente desde un archivo CSV o Excel</p>
+          <h1>{t('title')}</h1>
+          <p className="subtitle">{t('subtitle')}</p>
         </div>
       </div>
 
@@ -265,13 +299,13 @@ export default function ImportarDatos() {
           className={`import-tab ${tab === 'areas' ? 'import-tab--active' : ''}`}
           onClick={() => setTab('areas')}
         >
-          📂 Áreas y equipos
+          📂 {t('tab_areas')}
         </button>
         <button
           className={`import-tab ${tab === 'colaboradores' ? 'import-tab--active' : ''}`}
           onClick={() => setTab('colaboradores')}
         >
-          👥 Colaboradores
+          👥 {t('tab_collaborators')}
         </button>
       </div>
 
@@ -279,22 +313,28 @@ export default function ImportarDatos() {
       {tab === 'areas' && (
         <div className="import-section">
           <div className="import-info-box">
-            <p><strong>Formato esperado:</strong> archivo CSV con columnas <code>nombre, tipo, area_padre</code></p>
-            <p>Separador aceptado: coma (<code>,</code>) o punto y coma (<code>;</code>).</p>
-            <p>Tipos válidos: <code>company</code> · <code>area</code> · <code>team</code> · <code>business_unit</code></p>
-            <p>Dejá <code>area_padre</code> vacío para los nodos raíz. El orden no importa: el sistema resuelve la jerarquía.</p>
-            <button className="btn-download-template" onClick={() => downloadTemplate(AREA_TEMPLATE, 'plantilla_areas.csv')}>
-              ⬇ Descargar plantilla
+            <p>
+              <strong>{t('areas.format_title')}</strong>{' '}
+              <span dangerouslySetInnerHTML={{ __html: t('areas.format_cols') }} />
+            </p>
+            <p dangerouslySetInnerHTML={{ __html: t('areas.format_sep') }} />
+            <p dangerouslySetInnerHTML={{ __html: t('areas.format_types') }} />
+            <p dangerouslySetInnerHTML={{ __html: t('areas.format_root') }} />
+            <button
+              className="btn-download-template"
+              onClick={() => downloadTemplate(areaTemplateCsv, areaTemplateFilename)}
+            >
+              {t('areas.download_template')}
             </button>
           </div>
 
           <div className="import-upload-row">
             <input ref={areaInputRef} type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={handleAreaFile} />
             <button className="btn-upload" onClick={() => areaInputRef.current?.click()}>
-              📁 Seleccionar archivo CSV
+              📁 {t('areas.select_file')}
             </button>
             {areaRows.length > 0 && (
-              <span className="import-file-info">{areaRows.length} filas cargadas</span>
+              <span className="import-file-info">{t('areas.rows_loaded', { count: areaRows.length })}</span>
             )}
           </div>
 
@@ -304,28 +344,28 @@ export default function ImportarDatos() {
                 <table className="import-preview-table">
                   <thead>
                     <tr>
-                      <th>#</th>
-                      <th>Nombre</th>
-                      <th>Tipo</th>
-                      <th>Área padre</th>
-                      <th>Estado</th>
+                      <th>{t('areas.table_num')}</th>
+                      <th>{t('areas.table_name')}</th>
+                      <th>{t('areas.table_type')}</th>
+                      <th>{t('areas.table_parent')}</th>
+                      <th>{t('areas.table_status')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {areaRows.map((row, i) => (
                       <tr key={i} className={row._errors?.length ? 'import-row--error' : 'import-row--ok'}>
                         <td className="import-row-num">{i + 1}</td>
-                        <td>{row.name || <span className="import-empty">vacío</span>}</td>
+                        <td>{row.name || <span className="import-empty">{t('areas.empty_value')}</span>}</td>
                         <td>
                           <span className="import-type-badge">
-                            {AREA_TYPE_LABEL[row.type?.toLowerCase()] || row.type || 'area'}
+                            {t(`organigrama:types.${row.type?.toLowerCase()}`, { defaultValue: row.type || 'area' })}
                           </span>
                         </td>
                         <td>{row.parentName || <span className="import-empty">—</span>}</td>
                         <td>
                           {row._errors?.length
                             ? <span className="import-status import-status--error">⚠ {row._errors.join(', ')}</span>
-                            : <span className="import-status import-status--ok">✓ OK</span>
+                            : <span className="import-status import-status--ok">{t('areas.status_ok')}</span>
                           }
                         </td>
                       </tr>
@@ -336,14 +376,14 @@ export default function ImportarDatos() {
 
               <div className="import-actions">
                 <button className="btn-import-cancel" onClick={() => { setAreaRows([]); setAreaResult(null) }}>
-                  Cancelar
+                  {t('areas.cancel')}
                 </button>
                 <button
                   className="btn-import-confirm"
                   disabled={hasAreaErrors || importAreasMutation.isLoading}
                   onClick={() => importAreasMutation.mutate()}
                 >
-                  {importAreasMutation.isLoading ? 'Importando…' : `Importar ${areaRows.length} áreas`}
+                  {importAreasMutation.isLoading ? t('areas.importing') : t('areas.import_btn', { count: areaRows.length })}
                 </button>
               </div>
             </>
@@ -351,32 +391,27 @@ export default function ImportarDatos() {
 
           {areaResult && (
             <div className={`import-result ${areaResult.created > 0 ? 'import-result--success' : 'import-result--partial'}`}>
-              <p>
-                Resultado: se importaron <strong>{areaResult.created}</strong> de <strong>{areaResult.total}</strong> área
-                {areaResult.total !== 1 ? 's' : ''}.
-              </p>
+              <p dangerouslySetInnerHTML={{ __html: t(areaResult.total !== 1 ? 'areas.result_imported_plural' : 'areas.result_imported', { created: areaResult.created, total: areaResult.total }) }} />
               {getRejectedCount(areaResult) > 0 ? (
-                <p>
-                  Quedaron <strong>{getRejectedCount(areaResult)}</strong> fila
-                  {getRejectedCount(areaResult) !== 1 ? 's' : ''} sin importar.
-                </p>
+                <p dangerouslySetInnerHTML={{ __html: t('areas.result_rejected', { count: getRejectedCount(areaResult) }) }} />
               ) : (
-                <p>Todo el archivo fue importado correctamente.</p>
+                <p>{t('areas.result_all_ok')}</p>
               )}
               {areaResult.errors.length > 0 && (
                 <>
-                  <p>⚠ {areaResult.errors.length} fila{areaResult.errors.length !== 1 ? 's' : ''} con error{areaResult.errors.length !== 1 ? 'es' : ''}:</p>
+                  <p>{t('areas.result_errors', { count: areaResult.errors.length })}</p>
                   <ul>
                     {areaResult.errors.map((e, i) => (
-                      <li key={i}>{e.row > 0 ? `Fila ${e.row}: ` : ''}{e.message}</li>
+                      <li key={i}>
+                        {e.row > 0 ? `${e.row}: ` : ''}
+                        {getImportErrorMessage(e, t, AREA_IMPORT_API_ERROR_KEYS)}
+                      </li>
                     ))}
                   </ul>
                 </>
               )}
               {areaResult.created > 0 && areaResult.errors.length > 0 && (
-                <p className="import-result-note">
-                  Las filas válidas ya fueron creadas. Revisá solo las rechazadas antes de volver a importar.
-                </p>
+                <p className="import-result-note">{t('areas.result_note')}</p>
               )}
             </div>
           )}
@@ -387,22 +422,28 @@ export default function ImportarDatos() {
       {tab === 'colaboradores' && (
         <div className="import-section">
           <div className="import-info-box">
-            <p><strong>Formato esperado:</strong> archivo CSV con columnas <code>nombre, email, cargo, rol, area</code></p>
-            <p>Roles válidos: <code>collaborator</code> · <code>leader</code> · <code>director</code> · <code>admin</code></p>
-            <p>El <code>email</code> es opcional. El <code>area</code> debe coincidir exactamente con el nombre de un área existente.</p>
-            <p>Los colaboradores importados <strong>no reciben email de invitación</strong>. Podés enviarlo después desde la lista de colaboradores.</p>
-            <button className="btn-download-template" onClick={() => downloadTemplate(COLAB_TEMPLATE, 'plantilla_colaboradores.csv')}>
-              ⬇ Descargar plantilla
+            <p>
+              <strong>{t('collaborators.format_title')}</strong>{' '}
+              <span dangerouslySetInnerHTML={{ __html: t('collaborators.format_cols') }} />
+            </p>
+            <p dangerouslySetInnerHTML={{ __html: t('collaborators.format_roles') }} />
+            <p dangerouslySetInnerHTML={{ __html: t('collaborators.format_email') }} />
+            <p dangerouslySetInnerHTML={{ __html: t('collaborators.format_no_invite') }} />
+            <button
+              className="btn-download-template"
+              onClick={() => downloadTemplate(collaboratorTemplateCsv, collaboratorTemplateFilename)}
+            >
+              {t('collaborators.download_template')}
             </button>
           </div>
 
           <div className="import-upload-row">
             <input ref={colabInputRef} type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={handleColabFile} />
             <button className="btn-upload" onClick={() => colabInputRef.current?.click()}>
-              📁 Seleccionar archivo CSV
+              📁 {t('collaborators.select_file')}
             </button>
             {colabRows.length > 0 && (
-              <span className="import-file-info">{colabRows.length} filas cargadas</span>
+              <span className="import-file-info">{t('collaborators.rows_loaded', { count: colabRows.length })}</span>
             )}
           </div>
 
@@ -412,28 +453,34 @@ export default function ImportarDatos() {
                 <table className="import-preview-table">
                   <thead>
                     <tr>
-                      <th>#</th>
-                      <th>Nombre</th>
-                      <th>Email</th>
-                      <th>Cargo</th>
-                      <th>Rol</th>
-                      <th>Área</th>
-                      <th>Estado</th>
+                      <th>{t('collaborators.table_num')}</th>
+                      <th>{t('collaborators.table_name')}</th>
+                      <th>{t('collaborators.table_email')}</th>
+                      <th>{t('collaborators.table_position')}</th>
+                      <th>{t('collaborators.table_role')}</th>
+                      <th>{t('collaborators.table_area')}</th>
+                      <th>{t('collaborators.table_status')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {colabRows.map((row, i) => (
                       <tr key={i} className={row._errors?.length ? 'import-row--error' : 'import-row--ok'}>
                         <td className="import-row-num">{i + 1}</td>
-                        <td>{row.name || <span className="import-empty">vacío</span>}</td>
+                        <td>{row.name || <span className="import-empty">{t('collaborators.empty_value')}</span>}</td>
                         <td>{row.email || <span className="import-empty">—</span>}</td>
                         <td>{row.position || <span className="import-empty">—</span>}</td>
-                        <td><span className="import-type-badge">{row.role || 'collaborator'}</span></td>
+                        <td>
+                          <span className="import-type-badge">
+                            {t(`common:roles.${String(row.role || 'collaborator').toLowerCase()}`, {
+                              defaultValue: row.role || 'collaborator',
+                            })}
+                          </span>
+                        </td>
                         <td>{row.areaName || <span className="import-empty">—</span>}</td>
                         <td>
                           {row._errors?.length
                             ? <span className="import-status import-status--error">⚠ {row._errors.join(', ')}</span>
-                            : <span className="import-status import-status--ok">✓ OK</span>
+                            : <span className="import-status import-status--ok">{t('collaborators.status_ok')}</span>
                           }
                         </td>
                       </tr>
@@ -444,14 +491,14 @@ export default function ImportarDatos() {
 
               <div className="import-actions">
                 <button className="btn-import-cancel" onClick={() => { setColabRows([]); setColabResult(null) }}>
-                  Cancelar
+                  {t('collaborators.cancel')}
                 </button>
                 <button
                   className="btn-import-confirm"
                   disabled={hasColabErrors || importColabMutation.isLoading}
                   onClick={() => importColabMutation.mutate()}
                 >
-                  {importColabMutation.isLoading ? 'Importando…' : `Importar ${colabRows.length} colaboradores`}
+                  {importColabMutation.isLoading ? t('collaborators.importing') : t('collaborators.import_btn', { count: colabRows.length })}
                 </button>
               </div>
             </>
@@ -459,32 +506,27 @@ export default function ImportarDatos() {
 
           {colabResult && (
             <div className={`import-result ${colabResult.created > 0 ? 'import-result--success' : 'import-result--partial'}`}>
-              <p>
-                Resultado: se importaron <strong>{colabResult.created}</strong> de <strong>{colabResult.total}</strong> colaborador
-                {colabResult.total !== 1 ? 'es' : ''}.
-              </p>
+              <p dangerouslySetInnerHTML={{ __html: t(colabResult.total !== 1 ? 'collaborators.result_imported_plural' : 'collaborators.result_imported', { created: colabResult.created, total: colabResult.total }) }} />
               {getRejectedCount(colabResult) > 0 ? (
-                <p>
-                  Quedaron <strong>{getRejectedCount(colabResult)}</strong> fila
-                  {getRejectedCount(colabResult) !== 1 ? 's' : ''} sin importar.
-                </p>
+                <p dangerouslySetInnerHTML={{ __html: t('collaborators.result_rejected', { count: getRejectedCount(colabResult) }) }} />
               ) : (
-                <p>Todo el archivo fue importado correctamente.</p>
+                <p>{t('collaborators.result_all_ok')}</p>
               )}
               {colabResult.errors.length > 0 && (
                 <>
-                  <p>⚠ {colabResult.errors.length} fila{colabResult.errors.length !== 1 ? 's' : ''} con error{colabResult.errors.length !== 1 ? 'es' : ''}:</p>
+                  <p>{t('collaborators.result_errors', { count: colabResult.errors.length })}</p>
                   <ul>
                     {colabResult.errors.map((e, i) => (
-                      <li key={i}>{e.row > 0 ? `Fila ${e.row}: ` : ''}{e.message}</li>
+                      <li key={i}>
+                        {e.row > 0 ? `${e.row}: ` : ''}
+                        {getImportErrorMessage(e, t, COLLABORATOR_IMPORT_API_ERROR_KEYS)}
+                      </li>
                     ))}
                   </ul>
                 </>
               )}
               {colabResult.created > 0 && colabResult.errors.length > 0 && (
-                <p className="import-result-note">
-                  Los colaboradores válidos ya fueron creados. Revisá solo las filas rechazadas antes de reimportar.
-                </p>
+                <p className="import-result-note">{t('collaborators.result_note')}</p>
               )}
             </div>
           )}

@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import './Dialog.css'
 
 type DialogVariant = 'danger' | 'warning' | 'info'
@@ -32,6 +33,7 @@ const DialogContext = createContext<DialogContextValue | null>(null)
 const CLOSED: DialogState = { open: false, type: 'confirm', message: '', options: {}, resolve: null }
 
 export function DialogProvider({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation('common')
   const [state, setState] = useState<DialogState>(CLOSED)
   const [promptValue, setPromptValue] = useState('')
 
@@ -64,8 +66,12 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
   const { title, confirmLabel, cancelLabel, variant = 'info', placeholder } = options
 
   const defaultTitle =
-    type === 'alert' ? 'Aviso' : type === 'prompt' ? 'Ingresar valor' : 'Confirmar acción'
-  const defaultConfirm = type === 'alert' ? 'Aceptar' : 'Confirmar'
+    type === 'alert'
+      ? t('dialog.alert_title')
+      : type === 'prompt'
+      ? t('dialog.prompt_title')
+      : t('dialog.confirm_title')
+  const defaultConfirm = type === 'alert' ? t('accept') : t('confirm')
 
   return (
     <DialogContext.Provider value={{ confirm, alert, prompt }}>
@@ -97,7 +103,7 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
             <div className="dialog-actions">
               {type !== 'alert' && (
                 <button className="btn-secondary" onClick={handleCancel}>
-                  {cancelLabel ?? 'Cancelar'}
+                  {cancelLabel ?? t('cancel')}
                 </button>
               )}
               <button

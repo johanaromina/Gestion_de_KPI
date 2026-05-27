@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from 'react-query'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { resolveDirection, calculateVariationPercent } from '../utils/kpi'
 import './ArbolObjetivos.css'
@@ -54,14 +55,6 @@ const progressColor = (p: number) => {
   return '#dc2626'
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  not_started: 'Sin iniciar',
-  on_track: 'En camino',
-  at_risk: 'En riesgo',
-  behind: 'Atrasado',
-  completed: 'Completado',
-}
-
 const STATUS_DOT: Record<string, string> = {
   not_started: '#9ca3af',
   on_track: '#16a34a',
@@ -71,6 +64,7 @@ const STATUS_DOT: Record<string, string> = {
 }
 
 export default function ArbolObjetivos() {
+  const { t } = useTranslation('okr')
   const navigate = useNavigate()
   const [expandedScopes, setExpandedScopes] = useState<Set<string>>(new Set())
   const [expandedOkrs, setExpandedOkrs] = useState<Set<number>>(new Set())
@@ -107,7 +101,6 @@ export default function ArbolObjetivos() {
     })
   }
 
-  // Collect unique period names for filter
   const allPeriods = Array.from(
     new Set(
       tree.flatMap((g) => g.objectives.map((o) => o.periodName).filter(Boolean) as string[])
@@ -123,28 +116,26 @@ export default function ArbolObjetivos() {
   const totalKrs = filteredTree.reduce((s, g) => s + g.objectives.reduce((ss, o) => ss + o.keyResults.length, 0), 0)
 
   if (isLoading) {
-    return <div className="arbol-loading">Cargando árbol de objetivos...</div>
+    return <div className="arbol-loading">{t('arbol.loading')}</div>
   }
 
   return (
     <div className="arbol-page">
       <div className="arbol-header">
         <div>
-          <h1>Árbol de Objetivos</h1>
-          <p className="arbol-subtitle">
-            Jerarquía real de OKRs, Key Results y KPIs por área
-          </p>
+          <h1>{t('arbol.title')}</h1>
+          <p className="arbol-subtitle">{t('arbol.subtitle')}</p>
         </div>
         <button className="btn-primary" onClick={() => navigate('/okr/nuevo')}>
-          + Nuevo OKR
+          {t('arbol.new_okr')}
         </button>
       </div>
 
       <div className="arbol-toolbar">
         <div className="arbol-stats">
-          <span><strong>{filteredTree.length}</strong> áreas</span>
-          <span><strong>{totalObjectives}</strong> objetivos</span>
-          <span><strong>{totalKrs}</strong> key results</span>
+          <span><strong>{filteredTree.length}</strong> {t('arbol.stats.areas', { count: filteredTree.length })}</span>
+          <span><strong>{totalObjectives}</strong> {t('arbol.stats.objectives', { count: totalObjectives })}</span>
+          <span><strong>{totalKrs}</strong> {t('arbol.stats.krs', { count: totalKrs })}</span>
         </div>
         {allPeriods.length > 1 && (
           <select
@@ -152,7 +143,7 @@ export default function ArbolObjetivos() {
             value={filterPeriod}
             onChange={(e) => setFilterPeriod(e.target.value)}
           >
-            <option value="">Todos los períodos</option>
+            <option value="">{t('arbol.filter_all_periods')}</option>
             {allPeriods.map((p) => (
               <option key={p} value={p}>{p}</option>
             ))}
@@ -163,10 +154,10 @@ export default function ArbolObjetivos() {
       {filteredTree.length === 0 ? (
         <div className="arbol-empty">
           <div className="arbol-empty-icon">📋</div>
-          <h3>No hay objetivos activos</h3>
-          <p>Creá tu primer OKR para verlo aquí organizado por área y período.</p>
+          <h3>{t('arbol.empty.title')}</h3>
+          <p>{t('arbol.empty.text')}</p>
           <button className="btn-primary" onClick={() => navigate('/okr/nuevo')}>
-            Crear OKR
+            {t('arbol.empty.btn')}
           </button>
         </div>
       ) : (
@@ -185,7 +176,7 @@ export default function ArbolObjetivos() {
                   <span className="arbol-scope-chevron">{scopeOpen ? '▼' : '▶'}</span>
                   <span className="arbol-scope-icon">🏢</span>
                   <span className="arbol-scope-name">{group.scopeName}</span>
-                  <span className="arbol-scope-count">{group.objectives.length} OKR{group.objectives.length !== 1 ? 's' : ''}</span>
+                  <span className="arbol-scope-count">{t('arbol.scope_okrs', { count: group.objectives.length })}</span>
                 </button>
 
                 {scopeOpen && (
@@ -201,22 +192,22 @@ export default function ArbolObjetivos() {
                               className="arbol-expand-btn"
                               onClick={() => toggleOkr(okr.id)}
                               disabled={okr.keyResults.length === 0}
-                              title={okr.keyResults.length === 0 ? 'Sin Key Results' : undefined}
+                              title={okr.keyResults.length === 0 ? t('arbol.okr.no_krs_tooltip') : undefined}
                             >
                               {okr.keyResults.length > 0 ? (okrOpen ? '▼' : '▶') : '·'}
                             </button>
                             <div className="arbol-okr-main">
                               <div className="arbol-okr-top">
-                                <span className="arbol-okr-badge">OKR</span>
+                                <span className="arbol-okr-badge">{t('arbol.badges.okr')}</span>
                                 <span className="arbol-okr-title">{okr.title}</span>
                                 <span className={`arbol-status-pill arbol-status-pill--${okr.status}`}>
-                                  {okr.status === 'active' ? 'Activo' : okr.status === 'draft' ? 'Borrador' : 'Cerrado'}
+                                  {t(`status.${okr.status}`, { defaultValue: okr.status })}
                                 </span>
                               </div>
                               <div className="arbol-okr-meta">
                                 {okr.periodName && <span>📅 {okr.periodName}</span>}
                                 {okr.ownerName && <span>👤 {okr.ownerName}</span>}
-                                <span>{okr.keyResults.length} KR{okr.keyResults.length !== 1 ? 's' : ''}</span>
+                                <span>{t('arbol.okr.krs', { count: okr.keyResults.length })}</span>
                               </div>
                               <div className="arbol-progress-row">
                                 <div className="arbol-progress-track">
@@ -233,9 +224,9 @@ export default function ArbolObjetivos() {
                             <button
                               className="arbol-goto-btn"
                               onClick={() => navigate(`/okr/${okr.id}`)}
-                              title="Ver detalle del OKR"
+                              title={t('arbol.okr.goto_tooltip')}
                             >
-                              Ver →
+                              {t('arbol.okr.goto')}
                             </button>
                           </div>
 
@@ -243,6 +234,7 @@ export default function ArbolObjetivos() {
                           {okrOpen && okr.keyResults.map((kr) => {
                             const krOpen = expandedKrs.has(kr.id)
                             const hasKpis = kr.linkedKpis.length > 0
+                            const statusLabel = t(`status.${kr.status}`, { defaultValue: kr.status })
 
                             return (
                               <div key={kr.id} className="arbol-kr-block">
@@ -251,13 +243,13 @@ export default function ArbolObjetivos() {
                                     className="arbol-expand-btn arbol-expand-btn--sm"
                                     onClick={() => toggleKr(kr.id)}
                                     disabled={!hasKpis}
-                                    title={!hasKpis ? 'Sin KPIs vinculados' : undefined}
+                                    title={!hasKpis ? t('arbol.kr.no_kpis_tooltip') : undefined}
                                   >
                                     {hasKpis ? (krOpen ? '▼' : '▶') : '·'}
                                   </button>
                                   <div className="arbol-kr-main">
                                     <div className="arbol-kr-top">
-                                      <span className="arbol-kr-badge">KR</span>
+                                      <span className="arbol-kr-badge">{t('arbol.badges.kr')}</span>
                                       <span className="arbol-kr-title">{kr.title}</span>
                                       {kr.ownerName && (
                                         <span className="arbol-kr-owner">👤 {kr.ownerName}</span>
@@ -265,16 +257,14 @@ export default function ArbolObjetivos() {
                                       <span
                                         className="arbol-kr-status-dot"
                                         style={{ background: STATUS_DOT[kr.status] ?? '#9ca3af' }}
-                                        title={STATUS_LABEL[kr.status] ?? kr.status}
+                                        title={statusLabel}
                                       />
-                                      <span className="arbol-kr-status-label">
-                                        {STATUS_LABEL[kr.status] ?? kr.status}
-                                      </span>
+                                      <span className="arbol-kr-status-label">{statusLabel}</span>
                                     </div>
                                     <div className="arbol-kr-values">
                                       {kr.krType === 'kpi_linked' ? (
                                         <span className="arbol-kr-linked">
-                                          🔗 Vinculado a {kr.linkedKpis.length} KPI{kr.linkedKpis.length !== 1 ? 's' : ''}
+                                          {t('arbol.kr.linked', { count: kr.linkedKpis.length })}
                                         </span>
                                       ) : (
                                         <span className="arbol-kr-manual">
@@ -310,7 +300,7 @@ export default function ArbolObjetivos() {
                                             {lk.type === 'collaborator' ? '👤' : '🏢'}
                                           </span>
                                           <span className="arbol-kpi-name">
-                                            {lk.kpiName ?? 'KPI'}
+                                            {lk.kpiName ?? t('arbol.kpi_fallback')}
                                             {lk.sourceName && <span className="arbol-kpi-source"> — {lk.sourceName}</span>}
                                           </span>
                                           <span className="arbol-kpi-values">

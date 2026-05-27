@@ -1,9 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react'
 import { useMutation, useQueryClient } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
 import { useDialog } from './Dialog'
+import { resolveApiErrorMessage } from '../utils/apiErrors'
 import './ReviewModal.css'
 
 interface ReviewModalProps {
@@ -26,6 +28,7 @@ export default function ReviewModal({
   onClose,
   onSuccess,
 }: ReviewModalProps) {
+  const { t } = useTranslation('assignments')
   const [comments, setComments] = useState<string>(assignment.comments || '')
 
   const queryClient = useQueryClient()
@@ -48,9 +51,10 @@ export default function ReviewModal({
       },
       onError: (error: any) => {
         void dialog.alert(
-          error.response?.data?.error ||
-            `Error al ${action === 'approve' ? 'aprobar' : 'rechazar'} la asignación.`,
-          { title: 'Error', variant: 'danger' }
+          resolveApiErrorMessage(error, t, {
+            fallbackKey: action === 'approve' ? 'review.error_approve' : 'review.error_reject',
+          }),
+          { title: t('common:error_title'), variant: 'danger' }
         )
       },
     }
@@ -72,7 +76,7 @@ export default function ReviewModal({
       <div className="modal-content review-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>
-            {action === 'approve' ? 'Aprobar Asignación' : 'Rechazar Asignación'}
+            {action === 'approve' ? t('review.title_approve') : t('review.title_reject')}
           </h2>
           <button className="close-button" onClick={onClose}>
             ×
@@ -82,22 +86,22 @@ export default function ReviewModal({
         <form onSubmit={handleSubmit} className="review-form">
           <div className="review-info">
             <p>
-              <strong>Colaborador:</strong>{' '}
+              <strong>{t('review.collaborator')}</strong>{' '}
               {assignment.collaboratorName || 'N/A'}
             </p>
             <p>
-              <strong>KPI:</strong> {assignment.kpiName || 'N/A'}
+              <strong>{t('review.kpi')}</strong> {assignment.kpiName || 'N/A'}
             </p>
             {assignment.actual !== undefined && (
               <p>
-                <strong>Valor Propuesto:</strong> {assignment.actual}
+                <strong>{t('review.proposed_value')}</strong> {assignment.actual}
               </p>
             )}
           </div>
 
           <div className="form-group">
             <label htmlFor="comments">
-              Comentarios {action === 'reject' && '(Recomendado)'}
+              {t('review.comments_label')} {action === 'reject' && t('review.comments_recommended')}
             </label>
             <textarea
               id="comments"
@@ -105,21 +109,19 @@ export default function ReviewModal({
               onChange={(e) => setComments(e.target.value)}
               placeholder={
                 action === 'approve'
-                  ? 'Agrega comentarios sobre la aprobación...'
-                  : 'Explica las razones del rechazo...'
+                  ? t('review.comments_placeholder_approve')
+                  : t('review.comments_placeholder_reject')
               }
               rows={4}
             />
             <small className="form-hint">
-              {action === 'approve'
-                ? 'Los comentarios son opcionales pero recomendados'
-                : 'Es recomendable explicar por qué se rechaza para que el colaborador pueda corregir'}
+              {action === 'approve' ? t('review.hint_approve') : t('review.hint_reject')}
             </small>
           </div>
 
           <div className="form-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>
-              Cancelar
+              {t('review.cancel')}
             </button>
             <button
               type="submit"
@@ -128,11 +130,11 @@ export default function ReviewModal({
             >
               {reviewMutation.isLoading
                 ? action === 'approve'
-                  ? 'Aprobando...'
-                  : 'Rechazando...'
+                  ? t('review.approving')
+                  : t('review.rejecting')
                 : action === 'approve'
-                ? 'Aprobar'
-                : 'Rechazar'}
+                ? t('review.approve')
+                : t('review.reject')}
             </button>
           </div>
         </form>

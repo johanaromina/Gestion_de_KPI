@@ -218,22 +218,3 @@ export const buildTemplatePreset = (preset: TemplatePreset, authProfileId: strin
     enabled: true,
   }
 }
-
-export const getAuthProfileHint = (connector: string) => {
-  if (connector === 'jira' || connector === 'xray') {
-    return 'Jira/Xray: usa email + API token (Basic) o Bearer token.'
-  }
-  if (connector === 'sheets') {
-    return 'Google Sheets: soporta hojas por lider con KPI/Area/Colaborador y meses en columnas. Si la planilla es publica, podes dejar sin auth o usar API Key.'
-  }
-  if (connector === 'generic_api') {
-    return 'Generic API: usa endpoint base + Bearer, API Key, Basic o sin auth, segun la fuente.'
-  }
-  if (connector === 'looker') {
-    return 'Looker: usa endpoint base de la instancia y auth por token o clientId/clientSecret.'
-  }
-  if (connector === 'manual') {
-    return 'Manual/CSV no requiere auth profile.'
-  }
-  return ''
-}

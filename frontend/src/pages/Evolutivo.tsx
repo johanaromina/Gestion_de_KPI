@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, BarChart, Bar } from 'recharts'
 import api from '../services/api'
 import { useAuth } from '../hooks/useAuth'
@@ -39,6 +40,8 @@ interface EvolutionPoint {
 
 export default function Evolutivo() {
   const { user } = useAuth()
+  const { t, i18n } = useTranslation('history')
+  const locale = i18n.resolvedLanguage?.startsWith('en') ? 'en-US' : 'es-AR'
   const [selectedCollaborator, setSelectedCollaborator] = useState<number | null>(null)
   const [selectedKPI, setSelectedKPI] = useState<number | null>(null)
   const [selectedPeriod, setSelectedPeriod] = useState<number | ''>('')
@@ -89,7 +92,6 @@ export default function Evolutivo() {
       const params: any = {}
       if (selectedPeriod) params.periodId = selectedPeriod
       const res = await api.get(`/collaborator-kpis/collaborator/${selectedCollaborator}`, { params })
-      // Extraer KPIs únicos de las asignaciones
       const seen = new Map<number, KPI>()
       res.data.forEach((item: any) => {
         if (!seen.has(item.kpiId)) {
@@ -104,7 +106,7 @@ export default function Evolutivo() {
   const chartData = useMemo(() => {
     return (
       evolution?.map((point) => ({
-        month: new Date(point.monthDate).toLocaleDateString('es-ES', {
+        month: new Date(point.monthDate).toLocaleDateString(locale, {
           month: 'short',
           year: '2-digit',
         }),
@@ -113,7 +115,7 @@ export default function Evolutivo() {
         variation: point.variation ?? 0,
       })) || []
     )
-  }, [evolution])
+  }, [evolution, locale])
 
   const latest = evolution && evolution.length > 0 ? evolution[evolution.length - 1] : null
   const collaboratorName = evolution && evolution[0]?.collaboratorName
@@ -123,8 +125,8 @@ export default function Evolutivo() {
     <div className="evolutivo-page">
       <div className="evolutivo-header">
         <div>
-          <h1>Evolutivo de Objetivos</h1>
-          <p>Plan vs Real mes a mes por colaborador y KPI</p>
+          <h1>{t('evolution.title')}</h1>
+          <p>{t('evolution.subtitle')}</p>
         </div>
         {latest && (
           <div className="kpi-pill">
@@ -138,12 +140,12 @@ export default function Evolutivo() {
 
       <div className="filters">
         <div className="filter">
-          <label>Colaborador</label>
+          <label>{t('evolution.filter_collaborator')}</label>
           <select
             value={selectedCollaborator || ''}
             onChange={(e) => setSelectedCollaborator(e.target.value ? Number(e.target.value) : null)}
           >
-            <option value="">Selecciona un colaborador</option>
+            <option value="">{t('evolution.filter_collaborator_placeholder')}</option>
             {collaborators?.map((col) => (
               <option key={col.id} value={col.id}>
                 {col.name} {col.area ? `(${col.area})` : ''}
@@ -152,13 +154,13 @@ export default function Evolutivo() {
           </select>
         </div>
         <div className="filter">
-          <label>KPI</label>
+          <label>{t('evolution.filter_kpi')}</label>
           <select
             value={selectedKPI || ''}
             onChange={(e) => setSelectedKPI(e.target.value ? Number(e.target.value) : null)}
             disabled={!selectedCollaborator}
           >
-            <option value="">Selecciona un KPI</option>
+            <option value="">{t('evolution.filter_kpi_placeholder')}</option>
             {(selectedCollaborator ? collaboratorKpis : kpis || []).map((kpi) => (
               <option key={kpi.id} value={kpi.id}>
                 {kpi.name}
@@ -167,12 +169,12 @@ export default function Evolutivo() {
           </select>
         </div>
         <div className="filter">
-          <label>Periodo (opcional)</label>
+          <label>{t('evolution.filter_period')}</label>
           <select
             value={selectedPeriod}
             onChange={(e) => setSelectedPeriod(e.target.value ? Number(e.target.value) : '')}
           >
-            <option value="">Todos</option>
+            <option value="">{t('evolution.filter_all_periods')}</option>
             {periods?.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -185,30 +187,30 @@ export default function Evolutivo() {
       {!selectedCollaborator || !selectedKPI ? (
         <div className="empty-state">
           <div className="empty-icon">🗂️</div>
-          <h3>Elige colaborador y KPI</h3>
-          <p>Selecciona ambos filtros para ver la evolución</p>
+          <h3>{t('evolution.empty_select_title')}</h3>
+          <p>{t('evolution.empty_select_subtitle')}</p>
         </div>
       ) : isLoading ? (
-        <div className="loading">Cargando evolución...</div>
+        <div className="loading">{t('evolution.loading')}</div>
       ) : evolution && evolution.length > 0 ? (
         <>
           <div className="cards">
             <div className="card">
-              <p className="card-label">Último Plan</p>
+              <p className="card-label">{t('evolution.card_last_plan')}</p>
               <p className="card-value">{latest?.planValue ?? '-'}</p>
             </div>
             <div className="card">
-              <p className="card-label">Último Real</p>
+              <p className="card-label">{t('evolution.card_last_actual')}</p>
               <p className="card-value accent">{latest?.actualValue ?? '-'}</p>
             </div>
             <div className="card">
-              <p className="card-label">Variación</p>
+              <p className="card-label">{t('evolution.card_variation')}</p>
               <p className="card-value">{latest?.variation !== null && latest?.variation !== undefined ? `${latest.variation.toFixed(1)}%` : '-'}</p>
             </div>
           </div>
 
           <div className="chart-block">
-            <h3>Plan vs Real</h3>
+            <h3>{t('evolution.chart_plan_actual_title')}</h3>
             <ResponsiveContainer width="100%" height={340}>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -216,14 +218,14 @@ export default function Evolutivo() {
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                <Line type="monotone" dataKey="plan" name="Plan" stroke="#a3a3a3" />
-                <Line type="monotone" dataKey="actual" name="Real" stroke="#f97316" />
+                <Line type="monotone" dataKey="plan" name={t('evolution.line_plan')} stroke="#a3a3a3" />
+                <Line type="monotone" dataKey="actual" name={t('evolution.line_actual')} stroke="#f97316" />
               </LineChart>
             </ResponsiveContainer>
           </div>
 
           <div className="chart-block">
-            <h3>Variación %</h3>
+            <h3>{t('evolution.chart_variation_title')}</h3>
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -231,29 +233,29 @@ export default function Evolutivo() {
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="variation" name="Variación" fill="#16a34a" />
+                <Bar dataKey="variation" name={t('evolution.bar_variation')} fill="#16a34a" />
               </BarChart>
             </ResponsiveContainer>
           </div>
 
           <div className="table-block">
-            <h3>Detalle mensual</h3>
+            <h3>{t('evolution.table_title')}</h3>
             <div className="table-wrapper">
               <table>
                 <thead>
                   <tr>
-                    <th>Mes</th>
-                    <th>Plan</th>
-                    <th>Real</th>
-                    <th>Variación</th>
-                    <th>Periodo</th>
+                    <th>{t('evolution.table_month')}</th>
+                    <th>{t('evolution.table_plan')}</th>
+                    <th>{t('evolution.table_actual')}</th>
+                    <th>{t('evolution.table_variation')}</th>
+                    <th>{t('evolution.table_period')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {evolution.map((item) => (
                     <tr key={item.id}>
                       <td>
-                        {new Date(item.monthDate).toLocaleDateString('es-ES', {
+                        {new Date(item.monthDate).toLocaleDateString(locale, {
                           month: 'long',
                           year: 'numeric',
                         })}
@@ -272,8 +274,8 @@ export default function Evolutivo() {
       ) : (
         <div className="empty-state">
           <div className="empty-icon">🤷</div>
-          <h3>Sin datos</h3>
-          <p>No hay evolución para la selección actual</p>
+          <h3>{t('evolution.empty_no_data_title')}</h3>
+          <p>{t('evolution.empty_no_data_subtitle')}</p>
         </div>
       )}
     </div>

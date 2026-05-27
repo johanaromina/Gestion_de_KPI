@@ -1,0 +1,291 @@
+{
+  "title": "OKRs",
+  "subtitle": "Objetivos y Resultados Clave",
+  "new_objective": "+ Nuevo objetivo",
+  "status": {
+    "not_started": "Sin iniciar",
+    "on_track": "En camino",
+    "at_risk": "En riesgo",
+    "behind": "Atrasado",
+    "completed": "Completado",
+    "draft": "Borrador",
+    "active": "Activo",
+    "closed": "Cerrado"
+  },
+  "filters": {
+    "all_periods": "Todos los periodos",
+    "all_states": "Todos los estados"
+  },
+  "export": {
+    "pdf_title": "Exportar período a PDF",
+    "excel_title": "Exportar período a Excel"
+  },
+  "loading": "Cargando objetivos...",
+  "empty": {
+    "message": "No hay objetivos todavía.",
+    "create": "Crear primer objetivo"
+  },
+  "pagination": {
+    "prev": "← Anterior",
+    "next": "Siguiente →",
+    "info": "Página {{page}} de {{totalPages}} · {{count}} objetivos",
+    "info_short": "Página {{page}} de {{totalPages}}"
+  },
+  "card": {
+    "owner": "Responsable: {{name}}",
+    "progress": "Progreso"
+  },
+  "alignment": {
+    "title": "Árbol de Alineación OKR",
+    "subtitle": "Cascada empresa → área → equipo → individuo",
+    "select_period": "Seleccionar periodo...",
+    "summary": {
+      "objectives": "Objetivos",
+      "avg_progress": "Progreso promedio"
+    },
+    "no_period_selected": "Seleccioná un periodo para ver el árbol de alineación.",
+    "loading": "Cargando árbol...",
+    "empty": {
+      "message": "No hay objetivos en este periodo."
+    }
+  },
+  "fields": {
+    "objective": "Objetivo",
+    "key_result": "Resultado Clave",
+    "owner": "Responsable",
+    "period": "Período",
+    "progress": "Progreso",
+    "alignment": "Alineación"
+  },
+  "actions": {
+    "edit": "Editar OKR",
+    "delete": "Eliminar OKR",
+    "align": "Alinear",
+    "view": "Ver detalle"
+  },
+  "detail": {
+    "loading": "Cargando...",
+    "not_found": "Objetivo no encontrado.",
+    "back": "← OKRs",
+    "progress_label": "Progreso general",
+    "export": {
+      "pdf_title": "Exportar a PDF",
+      "excel_title": "Exportar a Excel"
+    },
+    "actions": {
+      "edit": "Editar",
+      "close": "Cerrar objetivo",
+      "close_confirm": "¿Cerrar este objetivo?"
+    },
+    "kr_section_title": "Key Results",
+    "kr_empty": "Sin key results definidos.",
+    "kr_actions": {
+      "edit": "Editar KR",
+      "cancel_edit": "Cancelar edición",
+      "hide_sources": "Ocultar fuentes",
+      "show_sources": "Ver fuentes ({{count}})",
+      "checkin": "+ Registrar avance",
+      "checkin_close": "Cerrar"
+    },
+    "kr_badges": {
+      "automatic": "Automático",
+      "automatic_title": "El progreso se actualiza automáticamente desde el KPI vinculado"
+    },
+    "kpi_values": "KPI: {{name}} — actual: {{actual}} / meta: {{target}}",
+    "datasource": {
+      "title": "Fuentes que alimentan este KR",
+      "collaborator": "Colaborador",
+      "area": "Área"
+    },
+    "kr_edit": {
+      "title": "Editar Key Result",
+      "field_title": "Título",
+      "field_type": "Tipo de medición",
+      "type_simple": "📝 Valor manual",
+      "type_kpi_linked": "🔗 Vinculado a KPI",
+      "field_start_value": "Valor inicial",
+      "field_target": "Meta",
+      "field_unit": "Unidad",
+      "unit_placeholder": "%, días, $...",
+      "field_kpi_links": "KPIs vinculados",
+      "chip_weight_label": "Peso %",
+      "add_kpi": "+ Agregar KPI...",
+      "field_kr_weight": "Peso relativo (%) ⓘ",
+      "field_kr_weight_tooltip": "Porcentaje de peso de este KR. Se recomienda que la suma de todos los KRs del objetivo sea 100%.",
+      "save": "Guardar cambios",
+      "saving": "Guardando...",
+      "cancel": "Cancelar",
+      "save_error_fallback": "Error al guardar el Key Result",
+      "weight_warning_title": "Advertencia de pesos",
+      "errors": {
+        "weight_range": "El peso del KR debe estar entre 1 y 100 (%)",
+        "kpi_weight_range": "El peso de cada KPI vinculado debe estar entre 1 y 100 (%)",
+        "kpi_weight_sum": "Los pesos de los KPIs deben sumar 100% (actualmente suman {{total}}%)",
+        "kr_weight_warning": "Advertencia: la suma de los pesos de los KRs es {{total}}%. Se va a guardar igual, pero se recomienda dejarla en 100% cuando termines de redistribuirlos."
+      }
+    },
+    "checkin": {
+      "title": "Registrar avance",
+      "hint": "Ingresá el valor actual del KR. Se guarda en el historial y actualiza el progreso.",
+      "field_current": "Valor actual",
+      "field_current_unit": "Valor actual ({{unit}})",
+      "target_placeholder": "Meta: {{target}}",
+      "field_note": "Nota",
+      "optional": "(opcional)",
+      "note_placeholder": "¿Qué pasó esta semana? ¿Hubo bloqueos?",
+      "save": "Guardar avance",
+      "saving": "Guardando...",
+      "history_title": "Historial"
+    },
+    "tree_links": {
+      "title": "Árbol de Objetivos vinculado",
+      "hint": "Vinculá este OKR a un nodo del árbol estratégico para que aparezca en el organigrama y análisis de alineación.",
+      "empty": "Sin vínculos al árbol organizacional.",
+      "remove": "Quitar",
+      "search_placeholder": "Buscar nodo del árbol…",
+      "no_results": "Sin resultados para \"{{search}}\"",
+      "link": "Vincular"
+    }
+  },
+  "form": {
+    "title_new": "Nuevo objetivo OKR",
+    "title_edit": "Editar objetivo",
+    "back": "← Volver",
+    "section_objective": "Objetivo",
+    "field_title": "Título *",
+    "title_placeholder": "Ej: Aumentar la satisfacción del cliente en Q1",
+    "field_description": "Descripción",
+    "description_placeholder": "Contexto adicional sobre este objetivo...",
+    "field_period": "Período",
+    "select_placeholder": "Seleccionar...",
+    "period_readonly": "El período no se puede cambiar",
+    "field_scope": "Área / Scope",
+    "no_scope": "Sin scope",
+    "field_owner": "Responsable *",
+    "field_status": "Estado",
+    "field_parent": "Objetivo padre",
+    "optional": "(opcional)",
+    "no_parent": "— Sin padre (objetivo raíz) —",
+    "parent_hint": "Usalo para crear un objetivo subordinado a otro del mismo período. Los objetivos padre muestran el progreso agregado de sus hijos en el árbol de alineación.",
+    "add_kr": "+ Agregar KR",
+    "kr_number": "KR {{number}}",
+    "remove_kr": "Quitar",
+    "field_kr_title": "Título del KR",
+    "kr_title_placeholder": "Ej: Reducir tiempo de respuesta a menos de 2h",
+    "kpi_link_needs_period": "Seleccioná un período primero",
+    "kr_type_hint_simple": "Vas a cargar el progreso manualmente con check-ins. Usalo para métricas que no están en el sistema (NPS, encuestas, metas cualitativas).",
+    "kr_type_hint_kpi": "El progreso se actualiza automáticamente desde el KPI asignado. No hace falta cargar check-ins.",
+    "start_hint": "Punto de partida (puede ser 0).",
+    "field_target_required": "Meta *",
+    "target_hint": "Valor a alcanzar para considerar este KR completado.",
+    "unit_placeholder": "%, tickets, $, días…",
+    "kpi_link_hint": "Podés vincular uno o más KPIs (individuales o grupales). El progreso del KR se calcula como el promedio de todos.",
+    "kr_weight_tooltip": "Porcentaje de peso de este KR en el objetivo. Se recomienda que la suma de todos los KRs sea 100%.",
+    "kr_weight_hint": "Ingresá el porcentaje (1–100). Idealmente la suma total de KRs debería quedar en 100%.",
+    "weight_summary_label": "Suma de pesos: ",
+    "weight_summary_denominator": " / 100%",
+    "weight_over": "⚠ La suma supera 100% — reducí algún peso.",
+    "weight_under": "Falta distribuir {{remaining}}% entre los KRs.",
+    "weight_ok": "✓ Distribución completa",
+    "cancel": "Cancelar",
+    "save_new": "Guardar objetivo",
+    "save_edit": "Guardar cambios",
+    "saving": "Guardando...",
+    "dialogs": {
+      "remove_kr_msg": "¿Eliminar este Key Result?",
+      "remove_kr_title": "Quitar KR",
+      "remove_kr_confirm": "Eliminar"
+    },
+    "errors": {
+      "title_required": "El título es requerido",
+      "period_required": "El período es requerido",
+      "owner_required": "El responsable es requerido",
+      "target_required": "La meta es requerida",
+      "target_equals_start": "La meta no puede ser igual al valor inicial ({{start}})",
+      "kr_errors": "Corregí los errores en los Key Results",
+      "save_failed": "No se pudo guardar el objetivo. Verificá los datos e intentá de nuevo.",
+      "update_failed": "No se pudo actualizar el objetivo. Verificá los datos e intentá de nuevo.",
+      "kr_partial_failure": "El objetivo fue guardado, pero algunos Key Results no pudieron cargarse: {{failures}}",
+      "kr_save_failed": "Error al guardar el KR \"{{title}}\""
+    }
+  },
+  "arbol": {
+    "title": "Árbol de Objetivos",
+    "subtitle": "Jerarquía real de OKRs, Key Results y KPIs por área",
+    "new_okr": "+ Nuevo OKR",
+    "loading": "Cargando árbol de objetivos...",
+    "filter_all_periods": "Todos los períodos",
+    "stats": {
+      "areas_one": "área",
+      "areas_other": "áreas",
+      "objectives_one": "objetivo",
+      "objectives_other": "objetivos",
+      "krs_one": "key result",
+      "krs_other": "key results"
+    },
+    "empty": {
+      "title": "No hay objetivos activos",
+      "text": "Creá tu primer OKR para verlo aquí organizado por área y período.",
+      "btn": "Crear OKR"
+    },
+    "badges": {
+      "okr": "OKR",
+      "kr": "KR"
+    },
+    "kpi_fallback": "KPI",
+    "scope_okrs_one": "{{count}} OKR",
+    "scope_okrs_other": "{{count}} OKRs",
+    "okr": {
+      "no_krs_tooltip": "Sin Key Results",
+      "goto_tooltip": "Ver detalle del OKR",
+      "goto": "Ver →",
+      "krs_one": "{{count}} KR",
+      "krs_other": "{{count}} KRs"
+    },
+    "kr": {
+      "no_kpis_tooltip": "Sin KPIs vinculados",
+      "linked_one": "🔗 Vinculado a {{count}} KPI",
+      "linked_other": "🔗 Vinculado a {{count}} KPIs"
+    }
+  },
+  "tree_form": {
+    "title_new": "Crear objetivo",
+    "title_edit": "Editar objetivo",
+    "fields": {
+      "name": "Nombre del objetivo *",
+      "name_placeholder": "Ej: Mejorar satisfacción del cliente",
+      "level": "Nivel *",
+      "parent": "Objetivo padre (opcional)",
+      "parent_placeholder": "Sin objetivo padre",
+      "parent_hint": "Solo se pueden seleccionar objetivos de niveles superiores",
+      "kpis": "KPIs asociados",
+      "kpis_hint": "Seleccioná los KPIs que están relacionados con este objetivo",
+      "scope_kpis": "Scope KPIs asociados",
+      "scope_kpis_hint": "Seleccioná los Scope KPIs organizacionales que contribuyen a este objetivo"
+    },
+    "levels": {
+      "company": "Empresa",
+      "direction": "Dirección",
+      "management": "Gerencia",
+      "leadership": "Liderazgo",
+      "individual": "Individual"
+    },
+    "errors": {
+      "name_required": "El nombre es requerido",
+      "level_required": "El nivel es requerido"
+    },
+    "empty": {
+      "kpis": "No hay KPIs disponibles",
+      "scope_kpis": "No hay Scope KPIs disponibles"
+    },
+    "badges": {
+      "macro": "Macro: KPI #{{id}}",
+      "scope": "Scope #{{id}}"
+    },
+    "actions": {
+      "saving": "Guardando...",
+      "update": "Actualizar",
+      "create": "Crear"
+    }
+  }
+}

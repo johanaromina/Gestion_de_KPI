@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import './OnboardingWizard.css'
 
@@ -25,6 +26,7 @@ interface Props {
 }
 
 export default function OnboardingWizard({ stats, onDismiss }: Props) {
+  const { t } = useTranslation('config')
   const navigate = useNavigate()
   const [expanded, setExpanded] = useState(true)
 
@@ -37,41 +39,41 @@ export default function OnboardingWizard({ stats, onDismiss }: Props) {
     {
       id: 'org',
       number: 1,
-      title: 'Definí la estructura organizacional',
-      description: 'Creá las áreas y equipos de tu empresa. Esto define quién es responsable de qué KPI.',
+      title: t('onboarding.steps.org.title'),
+      description: t('onboarding.steps.org.description'),
       completed: hasOrgStructure,
-      action: 'Ir a Configuración →',
+      action: t('onboarding.steps.org.action'),
       path: '/configuracion',
     },
     {
       id: 'kpis',
       number: 2,
-      title: 'Cargá los KPIs de tu empresa',
-      description: 'Definí qué vas a medir: ventas, tickets resueltos, NPS, cumplimiento de entregas, etc.',
+      title: t('onboarding.steps.kpis.title'),
+      description: t('onboarding.steps.kpis.description'),
       completed: hasKPIs,
-      action: 'Ir a KPIs →',
+      action: t('onboarding.steps.kpis.action'),
       path: '/kpis',
-      blockedBy: !hasOrgStructure ? 'Primero completá el paso 1' : undefined,
+      blockedBy: !hasOrgStructure ? t('onboarding.blocked', { step: 1 }) : undefined,
     },
     {
       id: 'period',
       number: 3,
-      title: 'Creá un período activo',
-      description: 'Definí el ciclo de evaluación (anual, semestral, trimestral) y sus sub-períodos.',
+      title: t('onboarding.steps.period.title'),
+      description: t('onboarding.steps.period.description'),
       completed: hasActivePeriod,
-      action: 'Ir a Períodos →',
+      action: t('onboarding.steps.period.action'),
       path: '/periodos',
-      blockedBy: !hasKPIs ? 'Primero completá el paso 2' : undefined,
+      blockedBy: !hasKPIs ? t('onboarding.blocked', { step: 2 }) : undefined,
     },
     {
       id: 'assignments',
       number: 4,
-      title: 'Asigná KPIs a tus colaboradores',
-      description: 'Definí qué KPI mide cada persona, con su objetivo y peso en la evaluación.',
+      title: t('onboarding.steps.assignments.title'),
+      description: t('onboarding.steps.assignments.description'),
       completed: hasAssignments,
-      action: 'Ir a Asignaciones →',
+      action: t('onboarding.steps.assignments.action'),
       path: '/asignaciones',
-      blockedBy: !hasActivePeriod ? 'Primero completá el paso 3' : undefined,
+      blockedBy: !hasActivePeriod ? t('onboarding.blocked', { step: 3 }) : undefined,
     },
   ]
 
@@ -84,11 +86,11 @@ export default function OnboardingWizard({ stats, onDismiss }: Props) {
       <div className="onboarding-done">
         <span className="onboarding-done-icon">✓</span>
         <div>
-          <strong>¡Sistema configurado!</strong>
-          <span> Ya podés empezar a cargar datos y ver resultados.</span>
+          <strong>{t('onboarding.done.title')}</strong>
+          <span> {t('onboarding.done.message')}</span>
         </div>
         <button className="onboarding-dismiss" onClick={onDismiss}>
-          Ocultar
+          {t('onboarding.hide')}
         </button>
       </div>
     )
@@ -99,10 +101,10 @@ export default function OnboardingWizard({ stats, onDismiss }: Props) {
       <div className="onboarding-header" onClick={() => setExpanded((v) => !v)}>
         <div className="onboarding-header-left">
           <span className="onboarding-title">
-            Configuración inicial
+            {t('onboarding.title')}
           </span>
           <span className="onboarding-progress-label">
-            {completedCount} de {steps.length} pasos completados
+            {t('onboarding.progress', { done: completedCount, total: steps.length })}
           </span>
         </div>
         <div className="onboarding-header-right">
@@ -114,7 +116,7 @@ export default function OnboardingWizard({ stats, onDismiss }: Props) {
             className="onboarding-dismiss"
             onClick={(e) => { e.stopPropagation(); onDismiss() }}
           >
-            Ocultar
+            {t('onboarding.hide')}
           </button>
         </div>
       </div>
@@ -145,7 +147,7 @@ export default function OnboardingWizard({ stats, onDismiss }: Props) {
                 </button>
               )}
               {step.completed && (
-                <span className="onboarding-step-done-label">Completado</span>
+                <span className="onboarding-step-done-label">{t('onboarding.completed_label')}</span>
               )}
             </div>
           ))}

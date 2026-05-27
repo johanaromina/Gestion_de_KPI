@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { pool } from '../config/database.js'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 export const getEvolution = async (req: Request, res: Response) => {
   try {
@@ -149,6 +150,6 @@ export const getEvolution = async (req: Request, res: Response) => {
     res.json(data)
   } catch (error) {
     logger.error('Error fetching evolution data:', error)
-    res.status(500).json({ error: 'Error al obtener evolutivo de objetivos' })
+    return sendApiError(res, 500, 'EVOLUTION_FETCH_FAILED', 'Error al obtener evolutivo de objetivos')
   }
 }

@@ -1,0 +1,66 @@
+{
+  "title": "Security",
+  "subtitle": "Manage roles, team permissions, and user exceptions.",
+  "tabs": {
+    "roles": "Roles",
+    "groups": "Team permissions",
+    "users": "User exceptions",
+    "audit": "Audit"
+  },
+  "roles": {
+    "title": "Base roles",
+    "subtitle": "Create, clone, and adjust roles without touching code.",
+    "new": "New role",
+    "duplicate": "Duplicate",
+    "users_count": "{{count}} users"
+  },
+  "groups": {
+    "title": "Team permissions",
+    "subtitle": "Define the default role for each scope.",
+    "scope": "Scope",
+    "type": "Type",
+    "default_role": "Default role",
+    "no_role": "No role",
+    "empty": "No configured scopes."
+  },
+  "users": {
+    "title": "User exceptions",
+    "subtitle": "The team role applies by default. Define overrides here.",
+    "user": "User",
+    "effective_role": "Effective role",
+    "overrides": "Overrides",
+    "no_role": "No role",
+    "active_overrides": "Active overrides",
+    "permissions_count": "{{count}} permissions",
+    "team_role": "Team role",
+    "permissions": "Permissions",
+    "reset": "Reset"
+  },
+  "audit_hint": "Use the Audit screen to view role and permission changes.",
+  "role_source": {
+    "usuario": "user",
+    "equipo": "team",
+    "legacy": "legacy",
+    "none": "no source"
+  },
+  "scope_types": {
+    "company": "Company",
+    "business_unit": "Business unit",
+    "area": "Area",
+    "team": "Team",
+    "person": "Person",
+    "product": "Product"
+  },
+  "role_modal": {
+    "new_title": "New role",
+    "edit_title": "Edit role",
+    "code": "Code",
+    "permissions": "Permissions",
+    "save": "Save role"
+  },
+  "override_modal": {
+    "title": "Custom permissions · {{name}}",
+    "save": "Save permissions"
+  },
+  "empty_permissions": "No configured permissions. Initialize permissions in the backend and reload."
+}

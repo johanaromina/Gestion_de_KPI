@@ -4,6 +4,7 @@ import { SubPeriod } from '../types'
 import { sendMail } from '../utils/mailer'
 import { AuthRequest } from '../middleware/auth.middleware'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 const normalizeDate = (value: any): string | null => {
   if (!value) return null
@@ -52,7 +53,7 @@ export const getSubPeriods = async (req: Request, res: Response) => {
     res.json(rows)
   } catch (error: any) {
     logger.error('Error fetching sub-periods:', error)
-    res.status(500).json({ error: 'Error al obtener subperíodos' })
+    return sendApiError(res, 500, 'SUBPERIOD_FETCH_FAILED', 'Error al obtener subperíodos')
   }
 }
 
@@ -65,13 +66,13 @@ export const getSubPeriodById = async (req: Request, res: Response) => {
     )
 
     if (Array.isArray(rows) && rows.length === 0) {
-      return res.status(404).json({ error: 'Subperíodo no encontrado' })
+      return sendApiError(res, 404, 'SUBPERIOD_NOT_FOUND', 'Subperíodo no encontrado')
     }
 
     res.json(rows[0])
   } catch (error: any) {
     logger.error('Error fetching sub-period:', error)
-    res.status(500).json({ error: 'Error al obtener subperíodo' })
+    return sendApiError(res, 500, 'SUBPERIOD_FETCH_ONE_FAILED', 'Error al obtener subperíodo')
   }
 }
 
@@ -80,7 +81,7 @@ export const createSubPeriod = async (req: Request, res: Response) => {
     const { periodId, name, startDate, endDate, weight, calendarProfileId } = req.body
 
     if (!periodId || !name || !startDate || !endDate) {
-      return res.status(400).json({ error: 'Faltan campos requeridos' })
+      return sendApiError(res, 400, 'SUBPERIOD_FIELDS_REQUIRED', 'Faltan campos requeridos')
     }
 
     const [existingRows] = await pool.query<any[]>(
@@ -93,7 +94,7 @@ export const createSubPeriod = async (req: Request, res: Response) => {
     const end = normalizeDate(endDate)
 
     if (!start || !end) {
-      return res.status(400).json({ error: 'Fechas inválidas' })
+      return sendApiError(res, 400, 'SUBPERIOD_DATES_INVALID', 'Fechas inválidas')
     }
 
     const resolvedCalendarProfileId =
@@ -153,7 +154,7 @@ export const createSubPeriod = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     logger.error('Error creating sub-period:', error)
-    res.status(500).json({ error: 'Error al crear subperíodo' })
+    return sendApiError(res, 500, 'SUBPERIOD_CREATE_FAILED', 'Error al crear subperíodo')
   }
 }
 
@@ -166,7 +167,7 @@ export const updateSubPeriod = async (req: Request, res: Response) => {
     const end = normalizeDate(endDate)
 
     if (!start || !end) {
-      return res.status(400).json({ error: 'Fechas inválidas' })
+      return sendApiError(res, 400, 'SUBPERIOD_DATES_INVALID', 'Fechas inválidas')
     }
 
     const [existingRows] = await pool.query<SubPeriod[]>(
@@ -175,12 +176,12 @@ export const updateSubPeriod = async (req: Request, res: Response) => {
     )
 
     if (Array.isArray(existingRows) && existingRows.length === 0) {
-      return res.status(404).json({ error: 'Subperíodo no encontrado' })
+      return sendApiError(res, 404, 'SUBPERIOD_NOT_FOUND', 'Subperíodo no encontrado')
     }
 
     const existing = existingRows[0]
     if (existing.status === 'closed') {
-      return res.status(400).json({ error: 'El subperíodo está cerrado' })
+      return sendApiError(res, 400, 'SUBPERIOD_CLOSED', 'El subperíodo está cerrado')
     }
 
     await pool.query(
@@ -193,7 +194,7 @@ export const updateSubPeriod = async (req: Request, res: Response) => {
     res.json({ message: 'Subperíodo actualizado correctamente' })
   } catch (error: any) {
     logger.error('Error updating sub-period:', error)
-    res.status(500).json({ error: 'Error al actualizar subperíodo' })
+    return sendApiError(res, 500, 'SUBPERIOD_UPDATE_FAILED', 'Error al actualizar subperíodo')
   }
 }
 
@@ -207,12 +208,12 @@ export const deleteSubPeriod = async (req: Request, res: Response) => {
     )
 
     if (Array.isArray(existingRows) && existingRows.length === 0) {
-      return res.status(404).json({ error: 'Subperíodo no encontrado' })
+      return sendApiError(res, 404, 'SUBPERIOD_NOT_FOUND', 'Subperíodo no encontrado')
     }
 
     const existing = existingRows[0]
     if (existing.status === 'closed') {
-      return res.status(400).json({ error: 'No se puede eliminar un subperíodo cerrado' })
+      return sendApiError(res, 400, 'SUBPERIOD_DELETE_CLOSED', 'No se puede eliminar un subperíodo cerrado')
     }
 
     await pool.query('DELETE FROM calendar_subperiods WHERE id = ?', [id])
@@ -220,7 +221,7 @@ export const deleteSubPeriod = async (req: Request, res: Response) => {
     res.json({ message: 'Subperíodo eliminado correctamente' })
   } catch (error: any) {
     logger.error('Error deleting sub-period:', error)
-    res.status(500).json({ error: 'Error al eliminar subperíodo' })
+    return sendApiError(res, 500, 'SUBPERIOD_DELETE_FAILED', 'Error al eliminar subperíodo')
   }
 }
 
@@ -237,12 +238,12 @@ export const closeSubPeriod = async (req: Request, res: Response) => {
     )
 
     if (Array.isArray(subRows) && subRows.length === 0) {
-      return res.status(404).json({ error: 'Subperíodo no encontrado' })
+      return sendApiError(res, 404, 'SUBPERIOD_NOT_FOUND', 'Subperíodo no encontrado')
     }
 
     const subPeriod = subRows[0]
     if (subPeriod.status === 'closed') {
-      return res.status(400).json({ error: 'El subperíodo ya está cerrado' })
+      return sendApiError(res, 400, 'SUBPERIOD_ALREADY_CLOSED', 'El subperíodo ya está cerrado')
     }
 
     await pool.query('UPDATE calendar_subperiods SET status = ? WHERE id = ?', [
@@ -362,6 +363,6 @@ export const closeSubPeriod = async (req: Request, res: Response) => {
     res.json({ message: 'Subperíodo cerrado y emails enviados', sent: sentCount })
   } catch (error: any) {
     logger.error('Error closing sub-period:', error)
-    res.status(500).json({ error: 'Error al cerrar subperíodo' })
+    return sendApiError(res, 500, 'SUBPERIOD_CLOSE_FAILED', 'Error al cerrar subperíodo')
   }
 }

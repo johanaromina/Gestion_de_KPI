@@ -1,0 +1,291 @@
+{
+  "title": "OKRs",
+  "subtitle": "Objectives and Key Results",
+  "new_objective": "+ New objective",
+  "status": {
+    "not_started": "Not started",
+    "on_track": "On track",
+    "at_risk": "At risk",
+    "behind": "Behind",
+    "completed": "Completed",
+    "draft": "Draft",
+    "active": "Active",
+    "closed": "Closed"
+  },
+  "filters": {
+    "all_periods": "All periods",
+    "all_states": "All statuses"
+  },
+  "export": {
+    "pdf_title": "Export period to PDF",
+    "excel_title": "Export period to Excel"
+  },
+  "loading": "Loading objectives...",
+  "empty": {
+    "message": "No objectives yet.",
+    "create": "Create first objective"
+  },
+  "pagination": {
+    "prev": "← Previous",
+    "next": "Next →",
+    "info": "Page {{page}} of {{totalPages}} · {{count}} objectives",
+    "info_short": "Page {{page}} of {{totalPages}}"
+  },
+  "card": {
+    "owner": "Owner: {{name}}",
+    "progress": "Progress"
+  },
+  "alignment": {
+    "title": "OKR Alignment Tree",
+    "subtitle": "Cascade: company → area → team → individual",
+    "select_period": "Select a period...",
+    "summary": {
+      "objectives": "Objectives",
+      "avg_progress": "Average progress"
+    },
+    "no_period_selected": "Select a period to view the alignment tree.",
+    "loading": "Loading tree...",
+    "empty": {
+      "message": "No objectives in this period."
+    }
+  },
+  "fields": {
+    "objective": "Objective",
+    "key_result": "Key Result",
+    "owner": "Owner",
+    "period": "Period",
+    "progress": "Progress",
+    "alignment": "Alignment"
+  },
+  "actions": {
+    "edit": "Edit OKR",
+    "delete": "Delete OKR",
+    "align": "Align",
+    "view": "View detail"
+  },
+  "detail": {
+    "loading": "Loading...",
+    "not_found": "Objective not found.",
+    "back": "← OKRs",
+    "progress_label": "Overall progress",
+    "export": {
+      "pdf_title": "Export to PDF",
+      "excel_title": "Export to Excel"
+    },
+    "actions": {
+      "edit": "Edit",
+      "close": "Close objective",
+      "close_confirm": "Close this objective?"
+    },
+    "kr_section_title": "Key Results",
+    "kr_empty": "No key results defined.",
+    "kr_actions": {
+      "edit": "Edit KR",
+      "cancel_edit": "Cancel edit",
+      "hide_sources": "Hide sources",
+      "show_sources": "Show sources ({{count}})",
+      "checkin": "+ Log progress",
+      "checkin_close": "Close"
+    },
+    "kr_badges": {
+      "automatic": "Automatic",
+      "automatic_title": "Progress is automatically updated from the linked KPI"
+    },
+    "kpi_values": "KPI: {{name}} — actual: {{actual}} / target: {{target}}",
+    "datasource": {
+      "title": "Sources feeding this KR",
+      "collaborator": "Collaborator",
+      "area": "Area"
+    },
+    "kr_edit": {
+      "title": "Edit Key Result",
+      "field_title": "Title",
+      "field_type": "Measurement type",
+      "type_simple": "📝 Manual value",
+      "type_kpi_linked": "🔗 Linked to KPI",
+      "field_start_value": "Start value",
+      "field_target": "Target",
+      "field_unit": "Unit",
+      "unit_placeholder": "%, days, $...",
+      "field_kpi_links": "Linked KPIs",
+      "chip_weight_label": "Weight %",
+      "add_kpi": "+ Add KPI...",
+      "field_kr_weight": "Relative weight (%) ⓘ",
+      "field_kr_weight_tooltip": "Weight percentage for this KR. The sum of all KR weights for the objective should equal 100%.",
+      "save": "Save changes",
+      "saving": "Saving...",
+      "cancel": "Cancel",
+      "save_error_fallback": "Error saving Key Result",
+      "weight_warning_title": "Weight warning",
+      "errors": {
+        "weight_range": "KR weight must be between 1 and 100 (%)",
+        "kpi_weight_range": "Each linked KPI weight must be between 1 and 100 (%)",
+        "kpi_weight_sum": "KPI weights must sum to 100% (currently {{total}}%)",
+        "kr_weight_warning": "Warning: total KR weight is {{total}}%. It will be saved, but you should redistribute to reach 100%."
+      }
+    },
+    "checkin": {
+      "title": "Log progress",
+      "hint": "Enter the current KR value. It is saved to history and updates progress.",
+      "field_current": "Current value",
+      "field_current_unit": "Current value ({{unit}})",
+      "target_placeholder": "Target: {{target}}",
+      "field_note": "Note",
+      "optional": "(optional)",
+      "note_placeholder": "What happened this week? Any blockers?",
+      "save": "Save progress",
+      "saving": "Saving...",
+      "history_title": "History"
+    },
+    "tree_links": {
+      "title": "Linked Objective Tree",
+      "hint": "Link this OKR to a strategic tree node so it appears in the org chart and alignment analysis.",
+      "empty": "No links to the objective tree.",
+      "remove": "Remove",
+      "search_placeholder": "Search tree node…",
+      "no_results": "No results for \"{{search}}\"",
+      "link": "Link"
+    }
+  },
+  "form": {
+    "title_new": "New OKR objective",
+    "title_edit": "Edit objective",
+    "back": "← Back",
+    "section_objective": "Objective",
+    "field_title": "Title *",
+    "title_placeholder": "E.g.: Increase customer satisfaction in Q1",
+    "field_description": "Description",
+    "description_placeholder": "Additional context for this objective...",
+    "field_period": "Period",
+    "select_placeholder": "Select...",
+    "period_readonly": "Period cannot be changed",
+    "field_scope": "Area / Scope",
+    "no_scope": "No scope",
+    "field_owner": "Owner *",
+    "field_status": "Status",
+    "field_parent": "Parent objective",
+    "optional": "(optional)",
+    "no_parent": "— No parent (root objective) —",
+    "parent_hint": "Use this to create an objective subordinate to another in the same period. Parent objectives show the aggregated progress of their children in the alignment tree.",
+    "add_kr": "+ Add KR",
+    "kr_number": "KR {{number}}",
+    "remove_kr": "Remove",
+    "field_kr_title": "KR Title",
+    "kr_title_placeholder": "E.g.: Reduce response time to under 2h",
+    "kpi_link_needs_period": "Select a period first",
+    "kr_type_hint_simple": "You will log progress manually via check-ins. Use this for metrics not tracked in the system (NPS, surveys, qualitative goals).",
+    "kr_type_hint_kpi": "Progress is automatically updated from the linked KPI. No check-ins needed.",
+    "start_hint": "Starting point (can be 0).",
+    "field_target_required": "Target *",
+    "target_hint": "Value to reach for this KR to be considered complete.",
+    "unit_placeholder": "%, tickets, $, days…",
+    "kpi_link_hint": "You can link one or more KPIs (individual or group). KR progress is the average of all linked KPIs.",
+    "kr_weight_tooltip": "Weight percentage for this KR in the objective. The sum of all KR weights should be 100%.",
+    "kr_weight_hint": "Enter a percentage (1–100). Ideally all KR weights should total 100%.",
+    "weight_summary_label": "Total weight: ",
+    "weight_summary_denominator": " / 100%",
+    "weight_over": "⚠ Total exceeds 100% — reduce a weight.",
+    "weight_under": "{{remaining}}% still to distribute among KRs.",
+    "weight_ok": "✓ Fully distributed",
+    "cancel": "Cancel",
+    "save_new": "Save objective",
+    "save_edit": "Save changes",
+    "saving": "Saving...",
+    "dialogs": {
+      "remove_kr_msg": "Delete this Key Result?",
+      "remove_kr_title": "Remove KR",
+      "remove_kr_confirm": "Delete"
+    },
+    "errors": {
+      "title_required": "Title is required",
+      "period_required": "Period is required",
+      "owner_required": "Owner is required",
+      "target_required": "Target is required",
+      "target_equals_start": "Target cannot equal start value ({{start}})",
+      "kr_errors": "Fix the errors in the Key Results",
+      "save_failed": "Could not save the objective. Check the data and try again.",
+      "update_failed": "Could not update the objective. Check the data and try again.",
+      "kr_partial_failure": "Objective was saved, but some Key Results could not be loaded: {{failures}}",
+      "kr_save_failed": "Error saving KR \"{{title}}\""
+    }
+  },
+  "arbol": {
+    "title": "Objective Tree",
+    "subtitle": "Real OKR, Key Result and KPI hierarchy by area",
+    "new_okr": "+ New OKR",
+    "loading": "Loading objective tree...",
+    "filter_all_periods": "All periods",
+    "stats": {
+      "areas_one": "area",
+      "areas_other": "areas",
+      "objectives_one": "objective",
+      "objectives_other": "objectives",
+      "krs_one": "key result",
+      "krs_other": "key results"
+    },
+    "empty": {
+      "title": "No active objectives",
+      "text": "Create your first OKR to see it here organized by area and period.",
+      "btn": "Create OKR"
+    },
+    "badges": {
+      "okr": "OKR",
+      "kr": "KR"
+    },
+    "kpi_fallback": "KPI",
+    "scope_okrs_one": "{{count}} OKR",
+    "scope_okrs_other": "{{count}} OKRs",
+    "okr": {
+      "no_krs_tooltip": "No Key Results",
+      "goto_tooltip": "View OKR detail",
+      "goto": "View →",
+      "krs_one": "{{count}} KR",
+      "krs_other": "{{count}} KRs"
+    },
+    "kr": {
+      "no_kpis_tooltip": "No linked KPIs",
+      "linked_one": "🔗 Linked to {{count}} KPI",
+      "linked_other": "🔗 Linked to {{count}} KPIs"
+    }
+  },
+  "tree_form": {
+    "title_new": "Create objective",
+    "title_edit": "Edit objective",
+    "fields": {
+      "name": "Objective name *",
+      "name_placeholder": "E.g.: Improve customer satisfaction",
+      "level": "Level *",
+      "parent": "Parent objective (optional)",
+      "parent_placeholder": "No parent objective",
+      "parent_hint": "Only objectives from higher levels can be selected",
+      "kpis": "Linked KPIs",
+      "kpis_hint": "Select the KPIs related to this objective",
+      "scope_kpis": "Linked Scope KPIs",
+      "scope_kpis_hint": "Select the organizational Scope KPIs that contribute to this objective"
+    },
+    "levels": {
+      "company": "Company",
+      "direction": "Direction",
+      "management": "Management",
+      "leadership": "Leadership",
+      "individual": "Individual"
+    },
+    "errors": {
+      "name_required": "Name is required",
+      "level_required": "Level is required"
+    },
+    "empty": {
+      "kpis": "No KPIs available",
+      "scope_kpis": "No Scope KPIs available"
+    },
+    "badges": {
+      "macro": "Macro: KPI #{{id}}",
+      "scope": "Scope #{{id}}"
+    },
+    "actions": {
+      "saving": "Saving...",
+      "update": "Update",
+      "create": "Create"
+    }
+  }
+}

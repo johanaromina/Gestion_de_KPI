@@ -9,6 +9,7 @@ import { getEffectivePermissions } from '../utils/permissions'
 import { buildTokenPayload, getSessionExpiry, issueAuthToken } from '../services/auth-session.service'
 import { AuthRequest } from '../middleware/auth.middleware'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 const setAuthCookie = (res: Response, token: string, rememberMe?: boolean) => {
   const maxAge = rememberMe ? 30 * 24 * 60 * 60 * 1000 : undefined
@@ -42,7 +43,7 @@ export const login = async (req: Request, res: Response) => {
     const normalizedEmail = email ? String(email).trim().toLowerCase() : ''
 
     if ((!normalizedEmail && !collaboratorId) || !password) {
-      return res.status(400).json({ error: 'Credenciales requeridas' })
+      return sendApiError(res, 400, 'AUTH_CREDENTIALS_REQUIRED', 'Credenciales requeridas')
     }
 
     const [rows] = await pool.query<any[]>(
@@ -53,22 +54,27 @@ export const login = async (req: Request, res: Response) => {
     )
 
     if (Array.isArray(rows) && rows.length === 0) {
-      return res.status(401).json({ error: 'Credenciales invalidas' })
+      return sendApiError(res, 401, 'AUTH_INVALID_CREDENTIALS', 'Credenciales invalidas')
     }
 
     const collaborator = rows[0]
 
     if (collaborator.status === 'inactive') {
-      return res.status(403).json({ error: 'Usuario inactivo' })
+      return sendApiError(res, 403, 'AUTH_USER_INACTIVE', 'Usuario inactivo')
     }
 
     if (!collaborator.passwordHash) {
-      return res.status(401).json({ error: 'Contrasena no configurada. Usa recuperar contrasena.' })
+      return sendApiError(
+        res,
+        401,
+        'AUTH_PASSWORD_NOT_SET',
+        'Contrasena no configurada. Usa recuperar contrasena.'
+      )
     }
 
     const matches = await bcrypt.compare(String(password), collaborator.passwordHash)
     if (!matches) {
-      return res.status(401).json({ error: 'Credenciales invalidas' })
+      return sendApiError(res, 401, 'AUTH_INVALID_CREDENTIALS', 'Credenciales invalidas')
     }
 
     const permissions = await getEffectivePermissions(collaborator.id)
@@ -105,7 +111,7 @@ export const login = async (req: Request, res: Response) => {
     return res.json({ user: buildTokenPayload(collaborator, permissions) })
   } catch (error: any) {
     logger.error('[auth] login', error)
-    res.status(500).json({ error: 'Error al iniciar sesion' })
+    return sendApiError(res, 500, 'AUTH_LOGIN_FAILED', 'Error al iniciar sesion')
   }
 }
 
@@ -113,18 +119,18 @@ export const verifyMfa = async (req: Request, res: Response) => {
   try {
     const { token, code, rememberMe } = req.body
     if (!token || !code) {
-      return res.status(400).json({ error: 'Codigo requerido' })
+      return sendApiError(res, 400, 'AUTH_MFA_CODE_REQUIRED', 'Codigo requerido')
     }
 
     let decoded: any
     try {
       decoded = jwt.verify(token, appEnv.jwtSecret) as any
     } catch {
-      return res.status(401).json({ error: 'Token invalido' })
+      return sendApiError(res, 401, 'AUTH_MFA_TOKEN_INVALID', 'Token invalido')
     }
 
     if (!decoded?.id || decoded?.purpose !== 'mfa') {
-      return res.status(401).json({ error: 'Token invalido' })
+      return sendApiError(res, 401, 'AUTH_MFA_TOKEN_INVALID', 'Token invalido')
     }
 
     const [rows] = await pool.query<any[]>(
@@ -132,21 +138,21 @@ export const verifyMfa = async (req: Request, res: Response) => {
       [decoded.id]
     )
     if (!Array.isArray(rows) || rows.length === 0) {
-      return res.status(404).json({ error: 'Usuario no encontrado' })
+      return sendApiError(res, 404, 'AUTH_USER_NOT_FOUND', 'Usuario no encontrado')
     }
 
     const collaborator = rows[0]
     if (!collaborator.mfaCodeHash || !collaborator.mfaCodeExpiresAt) {
-      return res.status(401).json({ error: 'Codigo expirado' })
+      return sendApiError(res, 401, 'AUTH_MFA_CODE_EXPIRED', 'Codigo expirado')
     }
 
     if (new Date(collaborator.mfaCodeExpiresAt).getTime() < Date.now()) {
-      return res.status(401).json({ error: 'Codigo expirado' })
+      return sendApiError(res, 401, 'AUTH_MFA_CODE_EXPIRED', 'Codigo expirado')
     }
 
     const codeHash = crypto.createHash('sha256').update(String(code)).digest('hex')
     if (codeHash !== collaborator.mfaCodeHash) {
-      return res.status(401).json({ error: 'Codigo invalido' })
+      return sendApiError(res, 401, 'AUTH_MFA_CODE_INVALID', 'Codigo invalido')
     }
 
     await pool.query(
@@ -162,7 +168,7 @@ export const verifyMfa = async (req: Request, res: Response) => {
     return res.json({ user: buildTokenPayload(collaborator, permissions) })
   } catch (error: any) {
     logger.error('[auth] mfa', error)
-    res.status(500).json({ error: 'Error al verificar codigo' })
+    return sendApiError(res, 500, 'AUTH_MFA_VERIFY_FAILED', 'Error al verificar codigo')
   }
 }
 
@@ -172,7 +178,7 @@ export const requestPasswordReset = async (req: Request, res: Response) => {
     const normalizedEmail = email ? String(email).trim().toLowerCase() : ''
 
     if (!normalizedEmail) {
-      return res.status(400).json({ error: 'Email requerido' })
+      return sendApiError(res, 400, 'AUTH_EMAIL_REQUIRED', 'Email requerido')
     }
 
     const [rows] = await pool.query<any[]>(
@@ -212,7 +218,7 @@ export const requestPasswordReset = async (req: Request, res: Response) => {
     return res.json({ message: 'Si el email existe, enviaremos instrucciones.' })
   } catch (error: any) {
     logger.error('[auth] requestPasswordReset', error)
-    res.status(500).json({ error: 'Error al solicitar recuperacion' })
+    return sendApiError(res, 500, 'AUTH_RESET_REQUEST_FAILED', 'Error al solicitar recuperacion')
   }
 }
 
@@ -221,11 +227,21 @@ export const resetPassword = async (req: Request, res: Response) => {
     const { token, password } = req.body
 
     if (!token || !password) {
-      return res.status(400).json({ error: 'Token y contrasena requeridos' })
+      return sendApiError(
+        res,
+        400,
+        'AUTH_RESET_TOKEN_AND_PASSWORD_REQUIRED',
+        'Token y contrasena requeridos'
+      )
     }
 
     if (String(password).length < 8) {
-      return res.status(400).json({ error: 'La contrasena debe tener al menos 8 caracteres' })
+      return sendApiError(
+        res,
+        400,
+        'AUTH_RESET_PASSWORD_TOO_SHORT',
+        'La contrasena debe tener al menos 8 caracteres'
+      )
     }
 
     const tokenHash = crypto.createHash('sha256').update(String(token)).digest('hex')
@@ -236,7 +252,7 @@ export const resetPassword = async (req: Request, res: Response) => {
     )
 
     if (!Array.isArray(rows) || rows.length === 0) {
-      return res.status(400).json({ error: 'Token invalido o expirado' })
+      return sendApiError(res, 400, 'AUTH_RESET_TOKEN_INVALID', 'Token invalido o expirado')
     }
 
     const collaborator = rows[0]
@@ -252,7 +268,7 @@ export const resetPassword = async (req: Request, res: Response) => {
     res.json({ message: 'Contrasena actualizada correctamente' })
   } catch (error: any) {
     logger.error('[auth] resetPassword', error)
-    res.status(500).json({ error: 'Error al restablecer contrasena' })
+    return sendApiError(res, 500, 'AUTH_RESET_PASSWORD_FAILED', 'Error al restablecer contrasena')
   }
 }
 
@@ -266,37 +282,60 @@ export const changePassword = async (req: Request, res: Response) => {
     }
 
     if (!collaboratorId) {
-      return res.status(401).json({ error: 'Sesion invalida' })
+      return sendApiError(res, 401, 'AUTH_SESSION_INVALID', 'Sesion invalida')
     }
 
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({ error: 'Contrasena actual y nueva contrasena son requeridas' })
+      return sendApiError(
+        res,
+        400,
+        'AUTH_CHANGE_PASSWORD_REQUIRED',
+        'Contrasena actual y nueva contrasena son requeridas'
+      )
     }
 
     if (String(newPassword).length < 8) {
-      return res.status(400).json({ error: 'La nueva contrasena debe tener al menos 8 caracteres' })
+      return sendApiError(
+        res,
+        400,
+        'AUTH_CHANGE_PASSWORD_TOO_SHORT',
+        'La nueva contrasena debe tener al menos 8 caracteres'
+      )
     }
 
     const [rows] = await pool.query<any[]>('SELECT id, passwordHash FROM collaborators WHERE id = ?', [collaboratorId])
     const collaborator = rows?.[0]
 
     if (!collaborator) {
-      return res.status(404).json({ error: 'Usuario no encontrado' })
+      return sendApiError(res, 404, 'AUTH_USER_NOT_FOUND', 'Usuario no encontrado')
     }
 
     if (!collaborator.passwordHash) {
-      return res.status(400).json({
-        error: 'Tu cuenta no tiene una contrasena local configurada. Usa recuperacion de contrasena o el acceso corporativo.',
-      })
+      return sendApiError(
+        res,
+        400,
+        'AUTH_LOCAL_PASSWORD_NOT_SET',
+        'Tu cuenta no tiene una contrasena local configurada. Usa recuperacion de contrasena o el acceso corporativo.'
+      )
     }
 
     const matches = await bcrypt.compare(String(currentPassword), collaborator.passwordHash)
     if (!matches) {
-      return res.status(401).json({ error: 'La contrasena actual es incorrecta' })
+      return sendApiError(
+        res,
+        401,
+        'AUTH_CURRENT_PASSWORD_INCORRECT',
+        'La contrasena actual es incorrecta'
+      )
     }
 
     if (String(currentPassword) === String(newPassword)) {
-      return res.status(400).json({ error: 'La nueva contrasena debe ser distinta de la actual' })
+      return sendApiError(
+        res,
+        400,
+        'AUTH_NEW_PASSWORD_SAME_AS_CURRENT',
+        'La nueva contrasena debe ser distinta de la actual'
+      )
     }
 
     const passwordHash = await bcrypt.hash(String(newPassword), 10)
@@ -310,7 +349,7 @@ export const changePassword = async (req: Request, res: Response) => {
     return res.json({ message: 'Contrasena actualizada correctamente' })
   } catch (error: any) {
     logger.error('[auth] changePassword', error)
-    return res.status(500).json({ error: 'Error al cambiar la contrasena' })
+    return sendApiError(res, 500, 'AUTH_CHANGE_PASSWORD_FAILED', 'Error al cambiar la contrasena')
   }
 }
 
@@ -321,25 +360,33 @@ export const logout = (_req: Request, res: Response) => {
 
 export const register = async (req: Request, res: Response) => {
   if (!appEnv.selfRegisterEnabled) {
-    return res.status(403).json({
-      error: 'El registro autonomo esta deshabilitado en esta instancia. El alta inicial se realiza por despliegue/bootstrap del cliente.',
-    })
+    return sendApiError(
+      res,
+      403,
+      'AUTH_SELF_REGISTER_DISABLED',
+      'El registro autonomo esta deshabilitado en esta instancia. El alta inicial se realiza por despliegue/bootstrap del cliente.'
+    )
   }
 
   const { companyName, adminName, email, password } = req.body
   const normalizedEmail = email ? String(email).trim().toLowerCase() : ''
 
   if (!companyName || !adminName || !normalizedEmail || !password) {
-    return res.status(400).json({ error: 'Todos los campos son requeridos' })
+    return sendApiError(res, 400, 'AUTH_REGISTER_ALL_FIELDS_REQUIRED', 'Todos los campos son requeridos')
   }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   if (!emailRegex.test(normalizedEmail)) {
-    return res.status(400).json({ error: 'Email inválido' })
+    return sendApiError(res, 400, 'AUTH_REGISTER_INVALID_EMAIL', 'Email invalido')
   }
 
   if (String(password).length < 8) {
-    return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' })
+    return sendApiError(
+      res,
+      400,
+      'AUTH_REGISTER_PASSWORD_TOO_SHORT',
+      'La contrasena debe tener al menos 8 caracteres'
+    )
   }
 
   const conn = await pool.getConnection()
@@ -353,7 +400,12 @@ export const register = async (req: Request, res: Response) => {
     if (Array.isArray(existing) && existing.length > 0) {
       await conn.rollback()
       conn.release()
-      return res.status(400).json({ error: 'Ya existe una cuenta con ese email' })
+      return sendApiError(
+        res,
+        400,
+        'AUTH_REGISTER_EMAIL_ALREADY_EXISTS',
+        'Ya existe una cuenta con ese email'
+      )
     }
 
     const [companyResult] = await conn.query<any>(
@@ -412,7 +464,7 @@ export const register = async (req: Request, res: Response) => {
     await conn.rollback().catch(() => {})
     conn.release()
     logger.error('Error in register:', error)
-    return res.status(500).json({ error: 'Error al registrar la empresa' })
+    return sendApiError(res, 500, 'AUTH_REGISTER_FAILED', 'Error al registrar la empresa')
   }
 }
 
@@ -426,7 +478,7 @@ export const getCurrentUser = async (req: Request, res: Response) => {
     )
 
     if (Array.isArray(rows) && rows.length === 0) {
-      return res.status(404).json({ error: 'Usuario no encontrado' })
+      return sendApiError(res, 404, 'AUTH_USER_NOT_FOUND', 'Usuario no encontrado')
     }
 
     const collaborator = rows[0]
@@ -438,6 +490,6 @@ export const getCurrentUser = async (req: Request, res: Response) => {
     } as User)
   } catch (error: any) {
     logger.error('[auth] getCurrentUser', error)
-    res.status(500).json({ error: 'Error al obtener usuario' })
+    return sendApiError(res, 500, 'AUTH_GET_CURRENT_USER_FAILED', 'Error al obtener usuario')
   }
 }

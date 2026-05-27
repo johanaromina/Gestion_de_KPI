@@ -3,14 +3,32 @@ import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQueryClient, useQuery } from 'react-query'
 import api from '../services/api'
 import { useAuth } from '../hooks/useAuth'
+import { useTranslation } from 'react-i18next'
 import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
 import { resolveDirection, calculateVariationPercent, supportsNegativeActual } from '../utils/kpi'
 import { useDialog } from './Dialog'
+import { resolveApiErrorMessage } from '../utils/apiErrors'
 import './CollaboratorKPIForm.css'
 
 const toNumber = (value: any): number => {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : 0
+}
+
+const ASSIGNMENT_ACTION_API_ERROR_KEYS: Record<string, string> = {
+  ASSIGNMENT_NOT_FOUND: 'assignments:error.api_errors.not_found',
+  ASSIGNMENT_CLOSE_FORBIDDEN: 'assignments:error.api_errors.close_forbidden',
+  ASSIGNMENT_ALREADY_CLOSED: 'assignments:error.api_errors.already_closed',
+  ASSIGNMENT_REOPEN_FORBIDDEN: 'assignments:error.api_errors.reopen_forbidden',
+  ASSIGNMENT_NOT_CLOSED: 'assignments:error.api_errors.not_closed',
+}
+
+const ASSIGNMENT_PLAN_API_ERROR_KEYS: Record<string, string> = {
+  ASSIGNMENT_PLAN_IDENTIFIERS_REQUIRED: 'assignments:form.api_errors.plan_identifiers_required',
+  ASSIGNMENT_PLAN_CONFIG_FORBIDDEN: 'assignments:form.api_errors.plan_config_forbidden',
+  ASSIGNMENT_PLAN_ITEMS_REQUIRED: 'assignments:form.api_errors.plan_items_required',
+  ASSIGNMENT_PLAN_TARGET_NEGATIVE: 'assignments:form.api_errors.plan_target_negative',
+  ASSIGNMENT_PLAN_WEIGHT_OVERRIDE_INVALID: 'assignments:form.api_errors.plan_weight_override_invalid',
 }
 
 interface CollaboratorKPI {
@@ -75,6 +93,7 @@ export default function CollaboratorKPIForm({
   const [weightDirty, setWeightDirty] = useState(false)
   const [criteriaPrefilled, setCriteriaPrefilled] = useState(false)
 
+  const { t } = useTranslation('assignments')
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const dialog = useDialog()
@@ -369,7 +388,13 @@ export default function CollaboratorKPIForm({
         onClose()
       },
       onError: (error: any) => {
-        void dialog.alert(error?.response?.data?.error || 'No se pudo cerrar la asignación', { title: 'Error', variant: 'danger' })
+        void dialog.alert(
+          resolveApiErrorMessage(error, t, {
+            codeMap: ASSIGNMENT_ACTION_API_ERROR_KEYS,
+            fallbackKey: 'error.close_assignment',
+          }),
+          { title: t('common:error_title'), variant: 'danger' }
+        )
       },
     }
   )
@@ -386,7 +411,13 @@ export default function CollaboratorKPIForm({
         onClose()
       },
       onError: (error: any) => {
-        void dialog.alert(error?.response?.data?.error || 'No se pudo reabrir la asignación', { title: 'Error', variant: 'danger' })
+        void dialog.alert(
+          resolveApiErrorMessage(error, t, {
+            codeMap: ASSIGNMENT_ACTION_API_ERROR_KEYS,
+            fallbackKey: 'error.reopen_assignment',
+          }),
+          { title: t('common:error_title'), variant: 'danger' }
+        )
       },
     }
   )
@@ -418,28 +449,28 @@ export default function CollaboratorKPIForm({
       formData.actual !== undefined && formData.actual !== null ? Number(formData.actual) : null
 
     if (isPeriodClosed && !assignment?.id) {
-      newErrors.periodId = 'No se pueden crear asignaciones en periodos cerrados'
+      newErrors.periodId = t('form.error_no_period')
     }
 
     if (!formData.collaboratorId || formData.collaboratorId === 0) {
-      newErrors.collaboratorId = 'Debe seleccionar un colaborador'
+      newErrors.collaboratorId = t('form.error_no_collaborator')
     }
 
     if (!formData.kpiId || formData.kpiId === 0) {
-      newErrors.kpiId = 'Debe seleccionar un KPI'
+      newErrors.kpiId = t('form.error_no_kpi')
     }
 
     if (!assignment?.id) {
       if (!targetValue || targetValue <= 0) {
-        newErrors.target = 'El target debe ser mayor a 0'
+        newErrors.target = t('form.error_target_positive')
       }
 
       if (!weightValue || weightValue <= 0) {
-        newErrors.weight = 'La ponderación debe ser mayor a 0'
+        newErrors.weight = t('form.error_weight_positive')
       }
 
       if (weightValue > 100) {
-        newErrors.weight = 'La ponderación no puede ser mayor a 100%'
+        newErrors.weight = t('form.error_weight_max')
       }
 
       // La validación de suma de pesos solo aplica a asignaciones resumen (sin subperíodo)
@@ -447,27 +478,25 @@ export default function CollaboratorKPIForm({
       if (!formData.subPeriodId) {
         const totalWeight = toNumber(calculateTotalWeight())
         if (totalWeight > 100) {
-          newErrors.weight = `La suma de ponderaciones sería ${totalWeight.toFixed(
-            1
-          )}%. Debe ser máximo 100%`
+          newErrors.weight = t('form.error_weight_sum', { value: totalWeight.toFixed(1) })
         }
       }
     }
 
     if (assignment?.id) {
       if (actualValue === null || Number.isNaN(actualValue)) {
-        newErrors.actual = 'Ingresa el valor actual'
+        newErrors.actual = t('form.error_actual_required')
       } else if (actualValue < 0 && !negativeActualAllowed) {
-        newErrors.actual = 'Este KPI no admite valores negativos en el alcance'
+        newErrors.actual = t('form.error_actual_negative')
       }
     }
 
     if (!formData.dataSource) {
-      newErrors.dataSource = 'Selecciona una fuente'
+      newErrors.dataSource = t('form.error_no_source')
     }
 
     if (!formData.criteriaText?.trim()) {
-      newErrors.criteriaText = 'El criterio es requerido'
+      newErrors.criteriaText = t('form.error_no_criteria')
     }
 
     setErrors(newErrors)
@@ -588,7 +617,12 @@ export default function CollaboratorKPIForm({
         queryClient.invalidateQueries(['collaborator-kpis', formData.collaboratorId, periodId])
       },
       onError: (err: any) => {
-        setPlanErrors(err?.response?.data?.error || 'Error al guardar plan mensual')
+        setPlanErrors(
+          resolveApiErrorMessage(err, t, {
+            codeMap: ASSIGNMENT_PLAN_API_ERROR_KEYS,
+            fallbackKey: 'form.plan_save_error',
+          })
+        )
       },
     }
   )
@@ -614,8 +648,8 @@ export default function CollaboratorKPIForm({
       <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div>
-            <h2>{assignment?.id ? 'Editar Asignación de KPI' : 'Asignar KPI a Colaborador'}</h2>
-            <p className="modal-subtitle">Completa en orden: Scope → Colaborador → KPI → Target.</p>
+            <h2>{assignment?.id ? t('form.title_edit') : t('form.title_create')}</h2>
+            <p className="modal-subtitle">{t('form.subtitle')}</p>
           </div>
           <button className="close-button" onClick={onClose}>
             ×
@@ -624,25 +658,25 @@ export default function CollaboratorKPIForm({
 
         {isPeriodClosed && (
           <div className="period-closed-warning">
-            <strong>⚠ Periodo Cerrado:</strong>{' '}
+            <strong>{t('form.period_closed_prefix')}</strong>{' '}
             {assignment?.id
-              ? 'Solo se puede actualizar el valor actual (alcance).'
-              : 'No se pueden crear nuevas asignaciones en periodos cerrados.'}
+              ? t('form.period_closed_edit')
+              : t('form.period_closed_create')}
           </div>
         )}
 
         {isAssignmentClosed && (
           <div className="closed-warning">
-            <strong>🔒 Asignación Cerrada</strong>
-            <p>Esta asignación está cerrada. Solo administradores y directores pueden reabrirla.</p>
+            <strong>{t('form.assignment_closed_title')}</strong>
+            <p>{t('form.assignment_closed_hint')}</p>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="collaborator-kpi-form">
-          <div className="form-section-title">1) Selección base</div>
+          <div className="form-section-title">{t('form.section_base')}</div>
           <div className="form-row form-row-3">
             <div className="form-group">
-              <label htmlFor="scopeId">Scope *</label>
+              <label htmlFor="scopeId">{t('form.scope_label')}</label>
               <select
                 id="scopeId"
                 value={selectedScopeId || ''}
@@ -657,22 +691,22 @@ export default function CollaboratorKPIForm({
                 }}
                 disabled={!!assignment?.id || isReadOnlyCollaborator}
               >
-                <option value="">Seleccione un scope</option>
+                <option value="">{t('form.scope_placeholder')}</option>
                 {areaScopes.map((scope: any) => (
                   <option key={scope.id} value={scope.id}>
                     {scope.label}
                   </option>
                 ))}
               </select>
-              <small className="form-hint">Esto filtra colaboradores disponibles.</small>
+              <small className="form-hint">{t('form.scope_hint')}</small>
               {selectedCalendarProfile && (
                 <div className="calendar-pill">
-                  Calendario: {selectedCalendarProfile.name} ({selectedCalendarProfile.frequency})
+                  {t('form.calendar_label')} {selectedCalendarProfile.name} ({selectedCalendarProfile.frequency})
                 </div>
               )}
             </div>
             <div className="form-group">
-              <label htmlFor="collaboratorId">Colaborador *</label>
+              <label htmlFor="collaboratorId">{t('form.collaborator_label')}</label>
               <select
                 id="collaboratorId"
                 value={formData.collaboratorId}
@@ -697,7 +731,7 @@ export default function CollaboratorKPIForm({
                 disabled={!!assignment?.id || !!collaboratorId || isPeriodClosed || isReadOnlyCollaborator}
                 className={errors.collaboratorId ? 'error' : ''}
               >
-                <option value="0">Seleccione un colaborador</option>
+                <option value="0">{t('form.collaborator_placeholder')}</option>
                 {collaboratorsByScope?.map((c: any) => (
                   <option key={c.id} value={c.id}>
                     {c.name} - {c.position}
@@ -705,11 +739,11 @@ export default function CollaboratorKPIForm({
                 ))}
               </select>
               {errors.collaboratorId && <span className="error-message">{errors.collaboratorId}</span>}
-              <small className="form-hint">Selecciona un colaborador del scope.</small>
+              <small className="form-hint">{t('form.collaborator_hint')}</small>
             </div>
 
             <div className="form-group">
-              <label htmlFor="kpiId">KPI *</label>
+              <label htmlFor="kpiId">{t('form.kpi_label')}</label>
               <select
                 id="kpiId"
                 value={formData.kpiId}
@@ -722,7 +756,7 @@ export default function CollaboratorKPIForm({
                 disabled={!!assignment?.id || isPeriodClosed || isReadOnlyCollaborator}
                 className={errors.kpiId ? 'error' : ''}
               >
-                <option value="0">Seleccione un KPI</option>
+                <option value="0">{t('form.kpi_placeholder')}</option>
                 {kpis?.map((k: any) => (
                   <option key={k.id} value={k.id}>
                     {k.name} ({k.type})
@@ -730,18 +764,18 @@ export default function CollaboratorKPIForm({
                 ))}
               </select>
               {errors.kpiId && <span className="error-message">{errors.kpiId}</span>}
-              <small className="form-hint">Los KPIs se aplican por asignación, no por área.</small>
+              <small className="form-hint">{t('form.kpi_hint')}</small>
             </div>
           </div>
 
-          <div className="form-section-title">2) Período</div>
+          <div className="form-section-title">{t('form.section_period')}</div>
           <div className="form-group">
-            <label>Período</label>
+            <label>{t('form.period_label')}</label>
             <div className="period-badge">
               {periodInfo?.name || `#${periodId}`}
               {periodInfo?.status && (
                 <span className={`period-status-tag period-status-${periodInfo.status}`}>
-                  {periodInfo.status === 'open' ? 'Abierto' : periodInfo.status === 'closed' ? 'Cerrado' : periodInfo.status}
+                  {periodInfo.status === 'open' ? t('form.period_open') : periodInfo.status === 'closed' ? t('form.period_closed') : periodInfo.status}
                 </span>
               )}
             </div>
@@ -751,7 +785,7 @@ export default function CollaboratorKPIForm({
             <>
               <div className="form-group" style={{ marginTop: 12 }}>
                 <label htmlFor="subPeriodId">
-                  Subperíodo específico <span className="field-optional">(opcional)</span>
+                  {t('form.subperiod_label')} <span className="field-optional">{t('form.subperiod_optional')}</span>
                 </label>
                 <select
                   id="subPeriodId"
@@ -764,7 +798,7 @@ export default function CollaboratorKPIForm({
                   }
                   disabled={isReadOnlyCollaborator}
                 >
-                  <option value="">Sin subperíodo — usar Plan Mensual para todos los meses</option>
+                  <option value="">{t('form.subperiod_empty')}</option>
                   {subPeriods.map((sp: any) => (
                     <option key={sp.id} value={sp.id}>
                       {sp.name} {sp.weight ? `(${sp.weight}%)` : ''}
@@ -773,12 +807,12 @@ export default function CollaboratorKPIForm({
                 </select>
                 {!formData.subPeriodId && (
                   <small className="form-hint">
-                    Dejá vacío si querés definir targets mes a mes en el <strong>Plan Mensual</strong> (disponible más abajo una vez que elijas colaborador y KPI).
+                    {t('form.subperiod_hint_empty')}
                   </small>
                 )}
                 {formData.subPeriodId && (
                   <small className="form-hint">
-                    Asignación para un mes específico. Para los demás meses podés crear asignaciones individuales o usar el Plan Mensual en la asignación resumen.
+                    {t('form.subperiod_hint_selected')}
                   </small>
                 )}
               </div>
@@ -803,10 +837,10 @@ export default function CollaboratorKPIForm({
 
           {!assignment?.id && (
             <>
-              <div className="form-section-title">3) Target y ponderación</div>
+              <div className="form-section-title">{t('form.section_target')}</div>
               <div className="form-row">
                 <div className="form-group">
-                <label htmlFor="target">Target *</label>
+                <label htmlFor="target">{t('form.target_label')}</label>
                 <input
                   type="number"
                   id="target"
@@ -820,14 +854,14 @@ export default function CollaboratorKPIForm({
                     })
                   }
                   className={errors.target ? 'error' : ''}
-                  placeholder="Ej: 100"
+                  placeholder={t('form.target_placeholder')}
                   disabled={isReadOnlyCollaborator}
                 />
                 {errors.target && <span className="error-message">{errors.target}</span>}
               </div>
 
               <div className="form-group">
-                <label htmlFor="weight">Ponderación (%) *</label>
+                <label htmlFor="weight">{t('form.weight_label')}</label>
                 <input
                   type="number"
                   id="weight"
@@ -843,29 +877,28 @@ export default function CollaboratorKPIForm({
                     })
                   }}
                   className={errors.weight ? 'error' : ''}
-                  placeholder="Ej: 25.00"
+                  placeholder={t('form.weight_placeholder')}
                   disabled={isReadOnlyCollaborator}
                 />
                 {errors.weight && <span className="error-message">{errors.weight}</span>}
                 {!assignment?.id && selectedKpi && selectedScopeId && !scopeWeightForSelection && (
                   <small className="form-hint warning">
-                    No hay ponderación definida para este KPI en el scope seleccionado. Definila en KPIs para que se
-                    precargue automáticamente.
+                    {t('form.weight_no_scope')}
                   </small>
                 )}
                 {!assignment?.id && scopeWeightForSelection && !weightDirty && (
                   <small className="form-hint">
-                    Ponderación precargada desde KPI por scope.
+                    {t('form.weight_preloaded')}
                   </small>
                 )}
                 <div className="weight-info">
-                  <span className="weight-total">Total ponderación: {totalWeight.toFixed(1)}%</span>
+                  <span className="weight-total">{t('form.weight_total', { value: totalWeight.toFixed(1) })}</span>
                   {remainingWeight >= 0 && (
-                    <span className="weight-remaining">Restante: {remainingWeight.toFixed(1)}%</span>
+                    <span className="weight-remaining">{t('form.weight_remaining', { value: remainingWeight.toFixed(1) })}</span>
                   )}
-                  {totalWeight === 100 && <span className="weight-perfect">✓ Suma perfecta (100%)</span>}
+                  {totalWeight === 100 && <span className="weight-perfect">{t('form.weight_perfect')}</span>}
                   {totalWeight > 100 && (
-                    <span className="weight-error">⚠ Excede 100% por {(totalWeight - 100).toFixed(1)}%</span>
+                    <span className="weight-error">{t('form.weight_exceeds', { value: (totalWeight - 100).toFixed(1) })}</span>
                   )}
                 </div>
               </div>
@@ -876,9 +909,9 @@ export default function CollaboratorKPIForm({
           {subPeriods && subPeriods.length > 0 && formData.kpiId !== 0 && formData.collaboratorId !== 0 && !formData.subPeriodId && (
             <div className="plan-section">
               <div className="plan-header">
-                <h3>Plan mensual — targets por subperíodo</h3>
+                <h3>{t('form.plan_title')}</h3>
                 <span className="plan-helper">
-                  Definí el target de cada mes. Guardá el plan antes de cerrar el formulario.
+                  {t('form.plan_helper')}
                 </span>
               </div>
               {canOverrideWeight && (
@@ -888,19 +921,19 @@ export default function CollaboratorKPIForm({
                     checked={weightOverrideEnabled}
                     onChange={(e) => setWeightOverrideEnabled(e.target.checked)}
                   />
-                  <span>Override de ponderación (solo casos especiales)</span>
+                  <span>{t('form.plan_override_toggle')}</span>
                 </label>
               )}
               {planErrors && <div className="error-message">{planErrors}</div>}
               <table className="plan-table">
                 <thead>
                   <tr>
-                    <th>Subperíodo</th>
-                    <th>Target</th>
-                    <th>Peso (%)</th>
-                    {weightOverrideEnabled && <th>Override</th>}
-                    <th>Actual</th>
-                    <th>% Mes</th>
+                    <th>{t('form.plan_table_subperiod')}</th>
+                    <th>{t('form.plan_table_target')}</th>
+                    <th>{t('form.plan_table_weight')}</th>
+                    {weightOverrideEnabled && <th>{t('form.plan_table_override')}</th>}
+                    <th>{t('form.plan_table_actual')}</th>
+                    <th>{t('form.plan_table_pct')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -967,10 +1000,10 @@ export default function CollaboratorKPIForm({
                 </tbody>
               </table>
               <div className="plan-footer">
-                <span>Peso total: {planWeightTotal.toFixed(2)}%</span>
-                <span>Target acumulado: {planTargetTotal.toFixed(2)}</span>
-                <span>Actual acumulado: {planActualTotal.toFixed(2)}</span>
-                <span>Avance: {planProgressTotal.toFixed(1)}%</span>
+                <span>{t('form.plan_footer_weight', { value: planWeightTotal.toFixed(2) })}</span>
+                <span>{t('form.plan_footer_target', { value: planTargetTotal.toFixed(2) })}</span>
+                <span>{t('form.plan_footer_actual', { value: planActualTotal.toFixed(2) })}</span>
+                <span>{t('form.plan_footer_progress', { value: planProgressTotal.toFixed(1) })}</span>
                 <button
                   type="button"
                   className="btn-secondary"
@@ -980,7 +1013,7 @@ export default function CollaboratorKPIForm({
                     upsertPlanMutation.mutate(planRows)
                   }}
                 >
-                  {upsertPlanMutation.isLoading ? 'Guardando plan…' : 'Guardar plan'}
+                  {upsertPlanMutation.isLoading ? t('form.plan_saving') : t('form.plan_save')}
                 </button>
               </div>
             </div>
@@ -988,22 +1021,22 @@ export default function CollaboratorKPIForm({
 
           <div className="curation-section">
             <div className="curation-header">
-              <h3>Fuente y criterio (Curaduría)</h3>
+              <h3>{t('form.curation_section_title')}</h3>
               <span className={`curation-pill curation-${formData.curationStatus}`}>
                 {formData.curationStatus === 'pending'
-                  ? 'Pendiente'
+                  ? t('curation.pending')
                   : formData.curationStatus === 'in_review'
-                  ? 'En revision'
+                  ? t('curation.in_review')
                   : formData.curationStatus === 'approved'
-                  ? 'Aprobado'
+                  ? t('curation.approved')
                   : formData.curationStatus === 'changes_requested'
-                  ? 'Cambios solicitados'
-                  : 'Rechazado'}
+                  ? t('curation.changes_requested')
+                  : t('curation.rejected')}
               </span>
             </div>
             <div className="form-row form-row-3">
               <div className="form-group">
-                <label htmlFor="inputMode">Modo de carga</label>
+                <label htmlFor="inputMode">{t('form.input_mode_label')}</label>
                 <select
                   id="inputMode"
                   value={formData.inputMode || 'manual'}
@@ -1012,16 +1045,16 @@ export default function CollaboratorKPIForm({
                   }
                   disabled={isReadOnlyCollaborator}
                 >
-                  <option value="manual">Manual</option>
-                  <option value="import">Import</option>
-                  <option value="auto">Auto</option>
+                  <option value="manual">{t('input.manual')}</option>
+                  <option value="import">{t('input.import')}</option>
+                  <option value="auto">{t('input.auto')}</option>
                 </select>
                 <span className="helper-text">
-                  Todo KPI entra primero como manual. La automatización reemplaza la carga, no el KPI.
+                  {t('form.input_mode_hint')}
                 </span>
               </div>
               <div className="form-group">
-                <label htmlFor="dataSource">Fuente del dato *</label>
+                <label htmlFor="dataSource">{t('form.data_source_label')}</label>
                 <select
                   id="dataSource"
                   value={formData.dataSource || ''}
@@ -1033,7 +1066,7 @@ export default function CollaboratorKPIForm({
                   className={errors.dataSource ? 'error' : ''}
                   disabled={isReadOnlyCollaborator}
                 >
-                  <option value="">Seleccione una fuente</option>
+                  <option value="">{t('form.data_source_placeholder')}</option>
                   {dataSourceOptions.map((option) => (
                     <option key={option} value={option}>
                       {option}
@@ -1043,7 +1076,7 @@ export default function CollaboratorKPIForm({
                 {errors.dataSource && <span className="error-message">{errors.dataSource}</span>}
               </div>
               <div className="form-group">
-                <label htmlFor="sourceConfig">Origen / Query / Endpoint</label>
+                <label htmlFor="sourceConfig">{t('form.source_config_label')}</label>
                 <input
                   type="text"
                   id="sourceConfig"
@@ -1053,14 +1086,14 @@ export default function CollaboratorKPIForm({
                     setCriteriaPrefilled(false)
                     setFormData({ ...formData, sourceConfig: e.target.value })
                   }}
-                  placeholder="JQL / SQL / URL / reporte"
+                  placeholder={t('form.source_config_placeholder')}
                   disabled={isReadOnlyCollaborator}
                 />
               </div>
             </div>
 
             <div className="form-group">
-              <label htmlFor="criteriaText">Criterio de cálculo *</label>
+              <label htmlFor="criteriaText">{t('form.criteria_label')}</label>
               <textarea
                 id="criteriaText"
                 value={formData.criteriaText || ''}
@@ -1070,19 +1103,19 @@ export default function CollaboratorKPIForm({
                   setFormData({ ...formData, criteriaText: e.target.value })
                 }}
                 rows={3}
-                placeholder="Describe cómo se calcula target/alcance/variación"
+                placeholder={t('form.criteria_placeholder')}
                 className={errors.criteriaText ? 'error' : ''}
                 disabled={isReadOnlyCollaborator}
               />
               {errors.criteriaText && <span className="error-message">{errors.criteriaText}</span>}
               {criteriaPrefilled && !criteriaDirty && (
-                <small className="form-hint">Se copió desde el KPI macro. Podés editarlo si cambia la fuente.</small>
+                <small className="form-hint">{t('form.criteria_prefilled_hint')}</small>
               )}
             </div>
 
             <div className="form-row">
               <div className="form-group">
-                <label htmlFor="evidenceUrl">Evidencia / adjunto (opcional)</label>
+                <label htmlFor="evidenceUrl">{t('form.evidence_label')}</label>
                 <input
                   type="text"
                   id="evidenceUrl"
@@ -1092,14 +1125,14 @@ export default function CollaboratorKPIForm({
                     setCriteriaPrefilled(false)
                     setFormData({ ...formData, evidenceUrl: e.target.value })
                   }}
-                  placeholder="Link o referencia"
+                  placeholder={t('form.evidence_placeholder')}
                   disabled={isReadOnlyCollaborator}
                 />
               </div>
               <div className="form-group">
-                <label>Responsable de curaduría</label>
+                <label>{t('form.curator_label')}</label>
                 <div className="role-pill">Data Curator</div>
-                <small className="form-hint">Se asigna por rol, no por persona.</small>
+                <small className="form-hint">{t('form.curator_hint')}</small>
               </div>
             </div>
 
@@ -1110,7 +1143,7 @@ export default function CollaboratorKPIForm({
                 onClick={() => setFormData({ ...formData, curationStatus: 'in_review', createCriteriaVersion: true })}
                 disabled={isReadOnlyCollaborator}
               >
-                Enviar a curaduría
+                {t('form.curation_submit')}
               </button>
               {assignment?.id && (
                 <button
@@ -1125,7 +1158,7 @@ export default function CollaboratorKPIForm({
                   }
                   disabled={!criteriaDirty || isReadOnlyCollaborator}
                 >
-                  Actualizar criterio
+                  {t('form.curation_update')}
                 </button>
               )}
               {canCurate && (
@@ -1138,11 +1171,11 @@ export default function CollaboratorKPIForm({
                     })
                   }
                 >
-                  <option value="pending">Pendiente</option>
-                  <option value="in_review">En revision</option>
-                  <option value="approved">Aprobado</option>
-                  <option value="rejected">Rechazado</option>
-                  <option value="changes_requested">Cambios solicitados</option>
+                  <option value="pending">{t('curation.pending')}</option>
+                  <option value="in_review">{t('curation.in_review')}</option>
+                  <option value="approved">{t('curation.approved')}</option>
+                  <option value="rejected">{t('curation.rejected')}</option>
+                  <option value="changes_requested">{t('curation.changes_requested')}</option>
                 </select>
               )}
             </div>
@@ -1151,7 +1184,7 @@ export default function CollaboratorKPIForm({
           {assignment?.id && (
             <div className="form-row">
               <div className="form-group">
-                <label>Target</label>
+                <label>{t('form.target_edit_label')}</label>
                 <input
                   type="number"
                   value={formData.target || ''}
@@ -1162,7 +1195,7 @@ export default function CollaboratorKPIForm({
                 />
               </div>
               <div className="form-group">
-                <label>Ponderación (%)</label>
+                <label>{t('form.weight_edit_label')}</label>
                 <input
                   type="number"
                   value={formData.weight || ''}
@@ -1177,7 +1210,7 @@ export default function CollaboratorKPIForm({
           )}
 
           <div className="form-group">
-            <label htmlFor="actual">Valor Actual (Alcance) *</label>
+            <label htmlFor="actual">{t('form.actual_label')}</label>
             <input
               type="number"
               id="actual"
@@ -1189,21 +1222,21 @@ export default function CollaboratorKPIForm({
                   actual: e.target.value === '' ? undefined : parseFloat(e.target.value),
                 })
               }
-              placeholder="Ingresa el valor logrado este mes"
+              placeholder={t('form.actual_placeholder')}
               className={errors.actual ? 'error' : ''}
               disabled={isReadOnlyCollaborator}
             />
             {errors.actual && <span className="error-message">{errors.actual}</span>}
             <small className="form-hint">
               {negativeActualAllowed
-                ? 'Este KPI admite valores negativos en el alcance. Target y ponderación no se editan al actualizar.'
-                : 'Actualiza aquí el valor alcanzado mes a mes. Target y ponderación no se editan al actualizar.'}
+                ? t('form.actual_hint_negative')
+                : t('form.actual_hint_normal')}
             </small>
           </div>
 
           {!isPeriodClosed && (
             <div className="form-group">
-              <label htmlFor="status">Estado</label>
+              <label htmlFor="status">{t('form.status_label')}</label>
               <select
                 id="status"
                 value={formData.status}
@@ -1215,43 +1248,43 @@ export default function CollaboratorKPIForm({
                 }
                 disabled={isReadOnlyCollaborator}
               >
-                <option value="proposed">Propuesto</option>
-                <option value="approved">Aprobado</option>
-                <option value="draft">Borrador</option>
-                <option value="closed">Cerrado</option>
+                <option value="proposed">{t('status.proposed')}</option>
+                <option value="approved">{t('status.approved')}</option>
+                <option value="draft">{t('status.draft')}</option>
+                <option value="closed">{t('status.closed')}</option>
               </select>
             </div>
           )}
 
           <div className="form-group">
-            <label htmlFor="comments">Comentarios</label>
+            <label htmlFor="comments">{t('form.comments_label')}</label>
             <textarea
               id="comments"
               value={formData.comments || ''}
               onChange={(e) => setFormData({ ...formData, comments: e.target.value })}
               rows={3}
-              placeholder="Comentarios adicionales sobre esta asignación..."
+              placeholder={t('form.comments_placeholder')}
               disabled={isReadOnlyCollaborator}
             />
           </div>
 
           <div className="form-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>
-              Cancelar
+              {t('form.cancel')}
             </button>
             {canCloseAssignment && (
               <button
                 type="button"
                 className="btn-secondary"
                 onClick={async () => {
-                  const ok = await dialog.confirm('¿Cerrar este KPI? Se bloquearán ediciones.', {
-                    title: 'Cerrar KPI', confirmLabel: 'Cerrar', variant: 'warning'
+                  const ok = await dialog.confirm(t('form.dialog_close_kpi'), {
+                    title: t('form.dialog_close_kpi_title'), confirmLabel: t('form.dialog_close_kpi_confirm'), variant: 'warning'
                   })
                   if (ok) closeAssignmentMutation.mutate()
                 }}
                 disabled={closeAssignmentMutation.isLoading}
               >
-                Cerrar KPI
+                {t('form.close_kpi')}
               </button>
             )}
             {canReopenAssignment && (
@@ -1259,14 +1292,14 @@ export default function CollaboratorKPIForm({
                 type="button"
                 className="btn-secondary"
                 onClick={async () => {
-                  const ok = await dialog.confirm('¿Reabrir este KPI? Volverá a ser editable.', {
-                    title: 'Reabrir KPI', confirmLabel: 'Reabrir', variant: 'info'
+                  const ok = await dialog.confirm(t('form.dialog_reopen_kpi'), {
+                    title: t('form.dialog_reopen_kpi_title'), confirmLabel: t('form.dialog_reopen_kpi_confirm'), variant: 'info'
                   })
                   if (ok) reopenAssignmentMutation.mutate()
                 }}
                 disabled={reopenAssignmentMutation.isLoading}
               >
-                Reabrir KPI
+                {t('form.reopen_kpi')}
               </button>
             )}
             <button
@@ -1280,10 +1313,10 @@ export default function CollaboratorKPIForm({
               }
             >
               {createMutation.isLoading || updateMutation.isLoading
-                ? 'Guardando...'
+                ? t('form.saving')
                 : assignment?.id
-                ? 'Actualizar'
-                : 'Asignar'}
+                ? t('form.update')
+                : t('form.assign')}
             </button>
           </div>
         </form>

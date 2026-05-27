@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { useAuth } from '../hooks/useAuth'
 import { useDialog } from '../components/Dialog'
+import { resolveApiErrorMessage } from '../utils/apiErrors'
 import './OKRCrear.css'
 
 interface Period { id: number; name: string }
@@ -43,6 +45,7 @@ export default function OKRCrear() {
   const { id } = useParams<{ id?: string }>()
   const isEdit = !!id
   const { user } = useAuth()
+  const { t } = useTranslation('okr')
   const queryClient = useQueryClient()
 
   const dialog = useDialog()
@@ -180,7 +183,7 @@ export default function OKRCrear() {
     if (validKrs.length <= 1) return null
     const totalKrWeight = validKrs.reduce((sum, kr) => sum + Number(kr.weight ?? 0), 0)
     if (Math.abs(totalKrWeight - 100) <= 0.5) return null
-    return `Advertencia: la suma de los pesos de los KRs es ${totalKrWeight.toFixed(0)}%. Se va a guardar igual, pero se recomienda dejarla en 100% cuando termines de redistribuirlos.`
+    return t('detail.kr_edit.errors.kr_weight_warning', { total: totalKrWeight.toFixed(0) })
   }
 
   const createMutation = useMutation(
@@ -201,7 +204,10 @@ export default function OKRCrear() {
         try {
           await api.post(`/okr/${objectiveId}/key-results`, buildKrPayload(kr))
         } catch (krErr: any) {
-          const msg = krErr?.response?.data?.error || `Error al guardar el KR "${kr.title}"`
+          const msg = resolveApiErrorMessage(krErr, t, {
+            fallbackKey: 'form.errors.kr_save_failed',
+            values: { title: kr.title },
+          })
           krFailures.push(msg)
         }
       }
@@ -211,12 +217,14 @@ export default function OKRCrear() {
       onSuccess: ({ objectiveId, krFailures }) => {
         queryClient.invalidateQueries('okr-objectives')
         if (krFailures.length > 0) {
-          setError(`El objetivo fue guardado, pero algunos Key Results no pudieron cargarse: ${krFailures.join(' | ')}`)
+          setError(t('form.errors.kr_partial_failure', { failures: krFailures.join(' | ') }))
         }
         navigate(`/okr/${objectiveId}`)
       },
       onError: (err: any) => {
-        const msg = err?.response?.data?.error || 'No se pudo guardar el objetivo. Verificá los datos e intentá de nuevo.'
+        const msg = resolveApiErrorMessage(err, t, {
+          fallbackKey: 'form.errors.save_failed',
+        })
         setError(msg)
       },
     }
@@ -268,7 +276,9 @@ export default function OKRCrear() {
         navigate(`/okr/${objectiveId}`)
       },
       onError: (err: any) => {
-        const msg = err?.response?.data?.error || 'No se pudo actualizar el objetivo. Verificá los datos e intentá de nuevo.'
+        const msg = resolveApiErrorMessage(err, t, {
+          fallbackKey: 'form.errors.update_failed',
+        })
         setError(msg)
       },
     }
@@ -281,9 +291,9 @@ export default function OKRCrear() {
     setError('')
     setKrErrors({})
 
-    if (!title.trim()) { setError('El título es requerido'); return }
-    if (!isEdit && !periodId) { setError('El período es requerido'); return }
-    if (!ownerId) { setError('El responsable es requerido'); return }
+    if (!title.trim()) { setError(t('form.errors.title_required')); return }
+    if (!isEdit && !periodId) { setError(t('form.errors.period_required')); return }
+    if (!ownerId) { setError(t('form.errors.owner_required')); return }
 
     // Validar KRs numéricos
     const newKrErrors: Record<string, string> = {}
@@ -291,39 +301,39 @@ export default function OKRCrear() {
       if (!kr.title.trim()) continue
       const w = Number(kr.weight)
       if (w <= 0 || w > 100) {
-        newKrErrors[kr.tempId] = 'El peso del KR debe estar entre 1 y 100 (%)'
+        newKrErrors[kr.tempId] = t('detail.kr_edit.errors.weight_range')
         continue
       }
       if (kr.krType === 'simple') {
         const start = Number(kr.startValue)
         const target = Number(kr.targetValue)
         if (!kr.targetValue) {
-          newKrErrors[kr.tempId] = 'La meta es requerida'
+          newKrErrors[kr.tempId] = t('form.errors.target_required')
         } else if (target === start) {
-          newKrErrors[kr.tempId] = `La meta no puede ser igual al valor inicial (${start})`
+          newKrErrors[kr.tempId] = t('form.errors.target_equals_start', { start })
         }
       }
       if (kr.krType === 'kpi_linked' && kr.kpiLinks.length > 1) {
         const badLink = kr.kpiLinks.find((lk) => { const lw = Number(lk.weight ?? 100); return lw <= 0 || lw > 100 })
         if (badLink) {
-          newKrErrors[kr.tempId] = 'El peso de cada KPI vinculado debe estar entre 1 y 100 (%)'
+          newKrErrors[kr.tempId] = t('detail.kr_edit.errors.kpi_weight_range')
         } else {
           const totalKpiWeight = kr.kpiLinks.reduce((sum, lk) => sum + Number(lk.weight ?? 100), 0)
           if (Math.abs(totalKpiWeight - 100) > 0.5) {
-            newKrErrors[kr.tempId] = `Los pesos de los KPIs deben sumar 100% (actualmente suman ${totalKpiWeight}%)`
+            newKrErrors[kr.tempId] = t('detail.kr_edit.errors.kpi_weight_sum', { total: totalKpiWeight })
           }
         }
       }
     }
     if (Object.keys(newKrErrors).length > 0) {
       setKrErrors(newKrErrors)
-      setError('Corregí los errores en los Key Results')
+      setError(t('form.errors.kr_errors'))
       return
     }
 
     const krWeightWarning = getKrWeightWarning(krs)
     if (krWeightWarning) {
-      await dialog.alert(krWeightWarning, { title: 'Advertencia de pesos', variant: 'warning' })
+      await dialog.alert(krWeightWarning, { title: t('detail.kr_edit.weight_warning_title'), variant: 'warning' })
     }
 
     if (isEdit) {
@@ -341,9 +351,9 @@ export default function OKRCrear() {
 
   const removeKR = async (tempId: string, hasTitle: boolean) => {
     if (hasTitle) {
-      const ok = await dialog.confirm('¿Eliminar este Key Result?', {
-        title: 'Quitar KR',
-        confirmLabel: 'Eliminar',
+      const ok = await dialog.confirm(t('form.dialogs.remove_kr_msg'), {
+        title: t('form.dialogs.remove_kr_title'),
+        confirmLabel: t('form.dialogs.remove_kr_confirm'),
         variant: 'danger',
       })
       if (!ok) return
@@ -355,8 +365,8 @@ export default function OKRCrear() {
   return (
     <div className="okr-crear">
       <div className="okr-crear-header">
-        <button className="btn-back" onClick={() => navigate('/okr')}>← Volver</button>
-        <h2>{isEdit ? 'Editar objetivo' : 'Nuevo objetivo OKR'}</h2>
+        <button className="btn-back" onClick={() => navigate('/okr')}>{t('form.back')}</button>
+        <h2>{isEdit ? t('form.title_edit') : t('form.title_new')}</h2>
       </div>
 
       <form onSubmit={handleSubmit} className="okr-crear-form">
@@ -364,44 +374,44 @@ export default function OKRCrear() {
 
         {/* Objetivo */}
         <section className="okr-section">
-          <h3>Objetivo</h3>
+          <h3>{t('form.section_objective')}</h3>
 
           <div className="form-group">
-            <label>Titulo *</label>
+            <label>{t('form.field_title')}</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ej: Aumentar la satisfaccion del cliente en Q1"
+              placeholder={t('form.title_placeholder')}
             />
           </div>
 
           <div className="form-group">
-            <label>Descripcion</label>
+            <label>{t('form.field_description')}</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Contexto adicional sobre este objetivo..."
+              placeholder={t('form.description_placeholder')}
               rows={3}
             />
           </div>
 
           <div className="form-row">
             <div className="form-group">
-              <label>Periodo {!isEdit && '*'}</label>
+              <label>{t('form.field_period')}{!isEdit && ' *'}</label>
               <select value={periodId} onChange={(e) => setPeriodId(e.target.value)} disabled={isEdit}>
-                <option value="">Seleccionar...</option>
+                <option value="">{t('form.select_placeholder')}</option>
                 {periods.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
-              {isEdit && <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>El periodo no se puede cambiar</span>}
+              {isEdit && <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{t('form.period_readonly')}</span>}
             </div>
 
             <div className="form-group">
-              <label>Area / Scope</label>
+              <label>{t('form.field_scope')}</label>
               <select value={orgScopeId} onChange={(e) => setOrgScopeId(e.target.value)}>
-                <option value="">Sin scope</option>
+                <option value="">{t('form.no_scope')}</option>
                 {scopes.map((s) => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
@@ -409,9 +419,9 @@ export default function OKRCrear() {
             </div>
 
             <div className="form-group">
-              <label>Responsable *</label>
+              <label>{t('form.field_owner')}</label>
               <select value={ownerId} onChange={(e) => setOwnerId(e.target.value)}>
-                <option value="">Seleccionar...</option>
+                <option value="">{t('form.select_placeholder')}</option>
                 {collaborators.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
@@ -419,26 +429,24 @@ export default function OKRCrear() {
             </div>
 
             <div className="form-group">
-              <label>Estado</label>
+              <label>{t('form.field_status')}</label>
               <select value={status} onChange={(e) => setStatus(e.target.value as any)}>
-                <option value="active">Activo</option>
-                <option value="draft">Borrador</option>
+                <option value="active">{t('status.active')}</option>
+                <option value="draft">{t('status.draft')}</option>
               </select>
             </div>
           </div>
 
           {parentOptions.length > 0 && (
             <div className="form-group">
-              <label>Objetivo padre <span className="form-label-optional">(opcional)</span></label>
+              <label>{t('form.field_parent')} <span className="form-label-optional">{t('form.optional')}</span></label>
               <select value={parentId} onChange={(e) => setParentId(e.target.value)}>
-                <option value="">— Sin padre (objetivo raíz) —</option>
+                <option value="">{t('form.no_parent')}</option>
                 {parentOptions.map((o) => (
                   <option key={o.id} value={o.id}>{o.title}</option>
                 ))}
               </select>
-              <small className="form-hint">
-                Usalo para crear un objetivo subordinado a otro del mismo período. Los objetivos padre muestran el progreso agregado de sus hijos en el árbol de alineación.
-              </small>
+              <small className="form-hint">{t('form.parent_hint')}</small>
             </div>
           )}
         </section>
@@ -446,57 +454,55 @@ export default function OKRCrear() {
         {/* Key Results */}
         <section className="okr-section">
           <div className="okr-kr-section-header">
-            <h3>Key Results</h3>
+            <h3>{t('detail.kr_section_title')}</h3>
             <button type="button" className="btn-add-kr" onClick={() => setKrs((p) => [...p, emptyKR()])}>
-              + Agregar KR
+              {t('form.add_kr')}
             </button>
           </div>
 
           {krs.map((kr, idx) => (
             <div key={kr.tempId} className="kr-block">
               <div className="kr-block-header">
-                <span className="kr-number">KR {idx + 1}</span>
+                <span className="kr-number">{t('form.kr_number', { number: idx + 1 })}</span>
                 {krs.length > 1 && (
                   <button type="button" className="btn-remove-kr" onClick={() => removeKR(kr.tempId, !!kr.title.trim())}>
-                    Quitar
+                    {t('form.remove_kr')}
                   </button>
                 )}
               </div>
 
               <div className="form-group">
-                <label>Titulo del KR</label>
+                <label>{t('form.field_kr_title')}</label>
                 <input
                   type="text"
                   value={kr.title}
                   onChange={(e) => updateKR(kr.tempId, 'title', e.target.value)}
-                  placeholder="Ej: Reducir tiempo de respuesta a menos de 2h"
+                  placeholder={t('form.kr_title_placeholder')}
                 />
               </div>
 
               <div className="form-group">
-                <label>Tipo de medición</label>
+                <label>{t('detail.kr_edit.field_type')}</label>
                 <div className="kr-type-toggle">
                   <button
                     type="button"
                     className={`kr-type-btn ${kr.krType === 'simple' ? 'active' : ''}`}
                     onClick={() => updateKR(kr.tempId, 'krType', 'simple')}
                   >
-                    📝 Valor manual
+                    {t('detail.kr_edit.type_simple')}
                   </button>
                   <button
                     type="button"
                     className={`kr-type-btn ${kr.krType === 'kpi_linked' ? 'active' : ''}`}
                     onClick={() => updateKR(kr.tempId, 'krType', 'kpi_linked')}
                     disabled={!periodId}
-                    title={!periodId ? 'Seleccioná un período primero' : ''}
+                    title={!periodId ? t('form.kpi_link_needs_period') : ''}
                   >
-                    🔗 Vinculado a KPI
+                    {t('detail.kr_edit.type_kpi_linked')}
                   </button>
                 </div>
                 <small className="form-hint">
-                  {kr.krType === 'simple'
-                    ? 'Vas a cargar el progreso manualmente con check-ins. Usalo para métricas que no están en el sistema (NPS, encuestas, metas cualitativas).'
-                    : 'El progreso se actualiza automáticamente desde el KPI asignado. No hace falta cargar check-ins.'}
+                  {kr.krType === 'simple' ? t('form.kr_type_hint_simple') : t('form.kr_type_hint_kpi')}
                 </small>
               </div>
 
@@ -504,23 +510,23 @@ export default function OKRCrear() {
                 <>
                   <div className="form-row">
                     <div className="form-group">
-                      <label>Valor inicial</label>
+                      <label>{t('detail.kr_edit.field_start_value')}</label>
                       <input type="number" value={kr.startValue} onChange={(e) => updateKR(kr.tempId, 'startValue', e.target.value)} />
-                      <small className="form-hint">Punto de partida (puede ser 0).</small>
+                      <small className="form-hint">{t('form.start_hint')}</small>
                     </div>
                     <div className="form-group">
-                      <label>Meta *</label>
+                      <label>{t('form.field_target_required')}</label>
                       <input
                         type="number"
                         value={kr.targetValue}
                         onChange={(e) => updateKR(kr.tempId, 'targetValue', e.target.value)}
                         className={krErrors[kr.tempId] ? 'input-error' : ''}
                       />
-                      <small className="form-hint">Valor a alcanzar para considerar este KR completado.</small>
+                      <small className="form-hint">{t('form.target_hint')}</small>
                     </div>
                     <div className="form-group">
-                      <label>Unidad</label>
-                      <input type="text" value={kr.unit} onChange={(e) => updateKR(kr.tempId, 'unit', e.target.value)} placeholder="%, tickets, $, días…" />
+                      <label>{t('detail.kr_edit.field_unit')}</label>
+                      <input type="text" value={kr.unit} onChange={(e) => updateKR(kr.tempId, 'unit', e.target.value)} placeholder={t('form.unit_placeholder')} />
                     </div>
                   </div>
                   {krErrors[kr.tempId] && (
@@ -531,7 +537,7 @@ export default function OKRCrear() {
 
               {kr.krType === 'kpi_linked' && (
                 <div className="form-group">
-                  <label>KPIs vinculados</label>
+                  <label>{t('detail.kr_edit.field_kpi_links')}</label>
                   {kr.kpiLinks.length > 0 && (
                     <div className="kpi-chips">
                       {kr.kpiLinks.map((lk) => (
@@ -539,7 +545,7 @@ export default function OKRCrear() {
                           {lk.label}
                           {kr.kpiLinks.length > 1 && (
                             <span className="kpi-chip-weight-wrap">
-                              <span className="kpi-chip-weight-label">Peso %</span>
+                              <span className="kpi-chip-weight-label">{t('detail.kr_edit.chip_weight_label')}</span>
                               <input
                                 type="number"
                                 className="kpi-chip-weight"
@@ -572,25 +578,25 @@ export default function OKRCrear() {
                       }
                     }}
                   >
-                    <option value="">+ Agregar KPI...</option>
+                    <option value="">{t('detail.kr_edit.add_kpi')}</option>
                     {collabKpis.filter((ck) => !kr.kpiLinks.some((l) => l.type === 'collaborator' && l.id === ck.id)).map((ck) => (
                       <option key={`collaborator:${ck.id}`} value={`collaborator:${ck.id}`}>
-                        👤 {ck.kpiName} — {ck.collaboratorName} (meta: {ck.target})
+                        👤 {ck.kpiName} — {ck.collaboratorName} ({t('detail.kr_edit.field_target')}: {ck.target})
                       </option>
                     ))}
                     {scopeKpis.filter((sk) => !kr.kpiLinks.some((l) => l.type === 'scope' && l.id === sk.id)).map((sk) => (
                       <option key={`scope:${sk.id}`} value={`scope:${sk.id}`}>
-                        🏢 {sk.name} — {sk.orgScopeName} (meta: {sk.target})
+                        🏢 {sk.name} — {sk.orgScopeName} ({t('detail.kr_edit.field_target')}: {sk.target})
                       </option>
                     ))}
                   </select>
-                  <small className="form-hint">Podés vincular uno o más KPIs (individuales o grupales). El progreso del KR se calcula como el promedio de todos.</small>
+                  <small className="form-hint">{t('form.kpi_link_hint')}</small>
                 </div>
               )}
 
               <div className="form-group form-group--small">
-                <label title="Porcentaje de peso de este KR en el objetivo. Se recomienda que la suma de todos los KRs sea 100%.">
-                  Peso relativo (%) ⓘ
+                <label title={t('form.kr_weight_tooltip')}>
+                  {t('detail.kr_edit.field_kr_weight')}
                 </label>
                 <input
                   type="number"
@@ -600,9 +606,7 @@ export default function OKRCrear() {
                   value={kr.weight}
                   onChange={(e) => updateKR(kr.tempId, 'weight', e.target.value)}
                 />
-                <small className="form-hint">
-                  Ingresá el porcentaje (1–100). Idealmente la suma total de KRs debería quedar en 100%.
-                </small>
+                <small className="form-hint">{t('form.kr_weight_hint')}</small>
               </div>
             </div>
           ))}
@@ -615,10 +619,10 @@ export default function OKRCrear() {
             const isExact = !isOver && !isUnder
             return (
               <div className={`kr-weight-summary ${isOver ? 'kr-weight-summary--over' : isExact ? 'kr-weight-summary--ok' : ''}`}>
-                <span>Suma de pesos: <strong>{total.toFixed(0)}%</strong> / 100%</span>
-                {isOver && <span className="kr-weight-warning"> ⚠ La suma supera 100% — reducí algún peso.</span>}
-                {isUnder && <span className="kr-weight-warning"> · Falta distribuir {(100 - total).toFixed(0)}% entre los KRs.</span>}
-                {isExact && <span className="kr-weight-ok"> ✓ Distribución completa</span>}
+                <span>{t('form.weight_summary_label')}<strong>{total.toFixed(0)}%</strong>{t('form.weight_summary_denominator')}</span>
+                {isOver && <span className="kr-weight-warning"> {t('form.weight_over')}</span>}
+                {isUnder && <span className="kr-weight-warning"> · {t('form.weight_under', { remaining: (100 - total).toFixed(0) })}</span>}
+                {isExact && <span className="kr-weight-ok"> {t('form.weight_ok')}</span>}
               </div>
             )
           })()}
@@ -626,10 +630,10 @@ export default function OKRCrear() {
 
         <div className="okr-crear-actions">
           <button type="button" className="btn-secondary" onClick={() => navigate('/okr')}>
-            Cancelar
+            {t('form.cancel')}
           </button>
           <button type="submit" className="btn-primary" disabled={isSubmitting}>
-            {isSubmitting ? 'Guardando...' : isEdit ? 'Guardar cambios' : 'Guardar objetivo'}
+            {isSubmitting ? t('form.saving') : isEdit ? t('form.save_edit') : t('form.save_new')}
           </button>
         </div>
       </form>

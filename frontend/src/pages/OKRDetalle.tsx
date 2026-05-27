@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { useDialog } from '../components/Dialog'
 import { resolveDirection, calculateVariationPercent } from '../utils/kpi'
+import { resolveApiErrorMessage } from '../utils/apiErrors'
 import './OKRDetalle.css'
 
 type KRStatus = 'not_started' | 'on_track' | 'at_risk' | 'behind' | 'completed'
@@ -93,14 +95,6 @@ interface Objective {
   keyResults?: KeyResult[]
 }
 
-const STATUS_LABEL: Record<KRStatus, string> = {
-  not_started: 'Sin iniciar',
-  on_track: 'En camino',
-  at_risk: 'En riesgo',
-  behind: 'Atrasado',
-  completed: 'Completado',
-}
-
 const STATUS_COLOR: Record<KRStatus, string> = {
   not_started: '#9ca3af',
   on_track: '#16a34a',
@@ -115,9 +109,13 @@ const progressColor = (p: number) => {
   return '#dc2626'
 }
 
+const KR_STATUSES: KRStatus[] = ['not_started', 'on_track', 'at_risk', 'behind', 'completed']
+
 export default function OKRDetalle() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { t, i18n } = useTranslation('okr')
+  const locale = i18n.resolvedLanguage?.startsWith('en') ? 'en-US' : 'es-AR'
   const queryClient = useQueryClient()
   const dialog = useDialog()
 
@@ -246,7 +244,9 @@ export default function OKRDetalle() {
         setKrEditError(null)
       },
       onError: (err: any) => {
-        const msg = err?.response?.data?.error || 'Error al guardar el Key Result'
+        const msg = resolveApiErrorMessage(err, t, {
+          fallbackKey: 'detail.kr_edit.save_error_fallback',
+        })
         setKrEditError(msg)
       },
     }
@@ -302,31 +302,31 @@ export default function OKRDetalle() {
       .reduce((sum: number, kr: any) => sum + Math.round((kr.weight ?? 1) * 100), 0)
     const totalKrWeight = othersWeight + nextWeight
     if (Math.abs(totalKrWeight - 100) <= 0.5) return null
-    return `Advertencia: la suma de los pesos de los KRs es ${totalKrWeight.toFixed(0)}%. Se va a guardar igual, pero se recomienda dejarla en 100% cuando termines de redistribuirlos.`
+    return t('detail.kr_edit.errors.kr_weight_warning', { total: totalKrWeight.toFixed(0) })
   }
 
   const saveKrEdit = async (krId: number) => {
     if (!krEditDraft) return
     const w = Number(krEditDraft.weight)
     if (w <= 0 || w > 100) {
-      setKrEditError('El peso del KR debe estar entre 1 y 100 (%)')
+      setKrEditError(t('detail.kr_edit.errors.weight_range'))
       return
     }
     if (krEditDraft.krType === 'kpi_linked' && krEditDraft.kpiLinks.length > 1) {
       const badLink = krEditDraft.kpiLinks.find((lk) => { const lw = Number(lk.weight ?? 100); return lw <= 0 || lw > 100 })
       if (badLink) {
-        setKrEditError('El peso de cada KPI vinculado debe estar entre 1 y 100 (%)')
+        setKrEditError(t('detail.kr_edit.errors.kpi_weight_range'))
         return
       }
       const totalKpiWeight = krEditDraft.kpiLinks.reduce((sum, lk) => sum + Number(lk.weight ?? 100), 0)
       if (Math.abs(totalKpiWeight - 100) > 0.5) {
-        setKrEditError(`Los pesos de los KPIs deben sumar 100% (actualmente suman ${totalKpiWeight}%)`)
+        setKrEditError(t('detail.kr_edit.errors.kpi_weight_sum', { total: totalKpiWeight }))
         return
       }
     }
     const krWeightWarning = getKrWeightWarning(krId, w)
     if (krWeightWarning) {
-      await dialog.alert(krWeightWarning, { title: 'Advertencia de pesos', variant: 'warning' })
+      await dialog.alert(krWeightWarning, { title: t('detail.kr_edit.weight_warning_title'), variant: 'warning' })
     }
     setKrEditError(null)
     updateKrMutation.mutate({
@@ -345,8 +345,8 @@ export default function OKRDetalle() {
     })
   }
 
-  if (isLoading) return <div className="okr-detalle-loading">Cargando...</div>
-  if (!objective) return <div className="okr-detalle-loading">Objetivo no encontrado.</div>
+  if (isLoading) return <div className="okr-detalle-loading">{t('detail.loading')}</div>
+  if (!objective) return <div className="okr-detalle-loading">{t('detail.not_found')}</div>
 
   const handleCheckIn = () => {
     if (!selectedKR || !checkInValue) return
@@ -356,11 +356,11 @@ export default function OKRDetalle() {
   return (
     <div className="okr-detalle">
       <div className="okr-detalle-header">
-        <button className="btn-back" onClick={() => navigate('/okr')}>← OKRs</button>
+        <button className="btn-back" onClick={() => navigate('/okr')}>{t('detail.back')}</button>
         <div className="okr-detalle-actions">
           <button
             className="btn-export btn-export-pdf"
-            title="Exportar a PDF"
+            title={t('detail.export.pdf_title')}
             onClick={() => window.open(
               `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/export/okr/${id}/pdf`,
               '_blank'
@@ -370,7 +370,7 @@ export default function OKRDetalle() {
           </button>
           <button
             className="btn-export btn-export-excel"
-            title="Exportar a Excel"
+            title={t('detail.export.excel_title')}
             onClick={() => window.open(
               `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/export/okr/${id}/excel`,
               '_blank'
@@ -384,13 +384,13 @@ export default function OKRDetalle() {
                 className="btn-secondary"
                 onClick={() => navigate(`/okr/${id}/editar`)}
               >
-                Editar
+                {t('detail.actions.edit')}
               </button>
               <button
                 className="btn-secondary"
-                onClick={() => { if (window.confirm('¿Cerrar este objetivo?')) closeObjectiveMutation.mutate() }}
+                onClick={() => { if (window.confirm(t('detail.actions.close_confirm'))) closeObjectiveMutation.mutate() }}
               >
-                Cerrar objetivo
+                {t('detail.actions.close')}
               </button>
             </>
           )}
@@ -403,17 +403,17 @@ export default function OKRDetalle() {
           {objective.orgScopeName && <span className="okr-badge okr-badge--scope">{objective.orgScopeName}</span>}
           {objective.periodName && <span className="okr-badge okr-badge--period">{objective.periodName}</span>}
           <span className={`okr-status-pill okr-status-pill--${objective.status}`}>
-            {objective.status === 'active' ? 'Activo' : objective.status === 'draft' ? 'Borrador' : 'Cerrado'}
+            {t(`status.${objective.status}`)}
           </span>
         </div>
 
         <h2 className="okr-detalle-title">{objective.title}</h2>
         {objective.description && <p className="okr-detalle-desc">{objective.description}</p>}
-        {objective.ownerName && <p className="okr-detalle-owner">Responsable: {objective.ownerName}</p>}
+        {objective.ownerName && <p className="okr-detalle-owner">{t('card.owner', { name: objective.ownerName })}</p>}
 
         <div className="okr-detalle-progress">
           <div className="okr-progress-label">
-            <span>Progreso general</span>
+            <span>{t('detail.progress_label')}</span>
             <strong style={{ color: progressColor(objective.progress) }}>{Math.round(objective.progress)}%</strong>
           </div>
           <div className="okr-progress-track">
@@ -427,10 +427,10 @@ export default function OKRDetalle() {
 
       {/* Key Results */}
       <div className="okr-kr-section">
-        <h3>Key Results</h3>
+        <h3>{t('detail.kr_section_title')}</h3>
 
         {(!objective.keyResults || objective.keyResults.length === 0) && (
-          <p className="okr-empty-inline">Sin key results definidos.</p>
+          <p className="okr-empty-inline">{t('detail.kr_empty')}</p>
         )}
 
         {objective.keyResults?.map((kr) => (
@@ -449,7 +449,7 @@ export default function OKRDetalle() {
                     className="btn-checkin"
                     onClick={() => editingKrId === kr.id ? (setEditingKrId(null), setKrEditDraft(null)) : openKrEdit(kr)}
                   >
-                    {editingKrId === kr.id ? 'Cancelar edición' : 'Editar KR'}
+                    {editingKrId === kr.id ? t('detail.kr_actions.cancel_edit') : t('detail.kr_actions.edit')}
                   </button>
                 )}
                 <select
@@ -462,8 +462,8 @@ export default function OKRDetalle() {
                     updateKRStatusMutation.mutate({ krId: kr.id, status: s })
                   }}
                 >
-                  {(Object.keys(STATUS_LABEL) as KRStatus[]).map((s) => (
-                    <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+                  {KR_STATUSES.map((s) => (
+                    <option key={s} value={s}>{t(`status.${s}`)}</option>
                   ))}
                 </select>
               </div>
@@ -499,7 +499,7 @@ export default function OKRDetalle() {
                       ))
                     : (
                         <span className="okr-kr-linked-badge">
-                          KPI: {kr.kpiName ?? '—'} — actual: {kr.kpiActual ?? '—'} / meta: {kr.kpiTarget ?? '—'}
+                          {t('detail.kpi_values', { name: kr.kpiName ?? '—', actual: kr.kpiActual ?? '—', target: kr.kpiTarget ?? '—' })}
                         </span>
                       )
                   }
@@ -515,14 +515,13 @@ export default function OKRDetalle() {
                   <button
                     className="btn-checkin"
                     onClick={() => toggleSources(kr.id)}
-                    title="Ver fuentes de datos que alimentan este KR"
                   >
-                    {expandedSources.has(kr.id) ? 'Ocultar fuentes' : `Ver fuentes (${dataSourceByKr.get(kr.id)!.sources.length})`}
+                    {expandedSources.has(kr.id) ? t('detail.kr_actions.hide_sources') : t('detail.kr_actions.show_sources', { count: dataSourceByKr.get(kr.id)!.sources.length })}
                   </button>
                 ) : null}
                 {kr.krType === 'kpi_linked' && (
-                  <span className="okr-kr-auto-badge" title="El progreso se actualiza automáticamente desde el KPI vinculado">
-                    Automático
+                  <span className="okr-kr-auto-badge" title={t('detail.kr_badges.automatic_title')}>
+                    {t('detail.kr_badges.automatic')}
                   </span>
                 )}
                 {kr.krType === 'simple' && (
@@ -530,7 +529,7 @@ export default function OKRDetalle() {
                     className="btn-checkin"
                     onClick={() => setSelectedKR(selectedKR === kr.id ? null : kr.id)}
                   >
-                    {selectedKR === kr.id ? 'Cerrar' : '+ Registrar avance'}
+                    {selectedKR === kr.id ? t('detail.kr_actions.checkin_close') : t('detail.kr_actions.checkin')}
                   </button>
                 )}
               </div>
@@ -543,7 +542,7 @@ export default function OKRDetalle() {
               return (
                 <div className="datasource-panel">
                   <p className="datasource-panel-title">
-                    Fuentes que alimentan este KR
+                    {t('detail.datasource.title')}
                   </p>
                   <div className="datasource-list">
                     {ds.sources.map((src, i) => {
@@ -556,7 +555,7 @@ export default function OKRDetalle() {
                           <div className="datasource-row-top">
                             <span className="datasource-name">
                               <span className={`datasource-type-badge datasource-type-badge--${src.sourceType}`}>
-                                {src.sourceType === 'collaborator' ? 'Colaborador' : 'Área'}
+                                {src.sourceType === 'collaborator' ? t('detail.datasource.collaborator') : t('detail.datasource.area')}
                               </span>
                               {src.sourceName}
                             </span>
@@ -580,11 +579,11 @@ export default function OKRDetalle() {
             {/* Panel edición inline de KR */}
             {editingKrId === kr.id && krEditDraft && (
               <div className="kr-edit-panel">
-                <div className="kr-edit-panel-title">Editar Key Result</div>
+                <div className="kr-edit-panel-title">{t('detail.kr_edit.title')}</div>
                 <div className="kr-edit-body">
 
                   <div className="kr-edit-field kr-edit-field--full">
-                    <label>Título</label>
+                    <label>{t('detail.kr_edit.field_title')}</label>
                     <input
                       type="text"
                       value={krEditDraft.title}
@@ -593,21 +592,21 @@ export default function OKRDetalle() {
                   </div>
 
                   <div className="kr-edit-field kr-edit-field--full">
-                    <label>Tipo de medición</label>
+                    <label>{t('detail.kr_edit.field_type')}</label>
                     <div className="kr-type-toggle">
                       <button
                         type="button"
                         className={`kr-type-btn ${krEditDraft.krType === 'simple' ? 'active' : ''}`}
                         onClick={() => setKrEditDraft((p) => p ? { ...p, krType: 'simple' } : p)}
                       >
-                        📝 Valor manual
+                        {t('detail.kr_edit.type_simple')}
                       </button>
                       <button
                         type="button"
                         className={`kr-type-btn ${krEditDraft.krType === 'kpi_linked' ? 'active' : ''}`}
                         onClick={() => setKrEditDraft((p) => p ? { ...p, krType: 'kpi_linked' } : p)}
                       >
-                        🔗 Vinculado a KPI
+                        {t('detail.kr_edit.type_kpi_linked')}
                       </button>
                     </div>
                   </div>
@@ -615,23 +614,23 @@ export default function OKRDetalle() {
                   {krEditDraft.krType === 'simple' && (
                     <>
                       <div className="kr-edit-field">
-                        <label>Valor inicial</label>
+                        <label>{t('detail.kr_edit.field_start_value')}</label>
                         <input type="number" value={krEditDraft.startValue} onChange={(e) => setKrEditDraft((p) => p ? { ...p, startValue: e.target.value } : p)} />
                       </div>
                       <div className="kr-edit-field">
-                        <label>Meta</label>
+                        <label>{t('detail.kr_edit.field_target')}</label>
                         <input type="number" value={krEditDraft.targetValue} onChange={(e) => setKrEditDraft((p) => p ? { ...p, targetValue: e.target.value } : p)} />
                       </div>
                       <div className="kr-edit-field">
-                        <label>Unidad</label>
-                        <input type="text" value={krEditDraft.unit} placeholder="%, días, $..." onChange={(e) => setKrEditDraft((p) => p ? { ...p, unit: e.target.value } : p)} />
+                        <label>{t('detail.kr_edit.field_unit')}</label>
+                        <input type="text" value={krEditDraft.unit} placeholder={t('detail.kr_edit.unit_placeholder')} onChange={(e) => setKrEditDraft((p) => p ? { ...p, unit: e.target.value } : p)} />
                       </div>
                     </>
                   )}
 
                   {krEditDraft.krType === 'kpi_linked' && (
                     <div className="kr-edit-field kr-edit-field--full">
-                      <label>KPIs vinculados</label>
+                      <label>{t('detail.kr_edit.field_kpi_links')}</label>
                       {krEditDraft.kpiLinks.length > 0 && (
                         <div className="kpi-chips">
                           {krEditDraft.kpiLinks.map((lk) => (
@@ -639,7 +638,7 @@ export default function OKRDetalle() {
                               {lk.label}
                               {krEditDraft.kpiLinks.length > 1 && (
                                 <span className="kpi-chip-weight-wrap">
-                                  <span className="kpi-chip-weight-label">Peso %</span>
+                                  <span className="kpi-chip-weight-label">{t('detail.kr_edit.chip_weight_label')}</span>
                                   <input
                                     type="number"
                                     className="kpi-chip-weight"
@@ -672,15 +671,15 @@ export default function OKRDetalle() {
                           }
                         }}
                       >
-                        <option value="">+ Agregar KPI...</option>
+                        <option value="">{t('detail.kr_edit.add_kpi')}</option>
                         {collabKpis.filter((ck) => !krEditDraft.kpiLinks.some((l) => l.type === 'collaborator' && l.id === ck.id)).map((ck) => (
                           <option key={`collaborator:${ck.id}`} value={`collaborator:${ck.id}`}>
-                            👤 {ck.kpiName} — {ck.collaboratorName} (meta: {ck.target})
+                            👤 {ck.kpiName} — {ck.collaboratorName} ({t('detail.kr_edit.field_target')}: {ck.target})
                           </option>
                         ))}
                         {scopeKpis.filter((sk) => !krEditDraft.kpiLinks.some((l) => l.type === 'scope' && l.id === sk.id)).map((sk) => (
                           <option key={`scope:${sk.id}`} value={`scope:${sk.id}`}>
-                            🏢 {sk.name} — {sk.orgScopeName} (meta: {sk.target})
+                            🏢 {sk.name} — {sk.orgScopeName} ({t('detail.kr_edit.field_target')}: {sk.target})
                           </option>
                         ))}
                       </select>
@@ -688,8 +687,8 @@ export default function OKRDetalle() {
                   )}
 
                   <div className="kr-edit-field">
-                    <label title="Porcentaje de peso de este KR. Se recomienda que la suma de todos los KRs del objetivo sea 100%.">
-                      Peso relativo (%) ⓘ
+                    <label title={t('detail.kr_edit.field_kr_weight_tooltip')}>
+                      {t('detail.kr_edit.field_kr_weight')}
                     </label>
                     <input
                       type="number" min="1" max="100" step="1"
@@ -705,10 +704,10 @@ export default function OKRDetalle() {
                       onClick={() => saveKrEdit(kr.id)}
                       disabled={!krEditDraft.title.trim() || updateKrMutation.isLoading}
                     >
-                      {updateKrMutation.isLoading ? 'Guardando...' : 'Guardar cambios'}
+                      {updateKrMutation.isLoading ? t('detail.kr_edit.saving') : t('detail.kr_edit.save')}
                     </button>
                     <button className="btn-secondary" onClick={() => { setEditingKrId(null); setKrEditDraft(null); setKrEditError(null) }}>
-                      Cancelar
+                      {t('detail.kr_edit.cancel')}
                     </button>
                   </div>
                 </div>
@@ -719,26 +718,26 @@ export default function OKRDetalle() {
             {selectedKR === kr.id && kr.krType === 'simple' && (
               <div className="checkin-panel">
                 <div className="checkin-panel-header">
-                  <span className="checkin-panel-title">Registrar avance</span>
+                  <span className="checkin-panel-title">{t('detail.checkin.title')}</span>
                   <span className="checkin-panel-hint">
-                    Ingresá el valor actual del KR. Se guarda en el historial y actualiza el progreso.
+                    {t('detail.checkin.hint')}
                   </span>
                 </div>
                 <div className="checkin-form">
                   <div className="checkin-field">
-                    <label>Valor actual{kr.unit ? ` (${kr.unit})` : ''}</label>
+                    <label>{kr.unit ? t('detail.checkin.field_current_unit', { unit: kr.unit }) : t('detail.checkin.field_current')}</label>
                     <input
                       type="number"
-                      placeholder={`Meta: ${kr.targetValue ?? '—'}`}
+                      placeholder={t('detail.checkin.target_placeholder', { target: kr.targetValue ?? '—' })}
                       value={checkInValue}
                       onChange={(e) => setCheckInValue(e.target.value)}
                     />
                   </div>
                   <div className="checkin-field checkin-field--wide">
-                    <label>Nota <span className="field-optional">(opcional)</span></label>
+                    <label>{t('detail.checkin.field_note')} <span className="field-optional">{t('detail.checkin.optional')}</span></label>
                     <input
                       type="text"
-                      placeholder="¿Qué pasó esta semana? ¿Hubo bloqueos?"
+                      placeholder={t('detail.checkin.note_placeholder')}
                       value={checkInNote}
                       onChange={(e) => setCheckInNote(e.target.value)}
                     />
@@ -748,19 +747,19 @@ export default function OKRDetalle() {
                     onClick={handleCheckIn}
                     disabled={!checkInValue || checkInMutation.isLoading}
                   >
-                    {checkInMutation.isLoading ? 'Guardando...' : 'Guardar avance'}
+                    {checkInMutation.isLoading ? t('detail.checkin.saving') : t('detail.checkin.save')}
                   </button>
                 </div>
 
                 {checkIns.length > 0 && (
                   <div className="checkin-history">
-                    <p className="checkin-history-title">Historial</p>
+                    <p className="checkin-history-title">{t('detail.checkin.history_title')}</p>
                     {checkIns.map((ci) => (
                       <div key={ci.id} className="checkin-row">
                         <span className="checkin-value">{ci.value}{kr.unit ? ` ${kr.unit}` : ''}</span>
                         {ci.note && <span className="checkin-note">{ci.note}</span>}
                         <span className="checkin-meta">
-                          {ci.authorName} · {new Date(ci.createdAt).toLocaleDateString('es-AR')}
+                          {ci.authorName} · {new Date(ci.createdAt).toLocaleDateString(locale)}
                         </span>
                       </div>
                     ))}
@@ -775,14 +774,14 @@ export default function OKRDetalle() {
       {/* Vinculos con Arbol de Objetivos */}
       <div className="okr-tree-links-section">
         <div className="okr-tree-links-header">
-          <h3>Árbol de Objetivos vinculado</h3>
+          <h3>{t('detail.tree_links.title')}</h3>
           <small className="okr-tree-hint">
-            Vinculá este OKR a un nodo del árbol estratégico para que aparezca en el organigrama y análisis de alineación.
+            {t('detail.tree_links.hint')}
           </small>
         </div>
 
         {treeLinks.length === 0 && (
-          <p className="okr-empty-inline">Sin vínculos al árbol organizacional.</p>
+          <p className="okr-empty-inline">{t('detail.tree_links.empty')}</p>
         )}
 
         {treeLinks.length > 0 && (
@@ -797,7 +796,7 @@ export default function OKRDetalle() {
                   className="btn-remove-kr"
                   onClick={() => unlinkTreeMutation.mutate(link.objectiveTreeId)}
                 >
-                  Quitar
+                  {t('detail.tree_links.remove')}
                 </button>
               </div>
             ))}
@@ -810,7 +809,7 @@ export default function OKRDetalle() {
               <input
                 className="tree-search-input"
                 type="text"
-                placeholder="Buscar nodo del árbol…"
+                placeholder={t('detail.tree_links.search_placeholder')}
                 value={treeSearch}
                 onChange={(e) => { setTreeSearch(e.target.value); setTreeDropdownOpen(true); setTreeNodeId('') }}
                 onFocus={() => setTreeDropdownOpen(true)}
@@ -837,7 +836,7 @@ export default function OKRDetalle() {
                       </button>
                     ))}
                   {availableNodes.filter((n) => n.name.toLowerCase().includes(treeSearch.toLowerCase())).length === 0 && (
-                    <div className="tree-search-empty">Sin resultados para "{treeSearch}"</div>
+                    <div className="tree-search-empty">{t('detail.tree_links.no_results', { search: treeSearch })}</div>
                   )}
                 </div>
               )}
@@ -847,7 +846,7 @@ export default function OKRDetalle() {
               disabled={!treeNodeId || linkTreeMutation.isLoading}
               onClick={() => { linkTreeMutation.mutate(Number(treeNodeId)); setTreeSearch(''); setTreeNodeId('') }}
             >
-              Vincular
+              {t('detail.tree_links.link')}
             </button>
           </div>
         )}

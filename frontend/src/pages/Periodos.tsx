@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useState } from 'react'
 import { useMutation, useQueries, useQuery, useQueryClient } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import { format } from 'date-fns'
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
@@ -9,6 +10,7 @@ import PeriodForm from '../components/PeriodForm'
 import SubPeriodForm from '../components/SubPeriodForm'
 import { useAuth } from '../hooks/useAuth'
 import { useDialog } from '../components/Dialog'
+import { resolveApiErrorMessage } from '../utils/apiErrors'
 import './Periodos.css'
 
 const toCalendarDate = (value?: string | Date | null): Date | null => {
@@ -29,6 +31,21 @@ const toCalendarDate = (value?: string | Date | null): Date | null => {
 const formatCalendarDate = (value?: string | Date | null) => {
   const parsed = toCalendarDate(value)
   return parsed ? format(parsed, 'dd MMM yyyy') : '—'
+}
+
+const SUBPERIOD_API_ERROR_KEYS: Record<string, string> = {
+  SUBPERIOD_NOT_FOUND: 'periods:dialogs.api_errors.subperiod_not_found',
+  SUBPERIOD_ALREADY_CLOSED: 'periods:dialogs.api_errors.subperiod_already_closed',
+}
+
+const PERIOD_REOPEN_API_ERROR_KEYS: Record<string, string> = {
+  PERIOD_REOPEN_FORBIDDEN: 'periods:dialogs.api_errors.reopen_forbidden',
+  PERIOD_NOT_FOUND: 'periods:dialogs.api_errors.period_not_found',
+  PERIOD_NOT_CLOSED: 'periods:dialogs.api_errors.period_not_closed',
+}
+
+const PERIOD_COPY_API_ERROR_KEYS: Record<string, string> = {
+  PERIOD_COPY_FIELDS_REQUIRED: 'periods:dialogs.api_errors.copy_fields_required',
 }
 
 function SubPeriodsSection({
@@ -56,6 +73,7 @@ function SubPeriodsSection({
   selectedCalendarProfileId: number | null
   onCalendarChange: (calendarProfileId: number | null) => void
 }) {
+  const { t } = useTranslation('periods')
   const { data, isLoading } = useQuery<SubPeriod[]>(
     ['sub-periods', period.id, selectedCalendarProfileId],
     async () => {
@@ -77,15 +95,15 @@ function SubPeriodsSection({
 
   const getStatusBadge = (status?: SubPeriod['status']) => {
     if (status === 'closed') {
-      return <span className="status-badge status-closed">Cerrado</span>
+      return <span className="status-badge status-closed">{t('subperiods.status_closed')}</span>
     }
-    return <span className="status-badge status-open">Abierto</span>
+    return <span className="status-badge status-open">{t('subperiods.status_open')}</span>
   }
 
   return (
     <div className="subperiods-section">
       <div className="subperiods-header">
-        <h4>Subperiodos</h4>
+        <h4>{t('subperiods.title')}</h4>
         <div className="subperiods-actions">
           <select
             value={selectedCalendarProfileId || ''}
@@ -94,7 +112,7 @@ function SubPeriodsSection({
             }
             className="filter-select"
           >
-            <option value="">Calendario: Default</option>
+            <option value="">{t('subperiods.calendar_default')}</option>
             {calendarProfiles?.map((profile) => (
               <option key={profile.id} value={profile.id}>
                 {profile.name}
@@ -103,14 +121,14 @@ function SubPeriodsSection({
           </select>
           {canConfig && (
             <button className="btn-small" onClick={onCreate}>
-              + Agregar subperiodo
+              {t('subperiods.add')}
             </button>
           )}
         </div>
       </div>
       {allClosed && period.status !== 'closed' && (
         <div className="subperiods-notice success">
-          Todos los subperiodos estan cerrados. Podes cerrar el periodo de forma manual.
+          {t('subperiods.all_closed_notice')}
         </div>
       )}
       {closeNotice && closeNotice.periodId === period.id && (
@@ -120,17 +138,17 @@ function SubPeriodsSection({
       )}
 
       {isLoading ? (
-        <div className="loading-row">Cargando subperiodos...</div>
+        <div className="loading-row">{t('subperiods.loading')}</div>
       ) : data && data.length > 0 ? (
         <table className="subperiods-table">
           <thead>
             <tr>
-              <th>Nombre</th>
-              <th>Fecha Inicio</th>
-              <th>Fecha Fin</th>
-              <th>Peso</th>
-              <th>Estado</th>
-              <th>Acciones</th>
+              <th>{t('subperiods.table_name')}</th>
+              <th>{t('subperiods.table_start')}</th>
+              <th>{t('subperiods.table_end')}</th>
+              <th>{t('subperiods.table_weight')}</th>
+              <th>{t('subperiods.table_status')}</th>
+              <th>{t('subperiods.table_actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -149,21 +167,21 @@ function SubPeriodsSection({
                         onClick={() => onEdit(subPeriod)}
                         disabled={subPeriod.status === 'closed'}
                       >
-                        Editar
+                        {t('subperiods.edit')}
                       </button>
                       <button
                         className="btn-text danger"
                         onClick={() => onDelete(subPeriod)}
                         disabled={subPeriod.status === 'closed'}
                       >
-                        Eliminar
+                        {t('subperiods.delete')}
                       </button>
                       {subPeriod.status !== 'closed' && (
                         <button
                           className="btn-text"
                           onClick={() => onClose(subPeriod)}
                         >
-                          Cerrar
+                          {t('subperiods.close')}
                         </button>
                       )}
                     </>
@@ -175,10 +193,10 @@ function SubPeriodsSection({
         </table>
       ) : (
         <div className="empty-subperiods">
-          <p>No hay subperiodos definidos</p>
+          <p>{t('subperiods.empty')}</p>
           {canConfig && (
             <button className="btn-small" onClick={onCreate}>
-              Crear primer subperiodo
+              {t('subperiods.create_first')}
             </button>
           )}
         </div>
@@ -212,6 +230,7 @@ export default function Periodos() {
 
   const queryClient = useQueryClient()
   const dialog = useDialog()
+  const { t } = useTranslation(['periods', 'common'])
 
   const { data: periods, isLoading } = useQuery<Period[]>(
     'periods',
@@ -272,13 +291,13 @@ export default function Periodos() {
             setCloseNotice({
               periodId: subPeriod.periodId,
               tone: 'warning',
-              text: `Subperíodo cerrado. Emails enviados: ${data.sent ?? 0}. Fallidos: ${data.failed.length}.`,
+              text: t('subperiods.close_notice_warning', { sent: data.sent ?? 0, failed: data.failed.length }),
             })
           } else {
             setCloseNotice({
               periodId: subPeriod.periodId,
               tone: 'success',
-              text: `Subperíodo cerrado. Emails enviados: ${data?.sent ?? 0}.`,
+              text: t('subperiods.close_notice_success', { sent: data?.sent ?? 0 }),
             })
           }
         }
@@ -288,7 +307,13 @@ export default function Periodos() {
         }
       },
       onError: (error: any) => {
-        void dialog.alert(error.response?.data?.error || 'No se pudo cerrar el subperíodo', { title: 'Error', variant: 'danger' })
+        void dialog.alert(
+          resolveApiErrorMessage(error, t, {
+            codeMap: SUBPERIOD_API_ERROR_KEYS,
+            fallbackKey: 'dialogs.close_subperiod_error',
+          }),
+          { title: t('common:error_title'), variant: 'danger' }
+        )
       },
     }
   )
@@ -317,10 +342,15 @@ export default function Periodos() {
         queryClient.invalidateQueries('collaborator-kpis')
         queryClient.invalidateQueries('period-summary-status')
         queryClient.invalidateQueries('period-summary')
-        void dialog.alert('Resumen anual recalculado correctamente.', { title: 'Recálculo completado', variant: 'info' })
+        void dialog.alert(t('dialogs.recalc_success'), { title: t('dialogs.recalc_success_title'), variant: 'info' })
       },
       onError: (error: any) => {
-        void dialog.alert(error.response?.data?.error || 'No se pudo recalcular el resumen anual', { title: 'Error', variant: 'danger' })
+        void dialog.alert(
+          resolveApiErrorMessage(error, t, {
+            fallbackKey: 'dialogs.recalc_error',
+          }),
+          { title: t('common:error_title'), variant: 'danger' }
+        )
       },
     }
   )
@@ -336,7 +366,13 @@ export default function Periodos() {
         setCopyResult(data)
       },
       onError: (error: any) => {
-        void dialog.alert(error.response?.data?.error || 'No se pudo copiar el período', { title: 'Error', variant: 'danger' })
+        void dialog.alert(
+          resolveApiErrorMessage(error, t, {
+            codeMap: PERIOD_COPY_API_ERROR_KEYS,
+            fallbackKey: 'dialogs.copy_error',
+          }),
+          { title: t('common:error_title'), variant: 'danger' }
+        )
       },
     }
   )
@@ -351,7 +387,13 @@ export default function Periodos() {
         queryClient.invalidateQueries('collaborator-kpis')
       },
       onError: (error: any) => {
-        void dialog.alert(error.response?.data?.error || 'No tenés permisos para reabrir períodos cerrados', { title: 'Sin permisos', variant: 'danger' })
+        void dialog.alert(
+          resolveApiErrorMessage(error, t, {
+            codeMap: PERIOD_REOPEN_API_ERROR_KEYS,
+            fallbackKey: 'dialogs.reopen_error',
+          }),
+          { title: t('dialogs.reopen_error_title'), variant: 'danger' }
+        )
       },
     }
   )
@@ -390,53 +432,53 @@ export default function Periodos() {
 
   const handleDeleteSubPeriod = async (subPeriod: SubPeriod) => {
     const ok = await dialog.confirm(
-      `¿Estás seguro de eliminar el subperíodo "${subPeriod.name}"? Esta acción no se puede deshacer.`,
-      { title: 'Eliminar subperíodo', confirmLabel: 'Eliminar', variant: 'danger' }
+      t('dialogs.delete_subperiod_msg', { name: subPeriod.name }),
+      { title: t('dialogs.delete_subperiod_title'), confirmLabel: t('dialogs.delete_subperiod_confirm'), variant: 'danger' }
     )
     if (ok) deleteSubPeriodMutation.mutate(subPeriod)
   }
 
   const handleCloseSubPeriod = async (subPeriod: SubPeriod) => {
     const ok = await dialog.confirm(
-      `¿Cerrar el subperíodo "${subPeriod.name}"? Se enviará un resumen por email.`,
-      { title: 'Cerrar subperíodo', confirmLabel: 'Cerrar', variant: 'warning' }
+      t('dialogs.close_subperiod_msg', { name: subPeriod.name }),
+      { title: t('dialogs.close_subperiod_title'), confirmLabel: t('dialogs.close_subperiod_confirm'), variant: 'warning' }
     )
     if (ok) closeSubPeriodMutation.mutate(subPeriod)
   }
 
   const handleDeletePeriod = async (id: number, name: string) => {
     const ok = await dialog.confirm(
-      `¿Estás seguro de eliminar el período "${name}"? Esta acción no se puede deshacer.`,
-      { title: 'Eliminar período', confirmLabel: 'Eliminar', variant: 'danger' }
+      t('dialogs.delete_period_msg', { name }),
+      { title: t('dialogs.delete_period_title'), confirmLabel: t('dialogs.delete_period_confirm'), variant: 'danger' }
     )
     if (ok) deletePeriodMutation.mutate(id)
   }
 
   const handleClosePeriod = async (period: Period) => {
     const ok = await dialog.confirm(
-      `¿Cerrar el período "${period.name}"? Una vez cerrado no se podrán editar asignaciones sin permisos especiales.`,
-      { title: 'Cerrar período', confirmLabel: 'Cerrar período', variant: 'warning' }
+      t('dialogs.close_period_msg', { name: period.name }),
+      { title: t('dialogs.close_period_title'), confirmLabel: t('dialogs.close_period_confirm'), variant: 'warning' }
     )
     if (!ok) return
     const sendEmail = await dialog.confirm(
-      '¿Enviar resumen anual por email a los colaboradores?',
-      { title: 'Enviar resumen', confirmLabel: 'Sí, enviar', cancelLabel: 'No enviar', variant: 'info' }
+      t('dialogs.send_email_msg'),
+      { title: t('dialogs.send_email_title'), confirmLabel: t('dialogs.send_email_confirm'), cancelLabel: t('dialogs.send_email_cancel'), variant: 'info' }
     )
     closePeriodMutation.mutate({ id: period.id, sendEmail })
   }
 
   const handleRecalculateSummary = async (period: Period) => {
     const ok = await dialog.confirm(
-      `¿Recalcular resumen anual para "${period.name}"? Esto regenerará el resumen con los datos actuales.`,
-      { title: 'Recalcular resumen', confirmLabel: 'Recalcular', variant: 'info' }
+      t('dialogs.recalc_msg', { name: period.name }),
+      { title: t('dialogs.recalc_title'), confirmLabel: t('dialogs.recalc_confirm'), variant: 'info' }
     )
     if (ok) recalcSummaryMutation.mutate(period.id)
   }
 
   const handleReopenPeriod = async (period: Period) => {
     const ok = await dialog.confirm(
-      `¿Reabrir el período "${period.name}"? Esta acción requiere permisos especiales.`,
-      { title: 'Reabrir período', confirmLabel: 'Reabrir', variant: 'warning' }
+      t('dialogs.reopen_msg', { name: period.name }),
+      { title: t('dialogs.reopen_title'), confirmLabel: t('dialogs.reopen_confirm'), variant: 'warning' }
     )
     if (ok) reopenPeriodMutation.mutate(period.id)
   }
@@ -488,61 +530,58 @@ export default function Periodos() {
   }, [summaryQueries, closedPeriods])
 
   const getStatusBadge = (status: Period['status']) => {
-    const statusConfig: Record<Period['status'], { label: string; class: string }> = {
-      open: { label: 'Abierto', class: 'status-open' },
-      in_review: { label: 'En revision', class: 'status-review' },
-      closed: { label: 'Cerrado', class: 'status-closed' },
+    const statusConfig: Record<Period['status'], { key: string; class: string }> = {
+      open: { key: 'status.open', class: 'status-open' },
+      in_review: { key: 'status.in_review', class: 'status-review' },
+      closed: { key: 'status.closed', class: 'status-closed' },
     }
     const config = statusConfig[status]
-    return <span className={`status-badge ${config.class}`}>{config.label}</span>
+    return <span className={`status-badge ${config.class}`}>{t(config.key)}</span>
   }
 
   return (
     <div className="periodos-page">
       <div className="page-header">
         <div>
-          <h1>Periodos</h1>
-          <p className="subtitle">Gestiona los periodos de evaluacion</p>
+          <h1>{t('title')}</h1>
+          <p className="subtitle">{t('subtitle')}</p>
         </div>
         <button className="btn-primary" onClick={handleCreatePeriod}>
-          + Crear periodo
+          {t('header.create')}
         </button>
       </div>
 
       <div className="info-banner">
-        <strong>¿Qué es un período?</strong> Es el ciclo de tiempo en que se miden los KPIs de tu empresa
-        (por ejemplo: Año 2026, Semestre 1, Q1). Dentro de cada período podés crear
-        <strong> subperíodos</strong> (meses, semanas) para registrar avances parciales.
-        Los KPIs solo se pueden cargar cuando el período está <strong>abierto</strong>.
+        <strong>{t('info_banner_title')}</strong> {t('info_banner_body')}
       </div>
 
       <div className="filters-section">
         <div className="search-group">
-          <label htmlFor="search">Buscar:</label>
+          <label htmlFor="search">{t('filters.search_label')}</label>
           <input
             type="text"
             id="search"
-            placeholder="Buscar por nombre de periodo..."
+            placeholder={t('filters.search_placeholder')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="search-input"
           />
         </div>
         <div className="filter-group">
-          <label htmlFor="filter-status">Estado:</label>
+          <label htmlFor="filter-status">{t('filters.status')}</label>
           <select
             id="filter-status"
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
           >
-            <option value="">Todos los estados</option>
-            <option value="open">Abierto</option>
-            <option value="in_review">En revision</option>
-            <option value="closed">Cerrado</option>
+            <option value="">{t('filters.all_statuses')}</option>
+            <option value="open">{t('status.open')}</option>
+            <option value="in_review">{t('status.in_review')}</option>
+            <option value="closed">{t('status.closed')}</option>
           </select>
         </div>
         <div className="filter-group">
-          <label htmlFor="filter-start">Desde:</label>
+          <label htmlFor="filter-start">{t('filters.from')}</label>
           <input
             id="filter-start"
             type="date"
@@ -551,7 +590,7 @@ export default function Periodos() {
           />
         </div>
         <div className="filter-group">
-          <label htmlFor="filter-end">Hasta:</label>
+          <label htmlFor="filter-end">{t('filters.to')}</label>
           <input
             id="filter-end"
             type="date"
@@ -569,18 +608,18 @@ export default function Periodos() {
               setFilterEndDate('')
             }}
           >
-            Limpiar filtros
+            {t('filters.clear')}
           </button>
         )}
       </div>
 
       <div className="table-container">
         {isLoading ? (
-          <div className="loading">Cargando periodos...</div>
+          <div className="loading">{t('loading')}</div>
         ) : filteredPeriods && filteredPeriods.length > 0 ? (
           <>
             <div className="results-info">
-              Mostrando {filteredPeriods.length} de {periods?.length || 0} periodos
+              {t('results.showing', { shown: filteredPeriods.length, total: periods?.length || 0 })}
             </div>
             <div className="periods-list">
               {filteredPeriods.map((period) => {
@@ -596,11 +635,11 @@ export default function Periodos() {
                             {formatCalendarDate(period.endDate)}
                           </div>
                           <div className="period-meta">
-                            <span className="meta-pill">Estado: {getStatusBadge(period.status)}</span>
+                            <span className="meta-pill">{t('card.status_label')} {getStatusBadge(period.status)}</span>
                             {period.status === 'closed' &&
                               !summaryByPeriodId.get(period.id)?.summaries?.length && (
                                 <span className="status-badge status-review" style={{ marginLeft: 8 }}>
-                                  Sin resumen anual
+                                  {t('card.no_summary')}
                                 </span>
                               )}
                           </div>
@@ -609,7 +648,7 @@ export default function Periodos() {
                           <button
                             className="btn-icon"
                             onClick={() => togglePeriodExpansion(period.id)}
-                            title={isExpanded ? 'Ocultar subperiodos' : 'Ver subperiodos'}
+                            title={isExpanded ? t('actions.hide_subperiods') : t('actions.show_subperiods')}
                           >
                             {isExpanded ? '[-]' : '[+]'}
                           </button>
@@ -617,17 +656,17 @@ export default function Periodos() {
                             <button
                               className="btn-text success"
                               onClick={() => handleReopenPeriod(period)}
-                              title="Reabrir periodo"
+                              title={t('actions.reopen_title')}
                             >
-                              Reabrir
+                              {t('actions.reopen')}
                             </button>
                           ) : (
                             <button
                               className="btn-text"
                               onClick={() => handleClosePeriod(period)}
-                              title="Cerrar periodo"
+                              title={t('actions.close_title')}
                             >
-                              Cerrar
+                              {t('actions.close')}
                             </button>
                           )}
                           {period.status === 'closed' && (
@@ -640,34 +679,34 @@ export default function Periodos() {
                                     : `/historial?periodId=${period.id}`
                                 )
                               }
-                              title="Ver resumen anual"
+                              title={t('actions.view_summary')}
                             >
-                              Ver resumen anual
+                              {t('actions.view_summary')}
                             </button>
                           )}
                           {period.status === 'closed' && (
                             <button
                               className="btn-text"
                               onClick={() => handleRecalculateSummary(period)}
-                              title="Recalcular resumen anual"
+                              title={t('actions.recalc_title')}
                             >
-                              Recalcular resumen
+                              {t('actions.recalc')}
                             </button>
                           )}
                           <button
                             className="btn-text"
                             onClick={() => handleEditPeriod(period)}
-                            title="Editar periodo"
+                            title={t('actions.edit_title')}
                             disabled={period.status === 'closed'}
                           >
-                            Editar
+                            {t('actions.edit')}
                           </button>
                           <button
                             className="btn-text danger"
                             onClick={() => handleDeletePeriod(period.id, period.name)}
-                            title="Eliminar periodo"
+                            title={t('actions.delete_title')}
                           >
-                            Eliminar
+                            {t('actions.delete')}
                           </button>
                           {canConfig && (
                             <button
@@ -675,7 +714,7 @@ export default function Periodos() {
                               onClick={() => {
                                 setCopyResult(null)
                                 setCopyForm({
-                                  name: `Copia de ${period.name}`,
+                                  name: t('copy_modal.name_default_prefix') + period.name,
                                   startDate: '',
                                   endDate: '',
                                   copyCollaboratorKpis: true,
@@ -684,9 +723,9 @@ export default function Periodos() {
                                 })
                                 setCopyingPeriod(period)
                               }}
-                              title="Copiar periodo"
+                              title={t('actions.copy_title')}
                             >
-                              Copiar
+                              {t('actions.copy')}
                             </button>
                           )}
                         </div>
@@ -719,8 +758,8 @@ export default function Periodos() {
         ) : periods && periods.length > 0 ? (
           <div className="empty-state">
             <div className="empty-icon">:/</div>
-            <h3>No se encontraron periodos</h3>
-            <p>Intenta ajustar los filtros de busqueda</p>
+            <h3>{t('empty.no_results_title')}</h3>
+            <p>{t('empty.no_results_subtitle')}</p>
             <button
               className="btn-primary"
               onClick={() => {
@@ -728,16 +767,16 @@ export default function Periodos() {
                 setFilterStatus('')
               }}
             >
-              Limpiar filtros
+              {t('empty.no_results_clear')}
             </button>
           </div>
         ) : (
           <div className="empty-state">
             <div className="empty-icon">:)</div>
-            <h3>No hay periodos registrados</h3>
-            <p>Crea un nuevo periodo para comenzar a evaluar KPIs</p>
+            <h3>{t('empty.no_data_title')}</h3>
+            <p>{t('empty.no_data_subtitle')}</p>
             <button className="btn-primary" onClick={handleCreatePeriod}>
-              Crear periodo
+              {t('empty.no_data_btn')}
             </button>
           </div>
         )}
@@ -770,28 +809,28 @@ export default function Periodos() {
         <div className="modal-overlay" onClick={() => !copyPeriodMutation.isLoading && setCopyingPeriod(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Copiar período</h2>
+              <h2>{t('copy_modal.title')}</h2>
               <button className="modal-close" onClick={() => setCopyingPeriod(null)} disabled={copyPeriodMutation.isLoading}>×</button>
             </div>
 
             {copyResult ? (
               <div className="copy-result">
                 <div className="copy-result-icon">✓</div>
-                <h3>Período copiado correctamente</h3>
+                <h3>{t('copy_modal.success_title')}</h3>
                 <ul className="copy-result-list">
-                  <li>KPIs individuales: <strong>{copyResult.copied.collaboratorKpis}</strong></li>
-                  <li>KPIs grupales: <strong>{copyResult.copied.scopeKpis}</strong></li>
-                  <li>Objetivos OKR: <strong>{copyResult.copied.objectives}</strong></li>
-                  <li>Key Results: <strong>{copyResult.copied.keyResults}</strong></li>
+                  <li>{t('copy_modal.kpis_individual')} <strong>{copyResult.copied.collaboratorKpis}</strong></li>
+                  <li>{t('copy_modal.kpis_group')} <strong>{copyResult.copied.scopeKpis}</strong></li>
+                  <li>{t('copy_modal.objectives')} <strong>{copyResult.copied.objectives}</strong></li>
+                  <li>{t('copy_modal.key_results')} <strong>{copyResult.copied.keyResults}</strong></li>
                 </ul>
-                <button className="btn-primary" onClick={() => setCopyingPeriod(null)}>Cerrar</button>
+                <button className="btn-primary" onClick={() => setCopyingPeriod(null)}>{t('copy_modal.close')}</button>
               </div>
             ) : (
               <div className="modal-body">
-                <p className="copy-source-label">Copiando desde: <strong>{copyingPeriod.name}</strong></p>
+                <p className="copy-source-label">{t('copy_modal.source_label')} <strong>{copyingPeriod.name}</strong></p>
 
                 <div className="form-group">
-                  <label>Nombre del nuevo período *</label>
+                  <label>{t('copy_modal.new_name_label')}</label>
                   <input
                     type="text"
                     value={copyForm.name}
@@ -801,7 +840,7 @@ export default function Periodos() {
                 </div>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Fecha inicio *</label>
+                    <label>{t('copy_modal.start_date_label')}</label>
                     <input
                       type="date"
                       value={copyForm.startDate}
@@ -810,7 +849,7 @@ export default function Periodos() {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Fecha fin *</label>
+                    <label>{t('copy_modal.end_date_label')}</label>
                     <input
                       type="date"
                       value={copyForm.endDate}
@@ -821,14 +860,14 @@ export default function Periodos() {
                 </div>
 
                 <div className="copy-options">
-                  <p className="copy-options-label">¿Qué copiar?</p>
+                  <p className="copy-options-label">{t('copy_modal.what_to_copy')}</p>
                   <label className="checkbox-label">
                     <input
                       type="checkbox"
                       checked={copyForm.copyCollaboratorKpis}
                       onChange={(e) => setCopyForm((f) => ({ ...f, copyCollaboratorKpis: e.target.checked }))}
                     />
-                    KPIs individuales (con targets, sin actuals)
+                    {t('copy_modal.copy_individual_kpis')}
                   </label>
                   <label className="checkbox-label">
                     <input
@@ -836,7 +875,7 @@ export default function Periodos() {
                       checked={copyForm.copyScopeKpis}
                       onChange={(e) => setCopyForm((f) => ({ ...f, copyScopeKpis: e.target.checked }))}
                     />
-                    KPIs grupales / macro KPIs (con targets, sin actuals)
+                    {t('copy_modal.copy_group_kpis')}
                   </label>
                   <label className="checkbox-label">
                     <input
@@ -844,7 +883,7 @@ export default function Periodos() {
                       checked={copyForm.copyOkrs}
                       onChange={(e) => setCopyForm((f) => ({ ...f, copyOkrs: e.target.checked }))}
                     />
-                    OKRs (objetivos y key results, sin progreso)
+                    {t('copy_modal.copy_okrs')}
                   </label>
                 </div>
 
@@ -854,7 +893,7 @@ export default function Periodos() {
                     onClick={() => setCopyingPeriod(null)}
                     disabled={copyPeriodMutation.isLoading}
                   >
-                    Cancelar
+                    {t('copy_modal.cancel')}
                   </button>
                   <button
                     className="btn-primary"
@@ -866,7 +905,7 @@ export default function Periodos() {
                       !copyForm.endDate
                     }
                   >
-                    {copyPeriodMutation.isLoading ? 'Copiando...' : 'Copiar período'}
+                    {copyPeriodMutation.isLoading ? t('copy_modal.copying') : t('copy_modal.confirm')}
                   </button>
                 </div>
               </div>

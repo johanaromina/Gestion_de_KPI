@@ -1,0 +1,111 @@
+{
+  "title": "Vistas",
+  "subtitle_superpowers": "Equipo y compañía en un solo lugar.",
+  "subtitle_team": "Vista general de tu equipo.",
+  "tabs": {
+    "aggregated": "Equipo · Agregadas",
+    "reduction": "Equipo · Reducción",
+    "company_grid": "Compañía · Parrilla"
+  },
+  "aggregated": {
+    "title": "Vistas Agregadas",
+    "subtitle": "Tableros de cumplimiento por nivel organizacional",
+    "filters": {
+      "period_label": "Período",
+      "select_period": "Selecciona un período"
+    },
+    "view_types": {
+      "area": "Por Área",
+      "direction": "Por Dirección",
+      "management": "Por Gerencia",
+      "leadership": "Por Jefatura"
+    },
+    "chart": {
+      "avg_title": "Promedio de Cumplimiento - {{view}}",
+      "range_title": "Rango de Cumplimiento - {{view}}",
+      "detailed_title": "Datos Detallados - {{view}}",
+      "bar_avg": "Promedio %",
+      "bar_min": "Mínimo %",
+      "bar_max": "Máximo %"
+    },
+    "table": {
+      "header_area": "Área",
+      "header_manager": "Gerente",
+      "header_leader": "Líder",
+      "header_collaborators": "Colaboradores",
+      "header_avg": "Promedio",
+      "header_min": "Mínimo",
+      "header_max": "Máximo",
+      "header_dispersion": "Dispersión (σ)",
+      "header_range": "Rango"
+    },
+    "no_name": "Sin nombre",
+    "loading": "Cargando datos agregados...",
+    "empty": {
+      "no_period_title": "Selecciona un período",
+      "no_period_text": "Elige un período para ver las vistas agregadas",
+      "no_data_title": "No hay datos disponibles",
+      "no_data_text": "No se encontraron datos agregados para el período seleccionado"
+    }
+  },
+  "reduction": {
+    "title": "Vistas de Reducción",
+    "subtitle": "Reportes y evolución temporal de objetivos de reducción",
+    "filters": {
+      "period_label": "Período",
+      "all_periods": "Todos los períodos",
+      "area_label": "Área",
+      "all_areas": "Todas las áreas",
+      "view_label": "Vista"
+    },
+    "view_modes": {
+      "overview": "Resumen",
+      "evolution": "Evolución Temporal"
+    },
+    "stats": {
+      "title": "Estadísticas Generales",
+      "loading": "Cargando estadísticas...",
+      "collaborators": "Colaboradores:",
+      "avg_target": "Promedio Target:",
+      "avg_actual": "Promedio Actual:",
+      "compliance_pct": "% Cumplimiento:",
+      "completion_rate": "Completitud:",
+      "empty": "No hay datos de reducción para los filtros seleccionados"
+    },
+    "chart": {
+      "comparison_title": "Comparación de KPIs de Reducción",
+      "target_avg": "Target Promedio",
+      "actual_avg": "Actual Promedio",
+      "compliance_pct": "% Cumplimiento"
+    },
+    "table": {
+      "title": "Detalles por KPI y Colaborador",
+      "loading": "Cargando datos...",
+      "header_collaborator": "Colaborador",
+      "header_area": "Área",
+      "header_period": "Período",
+      "header_target": "Target",
+      "header_actual": "Actual",
+      "header_compliance": "% Cumplimiento",
+      "header_status": "Estado",
+      "empty": "No hay KPIs de reducción para los filtros seleccionados"
+    },
+    "evolution": {
+      "title": "Evolución Temporal",
+      "kpi_label": "Seleccionar KPI:",
+      "select_kpi": "Selecciona un KPI",
+      "loading": "Cargando evolución...",
+      "chart_target_actual": "Evolución de Target vs Actual",
+      "chart_compliance": "Evolución del % de Cumplimiento",
+      "data_title": "Datos de Evolución",
+      "table": {
+        "period": "Período",
+        "target": "Target",
+        "actual": "Actual",
+        "compliance": "% Cumplimiento",
+        "status": "Estado"
+      },
+      "empty": "No hay datos de evolución para este KPI"
+    }
+  }
+}

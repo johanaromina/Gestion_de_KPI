@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { useDialog } from '../components/Dialog'
 import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
+import { resolveApiErrorMessage } from '../utils/apiErrors'
 import './InputDatos.css'
 
 type Measurement = {
@@ -35,14 +37,40 @@ type IntegrationRun = {
   outputs?: any
 }
 
-const formatDateTime = (value?: string | null) => {
+const MEASUREMENT_API_ERROR_KEYS: Record<string, string> = {
+  MEASUREMENT_OWNER_INVALID: 'input:measurements.api_errors.owner_invalid',
+  MEASUREMENT_VALUE_REQUIRED: 'input:measurements.api_errors.value_required',
+  MEASUREMENT_CURATION_REQUIRED: 'input:measurements.api_errors.curation_required',
+  MEASUREMENT_SUBPERIOD_CLOSED: 'input:measurements.api_errors.subperiod_closed',
+}
+
+const INPUT_TARGET_RUN_API_ERROR_KEYS: Record<string, string> = {
+  INTEGRATION_TARGET_NOT_FOUND: 'input:auto_ingest.api_errors.target_not_found',
+}
+
+const formatDateTime = (value: string | null | undefined, locale: string) => {
   if (!value) return '-'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString()
+  return date.toLocaleString(locale)
 }
 
 export default function InputDatos() {
+  const { t, i18n } = useTranslation(['input', 'common'])
+  const locale = i18n.resolvedLanguage?.startsWith('en') ? 'en-US' : 'es-AR'
+
+  const getCollaboratorLabel = (name?: string | null, id?: number | string | null) =>
+    name || t('filters.collaborator_fallback', { id })
+
+  const getKpiLabel = (name?: string | null, id?: number | string | null) =>
+    name || t('filters.kpi_fallback', { id })
+
+  const getPeriodLabel = (name?: string | null, id?: number | string | null) =>
+    name || t('filters.period_fallback', { id })
+
+  const getSubPeriodLabel = (name?: string | null, id?: number | string | null) =>
+    name || t('filters.subperiod_fallback', { id })
+
   const [showOnlyPending, setShowOnlyPending] = useState(false)
   const [searchParams] = useSearchParams()
   const assignmentFromQuery = searchParams.get('assignmentId')
@@ -132,9 +160,9 @@ export default function InputDatos() {
     for (const [key, group] of groups.entries()) {
       const sorted = [...group].sort((a, b) => Number(a.id) - Number(b.id))
       const base = sorted.find((item: any) => item.subPeriodId == null) || sorted[0]
-      const label = `${base.collaboratorName || `Colaborador #${base.collaboratorId}`} · ${
-        base.kpiName || `KPI #${base.kpiId}`
-      } · ${base.periodName || `Período #${base.periodId}`}`
+      const label = `${getCollaboratorLabel(base.collaboratorName, base.collaboratorId)} · ${
+        getKpiLabel(base.kpiName, base.kpiId)
+      } · ${getPeriodLabel(base.periodName, base.periodId)}`
       result.push({ id: base.id, key, label })
     }
 
@@ -160,7 +188,7 @@ export default function InputDatos() {
       .filter((assignment: any) => assignment.subPeriodId != null)
       .map((assignment: any) => ({
         id: assignment.subPeriodId,
-        name: assignment.subPeriodName || `Subperiodo #${assignment.subPeriodId}`,
+        name: getSubPeriodLabel(assignment.subPeriodName, assignment.subPeriodId),
       }))
   }, [selectedGroupAssignments])
 
@@ -287,9 +315,47 @@ export default function InputDatos() {
   const isCurationApproved = curationStatus === 'approved'
   const canApproveWithWarning = curationStatus === 'in_review'
   const canApproveMeasurement = isCurationApproved || canApproveWithWarning
-  const approvalWarning = canApproveWithWarning
-    ? 'Curaduría en revisión: la aprobación quedará registrada con advertencia.'
-    : null
+  const approvalWarning = canApproveWithWarning ? t('curation.warning') : null
+
+  const getCurationStatusLabel = (status?: string | null) => {
+    if (!status) return t('common:pending')
+    const normalized = status.toLowerCase()
+    const known = ['pending', 'in_review', 'approved', 'rejected', 'changes_requested']
+    if (known.includes(normalized)) {
+      return t(`common:${normalized}`)
+    }
+    return status
+  }
+
+  const getRunStatusLabel = (status?: string | null) => {
+    if (!status) return '-'
+    const normalized = status.toLowerCase()
+    const known = ['success', 'error', 'running', 'queued']
+    if (known.includes(normalized)) {
+      return t(`job.status_${normalized}`)
+    }
+    return status
+  }
+
+  const getMeasurementModeLabel = (mode?: Measurement['mode'] | string | null) => {
+    if (!mode) return '-'
+    const normalized = String(mode).toLowerCase()
+    const known = ['manual', 'import', 'auto']
+    if (known.includes(normalized)) {
+      return t(`measurements.mode_${normalized}`)
+    }
+    return String(mode)
+  }
+
+  const getCalendarFrequencyLabel = (frequency?: string | null) => {
+    if (!frequency) return '-'
+    const normalized = frequency.toLowerCase()
+    const known = ['monthly', 'quarterly', 'custom']
+    if (known.includes(normalized)) {
+      return t(`meta.calendar_frequency_${normalized}`)
+    }
+    return frequency
+  }
 
   const { data: measurements, isLoading } = useQuery<Measurement[]>(
     ['measurements', selectedAssignmentId],
@@ -326,20 +392,27 @@ export default function InputDatos() {
         if (data?.warning) {
           setInlineAlert({ type: 'warning', message: data.warning })
         } else {
-          setInlineAlert({ type: 'info', message: 'Medición cargada correctamente.' })
+          setInlineAlert({ type: 'info', message: t('measurements.loaded_ok') })
         }
       },
       onError: async (error: any) => {
         if (error?.response?.status === 409) {
           const { existingValue, existingDate } = error.response.data
-          const fecha = existingDate ? new Date(existingDate).toLocaleDateString('es-AR') : ''
+          const fecha = existingDate ? new Date(existingDate).toLocaleDateString(locale) : ''
+          const datePart = fecha ? t('duplicate_dialog.date_part', { date: fecha }) : ''
           const ok = await dialog.confirm(
-            `Ya existe una medición aprobada con valor ${existingValue}${fecha ? ` (${fecha})` : ''}. ¿Querés reemplazarla?`,
-            { title: 'Valor duplicado', confirmLabel: 'Reemplazar', variant: 'danger' }
+            t('duplicate_dialog.message', { value: existingValue, date: datePart }),
+            { title: t('duplicate_dialog.title'), confirmLabel: t('duplicate_dialog.confirm'), variant: 'danger' }
           )
           if (ok) createMeasurement.mutate(true)
         } else {
-          setInlineAlert({ type: 'error', message: error?.response?.data?.error || 'No se pudo guardar la medición.' })
+          setInlineAlert({
+            type: 'error',
+            message: resolveApiErrorMessage(error, t, {
+              codeMap: MEASUREMENT_API_ERROR_KEYS,
+              fallbackKey: 'measurements.save_error',
+            }),
+          })
         }
       },
     }
@@ -348,7 +421,7 @@ export default function InputDatos() {
   const runJobNow = useMutation(
     async () => {
       if (!selectedIntegrationTarget?.id) {
-        throw new Error('No hay target activo para ejecutar')
+        throw new Error(t('auto_ingest.no_target'))
       }
       const response = await api.post(`/integrations/targets/${selectedIntegrationTarget.id}/run`)
       return response.data
@@ -358,15 +431,21 @@ export default function InputDatos() {
         queryClient.invalidateQueries(['integration-runs', selectedIntegrationTarget?.id])
         queryClient.invalidateQueries(['measurements', selectedAssignmentId])
         if (data?.result?.skipped) {
-          setInlineAlert({ type: 'warning', message: data?.result?.reason || 'Ejecución omitida: ya existe una medición para este período.' })
+          setInlineAlert({ type: 'warning', message: data?.result?.reason || t('auto_ingest.no_target') })
           return
         }
         if (data?.result?.runId) {
-          setInlineAlert({ type: 'info', message: 'Job ejecutado correctamente. Revisá el historial de mediciones.' })
+          setInlineAlert({ type: 'info', message: t('measurements.job_ok') })
         }
       },
       onError: (error: any) => {
-        setInlineAlert({ type: 'error', message: error.response?.data?.error || 'Error al ejecutar job' })
+        setInlineAlert({
+          type: 'error',
+          message: resolveApiErrorMessage(error, t, {
+            codeMap: INPUT_TARGET_RUN_API_ERROR_KEYS,
+            fallbackKey: 'measurements.save_error',
+          }),
+        })
       },
     }
   )
@@ -388,15 +467,15 @@ export default function InputDatos() {
 
   const approvalBlockedReason = useMemo(() => {
     if (isCurationApproved || canApproveWithWarning) return null
-    return 'Curaduría pendiente, no se puede aprobar'
-  }, [isCurationApproved, canApproveWithWarning])
+    return t('curation.blocked')
+  }, [isCurationApproved, canApproveWithWarning, t])
 
   const handleApprove = async (id: number) => {
     if (!canApproveMeasurement) return
     if (canApproveWithWarning) {
       const confirmed = await dialog.confirm(
-        'La curaduría está en revisión. ¿Querés aprobar la medición igual?',
-        { title: 'Curaduría pendiente', confirmLabel: 'Aprobar igual', variant: 'warning' }
+        t('curation.warning'),
+        { title: t('curation.blocked'), confirmLabel: t('measurements.approve'), variant: 'warning' }
       )
       if (!confirmed) return
     }
@@ -420,10 +499,13 @@ export default function InputDatos() {
     return measurements.filter((m) => m.status === 'proposed' || m.status === 'draft')
   }, [measurements, showOnlyPending])
 
-  const formatMode = (mode: Measurement['mode']) => {
-    if (mode === 'auto') return 'Auto'
-    if (mode === 'import') return 'Import'
-    return 'Manual'
+  const getMeasurementStatusLabel = (status: Measurement['status']) => {
+    switch (status) {
+      case 'approved': return t('measurements.status_approved')
+      case 'rejected': return t('measurements.status_rejected')
+      case 'proposed': return t('measurements.status_proposed')
+      default: return t('measurements.status_draft')
+    }
   }
 
   const parseCsvLine = (line: string) => {
@@ -479,7 +561,7 @@ export default function InputDatos() {
       const text = await file.text()
       const lines = text.split(/\r?\n/).filter((line) => line.trim())
       if (lines.length === 0) {
-        setUploadMessage('El archivo está vacío.')
+        setUploadMessage(t('upload.empty'))
         return
       }
 
@@ -507,11 +589,11 @@ export default function InputDatos() {
         const sourceRunId = idxSourceRun >= 0 ? row[idxSourceRun] : ''
 
         if (!assignmentId || Number.isNaN(assignmentId)) {
-          errors.push(`Fila ${i + 1}: assignmentId inválido.`)
+          errors.push(t('upload.row_invalid_assignment', { row: i + 1 }))
           continue
         }
         if (value === undefined || Number.isNaN(value)) {
-          errors.push(`Fila ${i + 1}: value inválido.`)
+          errors.push(t('upload.row_invalid_value', { row: i + 1 }))
           continue
         }
 
@@ -527,7 +609,15 @@ export default function InputDatos() {
           })
           created += 1
         } catch (error: any) {
-          errors.push(`Fila ${i + 1}: ${error?.response?.data?.error || 'Error al crear medición'}`)
+          errors.push(
+            t('upload.row_error', {
+              row: i + 1,
+              error: resolveApiErrorMessage(error, t, {
+                codeMap: MEASUREMENT_API_ERROR_KEYS,
+                fallbackKey: 'upload.row_error_fallback',
+              }),
+            })
+          )
         }
       }
 
@@ -537,10 +627,10 @@ export default function InputDatos() {
 
       if (errors.length > 0) {
         setUploadMessage(
-          `Se cargaron ${created} mediciones. Errores: ${errors.slice(0, 3).join(' ')}${errors.length > 3 ? ' ...' : ''}`
+          t('upload.partial', { created, errors: errors.slice(0, 3).join(' ') + (errors.length > 3 ? ' ...' : '') })
         )
       } else {
-        setUploadMessage(`Se cargaron ${created} mediciones correctamente.`)
+        setUploadMessage(t('upload.success', { created }))
       }
     } finally {
       setUploading(false)
@@ -549,11 +639,11 @@ export default function InputDatos() {
 
   const handleAutoFetch = async () => {
     if (!selectedAssignmentId) {
-      setInlineAlert({ type: 'warning', message: 'Seleccioná una asignación primero para ejecutar el fetch.' })
+      setInlineAlert({ type: 'warning', message: t('auto_fetch.no_assignment') })
       return
     }
-    const value = await dialog.prompt('Ingresá el valor obtenido automáticamente:', {
-      title: 'Valor automático', placeholder: 'Ej: 95.5', confirmLabel: 'Cargar'
+    const value = await dialog.prompt(t('auto_fetch.prompt'), {
+      title: t('auto_fetch.prompt_title'), placeholder: t('auto_fetch.prompt_placeholder'), confirmLabel: t('auto_fetch.prompt_confirm')
     })
     if (!value) return
     await api.post('/measurements', {
@@ -563,7 +653,7 @@ export default function InputDatos() {
       status: 'proposed',
     })
     queryClient.invalidateQueries(['measurements', selectedAssignmentId])
-    setInlineAlert({ type: 'info', message: 'Valor cargado automáticamente como propuesto.' })
+    setInlineAlert({ type: 'info', message: t('auto_fetch.success') })
   }
 
   return (
@@ -581,80 +671,78 @@ export default function InputDatos() {
       )}
       <div className="page-header">
         <div>
-          <h1>Input de datos</h1>
-          <p className="subtitle">Carga automatizada o manual con validaciones tecnicas.</p>
+          <h1>{t('title')}</h1>
+          <p className="subtitle">{t('subtitle')}</p>
         </div>
         <div className="header-actions">
           <button className="btn-secondary" onClick={() => navigate('/configuracion')}>
-            Configurar integraciones
+            {t('actions.configure_integrations')}
           </button>
           <button
             className="btn-primary"
             onClick={() => {
               if (!selectedAssignmentId) {
-                setInlineAlert({ type: 'warning', message: 'Seleccioná una asignación primero para cargar datos.' })
+                setInlineAlert({ type: 'warning', message: t('upload.no_assignment_warning') })
                 return
               }
               setShowMeasurementModal(true)
             }}
           >
-            Nueva carga manual
+            {t('actions.new_manual')}
           </button>
         </div>
       </div>
 
       <div className="input-grid">
         <div className="card">
-          <h3>Ingesta automatica</h3>
-          <p className="muted">Jobs activos y salud de integraciones.</p>
+          <h3>{t('auto_ingest.title')}</h3>
+          <p className="muted">{t('auto_ingest.description')}</p>
           <div className="auto-list muted">
             {selectedIntegrationTarget
-              ? `Integración activa: ${selectedIntegrationTarget.templateName || 'Target #'+selectedIntegrationTarget.id}`
-              : 'Sin integraciones activas para la asignación seleccionada.'}
+              ? t('auto_ingest.active', { name: selectedIntegrationTarget.templateName || t('job.target_fallback', { id: selectedIntegrationTarget.id }) })
+              : t('auto_ingest.none')}
           </div>
           <div className="card-actions">
             <button
               className="btn-secondary"
               onClick={() => {
                 if (!selectedIntegrationTarget?.id) {
-                  setInlineAlert({ type: 'warning', message: 'No hay integraciones activas para esta asignación. Configuralo en Integraciones > Targets.' })
+                  setInlineAlert({ type: 'warning', message: t('auto_ingest.no_target') })
                   return
                 }
                 runJobNow.mutate()
               }}
               disabled={!selectedIntegrationTarget?.id || runJobNow.isLoading}
             >
-              {runJobNow.isLoading ? 'Ejecutando...' : 'Ejecutar jobs ahora'}
+              {runJobNow.isLoading ? t('actions.running') : t('actions.run_jobs_now')}
             </button>
           </div>
           {!selectedIntegrationTarget && selectedAssignmentId && (
-            <div className="form-hint">
-              No hay target vinculado a esta asignación. Configuralo en Integraciones &gt; Targets.
-            </div>
+            <div className="form-hint">{t('auto_ingest.no_target')}</div>
           )}
         </div>
 
         <div className="card">
           <div className="card-header">
-            <h3>Historial de mediciones</h3>
+            <h3>{t('measurements.title')}</h3>
             <label className="toggle">
               <input
                 type="checkbox"
                 checked={showOnlyPending}
                 onChange={(e) => setShowOnlyPending(e.target.checked)}
               />
-              <span>Solo pendientes</span>
+              <span>{t('measurements.only_pending')}</span>
             </label>
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="scope-select">Área</label>
+              <label htmlFor="scope-select">{t('filters.area_label')}</label>
               <select
                 id="scope-select"
                 value={selectedScopeId}
                 onChange={(e) => setSelectedScopeId(e.target.value ? Number(e.target.value) : '')}
               >
-                <option value="">Todas las áreas</option>
+                <option value="">{t('filters.all_areas')}</option>
                 {scopeOptions.map((scope: any) => (
                   <option key={scope.id} value={scope.id}>
                     {scope.name}
@@ -663,13 +751,13 @@ export default function InputDatos() {
               </select>
             </div>
             <div className="form-group">
-              <label htmlFor="kpi-select">KPI</label>
+              <label htmlFor="kpi-select">{t('filters.kpi_label')}</label>
               <select
                 id="kpi-select"
                 value={selectedKpiId}
                 onChange={(e) => setSelectedKpiId(e.target.value ? Number(e.target.value) : '')}
               >
-                <option value="">Todos los KPIs</option>
+                <option value="">{t('filters.all_kpis')}</option>
                 {kpisByScope.map((kpi: any) => (
                   <option key={kpi.id} value={kpi.id}>
                     {kpi.name}
@@ -678,7 +766,7 @@ export default function InputDatos() {
               </select>
             </div>
             <div className="form-group">
-              <label htmlFor="assignment-select">Asignación</label>
+              <label htmlFor="assignment-select">{t('filters.assignment_label')}</label>
               <select
                 id="assignment-select"
                 value={selectedAssignmentGroupId}
@@ -687,7 +775,7 @@ export default function InputDatos() {
                   setSelectedSubPeriodId('')
                 }}
               >
-                <option value="">Selecciona una asignación</option>
+                <option value="">{t('filters.select_assignment')}</option>
                 {collapsedAssignments.map((assignment) => (
                   <option key={assignment.id} value={assignment.id}>
                     {assignment.label}
@@ -696,7 +784,7 @@ export default function InputDatos() {
               </select>
             </div>
             <div className="form-group">
-              <label htmlFor="subperiod-select">Subperíodo</label>
+              <label htmlFor="subperiod-select">{t('filters.subperiod_label')}</label>
               <select
                 id="subperiod-select"
                 value={selectedSubPeriodId}
@@ -705,7 +793,7 @@ export default function InputDatos() {
                 }
                 disabled={!selectedAssignmentGroupId}
               >
-                <option value="">Resumen (sin subperíodo)</option>
+                <option value="">{t('filters.subperiod_summary')}</option>
                 {availableSubPeriods.map((sp: any) => (
                   <option key={sp.id} value={sp.id}>
                     {sp.name}
@@ -715,52 +803,52 @@ export default function InputDatos() {
             </div>
           </div>
           {collapsedAssignments.length === 0 ? (
-            <div className="form-hint">No hay asignaciones para esos filtros.</div>
+            <div className="form-hint">{t('filters.no_assignments')}</div>
           ) : null}
           {selectedAssignmentData && (
             <div className="cycle-indicator">
               <div className={`cycle-step done`}>
                 <span className="cycle-dot">✓</span>
-                <span>Asignación</span>
+                <span>{t('cycle.assignment')}</span>
               </div>
               <div className="cycle-arrow">→</div>
               <div className={`cycle-step ${isCurationApproved ? 'done' : canApproveWithWarning ? 'partial' : 'pending'}`}>
                 <span className="cycle-dot">{isCurationApproved ? '✓' : canApproveWithWarning ? '~' : '○'}</span>
-                <span>Criterio</span>
+                <span>{t('cycle.criteria')}</span>
               </div>
               <div className="cycle-arrow">→</div>
               <div className={`cycle-step ${(measurements?.length ?? 0) > 0 ? 'done' : 'pending'}`}>
                 <span className="cycle-dot">{(measurements?.length ?? 0) > 0 ? '✓' : '○'}</span>
-                <span>Medición</span>
+                <span>{t('cycle.measurement')}</span>
               </div>
               <div className="cycle-arrow">→</div>
               <div className={`cycle-step ${measurements?.some(m => m.status === 'approved') ? 'done' : 'pending'}`}>
                 <span className="cycle-dot">{measurements?.some(m => m.status === 'approved') ? '✓' : '○'}</span>
-                <span>Aprobación</span>
+                <span>{t('cycle.approval')}</span>
               </div>
             </div>
           )}
           {selectedAssignmentData && (
             <div className="assignment-meta">
               <div>
-                <span className="meta-label">Fuente:</span>{' '}
+                <span className="meta-label">{t('meta.source_label')}</span>{' '}
                 <span className="meta-value">
                   {selectedAssignmentData.dataSourceName ||
                     selectedAssignmentData.dataSource ||
-                    'Sin fuente'}
+                    t('meta.no_source')}
                 </span>
                 {selectedAssignmentData.sourceConfig && (
                   <span className="meta-sub">· {selectedAssignmentData.sourceConfig}</span>
                 )}
               </div>
               <div>
-                <span className="meta-label">Curaduría:</span>{' '}
+                <span className="meta-label">{t('meta.curation_label')}</span>{' '}
                 <span className={`status-pill ${isCurationApproved ? 'ok' : 'review'}`}>
-                  {selectedAssignmentData.curationStatus || 'pending'}
+                  {getCurationStatusLabel(selectedAssignmentData.curationStatus)}
                 </span>
               </div>
               <div className="meta-criteria">
-                <span className="meta-label">Criterio activo:</span>{' '}
+                <span className="meta-label">{t('meta.criteria_label')}</span>{' '}
                 <span
                   className="meta-value"
                   title={
@@ -771,14 +859,14 @@ export default function InputDatos() {
                 >
                   {selectedAssignmentData.criteriaText ||
                     selectedAssignmentData.kpiCriteria ||
-                    'Sin criterio'}
+                    t('meta.no_criteria')}
                 </span>
               </div>
               {selectedCalendarProfile && (
                 <div>
-                  <span className="meta-label">Calendario:</span>{' '}
+                  <span className="meta-label">{t('meta.calendar_label')}</span>{' '}
                   <span className="calendar-pill">
-                    {selectedCalendarProfile.name} ({selectedCalendarProfile.frequency})
+                    {selectedCalendarProfile.name} ({getCalendarFrequencyLabel(selectedCalendarProfile.frequency)})
                   </span>
                 </div>
               )}
@@ -787,36 +875,38 @@ export default function InputDatos() {
           {selectedIntegrationTarget && (
             <div className="job-status">
               <div className="job-header">
-                <strong>Estado del job</strong>
+                <strong>{t('job.title')}</strong>
                 <span className="job-meta">
-                  {selectedIntegrationTarget.templateName || 'Integración'} ·{' '}
-                  {selectedIntegrationTarget.templateSchedule || 'Sin cron'}
+                  {selectedIntegrationTarget.templateName || t('meta.integration_fallback')} ·{' '}
+                  {selectedIntegrationTarget.templateSchedule || t('job.no_cron')}
                 </span>
               </div>
               <div className="job-row">
-                <span className="meta-label">Última ejecución:</span>{' '}
-                <span className="meta-value">{formatDateTime(latestIntegrationRun?.startedAt)}</span>
+                <span className="meta-label">{t('job.last_run')}</span>{' '}
+                <span className="meta-value">{formatDateTime(latestIntegrationRun?.startedAt, locale)}</span>
                 <span className={`status-pill ${latestIntegrationRun?.status === 'success' ? 'ok' : 'review'}`}>
-                  {latestIntegrationRun?.status || '-'}
+                  {getRunStatusLabel(latestIntegrationRun?.status)}
                 </span>
               </div>
               <div className="job-row">
-                <span className="meta-label">Próximo run:</span>{' '}
-                <span className="meta-value">{formatDateTime(nextCronRun?.nextRun)}</span>
+                <span className="meta-label">{t('job.next_run')}</span>{' '}
+                <span className="meta-value">{formatDateTime(nextCronRun?.nextRun, locale)}</span>
               </div>
               <div className="job-row">
-                <span className="meta-label">Subperíodo destino:</span>{' '}
+                <span className="meta-label">{t('job.subperiod_label')}</span>{' '}
                 <span className="meta-value">
-                  {latestIntegrationRun?.outputs?.subPeriodName ||
-                    availableSubPeriods.find((sp: any) => sp.id === selectedSubPeriodId)?.name ||
-                    'Sin subperíodo'}
+                  {getSubPeriodLabel(
+                    latestIntegrationRun?.outputs?.subPeriodName ||
+                      availableSubPeriods.find((sp: any) => sp.id === selectedSubPeriodId)?.name,
+                    selectedSubPeriodId
+                  )}
                 </span>
               </div>
               {latestIntegrationRun?.outputs?.skipped && (
                 <div className="job-row warning">
-                  <span className="meta-label">Omitido:</span>{' '}
+                  <span className="meta-label">{t('job.skipped_label')}</span>{' '}
                   <span className="meta-value">
-                    {latestIntegrationRun?.outputs?.skipReason || 'El job ya tenía medición.'}
+                    {latestIntegrationRun?.outputs?.skipReason || t('job.skipped_default')}
                   </span>
                 </div>
               )}
@@ -829,48 +919,42 @@ export default function InputDatos() {
           )}
           {!canApproveMeasurement && approvalBlockedReason && (
             <div className="info-banner error" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>⚠️ {approvalBlockedReason}. Las mediciones no se pueden aprobar hasta que la curaduría esté aprobada.</span>
+              <span>⚠️ {approvalBlockedReason}. {t('curation.blocked_detail')}</span>
               <button
                 className="btn-secondary"
                 style={{ marginLeft: 12, padding: '4px 12px', fontSize: 12, whiteSpace: 'nowrap' }}
                 onClick={() => navigate('/curaduria')}
               >
-                Ir a Curaduría →
+                {t('actions.go_curation')}
               </button>
             </div>
           )}
           <table className="input-table">
             <thead>
               <tr>
-                <th>Valor</th>
-                <th>Modo</th>
-                <th>Fecha</th>
-                <th>Usuario/Fuente</th>
-                <th>Estado</th>
-                <th>Acciones</th>
+                <th>{t('measurements.table.value')}</th>
+                <th>{t('measurements.table.mode')}</th>
+                <th>{t('measurements.table.date')}</th>
+                <th>{t('measurements.table.source')}</th>
+                <th>{t('measurements.table.status')}</th>
+                <th>{t('measurements.table.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {isLoading && selectedAssignmentId ? (
                 <tr>
-                  <td colSpan={6} className="empty-row">Cargando mediciones...</td>
+                  <td colSpan={6} className="empty-row">{t('measurements.loading')}</td>
                 </tr>
               ) : (
                 filteredMeasurements.map((measurement) => (
                   <tr key={measurement.id}>
                     <td>{measurement.value}</td>
-                    <td>{formatMode(measurement.mode)}</td>
-                    <td>{measurement.capturedAt || '-'}</td>
+                    <td>{getMeasurementModeLabel(measurement.mode)}</td>
+                    <td>{formatDateTime(measurement.capturedAt, locale)}</td>
                     <td>{measurement.capturedByName || measurement.sourceRunId || '-'}</td>
                     <td>
                       <span className={`status-pill ${measurement.status === 'approved' ? 'ok' : 'review'}`}>
-                        {measurement.status === 'approved'
-                          ? 'Aprobado'
-                          : measurement.status === 'rejected'
-                          ? 'Rechazado'
-                          : measurement.status === 'proposed'
-                          ? 'Propuesto'
-                          : 'Borrador'}
+                        {getMeasurementStatusLabel(measurement.status)}
                       </span>
                     </td>
                     <td>
@@ -885,7 +969,7 @@ export default function InputDatos() {
                           onClick={() => handleApprove(measurement.id)}
                           title={!canApproveMeasurement ? approvalBlockedReason || '' : ''}
                         >
-                          Aprobar
+                          {t('measurements.approve')}
                         </button>
                         {!canApproveMeasurement && approvalBlockedReason && (
                           <span className="action-hint">{approvalBlockedReason}</span>
@@ -895,7 +979,7 @@ export default function InputDatos() {
                           disabled={measurement.status === 'rejected' || rejectMeasurement.isLoading}
                           onClick={() => rejectMeasurement.mutate(measurement.id)}
                         >
-                          Rechazar
+                          {t('measurements.reject')}
                         </button>
                       </div>
                     </td>
@@ -904,41 +988,41 @@ export default function InputDatos() {
               )}
               {!selectedAssignmentId && (
                 <tr>
-                  <td colSpan={6} className="empty-row">Selecciona una asignación para ver mediciones.</td>
+                  <td colSpan={6} className="empty-row">{t('measurements.empty_no_assignment')}</td>
                 </tr>
               )}
               {selectedAssignmentId && filteredMeasurements.length === 0 && !isLoading && (
                 <tr>
-                  <td colSpan={6} className="empty-row">No hay mediciones registradas.</td>
+                  <td colSpan={6} className="empty-row">{t('measurements.empty')}</td>
                 </tr>
               )}
             </tbody>
           </table>
           <div className="card-actions">
             <button className="btn-secondary" onClick={handleTemplateDownload}>
-              Descargar plantilla
+              {t('actions.download_template')}
             </button>
             <button
               className="btn-primary"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
             >
-              {uploading ? 'Subiendo...' : 'Subir archivo'}
+              {uploading ? t('actions.uploading') : t('actions.upload_file')}
             </button>
             <button className="btn-secondary" onClick={handleAutoFetch}>
-              Ejecutar fetch (auto)
+              {t('actions.run_auto_fetch')}
             </button>
             <button
               className="btn-primary"
               onClick={() => {
                 if (!selectedAssignmentId) {
-                  setInlineAlert({ type: 'warning', message: 'Seleccioná una asignación primero para cargar datos.' })
+                  setInlineAlert({ type: 'warning', message: t('upload.no_assignment_warning') })
                   return
                 }
                 setShowMeasurementModal(true)
               }}
             >
-              Cargar manual
+              {t('actions.manual_load')}
             </button>
           </div>
           {uploadMessage ? <div className="upload-message">{uploadMessage}</div> : null}
@@ -958,23 +1042,23 @@ export default function InputDatos() {
       </div>
 
       <div className="card validations-card">
-        <h3>Validaciones tecnicas</h3>
+        <h3>{t('validations.title')}</h3>
         <div className="validations-grid">
           <div className="validation-item">
-            <div className="validation-title">Tipos de dato</div>
-            <div className="validation-desc">Se validan enteros, decimales y fechas esperadas.</div>
+            <div className="validation-title">{t('validations.types_title')}</div>
+            <div className="validation-desc">{t('validations.types_desc')}</div>
           </div>
           <div className="validation-item">
-            <div className="validation-title">Nulos</div>
-            <div className="validation-desc">Campos obligatorios sin valor son bloqueados.</div>
+            <div className="validation-title">{t('validations.nulls_title')}</div>
+            <div className="validation-desc">{t('validations.nulls_desc')}</div>
           </div>
           <div className="validation-item">
-            <div className="validation-title">Rangos</div>
-            <div className="validation-desc">Limites minimos y maximos por KPI.</div>
+            <div className="validation-title">{t('validations.ranges_title')}</div>
+            <div className="validation-desc">{t('validations.ranges_desc')}</div>
           </div>
           <div className="validation-item">
-            <div className="validation-title">Duplicados</div>
-            <div className="validation-desc">Se evita duplicar claves de fuente + periodo.</div>
+            <div className="validation-title">{t('validations.duplicates_title')}</div>
+            <div className="validation-desc">{t('validations.duplicates_desc')}</div>
           </div>
         </div>
       </div>
@@ -987,7 +1071,7 @@ export default function InputDatos() {
         >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Cargar medición</h2>
+              <h2>{t('modal.title')}</h2>
               <button className="close-button" onClick={() => setShowMeasurementModal(false)}>
                 ×
               </button>
@@ -995,103 +1079,99 @@ export default function InputDatos() {
             <div className="modal-body">
               <div className="modal-meta">
                 {selectedAssignmentData
-                  ? `${selectedAssignmentData.collaboratorName || `Colaborador #${selectedAssignmentData.collaboratorId}`} · ${selectedAssignmentData.kpiName || `KPI #${selectedAssignmentData.kpiId}`}`
-                  : 'Asignación seleccionada'}
+                  ? `${getCollaboratorLabel(selectedAssignmentData.collaboratorName, selectedAssignmentData.collaboratorId)} · ${getKpiLabel(selectedAssignmentData.kpiName, selectedAssignmentData.kpiId)}`
+                  : t('modal.assignment_fallback')}
               </div>
               {(() => {
                 const currentApproved = (measurements ?? []).find((m) => m.status === 'approved')
                 if (!currentApproved) return null
                 return (
                   <div className="modal-current-value">
-                    Valor aprobado actual: <strong>{currentApproved.value}</strong>
+                    {t('modal.current_value')} <strong>{currentApproved.value}</strong>
                     {currentApproved.capturedAt && (
-                      <span> · {new Date(currentApproved.capturedAt).toLocaleDateString('es-AR')}</span>
+                      <span> · {new Date(currentApproved.capturedAt).toLocaleDateString(locale)}</span>
                     )}
                   </div>
                 )
               })()}
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="measurement-value">Valor</label>
+                  <label htmlFor="measurement-value">{t('modal.value_label')}</label>
                   <input
                     id="measurement-value"
                     type="number"
                     step="any"
                     value={newValue}
                     onChange={(e) => setNewValue(e.target.value)}
-                    placeholder="Ej: 82.5"
+                    placeholder={t('modal.value_placeholder')}
                   />
                 </div>
                 <div className="form-group">
-                  <label htmlFor="measurement-mode">Modo</label>
+                  <label htmlFor="measurement-mode">{t('modal.mode_label')}</label>
                   <select
                     id="measurement-mode"
                     value={newMode}
                     onChange={(e) => setNewMode(e.target.value as any)}
                   >
-                    <option value="manual">Manual — ingreso directo por el usuario</option>
-                    <option value="import">Import — carga desde archivo CSV</option>
-                    <option value="auto">Auto — obtenido por integración externa</option>
+                    <option value="manual">{t('modal.mode_manual')}</option>
+                    <option value="import">{t('modal.mode_import')}</option>
+                    <option value="auto">{t('modal.mode_auto')}</option>
                   </select>
                 </div>
                 <div className="form-group">
-                  <label htmlFor="measurement-status">Estado</label>
+                  <label htmlFor="measurement-status">{t('modal.status_label')}</label>
                   <select
                     id="measurement-status"
                     value={newStatus}
                     onChange={(e) => setNewStatus(e.target.value as any)}
                   >
                     <option value="approved" disabled={!canApproveMeasurement}>
-                      Aprobado
+                      {t('measurements.status_approved')}
                     </option>
-                    <option value="proposed">Propuesto</option>
-                    <option value="draft">Borrador</option>
+                    <option value="proposed">{t('measurements.status_proposed')}</option>
+                    <option value="draft">{t('measurements.status_draft')}</option>
                   </select>
                   {!canApproveMeasurement && selectedAssignmentId && (
-                    <small className="form-hint">
-                      La curaduria no está aprobada. Solo se permite proponer o dejar en borrador.
-                    </small>
+                    <small className="form-hint">{t('curation.hint_blocked')}</small>
                   )}
                   {canApproveWithWarning && selectedAssignmentId && (
-                    <small className="form-hint warning">
-                      Curaduria en revision: la aprobación quedará con warning.
-                    </small>
+                    <small className="form-hint warning">{t('curation.hint_warning')}</small>
                   )}
                 </div>
               </div>
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="measurement-reason">Motivo (override)</label>
+                  <label htmlFor="measurement-reason">{t('modal.reason_label')}</label>
                   <input
                     id="measurement-reason"
                     type="text"
                     value={newReason}
                     onChange={(e) => setNewReason(e.target.value)}
-                    placeholder="Razón del override (si aplica)"
+                    placeholder={t('modal.reason_placeholder')}
                   />
                 </div>
                 <div className="form-group">
-                  <label htmlFor="measurement-evidence">Evidencia</label>
+                  <label htmlFor="measurement-evidence">{t('modal.evidence_label')}</label>
                   <input
                     id="measurement-evidence"
                     type="text"
                     value={newEvidence}
                     onChange={(e) => setNewEvidence(e.target.value)}
-                    placeholder="Link o adjunto"
+                    placeholder={t('modal.evidence_placeholder')}
                   />
                 </div>
               </div>
             </div>
             <div className="modal-actions">
               <button className="btn-secondary" onClick={() => setShowMeasurementModal(false)}>
-                Cancelar
+                {t('modal.cancel')}
               </button>
               <button
                 className="btn-primary"
                 onClick={() => createMeasurement.mutate(false)}
                 disabled={!selectedAssignmentId || !newValue || createMeasurement.isLoading}
               >
-                {createMeasurement.isLoading ? 'Guardando...' : 'Guardar medición'}
+                {createMeasurement.isLoading ? t('modal.saving') : t('modal.save')}
               </button>
             </div>
           </div>

@@ -1,0 +1,43 @@
+{
+  "title": "Analytics",
+  "subtitle": "Executive tree, KPI trends, and team pulse",
+  "tabs": {
+    "tree": "Executive tree",
+    "trends": "KPI trends",
+    "checkins": "Check-ins"
+  },
+  "empty": {
+    "period_data": "No data for this period.",
+    "trends": "No trends available for this period.",
+    "checkins": "No check-ins recorded in this period."
+  },
+  "table": {
+    "scope": "Scope",
+    "total_kpis": "Total KPIs",
+    "approved": "Approved",
+    "completion": "Completion",
+    "average_variation": "Avg. variation",
+    "weighted_result": "Weighted result"
+  },
+  "meta": {
+    "scope": "Scope:",
+    "period": "Period:"
+  },
+  "toolbar": {
+    "last_weeks": "Last weeks"
+  },
+  "series": {
+    "checkins": "Check-ins",
+    "mood": "Mood",
+    "weighted_result": "Weighted result",
+    "average_variation": "Avg. variation %",
+    "completion": "Completion %"
+  },
+  "charts": {
+    "weighted_and_variation": "Weighted result and variation by period",
+    "completion_by_period": "Completion by period",
+    "weighted_by_subperiod": "Weighted result by sub-period ({{period}})",
+    "weekly_participation": "Weekly participation",
+    "team_mood": "Average team mood (1 = very bad · 5 = very good)"
+  }
+}

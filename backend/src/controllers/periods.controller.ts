@@ -5,6 +5,7 @@ import { calculateVariation, calculateWeightedResult } from '../utils/kpi-formul
 import { sendMail } from '../utils/mailer'
 import { copyPeriod } from '../services/copy-period.service.js'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 const normalizeNumber = (value: any) => {
   if (value === null || value === undefined) return null
@@ -154,7 +155,7 @@ export const getPeriods = async (req: Request, res: Response) => {
     res.json(rows)
   } catch (error: any) {
     logger.error('Error fetching periods:', error)
-    res.status(500).json({ error: 'Error al obtener períodos' })
+    return sendApiError(res, 500, 'PERIOD_FETCH_FAILED', 'Error al obtener períodos')
   }
 }
 
@@ -167,13 +168,13 @@ export const getPeriodById = async (req: Request, res: Response) => {
     )
 
     if (Array.isArray(rows) && rows.length === 0) {
-      return res.status(404).json({ error: 'Período no encontrado' })
+      return sendApiError(res, 404, 'PERIOD_NOT_FOUND', 'Período no encontrado')
     }
 
     res.json(rows[0])
   } catch (error: any) {
     logger.error('Error fetching period:', error)
-    res.status(500).json({ error: 'Error al obtener período' })
+    return sendApiError(res, 500, 'PERIOD_FETCH_ONE_FAILED', 'Error al obtener período')
   }
 }
 
@@ -192,7 +193,7 @@ export const getSubPeriodsByPeriod = async (req: Request, res: Response) => {
     res.json(rows)
   } catch (error: any) {
     logger.error('Error fetching sub-periods:', error)
-    res.status(500).json({ error: 'Error al obtener subperíodos' })
+    return sendApiError(res, 500, 'PERIOD_SUBPERIODS_FETCH_FAILED', 'Error al obtener subperíodos')
   }
 }
 
@@ -201,7 +202,7 @@ export const createPeriod = async (req: Request, res: Response) => {
     const { name, startDate, endDate, status } = req.body
 
     if (!name || !startDate || !endDate) {
-      return res.status(400).json({ error: 'Faltan campos requeridos' })
+      return sendApiError(res, 400, 'PERIOD_FIELDS_REQUIRED', 'Faltan campos requeridos')
     }
 
     const [result] = await pool.query(
@@ -220,7 +221,7 @@ export const createPeriod = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     logger.error('Error creating period:', error)
-    res.status(500).json({ error: 'Error al crear período' })
+    return sendApiError(res, 500, 'PERIOD_CREATE_FAILED', 'Error al crear período')
   }
 }
 
@@ -239,7 +240,7 @@ export const updatePeriod = async (req: Request, res: Response) => {
     res.json({ message: 'Período actualizado correctamente' })
   } catch (error: any) {
     logger.error('Error updating period:', error)
-    res.status(500).json({ error: 'Error al actualizar período' })
+    return sendApiError(res, 500, 'PERIOD_UPDATE_FAILED', 'Error al actualizar período')
   }
 }
 
@@ -257,7 +258,7 @@ export const closePeriod = async (req: Request, res: Response) => {
 
     if (Array.isArray(periodRows) && periodRows.length === 0) {
       conn.release()
-      return res.status(404).json({ error: 'Período no encontrado' })
+      return sendApiError(res, 404, 'PERIOD_NOT_FOUND', 'Período no encontrado')
     }
 
     const period = periodRows[0]
@@ -336,7 +337,7 @@ export const closePeriod = async (req: Request, res: Response) => {
     }
     conn.release()
     logger.error('Error closing period:', error)
-    res.status(500).json({ error: 'Error al cerrar período' })
+    return sendApiError(res, 500, 'PERIOD_CLOSE_FAILED', 'Error al cerrar período')
   }
 }
 
@@ -365,7 +366,7 @@ export const getPeriodSummary = async (req: Request, res: Response) => {
     res.json({ summaries, items })
   } catch (error: any) {
     logger.error('Error fetching period summary:', error)
-    res.status(500).json({ error: 'Error al obtener resumen anual' })
+    return sendApiError(res, 500, 'PERIOD_SUMMARY_FETCH_FAILED', 'Error al obtener resumen anual')
   }
 }
 
@@ -379,11 +380,7 @@ export const reopenPeriod = async (req: Request, res: Response) => {
       !user ||
       !['admin', 'director', 'manager'].includes(user.role)
     ) {
-      return res
-        .status(403)
-        .json({
-          error: 'No tienes permisos para reabrir períodos cerrados',
-        })
+      return sendApiError(res, 403, 'PERIOD_REOPEN_FORBIDDEN', 'No tienes permisos para reabrir períodos cerrados')
     }
 
     // Verificar que el período existe y está cerrado
@@ -393,14 +390,12 @@ export const reopenPeriod = async (req: Request, res: Response) => {
     )
 
     if (Array.isArray(periodRows) && periodRows.length === 0) {
-      return res.status(404).json({ error: 'Período no encontrado' })
+      return sendApiError(res, 404, 'PERIOD_NOT_FOUND', 'Período no encontrado')
     }
 
     const period = periodRows[0]
     if (period.status !== 'closed') {
-      return res
-        .status(400)
-        .json({ error: 'El período no está cerrado' })
+      return sendApiError(res, 400, 'PERIOD_NOT_CLOSED', 'El período no está cerrado')
     }
 
     // Cambiar estado a abierto
@@ -412,7 +407,7 @@ export const reopenPeriod = async (req: Request, res: Response) => {
     res.json({ message: 'Período reabierto correctamente' })
   } catch (error: any) {
     logger.error('Error reopening period:', error)
-    res.status(500).json({ error: 'Error al reabrir período' })
+    return sendApiError(res, 500, 'PERIOD_REOPEN_FAILED', 'Error al reabrir período')
   }
 }
 
@@ -425,7 +420,7 @@ export const deletePeriod = async (req: Request, res: Response) => {
     res.json({ message: 'Período eliminado correctamente' })
   } catch (error: any) {
     logger.error('Error deleting period:', error)
-    res.status(500).json({ error: 'Error al eliminar período' })
+    return sendApiError(res, 500, 'PERIOD_DELETE_FAILED', 'Error al eliminar período')
   }
 }
 
@@ -434,7 +429,7 @@ export const copyPeriodHandler = async (req: Request, res: Response) => {
     const { id } = req.params
     const { name, startDate, endDate, copyCollaboratorKpis, copyScopeKpis, copyOkrs } = req.body
     if (!name || !startDate || !endDate) {
-      return res.status(400).json({ error: 'Nombre, fecha de inicio y fecha de fin son requeridos' })
+      return sendApiError(res, 400, 'PERIOD_COPY_FIELDS_REQUIRED', 'Nombre, fecha de inicio y fecha de fin son requeridos')
     }
     const result = await copyPeriod(Number(id), {
       name,
@@ -447,6 +442,6 @@ export const copyPeriodHandler = async (req: Request, res: Response) => {
     res.json(result)
   } catch (error: any) {
     logger.error('Error copying period:', error)
-    res.status(500).json({ error: error.message || 'Error al copiar el período' })
+    return sendApiError(res, 500, 'PERIOD_COPY_FAILED', error.message || 'Error al copiar el período')
   }
 }

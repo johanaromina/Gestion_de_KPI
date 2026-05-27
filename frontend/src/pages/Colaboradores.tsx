@@ -1,12 +1,31 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { OrgScope, Collaborator } from '../types'
 import CollaboratorForm from '../components/CollaboratorForm'
 import { useAuth } from '../hooks/useAuth'
 import { useDialog } from '../components/Dialog'
+import { resolveApiErrorMessage } from '../utils/apiErrors'
 import './Colaboradores.css'
+
+const DELETE_API_ERROR_KEYS: Record<string, string> = {
+  COLLABORATOR_DELETE_FORBIDDEN: 'collaborators:dialogs.api_errors.delete_forbidden',
+  COLLABORATOR_NOT_FOUND: 'collaborators:dialogs.api_errors.not_found',
+}
+
+const DEACTIVATE_API_ERROR_KEYS: Record<string, string> = {
+  COLLABORATOR_DEACTIVATE_FORBIDDEN: 'collaborators:dialogs.api_errors.deactivate_forbidden',
+  COLLABORATOR_NOT_FOUND: 'collaborators:dialogs.api_errors.not_found',
+}
+
+const INVITE_API_ERROR_KEYS: Record<string, string> = {
+  COLLABORATOR_RESEND_INVITE_FORBIDDEN: 'collaborators:invite.api_errors.forbidden',
+  COLLABORATOR_NOT_FOUND: 'collaborators:invite.api_errors.not_found',
+  COLLABORATOR_RESEND_INVITE_EMAIL_MISSING: 'collaborators:invite.api_errors.email_missing',
+  COLLABORATOR_RESEND_INVITE_PASSWORD_ALREADY_SET: 'collaborators:invite.api_errors.password_already_set',
+}
 
 export default function Colaboradores() {
   const [showForm, setShowForm] = useState(false)
@@ -26,6 +45,8 @@ export default function Colaboradores() {
   const isManager = Boolean(auth?.isManager)
   const isLeader = Boolean(auth?.isLeader)
   const dialog = useDialog()
+  const { t } = useTranslation(['collaborators', 'common'])
+
   const { data: orgScopes } = useQuery<OrgScope[]>(
     'org-scopes',
     async () => {
@@ -64,9 +85,11 @@ export default function Colaboradores() {
       },
       onError: (error: any) => {
         void dialog.alert(
-          error.response?.data?.error ||
-            'Error al eliminar colaborador. Verifica que no tenga asignaciones asociadas.',
-          { title: 'Error al eliminar', variant: 'danger' }
+          resolveApiErrorMessage(error, t, {
+            codeMap: DELETE_API_ERROR_KEYS,
+            fallbackKey: 'dialogs.delete_error_msg',
+          }),
+          { title: t('dialogs.delete_error_title'), variant: 'danger' }
         )
       },
     }
@@ -81,7 +104,13 @@ export default function Colaboradores() {
         queryClient.invalidateQueries('collaborators')
       },
       onError: (error: any) => {
-        void dialog.alert(error.response?.data?.error || 'Error al desactivar colaborador', { title: 'Error', variant: 'danger' })
+        void dialog.alert(
+          resolveApiErrorMessage(error, t, {
+            codeMap: DEACTIVATE_API_ERROR_KEYS,
+            fallbackKey: 'dialogs.deactivate_error',
+          }),
+          { title: t('common:error_title'), variant: 'danger' }
+        )
       },
     }
   )
@@ -98,16 +127,16 @@ export default function Colaboradores() {
 
   const handleDelete = async (id: number, name: string) => {
     const ok = await dialog.confirm(
-      `¿Estás seguro de eliminar al colaborador "${name}"? Esta acción no se puede deshacer y eliminará todas sus asignaciones asociadas.`,
-      { title: 'Eliminar colaborador', confirmLabel: 'Eliminar', variant: 'danger' }
+      t('dialogs.delete_msg', { name }),
+      { title: t('dialogs.delete_title'), confirmLabel: t('dialogs.delete_confirm'), variant: 'danger' }
     )
     if (ok) deleteMutation.mutate(id)
   }
 
   const handleDeactivate = async (id: number, name: string) => {
     const reason = await dialog.prompt(
-      `Desactivar a "${name}". Opcional: indicá un motivo (desvinculación, cambio de rol, licencia).`,
-      { title: 'Desactivar colaborador', placeholder: 'Ej: desvinculación voluntaria', confirmLabel: 'Desactivar', variant: 'warning' }
+      t('dialogs.deactivate_msg', { name }),
+      { title: t('dialogs.deactivate_title'), placeholder: t('dialogs.deactivate_placeholder'), confirmLabel: t('dialogs.deactivate_confirm'), variant: 'warning' }
     )
     if (reason !== null) deactivateMutation.mutate({ id, reason: reason || undefined })
   }
@@ -116,11 +145,14 @@ export default function Colaboradores() {
     setResendingId(id)
     try {
       await api.post(`/collaborators/${id}/resend-invite`)
-      setInviteAlert({ id, message: 'Invitación reenviada correctamente', type: 'success' })
+      setInviteAlert({ id, message: t('invite.sent'), type: 'success' })
     } catch (error: any) {
       setInviteAlert({
         id,
-        message: error.response?.data?.error || 'Error al reenviar invitación',
+        message: resolveApiErrorMessage(error, t, {
+          codeMap: INVITE_API_ERROR_KEYS,
+          fallbackKey: 'invite.error',
+        }),
         type: 'error',
       })
     } finally {
@@ -138,13 +170,7 @@ export default function Colaboradores() {
     return managerMap.get(managerId) ?? `ID: ${managerId}`
   }
 
-  const roleLabel: Record<string, string> = {
-    collaborator: 'Colaborador',
-    leader: 'Líder',
-    manager: 'Gerente',
-    director: 'Director',
-    admin: 'Admin',
-  }
+  const getRoleLabel = (role: string) => t(`common:roles.${role}`, { defaultValue: role })
 
   const filteredCollaborators = collaborators?.filter((collaborator) => {
     const safeName = (collaborator.name || '').toLowerCase()
@@ -179,39 +205,39 @@ export default function Colaboradores() {
       )}
       <div className="page-header">
         <div>
-          <h1>Colaboradores</h1>
-          <p className="subtitle">Gestiona los colaboradores del sistema</p>
+          <h1>{t('title')}</h1>
+          <p className="subtitle">{t('subtitle')}</p>
         </div>
         <div className="header-actions">
           <a className="btn-secondary" href="/configuracion" target="_blank" rel="noreferrer">
-            Gestionar Áreas
+            {t('header.manage_areas')}
           </a>
           <button className="btn-primary" onClick={handleCreate}>
-            + Agregar Colaborador
+            {t('header.add')}
           </button>
         </div>
       </div>
 
       <div className="filters-section">
         <div className="search-group">
-          <label htmlFor="search">Buscar:</label>
+          <label htmlFor="search">{t('filters.search_label')}</label>
           <input
             type="text"
             id="search"
-            placeholder="Buscar por nombre o cargo..."
+            placeholder={t('filters.search_placeholder')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="search-input"
           />
         </div>
         <div className="filter-group">
-          <label htmlFor="filter-area">Área:</label>
+          <label htmlFor="filter-area">{t('filters.area')}</label>
           <select
             id="filter-area"
             value={filterArea}
             onChange={(e) => setFilterArea(e.target.value)}
           >
-            <option value="">Todas las áreas</option>
+            <option value="">{t('filters.all_areas')}</option>
             {areaScopes.map((area) => (
               <option key={area.id} value={area.name}>
                 {area.name}
@@ -220,22 +246,22 @@ export default function Colaboradores() {
           </select>
         </div>
         <div className="filter-group">
-          <label htmlFor="filter-role">Rol:</label>
+          <label htmlFor="filter-role">{t('filters.role')}</label>
           <select
             id="filter-role"
             value={filterRole}
             onChange={(e) => setFilterRole(e.target.value)}
           >
-            <option value="">Todos los roles</option>
-            <option value="admin">Administrador</option>
-            <option value="director">Director</option>
-            <option value="manager">Gerente</option>
-            <option value="leader">Líder</option>
-            <option value="collaborator">Colaborador</option>
+            <option value="">{t('filters.all_roles')}</option>
+            <option value="admin">{getRoleLabel('admin')}</option>
+            <option value="director">{getRoleLabel('director')}</option>
+            <option value="manager">{getRoleLabel('manager')}</option>
+            <option value="leader">{getRoleLabel('leader')}</option>
+            <option value="collaborator">{getRoleLabel('collaborator')}</option>
           </select>
         </div>
         <div className="filter-group checkbox-group">
-          <label htmlFor="show-inactive">Mostrar inactivos</label>
+          <label htmlFor="show-inactive">{t('filters.show_inactive')}</label>
           <input
             id="show-inactive"
             type="checkbox"
@@ -252,30 +278,30 @@ export default function Colaboradores() {
               setFilterRole('')
             }}
           >
-            Limpiar Filtros
+            {t('filters.clear')}
           </button>
         )}
       </div>
 
       <div className="table-container">
         {isLoading ? (
-          <div className="loading">Cargando colaboradores...</div>
+          <div className="loading">{t('loading')}</div>
         ) : filteredCollaborators && filteredCollaborators.length > 0 ? (
           <>
             <div className="results-info">
-              Mostrando {filteredCollaborators.length} de {collaborators?.length || 0} colaboradores
+              {t('results.showing', { shown: filteredCollaborators.length, total: collaborators?.length || 0 })}
             </div>
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>ID</th>
-                  <th>Nombre</th>
-                  <th>Cargo</th>
-                  <th>Area</th>
-                  <th>Estado</th>
-                  <th>Rol</th>
-                  <th>Jefe directo</th>
-                  <th>Acciones</th>
+                  <th>{t('table.id')}</th>
+                  <th>{t('table.name')}</th>
+                  <th>{t('table.position')}</th>
+                  <th>{t('table.area')}</th>
+                  <th>{t('table.status')}</th>
+                  <th>{t('table.role')}</th>
+                  <th>{t('table.manager')}</th>
+                  <th>{t('table.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -285,7 +311,7 @@ export default function Colaboradores() {
                     <td className="name-cell">
                       {collaborator.name}
                       {collaborator.status === 'inactive' && (
-                        <span className="status-pill inactive">Inactivo</span>
+                        <span className="status-pill inactive">{t('status.inactive')}</span>
                       )}
                     </td>
                     <td>{collaborator.position}</td>
@@ -294,57 +320,57 @@ export default function Colaboradores() {
                       <span
                         className={`status-pill ${collaborator.status === 'inactive' ? 'inactive' : 'active'}`}
                       >
-                        {collaborator.status === 'inactive' ? 'Inactivo' : 'Activo'}
+                        {t(`status.${collaborator.status}`, { defaultValue: collaborator.status })}
                       </span>
                     </td>
                     <td>
-                      <span className={`role-badge role-${collaborator.role}`}>{roleLabel[collaborator.role] ?? collaborator.role}</span>
+                      <span className={`role-badge role-${collaborator.role}`}>{getRoleLabel(collaborator.role)}</span>
                     </td>
                     <td>{getManagerName(collaborator.managerId)}</td>
                     <td>
                       <div className="action-buttons">
                         <button
                           className="btn-icon"
-                          title="Editar"
+                          title={t('actions.edit')}
                           onClick={() => handleEdit(collaborator)}
                           disabled={
                             !(isAdmin || isDirector || (user?.area && collaborator.area === user.area && (isManager || isLeader)))
                           }
                         >
-                          Editar
+                          {t('actions.edit')}
                         </button>
                         {collaborator.status !== 'inactive' && (
                           <button
                             className="btn-icon"
-                            title="Desactivar"
+                            title={t('actions.deactivate')}
                             onClick={() => handleDeactivate(collaborator.id, collaborator.name)}
                             disabled={
                               deactivateMutation.isLoading ||
                               !(isAdmin || isDirector || (user?.area && collaborator.area === user.area && (isManager || isLeader)))
                             }
                           >
-                            Desactivar
+                            {t('actions.deactivate')}
                           </button>
                         )}
                         <button
                           className="btn-icon"
-                          title="Eliminar"
+                          title={t('actions.delete')}
                           onClick={() => handleDelete(collaborator.id, collaborator.name)}
                           disabled={
                             deleteMutation.isLoading ||
                             !(isAdmin || isDirector || (user?.area && collaborator.area === user.area && (isManager || isLeader)))
                           }
                         >
-                          Eliminar
+                          {t('actions.delete')}
                         </button>
                         {collaborator.email && (
                           <button
                             className="btn-icon"
-                            title="Reenviar invitación"
+                            title={t('actions.resend_invite')}
                             onClick={() => handleResendInvite(collaborator.id)}
                             disabled={resendingId === collaborator.id}
                           >
-                            {resendingId === collaborator.id ? 'Enviando...' : 'Reenviar invitación'}
+                            {resendingId === collaborator.id ? t('actions.resending') : t('actions.resend_invite')}
                           </button>
                         )}
                       </div>
@@ -357,8 +383,8 @@ export default function Colaboradores() {
         ) : collaborators && collaborators.length > 0 ? (
           <div className="empty-state">
             <div className="empty-icon">:/</div>
-            <h3>No se encontraron colaboradores</h3>
-            <p>Intenta ajustar los filtros de busqueda</p>
+            <h3>{t('empty.no_results_title')}</h3>
+            <p>{t('empty.no_results_subtitle')}</p>
             <button
               className="btn-primary"
               onClick={() => {
@@ -367,16 +393,16 @@ export default function Colaboradores() {
                 setFilterRole('')
               }}
             >
-              Limpiar Filtros
+              {t('filters.clear')}
             </button>
           </div>
         ) : (
           <div className="empty-state">
             <div className="empty-icon">:)</div>
-            <h3>No hay colaboradores registrados</h3>
-            <p>Comienza agregando tu primer colaborador al sistema</p>
+            <h3>{t('empty.no_data_title')}</h3>
+            <p>{t('empty.no_data_subtitle')}</p>
             <button className="btn-primary" onClick={handleCreate}>
-              Agregar Colaborador
+              {t('empty.no_data_btn')}
             </button>
           </div>
         )}

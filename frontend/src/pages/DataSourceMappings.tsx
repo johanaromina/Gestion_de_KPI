@@ -1,19 +1,27 @@
 import { ChangeEvent, useEffect, useRef, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { useAuth } from '../hooks/useAuth'
 import { Collaborator, DataSourceMapping, OrgScope } from '../types'
 import { useDialog } from '../components/Dialog'
+import { resolveApiErrorMessage } from '../utils/apiErrors'
 import {
   DEFAULT_MAPPING_SOURCE_TYPE,
-  getMappingSourceTypeLabel,
   MAPPING_SOURCE_TYPE_OPTIONS,
   normalizeMappingSourceType,
   parseExternalKeysText,
 } from '../utils/dataSourceMappings'
 import './Configuracion.css'
 import './DataSourceMappings.css'
+
+const DATASOURCE_API_ERROR_KEYS: Record<string, string> = {
+  DATASOURCE_MAPPING_ENTITY_TYPE_INVALID: 'datasource:errors.api_errors.entity_type_invalid',
+  DATASOURCE_MAPPING_ENTITY_ID_REQUIRED: 'datasource:errors.api_errors.entity_id_required',
+  DATASOURCE_MAPPING_ENTITY_NOT_FOUND: 'datasource:errors.api_errors.entity_not_found',
+  DATASOURCE_MAPPING_ITEMS_REQUIRED: 'datasource:errors.api_errors.items_required',
+}
 
 type EntityTypeFilter = 'all' | DataSourceMapping['entityType']
 
@@ -36,10 +44,20 @@ type PendingGroup = {
   entityId: number
 }
 
+type EntityDescriptorStrings = {
+  noPosition: string
+  noArea: string
+  notFound: string
+  collaboratorFallback: string
+  scopeFallback: string
+  parentLabel: string
+  scopeTypeLabel: (value?: string | null) => string
+}
+
 const normalizeSearch = (value: string) =>
   String(value || '')
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .trim()
     .toLowerCase()
 
@@ -104,35 +122,30 @@ const downloadCsvFile = (filename: string, headers: string[], rows: any[][]) => 
   URL.revokeObjectURL(link.href)
 }
 
-const formatDateTime = (value?: string | null) => {
-  if (!value) return 'Sin cambios'
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return 'Sin cambios'
-  return parsed.toLocaleString('es-AR', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  })
-}
-
 const buildEntityDescriptor = (
   entityType: DataSourceMapping['entityType'],
   entityId: number,
   collaborators: Collaborator[],
-  orgScopes: OrgScope[]
+  orgScopes: OrgScope[],
+  strings: EntityDescriptorStrings
 ) => {
   if (entityType === 'collaborator') {
     const collaborator = collaborators.find((item) => Number(item.id) === Number(entityId))
     return {
-      name: collaborator?.name || `Colaborador #${entityId}`,
-      subtitle: collaborator ? `${collaborator.position || 'Sin posición'} · ${collaborator.area || 'Sin área'}` : 'No encontrado',
+      name: collaborator?.name || strings.collaboratorFallback.replace('{{id}}', String(entityId)),
+      subtitle: collaborator
+        ? `${collaborator.position || strings.noPosition} · ${collaborator.area || strings.noArea}`
+        : strings.notFound,
       active: collaborator?.status !== 'inactive',
     }
   }
 
   const scope = orgScopes.find((item) => Number(item.id) === Number(entityId))
   return {
-    name: scope?.name || `Scope #${entityId}`,
-    subtitle: scope ? `${scope.type}${scope.parentId ? ` · parent ${scope.parentId}` : ''}` : 'No encontrado',
+    name: scope?.name || strings.scopeFallback.replace('{{id}}', String(entityId)),
+    subtitle: scope
+      ? `${strings.scopeTypeLabel(scope.type)}${scope.parentId ? ` · ${strings.parentLabel} ${scope.parentId}` : ''}`
+      : strings.notFound,
     active: scope?.active !== false,
   }
 }
@@ -140,7 +153,8 @@ const buildEntityDescriptor = (
 const buildGroupedMappings = (
   mappings: DataSourceMapping[],
   collaborators: Collaborator[],
-  orgScopes: OrgScope[]
+  orgScopes: OrgScope[],
+  strings: EntityDescriptorStrings
 ): MappingGroup[] => {
   const groups = new Map<string, DataSourceMapping[]>()
 
@@ -154,7 +168,7 @@ const buildGroupedMappings = (
   return Array.from(groups.entries())
     .map(([groupKey, groupMappings]) => {
       const first = groupMappings[0]
-      const descriptor = buildEntityDescriptor(first.entityType, first.entityId, collaborators, orgScopes)
+      const descriptor = buildEntityDescriptor(first.entityType, first.entityId, collaborators, orgScopes, strings)
       const updatedAt =
         groupMappings
           .map((item) => item.updatedAt || item.createdAt || null)
@@ -186,13 +200,14 @@ const mergePendingGroups = (
   baseGroups: MappingGroup[],
   pendingGroupsByKey: Record<string, PendingGroup>,
   collaborators: Collaborator[],
-  orgScopes: OrgScope[]
+  orgScopes: OrgScope[],
+  strings: EntityDescriptorStrings
 ) => {
   const merged = new Map(baseGroups.map((group) => [group.groupKey, group]))
 
   Object.entries(pendingGroupsByKey).forEach(([groupKey, pendingGroup]) => {
     if (merged.has(groupKey)) return
-    const descriptor = buildEntityDescriptor(pendingGroup.entityType, pendingGroup.entityId, collaborators, orgScopes)
+    const descriptor = buildEntityDescriptor(pendingGroup.entityType, pendingGroup.entityId, collaborators, orgScopes, strings)
     merged.set(groupKey, {
       groupKey,
       sourceType: pendingGroup.sourceType,
@@ -215,6 +230,8 @@ const mergePendingGroups = (
 }
 
 export default function DataSourceMappings() {
+  const { t, i18n } = useTranslation(['datasource', 'organigrama'])
+  const locale = i18n.resolvedLanguage?.startsWith('en') ? 'en-US' : 'es-AR'
   const queryClient = useQueryClient()
   const { canConfig, isLoading: authLoading } = useAuth()
   const dialog = useDialog()
@@ -232,6 +249,34 @@ export default function DataSourceMappings() {
     entityId: '',
     externalKeysText: '',
   })
+
+  const sourceTypeOptions = MAPPING_SOURCE_TYPE_OPTIONS.map((option) => ({
+    ...option,
+    label: t(`source_types.${option.value}`, { defaultValue: option.label }),
+  }))
+  const getSourceTypeLabel = (value: string) =>
+    sourceTypeOptions.find((option) => option.value === normalizeMappingSourceType(value))?.label || value
+
+  const formatDateTime = (value?: string | null) => {
+    if (!value) return t('table.no_changes')
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return t('table.no_changes')
+    return parsed.toLocaleString(locale, {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    })
+  }
+
+  const entityStrings: EntityDescriptorStrings = {
+    noPosition: t('table.no_position'),
+    noArea: t('table.no_area'),
+    notFound: t('table.not_found'),
+    collaboratorFallback: t('table.collaborator_fallback', { id: '{{id}}' }),
+    scopeFallback: t('table.scope_fallback', { id: '{{id}}' }),
+    parentLabel: t('table.parent_label'),
+    scopeTypeLabel: (value?: string | null) =>
+      t(`organigrama:types.${String(value || '').toLowerCase()}`, { defaultValue: value || '-' }),
+  }
 
   const { data: collaborators = [], isLoading: collaboratorsLoading } = useQuery<Collaborator[]>(
     'mapping-collaborators',
@@ -295,10 +340,16 @@ export default function DataSourceMappings() {
           delete next[result.groupKey]
           return next
         })
-        setToastMessage('Mapping actualizado correctamente.')
+        setToastMessage(t('toast.saved'))
       },
       onError: (error: any) => {
-        void dialog.alert(error?.response?.data?.error || 'No se pudo guardar el mapping', { title: 'Error', variant: 'danger' })
+        void dialog.alert(
+          resolveApiErrorMessage(error, t, {
+            codeMap: DATASOURCE_API_ERROR_KEYS,
+            fallbackKey: 'errors.save_error',
+          }),
+          { title: t('errors.error_title'), variant: 'danger' }
+        )
       },
     }
   )
@@ -335,10 +386,16 @@ export default function DataSourceMappings() {
           groupKeys.forEach((groupKey) => delete next[groupKey])
           return next
         })
-        setToastMessage('Mappings guardados por lote.')
+        setToastMessage(t('toast.saved_bulk'))
       },
       onError: (error: any) => {
-        void dialog.alert(error?.response?.data?.error || 'No se pudieron guardar los mappings', { title: 'Error', variant: 'danger' })
+        void dialog.alert(
+          resolveApiErrorMessage(error, t, {
+            codeMap: DATASOURCE_API_ERROR_KEYS,
+            fallbackKey: 'errors.save_bulk_error',
+          }),
+          { title: t('errors.error_title'), variant: 'danger' }
+        )
       },
     }
   )
@@ -347,11 +404,11 @@ export default function DataSourceMappings() {
     async () => {
       const entityId = Number(createForm.entityId)
       if (!entityId) {
-        throw new Error('Seleccioná una entidad para crear el mapping')
+        throw new Error(t('errors.create_entity_required'))
       }
       const externalKeys = parseExternalKeysText(createForm.externalKeysText)
       if (externalKeys.length === 0) {
-        throw new Error('Ingresá al menos una clave externa')
+        throw new Error(t('errors.create_keys_required'))
       }
 
       await api.post('/data-source-mappings/sync', {
@@ -382,10 +439,18 @@ export default function DataSourceMappings() {
           entityId: '',
           externalKeysText: '',
         })
-        setToastMessage('Grupo de mappings creado correctamente.')
+        setToastMessage(t('toast.created'))
       },
       onError: (error: any) => {
-        void dialog.alert(error instanceof Error ? error.message : error?.response?.data?.error || 'No se pudo crear el mapping', { title: 'Error', variant: 'danger' })
+        void dialog.alert(
+          error instanceof Error
+            ? error.message
+            : resolveApiErrorMessage(error, t, {
+                codeMap: DATASOURCE_API_ERROR_KEYS,
+                fallbackKey: 'errors.create_error',
+              }),
+          { title: t('errors.error_title'), variant: 'danger' }
+        )
       },
     }
   )
@@ -401,9 +466,9 @@ export default function DataSourceMappings() {
   }
 
   const loading = authLoading || collaboratorsLoading || scopesLoading || mappingsLoading
-  const baseGroups = buildGroupedMappings(mappings, collaborators, orgScopes)
+  const baseGroups = buildGroupedMappings(mappings, collaborators, orgScopes, entityStrings)
   const existingGroupKeys = new Set(baseGroups.map((group) => group.groupKey))
-  const groups = mergePendingGroups(baseGroups, pendingGroupsByKey, collaborators, orgScopes)
+  const groups = mergePendingGroups(baseGroups, pendingGroupsByKey, collaborators, orgScopes, entityStrings)
   const normalizedSearch = normalizeSearch(search)
   const filteredGroups = groups.filter((group) => {
     if (sourceTypeFilter !== 'all' && group.sourceType !== sourceTypeFilter) return false
@@ -428,14 +493,14 @@ export default function DataSourceMappings() {
           .sort((a, b) => a.name.localeCompare(b.name))
           .map((collaborator) => ({
             id: collaborator.id,
-            label: `${collaborator.name} · ${collaborator.position || 'Sin posición'} · ${collaborator.area || 'Sin área'}`,
+            label: `${collaborator.name} · ${collaborator.position || t('table.no_position')} · ${collaborator.area || t('table.no_area')}`,
           }))
       : orgScopes
           .slice()
           .sort((a, b) => a.name.localeCompare(b.name))
           .map((scope) => ({
             id: scope.id,
-            label: `${scope.name} · ${scope.type}`,
+            label: `${scope.name} · ${t(`organigrama:types.${String(scope.type || '').toLowerCase()}`, { defaultValue: scope.type })}`,
           }))
 
   const handleDraftChange = (groupKey: string, value: string) => {
@@ -507,7 +572,7 @@ export default function DataSourceMappings() {
     const lines = text.split(/\r?\n/).filter((line) => line.trim())
 
     if (lines.length === 0) {
-      throw new Error('El archivo CSV está vacío')
+      throw new Error(t('errors.csv_empty'))
     }
 
     const headers = parseCsvLine(lines[0]).map(normalizeHeader)
@@ -518,7 +583,7 @@ export default function DataSourceMappings() {
     const idxExternalKeys = headerIndex('externalkeys')
 
     if (idxSourceType < 0 || idxEntityType < 0 || idxEntityId < 0 || idxExternalKeys < 0) {
-      throw new Error('El CSV debe incluir columnas sourceType, entityType, entityId y externalKeys')
+      throw new Error(t('errors.csv_missing_columns'))
     }
 
     const nextDrafts: Record<string, string> = {}
@@ -534,11 +599,11 @@ export default function DataSourceMappings() {
       const externalKeysText = String(row[idxExternalKeys] || '').trim()
 
       if (!['collaborator', 'org_scope'].includes(entityType)) {
-        errors.push(`Fila ${lineIndex + 1}: entityType inválido`)
+        errors.push(t('errors.csv_invalid_entity_type', { row: lineIndex + 1 }))
         continue
       }
       if (!entityId || Number.isNaN(entityId)) {
-        errors.push(`Fila ${lineIndex + 1}: entityId inválido`)
+        errors.push(t('errors.csv_invalid_entity_id', { row: lineIndex + 1 }))
         continue
       }
 
@@ -548,13 +613,13 @@ export default function DataSourceMappings() {
           : orgScopes.some((item) => Number(item.id) === entityId)
 
       if (!entityExists) {
-        errors.push(`Fila ${lineIndex + 1}: la entidad ${entityType}#${entityId} no existe`)
+        errors.push(t('errors.csv_entity_not_found', { row: lineIndex + 1, type: entityType, id: entityId }))
         continue
       }
 
       const groupKey = buildGroupKey(sourceType, entityType, entityId)
       if (!existingGroupKeys.has(groupKey) && !externalKeysText) {
-        errors.push(`Fila ${lineIndex + 1}: no hay claves externas para crear un grupo nuevo`)
+        errors.push(t('errors.csv_no_keys_new', { row: lineIndex + 1 }))
         continue
       }
 
@@ -579,13 +644,13 @@ export default function DataSourceMappings() {
     }))
 
     if (imported === 0) {
-      throw new Error(errors[0] || 'No se pudo importar ninguna fila')
+      throw new Error(errors[0] || t('errors.csv_no_rows'))
     }
 
     setToastMessage(
       errors.length > 0
-        ? `CSV importado: ${imported} filas cargadas, ${errors.length} omitidas.`
-        : `CSV importado: ${imported} filas cargadas.`
+        ? t('toast.csv_imported_errors', { count: imported, errors: errors.length })
+        : t('toast.csv_imported', { count: imported })
     )
   }
 
@@ -596,57 +661,55 @@ export default function DataSourceMappings() {
     try {
       await handleImportCsv(file)
     } catch (error: any) {
-      void dialog.alert(error?.message || 'No se pudo importar el CSV', { title: 'Error al importar', variant: 'danger' })
+      void dialog.alert(error?.message || t('errors.csv_import_error'), { title: t('errors.csv_import_error_title'), variant: 'danger' })
     }
   }
 
   return (
     <div className="config-page mappings-page">
       <div className="page-header">
-        <h1>Mappings Externos</h1>
-        <p className="subtitle">
-          Administrá aliases y claves externas por conector para colaboradores y scopes, con edición por lote.
-        </p>
+        <h1>{t('title')}</h1>
+        <p className="subtitle">{t('subtitle')}</p>
         {toastMessage ? <div className="toast">{toastMessage}</div> : null}
       </div>
 
       <div className="mapping-summary-grid">
         <div className="card mapping-stat-card">
           <div className="mapping-stat-value">{groups.length}</div>
-          <div className="mapping-stat-label">Grupos configurados</div>
+          <div className="mapping-stat-label">{t('stats.groups')}</div>
         </div>
         <div className="card mapping-stat-card">
           <div className="mapping-stat-value">{mappings.length}</div>
-          <div className="mapping-stat-label">Claves externas</div>
+          <div className="mapping-stat-label">{t('stats.keys')}</div>
         </div>
         <div className="card mapping-stat-card">
           <div className="mapping-stat-value">{dirtyGroups.length}</div>
-          <div className="mapping-stat-label">Cambios pendientes</div>
+          <div className="mapping-stat-label">{t('stats.pending')}</div>
         </div>
       </div>
 
       <div className="mapping-toolbar">
         <div className="card">
           <div className="card-header">
-            <h2>Filtros</h2>
+            <h2>{t('filters.title')}</h2>
           </div>
           <div className="mapping-filters-grid">
             <div className="mapping-field">
-              <label htmlFor="mapping-search">Buscar</label>
+              <label htmlFor="mapping-search">{t('filters.search_label')}</label>
               <div className="mapping-search-wrap">
                 <input
                   id="mapping-search"
                   type="text"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Entidad, clave, source type..."
+                  placeholder={t('filters.search_placeholder')}
                 />
                 {search && (
                   <button
                     className="mapping-clear-input"
                     type="button"
                     onClick={() => setSearch('')}
-                    title="Limpiar búsqueda"
+                    title={t('filters.search_clear_title')}
                   >
                     ×
                   </button>
@@ -654,14 +717,14 @@ export default function DataSourceMappings() {
               </div>
             </div>
             <div className="mapping-field">
-              <label htmlFor="mapping-source-filter">Source type</label>
+              <label htmlFor="mapping-source-filter">{t('filters.source_label')}</label>
               <select
                 id="mapping-source-filter"
                 value={sourceTypeFilter}
                 onChange={(event) => setSourceTypeFilter(event.target.value)}
               >
-                <option value="all">Todos</option>
-                {MAPPING_SOURCE_TYPE_OPTIONS.map((option) => (
+                <option value="all">{t('filters.source_all')}</option>
+                {sourceTypeOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -669,15 +732,15 @@ export default function DataSourceMappings() {
               </select>
             </div>
             <div className="mapping-field">
-              <label htmlFor="mapping-entity-filter">Tipo de entidad</label>
+              <label htmlFor="mapping-entity-filter">{t('filters.entity_label')}</label>
               <select
                 id="mapping-entity-filter"
                 value={entityTypeFilter}
                 onChange={(event) => setEntityTypeFilter(event.target.value as EntityTypeFilter)}
               >
-                <option value="all">Todas</option>
-                <option value="collaborator">Colaborador</option>
-                <option value="org_scope">Scope</option>
+                <option value="all">{t('filters.entity_all')}</option>
+                <option value="collaborator">{t('filters.entity_collaborator')}</option>
+                <option value="org_scope">{t('filters.entity_scope')}</option>
               </select>
             </div>
             {(search || sourceTypeFilter !== 'all' || entityTypeFilter !== 'all') && (
@@ -692,7 +755,7 @@ export default function DataSourceMappings() {
                     setEntityTypeFilter('all')
                   }}
                 >
-                  × Limpiar filtros
+                  {t('filters.clear_filters')}
                 </button>
               </div>
             )}
@@ -701,12 +764,10 @@ export default function DataSourceMappings() {
 
         <div className="card">
           <div className="card-header">
-            <h2>Acciones</h2>
+            <h2>{t('actions.title')}</h2>
           </div>
           <div className="mapping-actions-panel">
-            <p className="empty-hint">
-              Editá varias filas, exportalas a CSV o importá un archivo para precargar cambios antes de guardar.
-            </p>
+            <p className="empty-hint">{t('actions.hint')}</p>
             <input
               ref={fileInputRef}
               type="file"
@@ -716,13 +777,13 @@ export default function DataSourceMappings() {
             />
             <div className="mapping-action-buttons">
               <button className="btn-ghost" type="button" onClick={handleTemplateDownload}>
-                Descargar plantilla
+                {t('actions.download_template')}
               </button>
               <button className="btn-ghost" type="button" onClick={handleExportCsv}>
-                Exportar visibles
+                {t('actions.export')}
               </button>
               <button className="btn-ghost" type="button" onClick={() => fileInputRef.current?.click()}>
-                Importar CSV
+                {t('actions.import_csv')}
               </button>
               <button
                 className="btn-secondary"
@@ -733,7 +794,7 @@ export default function DataSourceMappings() {
                   setPendingGroupsByKey({})
                 }}
               >
-                Descartar cambios
+                {t('actions.discard')}
               </button>
               <button
                 className="btn-primary"
@@ -741,7 +802,7 @@ export default function DataSourceMappings() {
                 disabled={dirtyGroups.length === 0 || bulkSaveMutation.isLoading}
                 onClick={handleSaveAll}
               >
-                {bulkSaveMutation.isLoading ? 'Guardando...' : `Guardar ${dirtyGroups.length} cambios`}
+                {bulkSaveMutation.isLoading ? t('actions.saving') : t('actions.save_all', { count: dirtyGroups.length })}
               </button>
             </div>
           </div>
@@ -750,11 +811,11 @@ export default function DataSourceMappings() {
 
       <div className="card">
         <div className="card-header">
-          <h2>Nuevo grupo de mappings</h2>
+          <h2>{t('create.title')}</h2>
         </div>
         <div className="mapping-create-grid">
           <div className="mapping-field">
-            <label htmlFor="mapping-create-source">Source type</label>
+            <label htmlFor="mapping-create-source">{t('create.source_label')}</label>
             <select
               id="mapping-create-source"
               value={createForm.sourceType}
@@ -765,7 +826,7 @@ export default function DataSourceMappings() {
                 }))
               }
             >
-              {MAPPING_SOURCE_TYPE_OPTIONS.map((option) => (
+              {sourceTypeOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
@@ -773,7 +834,7 @@ export default function DataSourceMappings() {
             </select>
           </div>
           <div className="mapping-field">
-            <label htmlFor="mapping-create-entity-type">Tipo de entidad</label>
+            <label htmlFor="mapping-create-entity-type">{t('create.entity_type_label')}</label>
             <select
               id="mapping-create-entity-type"
               value={createForm.entityType}
@@ -785,12 +846,12 @@ export default function DataSourceMappings() {
                 }))
               }
             >
-              <option value="collaborator">Colaborador</option>
-              <option value="org_scope">Scope</option>
+              <option value="collaborator">{t('create.entity_collaborator')}</option>
+              <option value="org_scope">{t('create.entity_scope')}</option>
             </select>
           </div>
           <div className="mapping-field">
-            <label htmlFor="mapping-create-entity">Entidad</label>
+            <label htmlFor="mapping-create-entity">{t('create.entity_label')}</label>
             <select
               id="mapping-create-entity"
               value={createForm.entityId}
@@ -801,7 +862,7 @@ export default function DataSourceMappings() {
                 }))
               }
             >
-              <option value="">Seleccioná una entidad</option>
+              <option value="">{t('create.entity_placeholder')}</option>
               {availableEntities.map((entity) => (
                 <option key={entity.id} value={entity.id}>
                   {entity.label}
@@ -810,7 +871,7 @@ export default function DataSourceMappings() {
             </select>
           </div>
           <div className="mapping-field mapping-field-wide">
-            <label htmlFor="mapping-create-keys">Claves externas</label>
+            <label htmlFor="mapping-create-keys">{t('create.keys_label')}</label>
             <textarea
               id="mapping-create-keys"
               value={createForm.externalKeysText}
@@ -820,7 +881,7 @@ export default function DataSourceMappings() {
                   externalKeysText: event.target.value,
                 }))
               }
-              placeholder="Separá aliases por coma. Ej: johana, j.garcia, jgarcia@empresa.com"
+              placeholder={t('create.keys_placeholder')}
             />
           </div>
         </div>
@@ -831,31 +892,33 @@ export default function DataSourceMappings() {
             disabled={createGroupMutation.isLoading}
             onClick={() => createGroupMutation.mutate()}
           >
-            {createGroupMutation.isLoading ? 'Guardando...' : 'Crear grupo'}
+            {createGroupMutation.isLoading ? t('create.saving') : t('create.submit')}
           </button>
         </div>
       </div>
 
       <div className="card">
         <div className="card-header">
-          <h2>Grupos existentes</h2>
-          <span className="muted">{loading ? 'Cargando...' : `${filteredGroups.length} visibles`}</span>
+          <h2>{t('table.title')}</h2>
+          <span className="muted">
+            {loading ? t('table.loading') : t('table.visible', { count: filteredGroups.length })}
+          </span>
         </div>
 
         {filteredGroups.length === 0 ? (
-          <div className="empty-hint">No hay mappings para los filtros actuales.</div>
+          <div className="empty-hint">{t('table.empty')}</div>
         ) : (
           <div className="mapping-table-wrap">
             <table className="config-table mapping-table">
               <thead>
                 <tr>
-                  <th>Source</th>
-                  <th>Tipo</th>
-                  <th>Entidad</th>
-                  <th>Claves externas</th>
-                  <th>Estado</th>
-                  <th>Actualizado</th>
-                  <th>Acciones</th>
+                  <th>{t('table.col_source')}</th>
+                  <th>{t('table.col_type')}</th>
+                  <th>{t('table.col_entity')}</th>
+                  <th>{t('table.col_keys')}</th>
+                  <th>{t('table.col_status')}</th>
+                  <th>{t('table.col_updated')}</th>
+                  <th>{t('table.col_actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -868,9 +931,13 @@ export default function DataSourceMappings() {
                   return (
                     <tr key={group.groupKey} className={isDirty ? 'mapping-row-dirty' : ''}>
                       <td>
-                        <span className="mapping-chip">{getMappingSourceTypeLabel(group.sourceType)}</span>
+                        <span className="mapping-chip">{getSourceTypeLabel(group.sourceType)}</span>
                       </td>
-                      <td>{group.entityType === 'collaborator' ? 'Colaborador' : 'Scope'}</td>
+                      <td>
+                        {group.entityType === 'collaborator'
+                          ? t('filters.entity_collaborator')
+                          : t('filters.entity_scope')}
+                      </td>
                       <td>
                         <div className="mapping-entity-name">{group.entityName}</div>
                         <div className="mapping-entity-subtitle">{group.entitySubtitle}</div>
@@ -881,28 +948,28 @@ export default function DataSourceMappings() {
                           value={draftValue}
                           onChange={(event) => handleDraftChange(group.groupKey, event.target.value)}
                         />
-                        <div className="mapping-row-meta">{group.mappingsCount} claves guardadas</div>
+                        <div className="mapping-row-meta">{t('table.keys_saved', { count: group.mappingsCount })}</div>
                         {isPendingOnly ? (
-                          <div className="mapping-row-meta">Nuevo grupo cargado desde CSV o pendiente de alta.</div>
+                          <div className="mapping-row-meta">{t('table.pending_note')}</div>
                         ) : null}
                       </td>
                       <td>
                         <span className={`status-pill ${group.active ? 'ok' : 'review'}`}>
-                          {group.active ? 'Activo' : 'Inactivo'}
+                          {group.active ? t('table.active') : t('table.inactive')}
                         </span>
                       </td>
                       <td>{formatDateTime(group.updatedAt)}</td>
                       <td>
                         <div className="action-buttons">
                           <button className="btn-ghost" type="button" onClick={() => handleResetDraft(group)}>
-                            Reset
+                            {t('table.btn_reset')}
                           </button>
                           <button
                             className="btn-secondary"
                             type="button"
                             onClick={() => handleDraftChange(group.groupKey, '')}
                           >
-                            Vaciar
+                            {t('table.btn_clear')}
                           </button>
                           <button
                             className="btn-primary"
@@ -910,7 +977,7 @@ export default function DataSourceMappings() {
                             disabled={saveGroupMutation.isLoading || !isDirty}
                             onClick={() => handleSaveGroup(group)}
                           >
-                            Guardar
+                            {t('table.btn_save')}
                           </button>
                         </div>
                       </td>

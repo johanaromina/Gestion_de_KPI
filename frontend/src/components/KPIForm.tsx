@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { KPI } from '../types'
 import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
@@ -28,6 +29,7 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const queryClient = useQueryClient()
+  const { t } = useTranslation('kpis')
 
   const { data: periods } = useQuery(
     ['periods-for-kpi-form'],
@@ -136,11 +138,11 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
     const newErrors: Record<string, string> = {}
 
     if (!formData.name?.trim()) {
-      newErrors.name = 'El nombre es requerido'
+      newErrors.name = t('form.errors.name_required')
     }
 
     if (!formData.type) {
-      newErrors.type = 'El tipo es requerido'
+      newErrors.type = t('form.errors.type_required')
     }
 
     setErrors(newErrors)
@@ -189,7 +191,7 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
     >
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{kpi?.id ? 'Editar KPI' : 'Crear KPI'}</h2>
+          <h2>{kpi?.id ? t('form.title_edit') : t('form.title_create')}</h2>
           <button className="close-button" onClick={onClose}>
             x
           </button>
@@ -197,32 +199,32 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
 
         <form onSubmit={handleSubmit} className="kpi-form">
           <div className="form-group">
-            <label htmlFor="name">Nombre del KPI *</label>
+            <label htmlFor="name">{t('form.name_label')}</label>
             <input
               type="text"
               id="name"
               value={formData.name || ''}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Ej: Tiempo de respuesta promedio"
+              placeholder={t('form.name_placeholder')}
               className={errors.name ? 'error' : ''}
             />
             {errors.name && <span className="error-message">{errors.name}</span>}
           </div>
 
           <div className="form-group">
-            <label htmlFor="description">Descripción</label>
+            <label htmlFor="description">{t('form.description_label')}</label>
             <textarea
               id="description"
               value={formData.description || ''}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Describe el KPI y cómo se mide..."
+              placeholder={t('form.description_placeholder')}
               rows={3}
             />
           </div>
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="type">Tipo de KPI *</label>
+              <label htmlFor="type">{t('form.type_label')}</label>
               <select
                 id="type"
                 value={formData.type || 'value'}
@@ -242,13 +244,11 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
                 <option value="value">Value</option>
               </select>
               {errors.type && <span className="error-message">{errors.type}</span>}
-              <small className="form-hint">
-                Manual para iniciar sin integraciones. Count/Ratio/SLA/Value se automatizan cuando el criterio este estable.
-              </small>
+              <small className="form-hint">{t('form.type_hint')}</small>
             </div>
 
             <div className="form-group">
-              <label htmlFor="direction">Direccion de calculo</label>
+              <label htmlFor="direction">{t('form.direction_label')}</label>
               <select
                 id="direction"
                 value={formData.direction || (formData.type === 'sla' ? 'reduction' : 'growth')}
@@ -259,17 +259,15 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
                   })
                 }
               >
-                <option value="growth">Crecimiento (mayor es mejor)</option>
-                <option value="reduction">Reduccion (menor es mejor)</option>
-                <option value="exact">Exacto (debe coincidir)</option>
+                <option value="growth">{t('form.direction_growth')}</option>
+                <option value="reduction">{t('form.direction_reduction')}</option>
+                <option value="exact">{t('form.direction_exact')}</option>
               </select>
-              <small className="form-hint">
-                Afecta el calculo de cumplimiento (variacion).
-              </small>
+              <small className="form-hint">{t('form.direction_hint')}</small>
             </div>
 
             <div className="form-group">
-              <label htmlFor="macroKPIId">KPI agrupador (Opcional)</label>
+              <label htmlFor="macroKPIId">{t('form.macro_label')}</label>
               <select
                 id="macroKPIId"
                 value={formData.macroKPIId || ''}
@@ -280,24 +278,21 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
                   })
                 }
               >
-                <option value="">Sin KPI agrupador</option>
+                <option value="">{t('form.macro_none')}</option>
                 {availableMacroKPIs.map((macroKPI) => (
                   <option key={macroKPI.id} value={macroKPI.id}>
                     {macroKPI.name}
                   </option>
                 ))}
               </select>
-              <span className="helper-text">
-                Si este KPI forma parte de un indicador más amplio, seleccioná el KPI padre que lo agrupa.
-                El resultado del agrupador se calcula como promedio ponderado de sus KPIs hijos.
-              </span>
+              <span className="helper-text">{t('form.macro_hint')}</span>
             </div>
           </div>
 
           {/* Áreas removidas del formulario: se definen en Asignaciones (scopes/colaboradores). */}
 
           <div className="form-group">
-            <label>Períodos</label>
+            <label>{t('form.periods_label')}</label>
             <div className="checkbox-list">
               {periods?.map((p) => (
                 <label key={p.id} className="checkbox-item">
@@ -310,14 +305,14 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
                 </label>
               ))}
             </div>
-            <small className="form-hint">Selecciona los períodos donde estará vigente este KPI.</small>
+            <small className="form-hint">{t('form.periods_hint')}</small>
           </div>
 
           <div className="form-group">
-            <label>Ponderación por área (opcional)</label>
+            <label>{t('form.scope_weights_label')}</label>
             <div className="scope-weights">
               {areaScopes.length === 0 ? (
-                <div className="form-hint">No hay áreas activas para configurar.</div>
+                <div className="form-hint">{t('form.scope_weights_no_areas')}</div>
               ) : (
                 areaScopes.map((scope) => (
                   <div key={scope.id} className="scope-weight-row">
@@ -329,69 +324,71 @@ export default function KPIForm({ kpi, onClose, onSuccess }: KPIFormProps) {
                       step="0.01"
                       value={scopeWeightMap.get(scope.id) ?? ''}
                       onChange={(e) => updateScopeWeight(scope.id, Number(e.target.value))}
-                      placeholder="Ej: 25"
+                      placeholder={t('form.scope_weights_placeholder')}
                     />
                   </div>
                 ))
               )}
             </div>
-            <small className="form-hint">
-              Define el peso del KPI según el área. En Asignaciones se precarga este valor y se puede ajustar por persona.
-            </small>
+            <small className="form-hint">{t('form.scope_weights_hint')}</small>
             {totalScopeWeight > 0 && (
-              <small className="form-hint">Suma actual de pesos definidos: {totalScopeWeight.toFixed(1)}%</small>
+              <small className="form-hint">{t('form.scope_weights_total', { value: totalScopeWeight.toFixed(1) })}</small>
             )}
           </div>
 
           <div className="form-group">
-            <label htmlFor="criteria">Criterio de Cálculo</label>
+            <label htmlFor="criteria">{t('form.criteria_label')}</label>
             <textarea
               id="criteria"
               value={formData.criteria || ''}
               onChange={(e) => setFormData({ ...formData, criteria: e.target.value })}
-              placeholder="Describe cómo se calcula este KPI (fórmulas, reglas, etc.)"
+              placeholder={t('form.criteria_placeholder')}
               rows={3}
             />
-            <small className="form-hint">Ej: (Actual - Target) / Target * 100 para crecimiento</small>
+            <small className="form-hint">{t('form.criteria_hint')}</small>
           </div>
 
           <div className="form-group">
             <label htmlFor="formula">
-              Fórmula Personalizada (Opcional)
-              <span className="formula-help-icon" title="Ver ayuda">??</span>
+              {t('form.formula_label')}
+              <span className="formula-help-icon" title={t('form.formula_help_title')}>??</span>
             </label>
             <textarea
               id="formula"
               value={formData.formula || ''}
               onChange={(e) => setFormData({ ...formData, formula: e.target.value })}
-              placeholder="Ej: (actual / target) * 100"
+              placeholder={t('form.formula_placeholder')}
               rows={3}
               className={errors.formula ? 'error' : ''}
             />
             {errors.formula && <span className="error-message">{errors.formula}</span>}
             <small className="form-hint">
-              <strong>Variables disponibles:</strong> <code>target</code>, <code>actual</code>
+              <strong>{t('form.formula_vars_label')}:</strong> <code>target</code>, <code>actual</code>
               <br />
-              <strong>Operadores:</strong> +, -, *, /, ( )
+              <strong>{t('form.formula_ops_label')}:</strong> +, -, *, /, ( )
               <br />
-              <strong>Ejemplos:</strong>
+              <strong>{t('form.formula_examples_label')}:</strong>
               <br />
-              ➜ Crecimiento: <code>(actual / target) * 100</code>
+              ➜ {t('direction.growth')}: <code>(actual / target) * 100</code>
               <br />
-              ➜ Reducción: <code>(target / actual) * 100</code>
+              ➜ {t('direction.reduction')}: <code>(target / actual) * 100</code>
               <br />
-              ➜ Exacto: <code>100 - (Math.abs(actual - target) / target) * 100</code>
+              ➜ {t('direction.exact')}: <code>100 - (Math.abs(actual - target) / target) * 100</code>
               <br />
-              <em>Si se deja vacío, se usará la fórmula por defecto según el tipo de KPI.</em>
+              <em>{t('form.formula_hint')}</em>
             </small>
           </div>
 
           <div className="form-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>
-              Cancelar
+              {t('form.cancel')}
             </button>
             <button type="submit" className="btn-primary" disabled={createMutation.isLoading || updateMutation.isLoading}>
-              {createMutation.isLoading || updateMutation.isLoading ? 'Guardando...' : kpi?.id ? 'Actualizar' : 'Crear'}
+              {createMutation.isLoading || updateMutation.isLoading
+                ? t('form.saving')
+                : kpi?.id
+                ? t('form.update')
+                : t('form.create')}
             </button>
           </div>
         </form>

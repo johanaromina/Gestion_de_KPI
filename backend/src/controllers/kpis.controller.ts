@@ -18,6 +18,7 @@ import {
   resolveKpiDirectionInput,
   VALID_KPI_TYPES,
 } from '../services/kpi-definition.service'
+import { sendApiError } from '../utils/api-errors'
 
 const isConfigUser = (req: Request) => {
   const user = (req as AuthRequest).user
@@ -79,8 +80,9 @@ pool.query(`
 export const getKPIs = async (req: Request, res: Response) => {
   try {
     const { area, areaId, periodId } = req.query
+    const limit = req.query.limit !== undefined ? Math.max(1, Math.min(1000, Number(req.query.limit))) : null
+    const offset = req.query.offset !== undefined ? Math.max(0, Number(req.query.offset)) : 0
 
-    let query = 'SELECT * FROM kpis'
     const params: any[] = []
     const where: string[] = []
 
@@ -102,13 +104,20 @@ export const getKPIs = async (req: Request, res: Response) => {
       where.push('EXISTS (SELECT 1 FROM kpi_periods kp WHERE kp.kpiId = kpis.id AND kp.periodId = ?)')
       params.push(periodId)
     }
-    if (where.length > 0) {
-      query += ' WHERE ' + where.join(' AND ')
+
+    const whereClause = where.length > 0 ? ' WHERE ' + where.join(' AND ') : ''
+    const baseQuery = `SELECT * FROM kpis${whereClause} ORDER BY name ASC`
+
+    let total: number | null = null
+    let rows: KPI[]
+
+    if (limit !== null) {
+      const [[countRow]] = await pool.query<any[]>(`SELECT COUNT(*) as total FROM kpis${whereClause}`, params)
+      total = Number(countRow.total)
+      ;[rows] = await pool.query<KPI[]>(`${baseQuery} LIMIT ? OFFSET ?`, [...params, limit, offset])
+    } else {
+      ;[rows] = await pool.query<KPI[]>(baseQuery, params)
     }
-
-    query += ' ORDER BY name ASC'
-
-    const [rows] = await pool.query<KPI[]>(query, params)
 
     const ids = Array.isArray(rows) ? rows.map((r) => r.id) : []
     let periodsMap: Record<number, number[]> = {}
@@ -139,17 +148,16 @@ export const getKPIs = async (req: Request, res: Response) => {
     }
 
     const enriched = Array.isArray(rows)
-      ? rows.map((r) => ({
-          ...r,
-          periodIds: periodsMap[r.id] || [],
-          scopeWeights: weightsMap[r.id] || [],
-        }))
+      ? rows.map((r) => ({ ...r, periodIds: periodsMap[r.id] || [], scopeWeights: weightsMap[r.id] || [] }))
       : []
 
+    if (limit !== null) {
+      return res.json({ data: enriched, total: total!, limit, offset })
+    }
     res.json(enriched)
   } catch (error: any) {
     logger.error('Error fetching KPIs:', error)
-    res.status(500).json({ error: 'Error al obtener KPIs' })
+    return sendApiError(res, 500, 'KPI_FETCH_FAILED', 'Error al obtener KPIs')
   }
 }
 
@@ -162,7 +170,7 @@ export const getKPIById = async (req: Request, res: Response) => {
     )
 
     if (Array.isArray(rows) && rows.length === 0) {
-      return res.status(404).json({ error: 'KPI no encontrado' })
+      return sendApiError(res, 404, 'KPI_NOT_FOUND', 'KPI no encontrado')
     }
 
     const [areasRows] = await pool.query<any[]>('SELECT area FROM kpi_areas WHERE kpiId = ? ORDER BY area ASC', [id])
@@ -183,12 +191,14 @@ export const getKPIById = async (req: Request, res: Response) => {
     res.json({ ...rows[0], areas, periodIds, scopeWeights: weightsRows || [] })
   } catch (error: any) {
     logger.error('Error fetching KPI:', error)
-    res.status(500).json({ error: 'Error al obtener KPI' })
+    return sendApiError(res, 500, 'KPI_FETCH_BY_ID_FAILED', 'Error al obtener KPI')
   }
 }
 
 export const createKPI = async (req: Request, res: Response) => {
-  if (!isConfigUser(req)) return res.status(403).json({ error: 'Sin autorización para crear definiciones KPI' })
+  if (!isConfigUser(req)) {
+    return sendApiError(res, 403, 'KPI_FORBIDDEN_CREATE', 'Sin autorizacion para crear definiciones KPI')
+  }
   try {
     const {
       name,
@@ -208,14 +218,18 @@ export const createKPI = async (req: Request, res: Response) => {
 
     const normalizedName = parseKpiName(name)
     if (!normalizedName) {
-      return res.status(400).json({ error: 'El nombre es requerido' })
+      return sendApiError(res, 400, 'KPI_NAME_REQUIRED', 'El nombre es requerido')
     }
 
     const normalizedType = parseKpiType(type)
     if (!normalizedType) {
-      return res.status(400).json({
-        error: `Tipo de KPI inválido. Valores permitidos: ${VALID_KPI_TYPES.join(', ')}`,
-      })
+      return sendApiError(
+        res,
+        400,
+        'KPI_TYPE_INVALID',
+        `Tipo de KPI invalido. Valores permitidos: ${VALID_KPI_TYPES.join(', ')}`,
+        { validTypes: VALID_KPI_TYPES.join(', ') }
+      )
     }
 
     const normalizedDescription = normalizeOptionalText(description)
@@ -226,13 +240,13 @@ export const createKPI = async (req: Request, res: Response) => {
     const normalizedDefaultCalcRule = normalizeOptionalText(defaultCalcRule)
     const resolvedDirection = resolveKpiDirectionInput(normalizedType, direction)
 
-    // Validar fórmula si se proporciona
-    if (normalizedFormula) {
-      const validation = validateFormula(normalizedFormula)
-      if (!validation.valid) {
-        return res.status(400).json({ error: validation.error })
+      // Validar fórmula si se proporciona
+      if (normalizedFormula) {
+        const validation = validateFormula(normalizedFormula)
+        if (!validation.valid) {
+          return sendApiError(res, 400, 'KPI_FORMULA_INVALID', validation.error || 'Fórmula inválida')
+        }
       }
-    }
 
     const conn = await pool.getConnection()
     try {
@@ -318,12 +332,14 @@ export const createKPI = async (req: Request, res: Response) => {
     }
   } catch (error: any) {
     logger.error('Error creating KPI:', error)
-    res.status(500).json({ error: 'Error al crear KPI' })
+    return sendApiError(res, 500, 'KPI_CREATE_FAILED', 'Error al crear KPI')
   }
 }
 
 export const updateKPI = async (req: Request, res: Response) => {
-  if (!isConfigUser(req)) return res.status(403).json({ error: 'Sin autorización para editar definiciones KPI' })
+  if (!isConfigUser(req)) {
+    return sendApiError(res, 403, 'KPI_FORBIDDEN_UPDATE', 'Sin autorizacion para editar definiciones KPI')
+  }
   try {
     const { id } = req.params
     const {
@@ -344,14 +360,18 @@ export const updateKPI = async (req: Request, res: Response) => {
 
     const normalizedName = parseKpiName(name)
     if (!normalizedName) {
-      return res.status(400).json({ error: 'El nombre es requerido' })
+      return sendApiError(res, 400, 'KPI_NAME_REQUIRED', 'El nombre es requerido')
     }
 
     const normalizedType = parseKpiType(type)
     if (!normalizedType) {
-      return res.status(400).json({
-        error: `Tipo de KPI inválido. Valores permitidos: ${VALID_KPI_TYPES.join(', ')}`,
-      })
+      return sendApiError(
+        res,
+        400,
+        'KPI_TYPE_INVALID',
+        `Tipo de KPI invalido. Valores permitidos: ${VALID_KPI_TYPES.join(', ')}`,
+        { validTypes: VALID_KPI_TYPES.join(', ') }
+      )
     }
 
     const normalizedDescription = normalizeOptionalText(description)
@@ -361,13 +381,13 @@ export const updateKPI = async (req: Request, res: Response) => {
     const normalizedDefaultCriteriaTemplate = normalizeOptionalText(defaultCriteriaTemplate)
     const normalizedDefaultCalcRule = normalizeOptionalText(defaultCalcRule)
 
-    // Validar fórmula si se proporciona
-    if (normalizedFormula) {
-      const validation = validateFormula(normalizedFormula)
-      if (!validation.valid) {
-        return res.status(400).json({ error: validation.error })
+      // Validar fórmula si se proporciona
+      if (normalizedFormula) {
+        const validation = validateFormula(normalizedFormula)
+        if (!validation.valid) {
+          return sendApiError(res, 400, 'KPI_FORMULA_INVALID', validation.error || 'Fórmula inválida')
+        }
       }
-    }
 
     const conn = await pool.getConnection()
     try {
@@ -396,7 +416,7 @@ export const updateKPI = async (req: Request, res: Response) => {
       )
       if (Number((updateResult as any).affectedRows || 0) === 0) {
         await conn.rollback()
-        return res.status(404).json({ error: 'KPI no encontrado' })
+        return sendApiError(res, 404, 'KPI_NOT_FOUND', 'KPI no encontrado')
       }
 
       if (Array.isArray(areas)) {
@@ -521,12 +541,14 @@ export const updateKPI = async (req: Request, res: Response) => {
     res.json({ message: 'KPI actualizado correctamente' })
   } catch (error: any) {
     logger.error('Error updating KPI:', error)
-    res.status(500).json({ error: 'Error al actualizar KPI' })
+    return sendApiError(res, 500, 'KPI_UPDATE_FAILED', 'Error al actualizar KPI')
   }
 }
 
 export const deleteKPI = async (req: Request, res: Response) => {
-  if (!isConfigUser(req)) return res.status(403).json({ error: 'Sin autorización para eliminar definiciones KPI' })
+  if (!isConfigUser(req)) {
+    return sendApiError(res, 403, 'KPI_FORBIDDEN_DELETE', 'Sin autorizacion para eliminar definiciones KPI')
+  }
   try {
     const { id } = req.params
 
@@ -544,19 +566,17 @@ export const deleteKPI = async (req: Request, res: Response) => {
       Number(usage?.objectiveLinks ?? 0)
 
     if (totalReferences > 0) {
-      return res.status(409).json({
-        error: 'Este KPI está en uso y no puede eliminarse.',
-      })
+      return sendApiError(res, 409, 'KPI_DELETE_IN_USE', 'Este KPI esta en uso y no puede eliminarse.')
     }
 
     const [result] = await pool.query<any>('DELETE FROM kpis WHERE id = ?', [id])
     if (Number((result as any).affectedRows || 0) === 0) {
-      return res.status(404).json({ error: 'KPI no encontrado' })
+      return sendApiError(res, 404, 'KPI_NOT_FOUND', 'KPI no encontrado')
     }
 
     res.json({ message: 'KPI eliminado correctamente' })
   } catch (error: any) {
     logger.error('Error deleting KPI:', error)
-    res.status(500).json({ error: 'Error al eliminar KPI' })
+    return sendApiError(res, 500, 'KPI_DELETE_FAILED', 'Error al eliminar KPI')
   }
 }

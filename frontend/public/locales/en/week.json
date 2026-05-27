@@ -1,0 +1,28 @@
+{
+  "loading": "Loading your week...",
+  "title": "My week",
+  "subtitle": "Week of {{range}}",
+  "checkin_done": "Check-in ✓",
+  "empty": "You have no active KRs or KPIs assigned this week.",
+  "objective_link_title": "View objective",
+  "last_update": "Last: {{value}}",
+  "result": "Result: {{value}}%",
+  "sections": {
+    "assigned_krs": "Assigned Key Results",
+    "my_kpis": "My period KPIs"
+  },
+  "actions": {
+    "weekly_checkin": "Complete weekly check-in",
+    "update": "Update",
+    "saved": "✓ Saved"
+  },
+  "input": {
+    "new_value": "New value",
+    "optional_note": "Note (optional)"
+  },
+  "relative_day": {
+    "today": "today",
+    "yesterday": "yesterday",
+    "days_ago": "{{count}} days ago"
+  }
+}

@@ -3,6 +3,7 @@ import { pool } from '../config/database'
 import { ObjectiveTree, KPI, ScopeKPI } from '../types'
 import { hydrateScopeKpiMixedFields } from '../services/scope-kpi-mixed.service'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 const parseIdArray = (value: any) =>
   Array.from(
@@ -180,6 +181,19 @@ const getObjectiveTreeRowOrThrow = async (id: number) => {
   return rows[0]
 }
 
+const sendObjectiveTreeError = (
+  res: Response,
+  error: any,
+  fallbackCode: string,
+  fallbackMessage: string
+) => {
+  const message = error?.message || fallbackMessage
+  if (message === 'Objetivo no encontrado') {
+    return sendApiError(res, 404, 'OBJECTIVE_TREE_NOT_FOUND', 'Objetivo no encontrado')
+  }
+  return sendApiError(res, 500, fallbackCode, message)
+}
+
 export const getObjectiveTrees = async (_req: Request, res: Response) => {
   try {
     const allKpis = await fetchAllKpisWithAreas()
@@ -235,7 +249,7 @@ export const getObjectiveTrees = async (_req: Request, res: Response) => {
     res.json(objectivesWithRelations)
   } catch (error: any) {
     logger.error('Error fetching objective trees:', error)
-    res.status(500).json({ error: 'Error al obtener árbol de objetivos' })
+    return sendApiError(res, 500, 'OBJECTIVE_TREE_FETCH_FAILED', 'Error al obtener árbol de objetivos')
   }
 }
 
@@ -259,9 +273,8 @@ export const getObjectiveTreeById = async (req: Request, res: Response) => {
       scopeKpis: scopeKpisByObjective.get(id) || [],
     })
   } catch (error: any) {
-    const message = error?.message || 'Error al obtener objetivo'
     logger.error('Error fetching objective tree:', error)
-    res.status(message === 'Objetivo no encontrado' ? 404 : 500).json({ error: message })
+    return sendObjectiveTreeError(res, error, 'OBJECTIVE_TREE_FETCH_ONE_FAILED', 'Error al obtener objetivo')
   }
 }
 
@@ -272,9 +285,8 @@ export const getObjectiveTreeScopeKpis = async (req: Request, res: Response) => 
     const scopeKpisByObjective = await fetchScopeKpisForObjectives([id])
     res.json(scopeKpisByObjective.get(id) || [])
   } catch (error: any) {
-    const message = error?.message || 'Error al obtener Scope KPIs del objetivo'
     logger.error('Error fetching objective tree scope KPIs:', error)
-    res.status(message === 'Objetivo no encontrado' ? 404 : 500).json({ error: message })
+    return sendObjectiveTreeError(res, error, 'OBJECTIVE_TREE_SCOPE_KPIS_FETCH_FAILED', 'Error al obtener Scope KPIs del objetivo')
   }
 }
 
@@ -303,9 +315,8 @@ export const getObjectiveTreeDrilldown = async (req: Request, res: Response) => 
       })),
     })
   } catch (error: any) {
-    const message = error?.message || 'Error al obtener drill-down del objetivo'
     logger.error('Error fetching objective tree drilldown:', error)
-    res.status(message === 'Objetivo no encontrado' ? 404 : 500).json({ error: message })
+    return sendObjectiveTreeError(res, error, 'OBJECTIVE_TREE_DRILLDOWN_FETCH_FAILED', 'Error al obtener drill-down del objetivo')
   }
 }
 
@@ -317,7 +328,7 @@ export const createObjectiveTree = async (req: Request, res: Response) => {
     const scopeKpiIds = parseIdArray(req.body?.scopeKpiIds)
 
     if (!level || !name) {
-      return res.status(400).json({ error: 'Faltan campos requeridos' })
+      return sendApiError(res, 400, 'OBJECTIVE_TREE_FIELDS_REQUIRED', 'Faltan campos requeridos')
     }
 
     await connection.beginTransaction()
@@ -343,7 +354,7 @@ export const createObjectiveTree = async (req: Request, res: Response) => {
   } catch (error: any) {
     await connection.rollback()
     logger.error('Error creating objective tree:', error)
-    res.status(500).json({ error: 'Error al crear objetivo' })
+    return sendApiError(res, 500, 'OBJECTIVE_TREE_CREATE_FAILED', 'Error al crear objetivo')
   } finally {
     connection.release()
   }
@@ -372,7 +383,7 @@ export const updateObjectiveTree = async (req: Request, res: Response) => {
   } catch (error: any) {
     await connection.rollback()
     logger.error('Error updating objective tree:', error)
-    res.status(500).json({ error: 'Error al actualizar objetivo' })
+    return sendApiError(res, 500, 'OBJECTIVE_TREE_UPDATE_FAILED', 'Error al actualizar objetivo')
   } finally {
     connection.release()
   }
@@ -398,9 +409,8 @@ export const syncObjectiveTreeScopeKpis = async (req: Request, res: Response) =>
     res.json({ message: 'Scope KPIs del objetivo sincronizados', count: scopeKpiIds.length })
   } catch (error: any) {
     await connection.rollback()
-    const message = error?.message || 'Error al sincronizar Scope KPIs del objetivo'
     logger.error('Error syncing objective tree scope KPIs:', error)
-    res.status(message === 'Objetivo no encontrado' ? 404 : 500).json({ error: message })
+    return sendObjectiveTreeError(res, error, 'OBJECTIVE_TREE_SCOPE_KPIS_SYNC_FAILED', 'Error al sincronizar Scope KPIs del objetivo')
   } finally {
     connection.release()
   }
@@ -414,7 +424,7 @@ export const getOKRsForObjectiveTree = async (req: Request, res: Response) => {
     res.json(okrs)
   } catch (error: any) {
     logger.error('Error fetching OKRs for objective tree:', error)
-    res.status(500).json({ error: 'Error al obtener OKRs vinculados' })
+    return sendApiError(res, 500, 'OBJECTIVE_TREE_OKRS_FETCH_FAILED', 'Error al obtener OKRs vinculados')
   }
 }
 
@@ -425,6 +435,6 @@ export const deleteObjectiveTree = async (req: Request, res: Response) => {
     res.json({ message: 'Objetivo eliminado correctamente' })
   } catch (error: any) {
     logger.error('Error deleting objective tree:', error)
-    res.status(500).json({ error: 'Error al eliminar objetivo' })
+    return sendApiError(res, 500, 'OBJECTIVE_TREE_DELETE_FAILED', 'Error al eliminar objetivo')
   }
 }

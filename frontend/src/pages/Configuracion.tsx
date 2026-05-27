@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
+import { Trans, useTranslation } from 'react-i18next'
+import i18n from '../i18n'
 import api from '../services/api'
 import { useAuth } from '../hooks/useAuth'
 import SubPeriodForm from '../components/SubPeriodForm'
@@ -11,8 +13,6 @@ import './Configuracion.css'
 import { PreviewSourceMeta } from './configuracion/PreviewSourceMeta'
 import {
   buildTemplatePreset,
-  getAuthProfileHint,
-  metricTypeLabel,
   metricTypeToBackend,
   type TemplateFormState,
   type TemplatePreset,
@@ -26,6 +26,40 @@ import {
   normalizeMappingSourceType,
   parseExternalKeysText,
 } from '../utils/dataSourceMappings'
+import { resolveApiErrorMessage } from '../utils/apiErrors'
+
+const TEMPLATE_API_ERROR_KEYS: Record<string, string> = {
+  INTEGRATION_TEMPLATE_NAME_REQUIRED: 'config:api_errors.template_name_required',
+  INTEGRATION_TEMPLATE_CRON_INVALID: 'config:api_errors.template_cron_invalid',
+  INTEGRATION_TEMPLATE_CREATE_FAILED: 'config:errors.save_template',
+  INTEGRATION_TEMPLATE_UPDATE_FAILED: 'config:errors.save_template',
+}
+
+const DATASOURCE_MAPPING_API_ERROR_KEYS: Record<string, string> = {
+  DATASOURCE_MAPPING_ENTITY_TYPE_INVALID: 'config:api_errors.mapping_entity_type_invalid',
+  DATASOURCE_MAPPING_ENTITY_ID_REQUIRED: 'config:api_errors.mapping_entity_id_required',
+  DATASOURCE_MAPPING_ENTITY_NOT_FOUND: 'config:api_errors.mapping_entity_not_found',
+  DATASOURCE_MAPPING_ITEMS_REQUIRED: 'config:api_errors.mapping_items_required',
+}
+
+const ORG_SCOPE_API_ERROR_KEYS: Record<string, string> = {
+  ORG_SCOPE_DELETE_HAS_CHILDREN: 'config:api_errors.org_delete_has_children',
+  ORG_SCOPE_DELETE_HAS_COLLABORATORS: 'config:api_errors.org_delete_has_collaborators',
+  ORG_SCOPE_DELETE_HAS_ASSIGNMENTS: 'config:api_errors.org_delete_has_assignments',
+  ORG_SCOPE_DELETE_HAS_TARGETS: 'config:api_errors.org_delete_has_targets',
+}
+
+const INTEGRATION_TEMPLATE_TEST_API_ERROR_KEYS: Record<string, string> = {
+  INTEGRATION_TEMPLATE_NOT_FOUND: 'config:api_errors.template_not_found',
+  INTEGRATION_TEMPLATE_TEST_REQUIRED_FIELDS: 'config:api_errors.template_test_required_fields',
+  INTEGRATION_TEMPLATE_TEST_RATIO_REQUIRED: 'config:api_errors.template_test_ratio_required',
+}
+
+const EMAIL_TEST_API_ERROR_KEYS: Record<string, string> = {
+  NOTIFICATION_EMAIL_SMTP_NOT_CONFIGURED: 'config:api_errors.email_smtp_not_configured',
+  NOTIFICATION_EMAIL_SMTP_CONNECTION_FAILED: 'config:api_errors.email_smtp_connection_failed',
+  NOTIFICATION_EMAIL_TO_REQUIRED: 'config:api_errors.email_to_required',
+}
 
 type Collaborator = {
   id: number
@@ -168,13 +202,99 @@ const ORG_SCOPE_TYPE_LABELS: Record<string, string> = {
   product: 'Producto',
 }
 
-const getOrgScopeTypeLabel = (type?: string) =>
-  ORG_SCOPE_TYPE_LABELS[String(type || '').trim().toLowerCase()] || type || 'Sin tipo'
+const getOrgScopeTypeLabel = (type?: string | null) =>
+  i18n.t(`security:scope_types.${String(type || '').trim().toLowerCase()}`, {
+    defaultValue:
+      ORG_SCOPE_TYPE_LABELS[String(type || '').trim().toLowerCase()] ||
+      i18n.t('config:scope_modal.unknown_type') ||
+      type ||
+      'Sin tipo',
+  })
 
 export default function Configuracion() {
+  const { t } = useTranslation(['config', 'common', 'security', 'datasource'])
   const { user } = useAuth()
   const dialog = useDialog()
   const queryClient = useQueryClient()
+  const getConnectorLabel = (connector?: string | null) =>
+    connector ? t(`config:options.connectors.${connector}`, { defaultValue: connector }) : '-'
+  const getMetricTypeLabel = (metricType?: string | null) =>
+    metricType ? t(`config:options.metric_types.${metricType}`, { defaultValue: metricType }) : '-'
+  const getAuthTypeLabel = (authType?: string | null) =>
+    authType ? t(`config:options.auth_types.${authType}`, { defaultValue: authType }) : '-'
+  const getFrequencyLabel = (frequency?: string | null) =>
+    frequency ? t(`config:options.frequencies.${frequency}`, { defaultValue: frequency }) : '-'
+  const getRunStatusLabel = (status?: string | null) =>
+    status ? t(`config:options.run_status.${status}`, { defaultValue: status }) : '-'
+  const getConfigSourceTypeLabel = (sourceType?: string | null) =>
+    sourceType
+      ? t(`datasource:source_types.${normalizeMappingSourceType(sourceType)}`, {
+          defaultValue: getMappingSourceTypeLabel(sourceType),
+        })
+      : '-'
+  const getPresetLabel = (preset: TemplatePreset) =>
+    t(`config:template_modal.quick_template_labels.${preset}`, {
+      defaultValue: preset,
+    })
+  const getTemplatePrimaryLabel = (connector?: string | null) => {
+    if (connector === 'jira' || connector === 'xray') return t('config:template_modal.labels.filter_a')
+    if (connector === 'generic_api') return t('config:template_modal.labels.request_config')
+    if (connector === 'looker') return t('config:template_modal.labels.looker_config')
+    return t('config:template_modal.labels.config_a')
+  }
+  const getTemplateSecondaryLabel = (connector?: string | null) => {
+    if (connector === 'jira' || connector === 'xray') return t('config:template_modal.labels.filter_b')
+    return t('config:template_modal.labels.config_b')
+  }
+  const getTemplatePrimaryHint = (connector?: string | null, metricType?: string | null) => {
+    if (connector === 'jira' || connector === 'xray') {
+      if (metricType === 'sla') return t('config:template_modal.examples.primary_sla_jira')
+      if (metricType === 'ratio') return t('config:template_modal.examples.primary_ratio_jira')
+      return t('config:template_modal.examples.primary_default_jira')
+    }
+    if (connector === 'generic_api') return t('config:template_modal.examples.primary_generic_api')
+    if (connector === 'looker') return t('config:template_modal.examples.primary_looker')
+    return t('config:template_modal.examples.primary_default')
+  }
+  const getTemplateSecondaryHint = (connector?: string | null, metricType?: string | null) => {
+    if (connector === 'jira' || connector === 'xray') {
+      if (metricType === 'sla') return t('config:template_modal.examples.secondary_sla_jira')
+      return t('config:template_modal.examples.secondary_default_jira')
+    }
+    if (connector === 'generic_api') return t('config:template_modal.examples.secondary_generic_api')
+    if (connector === 'looker') return t('config:template_modal.examples.secondary_looker')
+    return t('config:template_modal.examples.secondary_default')
+  }
+  const getTemplateSingleConfigHint = (connector?: string | null, metricType?: string | null) => {
+    if (metricType === 'manual') return t('config:template_modal.examples.single_manual')
+    if (connector === 'generic_api') return t('config:template_modal.examples.single_generic_api')
+    if (connector === 'looker') return t('config:template_modal.examples.single_looker')
+    return t('config:template_modal.examples.single_default')
+  }
+  const getAuthEndpointHint = (connector?: string | null) => {
+    if (connector === 'sheets') return t('config:auth_modal.endpoint_hints.sheets')
+    if (connector === 'looker') return t('config:auth_modal.endpoint_hints.looker')
+    if (connector === 'generic_api') return t('config:auth_modal.endpoint_hints.generic_api')
+    return t('config:auth_modal.endpoint_hints.default')
+  }
+  const getAuthProfileHint = (connector?: string | null) => {
+    if (connector === 'jira' || connector === 'xray') return t('config:auth_modal.auth_profile_hints.jira_xray')
+    if (connector === 'sheets') return t('config:auth_modal.auth_profile_hints.sheets')
+    if (connector === 'generic_api') return t('config:auth_modal.auth_profile_hints.generic_api')
+    if (connector === 'looker') return t('config:auth_modal.auth_profile_hints.looker')
+    if (connector === 'manual') return t('config:auth_modal.auth_profile_hints.manual')
+    return ''
+  }
+  const formatAssignmentOptionLabel = (assignment: any) =>
+    `${assignment.collaboratorName || t('config:target_modal.fallbacks.collaborator', { id: assignment.collaboratorId })} · ${
+      assignment.kpiName || t('config:target_modal.fallbacks.kpi', { id: assignment.kpiId })
+    } · ${assignment.periodName || t('config:target_modal.fallbacks.period', { id: assignment.periodId })}`
+  const formatScopeKpiOptionLabel = (scopeKpi: any) =>
+    `${scopeKpi.name} · ${
+      scopeKpi.orgScopeName || t('config:target_modal.fallbacks.scope', { id: scopeKpi.orgScopeId })
+    } · ${scopeKpi.periodName || t('config:target_modal.fallbacks.period', { id: scopeKpi.periodId })}`
+  const formatTargetScopeLabel = (scopeType?: string | null, scopeName?: string | null) =>
+    `${getOrgScopeTypeLabel(scopeType)} · ${scopeName || '-'}`
   const [activeIntegrationTab, setActiveIntegrationTab] = useState<'templates' | 'targets' | 'runs' | 'auth'>(
     'templates'
   )
@@ -425,30 +545,30 @@ export default function Configuracion() {
     () => [
       {
         id: 'areas',
-        label: 'Áreas y equipos',
-        description: 'Creá la estructura organizacional base.',
+        label: t('config:guide.checklist.areas_label'),
+        description: t('config:guide.checklist.areas_desc'),
         ready: activeAreaScopes.length > 0,
       },
       {
         id: 'collaborators',
-        label: 'Colaboradores',
-        description: 'Cargá personas y asignales área y jefe directo.',
+        label: t('config:guide.checklist.collaborators_label'),
+        description: t('config:guide.checklist.collaborators_desc'),
         ready: Boolean(collaborators?.length),
       },
       {
         id: 'periods',
-        label: 'Períodos',
-        description: 'Definí al menos un período activo para operar.',
+        label: t('config:guide.checklist.periods_label'),
+        description: t('config:guide.checklist.periods_desc'),
         ready: Boolean(periods?.length),
       },
       {
         id: 'assignments',
-        label: 'Asignaciones',
-        description: 'Asigná KPIs con metas a cada colaborador.',
+        label: t('config:guide.checklist.assignments_label'),
+        description: t('config:guide.checklist.assignments_desc'),
         ready: Boolean(assignments?.length),
       },
     ],
-    [activeAreaScopes.length, assignments?.length, collaborators?.length, periods?.length]
+    [activeAreaScopes.length, assignments?.length, collaborators?.length, periods?.length, t]
   )
 
   const setupBaseReady =
@@ -604,7 +724,7 @@ export default function Configuracion() {
 
   const authProfileHint = useMemo(() => {
     return getAuthProfileHint(templateForm.connector)
-  }, [templateForm.connector])
+  }, [templateForm.connector, t])
 
   const selectedTargetTemplate = useMemo(() => {
     const templateId = Number(targetForm.templateId || selectedTemplateId || 0)
@@ -615,7 +735,7 @@ export default function Configuracion() {
   const convertJqlToParams = () => {
     const jql = rawJqlInput.trim()
     if (!jql) {
-      setTargetFormError('Pega un JQL para convertir.')
+      setTargetFormError(t('config:errors.paste_jql'))
       return
     }
     const normalized = jql.replace(/\s+/g, ' ').trim()
@@ -839,7 +959,7 @@ export default function Configuracion() {
           current = parsed
         }
       } catch {
-        setTargetFormError('El JSON de params no es válido. Corregilo antes de usar el editor de mapping.')
+        setTargetFormError(t('config:errors.invalid_params_json_editor'))
         return false
       }
     }
@@ -1049,7 +1169,9 @@ export default function Configuracion() {
     })
     setTargetDraftPreviewMessage('')
     setToastMessage(
-      mode === 'unmapped' ? `Claves faltantes agregadas al editor: ${nextRows.length}` : `Filas cargadas desde preview: ${nextRows.length}`
+      mode === 'unmapped'
+        ? t('config:messages.preview_rows_unmapped_loaded', { count: nextRows.length })
+        : t('config:messages.preview_rows_loaded', { count: nextRows.length })
     )
     setTimeout(() => setToastMessage(''), 2500)
   }
@@ -1389,7 +1511,10 @@ export default function Configuracion() {
                       })
       },
       onError: (error: any) => {
-        setTemplateFormError(error?.response?.data?.error || error?.message || 'Error al guardar plantilla')
+        setTemplateFormError(resolveApiErrorMessage(error, t, {
+          codeMap: TEMPLATE_API_ERROR_KEYS,
+          fallbackKey: 'config:errors.save_template',
+        }))
       },
     }
   )
@@ -1406,21 +1531,19 @@ export default function Configuracion() {
         ? 1
         : 0
       if (targetRequiresStructuredParams && targetMissingParamKeys.length > 0) {
-        throw new Error(`Faltan params requeridos: ${targetMissingParamKeys.join(', ')}`)
+        throw new Error(t('config:errors.required_params', { keys: targetMissingParamKeys.join(', ') }))
       }
       if (targetParamsInvalidJson) {
-        throw new Error('El JSON de params no es válido')
+        throw new Error(t('config:errors.invalid_params_json'))
       }
       if (targetForm.assignmentId && usersCount > 1) {
-        throw new Error(
-          'Target con multiples users no puede asignarse a un KPI individual. Usa un target por persona o quita la asignacion.'
-        )
+        throw new Error(t('config:errors.multiple_users_assignment'))
       }
       if (parsedParams?.targetMap && (targetForm.assignmentId || targetForm.scopeKpiId)) {
-        throw new Error('Un target con mapping por filas no puede apuntar también a una asignación o Scope KPI directo')
+        throw new Error(t('config:errors.mapping_and_direct_destination'))
       }
       if (targetForm.assignmentId && targetForm.scopeKpiId) {
-        throw new Error('Un target solo puede apuntar a asignación o Scope KPI')
+        throw new Error(t('config:errors.single_destination_only'))
       }
       const selectedScope = orgScopes?.find((scope) => scope.id === Number(targetForm.orgScopeId))
       const selectedScopeKpi = scopeKpis?.find((scopeKpi) => scopeKpi.id === Number(targetForm.scopeKpiId))
@@ -1461,7 +1584,7 @@ export default function Configuracion() {
         })
       },
       onError: (error: any) => {
-        setTargetFormError(error?.message || 'Error al guardar target')
+        setTargetFormError(error?.message || t('config:errors.save_target'))
       },
     }
   )
@@ -1475,7 +1598,7 @@ export default function Configuracion() {
         .filter((item) => item.selection?.entityId)
 
       if (rowsToPersist.length === 0) {
-        throw new Error('Seleccioná al menos un destino para crear mappings explícitos')
+        throw new Error(t('config:errors.select_mapping_destination'))
       }
 
       const grouped = new Map<
@@ -1500,11 +1623,11 @@ export default function Configuracion() {
         if (row.ownerType === 'assignment') {
           const assignment = assignmentGroupById.get(selectedId)
           if (!assignment) {
-            throw new Error(`La asignación seleccionada ya no está disponible para ${row.externalKey}`)
+            throw new Error(t('config:errors.assignment_unavailable', { key: row.externalKey }))
           }
           const collaboratorId = Number(assignment.collaboratorId || 0)
           if (!collaboratorId) {
-            throw new Error(`No se pudo resolver el colaborador base para ${row.externalKey}`)
+            throw new Error(t('config:errors.base_collaborator_unresolved', { key: row.externalKey }))
           }
           const groupKey = `${targetExplicitMappingSourceType}:collaborator:${collaboratorId}`
           if (!grouped.has(groupKey)) {
@@ -1532,11 +1655,11 @@ export default function Configuracion() {
 
         const scopeKpi = scopeKpiById.get(selectedId)
         if (!scopeKpi) {
-          throw new Error(`El Scope KPI seleccionado ya no está disponible para ${row.externalKey}`)
+          throw new Error(t('config:errors.scope_kpi_unavailable', { key: row.externalKey }))
         }
         const orgScopeId = Number(scopeKpi.orgScopeId || 0)
         if (!orgScopeId) {
-          throw new Error(`No se pudo resolver el scope base para ${row.externalKey}`)
+          throw new Error(t('config:errors.base_scope_unresolved', { key: row.externalKey }))
         }
         const groupKey = `${targetExplicitMappingSourceType}:org_scope:${orgScopeId}`
         if (!grouped.has(groupKey)) {
@@ -1596,11 +1719,17 @@ export default function Configuracion() {
           )
         )
         setTargetFormError('')
-        setToastMessage(`Mappings explícitos guardados y filas resueltas: ${result.rowCount}`)
+        setToastMessage(t('config:messages.explicit_mappings_saved', { count: result.rowCount }))
         setTimeout(() => setToastMessage(''), 2500)
       },
       onError: (error: any) => {
-        setTargetFormError(error?.response?.data?.error || error?.message || 'Error al guardar mappings explícitos')
+        setTargetFormError(
+          resolveApiErrorMessage(error, t, {
+            codeMap: DATASOURCE_MAPPING_API_ERROR_KEYS,
+            fallbackKey: 'config:errors.save_explicit_mappings',
+            fallbackValue: error?.message || t('config:errors.save_explicit_mappings'),
+          })
+        )
       },
     }
   )
@@ -1630,7 +1759,11 @@ export default function Configuracion() {
         queryClient.invalidateQueries(['integration-targets', selectedTemplateId])
         const created = summary?.created || 0
         const skipped = summary?.skipped || 0
-        setToastMessage(`Targets creados: ${created}${skipped ? ` · ya existian: ${skipped}` : ''}`)
+        setToastMessage(
+          skipped
+            ? t('config:messages.targets_created_with_existing', { created, skipped })
+            : t('config:messages.targets_created', { count: created })
+        )
         setTimeout(() => setToastMessage(''), 2500)
       },
     }
@@ -1651,7 +1784,7 @@ export default function Configuracion() {
       }
     })
     if (toCreate.length === 0 && toEnable.length === 0) {
-      setToastMessage('No hay cambios para aplicar.')
+      setToastMessage(t('config:messages.no_changes_to_apply'))
       setTimeout(() => setToastMessage(''), 2500)
       return
     }
@@ -1674,20 +1807,20 @@ export default function Configuracion() {
         })
       )
       queryClient.invalidateQueries(['integration-targets', selectedTemplateId])
-      setToastMessage(`Targets habilitados: ${toEnable.length}`)
+      setToastMessage(t('config:messages.targets_enabled', { count: toEnable.length }))
       setTimeout(() => setToastMessage(''), 2500)
     }
   }
 
   const openTargetWizard = (target: IntegrationTarget) => {
     if (!target.params?.users || !Array.isArray(target.params.users)) {
-      setToastMessage('El target no tiene lista de users para duplicar.')
+      setToastMessage(t('config:errors.target_missing_users'))
       setTimeout(() => setToastMessage(''), 2500)
       return
     }
     const users = target.params.users.filter((user: any) => user)
     if (users.length === 0) {
-      setToastMessage('No hay users en params para duplicar.')
+      setToastMessage(t('config:messages.no_users_to_duplicate'))
       setTimeout(() => setToastMessage(''), 2500)
       return
     }
@@ -1738,14 +1871,18 @@ export default function Configuracion() {
         queryClient.invalidateQueries(['integration-targets', selectedTemplateId])
         const created = summary?.created || 0
         const skipped = summary?.skipped || 0
-        setToastMessage(`Targets creados: ${created}${skipped ? ` · omitidos: ${skipped}` : ''}`)
+        setToastMessage(
+          skipped
+            ? t('config:messages.targets_created_with_skipped', { created, skipped })
+            : t('config:messages.targets_created', { count: created })
+        )
         setTimeout(() => setToastMessage(''), 2500)
         setShowTargetWizard(false)
         setWizardTarget(null)
         setWizardRows([])
       },
       onError: (error: any) => {
-        setToastMessage(error?.message || 'Error al crear targets')
+        setToastMessage(error?.message || t('config:messages.create_targets_error'))
         setTimeout(() => setToastMessage(''), 2500)
       },
     }
@@ -1754,11 +1891,11 @@ export default function Configuracion() {
   const duplicateTargetByUsers = useMutation(
     async (target: IntegrationTarget) => {
       if (!target.params?.users || !Array.isArray(target.params.users)) {
-        throw new Error('El target no tiene lista de users para duplicar.')
+        throw new Error(t('config:errors.target_missing_users'))
       }
       const users = target.params.users.filter((user: any) => user)
       if (users.length <= 1) {
-        throw new Error('Necesitas al menos 2 users para duplicar.')
+        throw new Error(t('config:errors.target_min_users'))
       }
       const existing = existingTargetUsers.get(String(target.templateId)) || new Set<string>()
       let created = 0
@@ -1790,11 +1927,15 @@ export default function Configuracion() {
         queryClient.invalidateQueries(['integration-targets', selectedTemplateId])
         const created = summary?.created || 0
         const skipped = summary?.skipped || 0
-        setToastMessage(`Targets por usuario: ${created}${skipped ? ` · ya existian: ${skipped}` : ''}`)
+        setToastMessage(
+          skipped
+            ? t('config:messages.targets_by_user_with_skipped', { created, skipped })
+            : t('config:messages.targets_by_user', { created })
+        )
         setTimeout(() => setToastMessage(''), 2500)
       },
       onError: (error: any) => {
-        setToastMessage(error?.message || 'Error al duplicar targets')
+        setToastMessage(error?.message || t('config:messages.duplicate_targets_error'))
         setTimeout(() => setToastMessage(''), 2500)
       },
     }
@@ -1803,7 +1944,7 @@ export default function Configuracion() {
   const createTargetsNewAreas = async () => {
     if (!selectedTemplateId) return
     if (missingAreaScopes.length === 0) {
-      setToastMessage('No hay areas nuevas para crear targets.')
+      setToastMessage(t('config:messages.no_new_areas'))
       setTimeout(() => setToastMessage(''), 2500)
       return
     }
@@ -1839,7 +1980,9 @@ export default function Configuracion() {
       onSuccess: (summary: any) => {
         queryClient.invalidateQueries(['integration-targets', selectedTemplateId])
         const updated = summary?.updated || 0
-        setToastMessage(updated ? `Targets desactivados: ${updated}` : 'No hay targets para desactivar.')
+        setToastMessage(
+          updated ? t('config:messages.targets_deactivated', { count: updated }) : t('config:messages.no_targets_to_deactivate')
+        )
         setTimeout(() => setToastMessage(''), 2500)
       },
     }
@@ -1992,7 +2135,7 @@ export default function Configuracion() {
         setScopeMappingSourceType(DEFAULT_MAPPING_SOURCE_TYPE)
         setScopeAdvancedOpen(false)
         if (data?.warning) {
-          void dialog.alert(data.warning, { title: 'Advertencia', variant: 'warning' })
+          void dialog.alert(data.warning, { title: t('config:dialog_titles.warning'), variant: 'warning' })
         }
       },
     }
@@ -2008,7 +2151,13 @@ export default function Configuracion() {
         queryClient.invalidateQueries('org-scopes')
       },
       onError: (error: any) => {
-        void dialog.alert(error.response?.data?.error || 'Error al eliminar la unidad organizacional', { title: 'Error', variant: 'danger' })
+        void dialog.alert(
+          resolveApiErrorMessage(error, t, {
+            codeMap: ORG_SCOPE_API_ERROR_KEYS,
+            fallbackKey: 'config:org.delete_error',
+          }),
+          { title: t('common:error_title'), variant: 'danger' }
+        )
       },
     }
   )
@@ -2033,7 +2182,7 @@ export default function Configuracion() {
       onSuccess: (templateId) => {
         setSelectedTemplateId(templateId)
         setActiveIntegrationTab('runs')
-        setToastMessage('Target ejecutado. Revisar Runs.')
+        setToastMessage(t('config:messages.target_run_success'))
         setTimeout(() => setToastMessage(''), 2500)
         queryClient.invalidateQueries(['integration-template-runs', templateId])
       },
@@ -2081,7 +2230,13 @@ export default function Configuracion() {
         setTargetPreviewMessage('')
       },
       onError: (error: any) => {
-        setTargetPreviewMessage(error?.response?.data?.error || error?.message || 'Error al probar target')
+        setTargetPreviewMessage(
+          resolveApiErrorMessage(error, t, {
+            codeMap: INTEGRATION_TEMPLATE_TEST_API_ERROR_KEYS,
+            fallbackKey: 'config:messages.test_target_error',
+            fallbackValue: error?.message || t('config:messages.test_target_error'),
+          })
+        )
       },
     }
   )
@@ -2089,7 +2244,7 @@ export default function Configuracion() {
   const previewTargetDraft = useMutation(
     async () => {
       if (targetParamsInvalidJson) {
-        throw new Error('El JSON de params no es válido')
+        throw new Error(t('config:errors.invalid_params_json'))
       }
       let parsedParams: any = {}
       if (targetForm.paramsText.trim()) {
@@ -2097,7 +2252,7 @@ export default function Configuracion() {
       }
       const templateId = Number(targetForm.templateId || selectedTemplateId)
       if (!templateId) {
-        throw new Error('Selecciona una plantilla para probar el target')
+        throw new Error(t('config:errors.select_template_to_test'))
       }
       const payload = {
         templateId,
@@ -2114,7 +2269,13 @@ export default function Configuracion() {
         setTargetDraftPreviewMessage('')
       },
       onError: (error: any) => {
-        setTargetDraftPreviewMessage(error?.response?.data?.error || error?.message || 'Error al probar params')
+        setTargetDraftPreviewMessage(
+          resolveApiErrorMessage(error, t, {
+            codeMap: INTEGRATION_TEMPLATE_TEST_API_ERROR_KEYS,
+            fallbackKey: 'config:messages.test_params_error',
+            fallbackValue: error?.message || t('config:messages.test_params_error'),
+          })
+        )
       },
     }
   )
@@ -2182,8 +2343,8 @@ export default function Configuracion() {
   if (!canManage) {
     return (
       <div className="config-page">
-        <h1>Configuración</h1>
-        <p className="subtitle">No tienes permisos para administrar configuración.</p>
+        <h1>{t('config:title')}</h1>
+        <p className="subtitle">{t('config:restricted')}</p>
       </div>
     )
   }
@@ -2192,8 +2353,8 @@ export default function Configuracion() {
     <div className="config-page">
       <div className="page-header">
         <div>
-          <h1>Configuración</h1>
-          <p className="subtitle">Estructura organizacional, calendarios e integraciones</p>
+          <h1>{t('config:title')}</h1>
+          <p className="subtitle">{t('config:subtitle')}</p>
         </div>
         <div className="config-header-actions">
           <button
@@ -2201,7 +2362,7 @@ export default function Configuracion() {
             onClick={() => (setupGuideOpen ? hideSetupGuide() : showSetupGuide())}
             type="button"
           >
-            {setupGuideOpen ? 'Ocultar guía inicial' : 'Ver guía inicial'}
+            {setupGuideOpen ? t('config:guide.hide') : t('config:guide.show')}
           </button>
         </div>
       </div>
@@ -2216,11 +2377,11 @@ export default function Configuracion() {
           <div className="modal-content setup-guide-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
-                <h2>Guía inicial de configuración</h2>
+                <h2>{t('config:guide.title')}</h2>
                 <p className="setup-guide-modal-subtitle">
                   {setupConfigured
-                    ? 'La configuración base ya está completa. Podés reabrir esta guía cuando quieras.'
-                    : `Completaste ${setupCompletedCount} de ${setupChecklist.length} pasos base.`}
+                    ? t('config:guide.completed')
+                    : t('config:guide.progress', { done: setupCompletedCount, total: setupChecklist.length })}
                 </p>
               </div>
               <button className="close-button" onClick={hideSetupGuide}>
@@ -2229,15 +2390,45 @@ export default function Configuracion() {
             </div>
             <div className="modal-body">
               <div className="setup-guide">
-                <div className="setup-guide-title">¿Cómo configurar el sistema por primera vez?</div>
+                <div className="setup-guide-title">{t('config:guide.how_to')}</div>
                 <ol className="setup-guide-steps">
-                  <li><strong>Creá las áreas y equipos</strong> de tu empresa en <em>Estructura Organizacional</em> (más abajo ↓)</li>
-                  <li>Agregá los <strong>colaboradores</strong> y asignales un área y jefe directo → <a href="/colaboradores">Colaboradores</a></li>
-                  <li>Definí los <strong>KPIs</strong> que vas a medir → <a href="/kpis">KPIs</a></li>
-                  <li>Creá un <strong>período activo</strong> (anual, semestral, trimestral) → <a href="/periodos">Períodos</a></li>
-                  <li>Asigná KPIs a cada colaborador con su meta → <a href="/asignaciones">Asignaciones</a></li>
+                  <li>
+                    <Trans
+                      ns="config"
+                      i18nKey="guide.steps.areas"
+                      components={{ strong: <strong />, em: <em /> }}
+                    />
+                  </li>
+                  <li>
+                    <Trans
+                      ns="config"
+                      i18nKey="guide.steps.collaborators"
+                      components={{ strong: <strong />, link: <a href="/colaboradores" /> }}
+                    />
+                  </li>
+                  <li>
+                    <Trans
+                      ns="config"
+                      i18nKey="guide.steps.kpis"
+                      components={{ strong: <strong />, link: <a href="/kpis" /> }}
+                    />
+                  </li>
+                  <li>
+                    <Trans
+                      ns="config"
+                      i18nKey="guide.steps.periods"
+                      components={{ strong: <strong />, link: <a href="/periodos" /> }}
+                    />
+                  </li>
+                  <li>
+                    <Trans
+                      ns="config"
+                      i18nKey="guide.steps.assignments"
+                      components={{ strong: <strong />, link: <a href="/asignaciones" /> }}
+                    />
+                  </li>
                 </ol>
-                <p className="setup-guide-note">Los calendarios e integraciones son opcionales y se pueden configurar después.</p>
+                <p className="setup-guide-note">{t('config:guide.note')}</p>
               </div>
 
               <div className="setup-guide-progress">
@@ -2259,7 +2450,7 @@ export default function Configuracion() {
             </div>
             <div className="modal-actions">
               <button className="btn-secondary" onClick={hideSetupGuide}>
-                Guardar y ocultar
+                {t('config:guide.save_hide')}
               </button>
             </div>
           </div>
@@ -2270,12 +2461,12 @@ export default function Configuracion() {
         <div className="sheets-wizard-banner-text">
           <span className="sheets-wizard-banner-icon">📊</span>
           <div>
-            <strong>Conectar Google Sheets</strong>
-            <p>Importá valores de KPI directamente desde tus planillas, sin configuración técnica.</p>
+            <strong>{t('config:banners.sheets_title')}</strong>
+            <p>{t('config:banners.sheets_text')}</p>
           </div>
         </div>
         <button className="btn-primary" onClick={() => setSheetsWizardOpen(true)}>
-          Conectar planilla →
+          {t('config:banners.sheets_action')}
         </button>
       </div>
 
@@ -2283,12 +2474,12 @@ export default function Configuracion() {
         <div className="sheets-wizard-banner-text">
           <span className="sheets-wizard-banner-icon">💬</span>
           <div>
-            <strong>Conectar Slack</strong>
-            <p>Recibí alertas de KPIs en riesgo directamente en tu canal de Slack.</p>
+            <strong>{t('config:banners.slack_title')}</strong>
+            <p>{t('config:banners.slack_text')}</p>
           </div>
         </div>
         <button className="btn-primary" onClick={() => setSlackWizardOpen(true)}>
-          Configurar Slack →
+          {t('config:banners.slack_action')}
         </button>
       </div>
 
@@ -2296,14 +2487,14 @@ export default function Configuracion() {
         <div className="sheets-wizard-banner-text">
           <span className="sheets-wizard-banner-icon">📧</span>
           <div>
-            <strong>Notificaciones por email</strong>
+            <strong>{t('config:banners.email_title')}</strong>
             {emailStatus?.configured ? (
-              <p>SMTP activo — enviando desde <strong>{emailStatus.from}</strong> vía <code>{emailStatus.host}</code></p>
+              <p>{t('config:banners.email_active', { from: emailStatus.from, host: emailStatus.host })}</p>
             ) : (
-              <p>Configurá <code>SMTP_HOST</code>, <code>SMTP_USER</code> y <code>SMTP_PASS</code> en el <code>.env</code> del servidor para activar alertas por email.</p>
+              <p>{t('config:banners.email_inactive')}</p>
             )}
             {emailTestResult?.ok && (
-              <p style={{ color: '#16a34a', marginTop: 6 }}>Email enviado a {emailTestResult.to}</p>
+              <p style={{ color: '#16a34a', marginTop: 6 }}>{t('config:banners.email_sent', { to: emailTestResult.to })}</p>
             )}
             {emailTestResult?.error && (
               <p style={{ color: '#dc2626', marginTop: 6 }}>{emailTestResult.error}</p>
@@ -2314,7 +2505,7 @@ export default function Configuracion() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
             <input
               type="email"
-              placeholder="email de prueba"
+              placeholder={t('config:banners.email_test_placeholder')}
               value={emailTestTo}
               onChange={(e) => setEmailTestTo(e.target.value)}
               style={{ padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 13, minWidth: 200 }}
@@ -2329,13 +2520,18 @@ export default function Configuracion() {
                   const res = await api.post('/notifications/test-email', { to: emailTestTo })
                   setEmailTestResult({ ok: true, to: res.data.to })
                 } catch (err: any) {
-                  setEmailTestResult({ error: err?.response?.data?.error || 'Error al enviar email de prueba' })
+                  setEmailTestResult({
+                    error: resolveApiErrorMessage(err, t, {
+                      codeMap: EMAIL_TEST_API_ERROR_KEYS,
+                      fallbackKey: 'config:banners.email_test_error',
+                    }),
+                  })
                 } finally {
                   setEmailTestLoading(false)
                 }
               }}
             >
-              {emailTestLoading ? 'Enviando...' : 'Enviar email de prueba'}
+              {emailTestLoading ? t('config:banners.email_test_sending') : t('config:banners.email_test_action')}
             </button>
           </div>
         )}
@@ -2347,8 +2543,8 @@ export default function Configuracion() {
         aria-expanded={integrationOpen}
       >
         <span>{integrationOpen ? '▲' : '▼'}</span>
-        Configuración avanzada — Integraciones
-        <span className="advanced-toggle-hint">Jira, Zendesk, conectores externos. Solo para administradores técnicos.</span>
+        {t('config:advanced.title')}
+        <span className="advanced-toggle-hint">{t('config:advanced.hint')}</span>
       </button>
 
       {integrationOpen && (
@@ -2356,8 +2552,8 @@ export default function Configuracion() {
         <div className="card">
           <div className="card-header">
             <div>
-              <h3>Integraciones (plantillas)</h3>
-              <p className="muted">Configura plantillas reutilizables, targets y auth profiles.</p>
+              <h3>{t('config:integrations.title')}</h3>
+              <p className="muted">{t('config:integrations.subtitle')}</p>
             </div>
             <div className="action-buttons">
               {activeIntegrationTab === 'templates' && (
@@ -2380,7 +2576,7 @@ export default function Configuracion() {
                     setShowTemplateModal(true)
                   }}
                 >
-                  Nueva plantilla
+                  {t('config:integrations.new_template')}
                 </button>
               )}
               {activeIntegrationTab === 'targets' && (
@@ -2390,21 +2586,21 @@ export default function Configuracion() {
                     onClick={createTargetsAllAreas}
                     disabled={!selectedTemplateId || createTargetsForScopes.isLoading}
                   >
-                    Crear targets (todas las areas)
+                    {t('config:integrations.create_targets_all')}
                   </button>
                   <button
                     className="btn-secondary"
                     onClick={createTargetsNewAreas}
                     disabled={!selectedTemplateId || createTargetsForScopes.isLoading}
                   >
-                    Crear para areas nuevas
+                    {t('config:integrations.create_targets_new')}
                   </button>
                   <button
                     className="btn-secondary"
                     onClick={() => deactivateInactiveAreaTargets.mutate()}
                     disabled={!selectedTemplateId || deactivateInactiveAreaTargets.isLoading}
                   >
-                    Desactivar areas inactivas
+                    {t('config:integrations.deactivate_inactive')}
                   </button>
                   <button
                     className="btn-primary"
@@ -2426,7 +2622,7 @@ export default function Configuracion() {
                     }}
                     disabled={!selectedTemplateId}
                   >
-                    Nuevo target
+                    {t('config:integrations.new_target')}
                   </button>
                 </>
               )}
@@ -2453,7 +2649,7 @@ export default function Configuracion() {
                     setShowAuthModal(true)
                   }}
                 >
-                  Nuevo auth profile
+                  {t('config:integrations.new_auth')}
                 </button>
               )}
               {activeIntegrationTab === 'runs' && (
@@ -2462,23 +2658,23 @@ export default function Configuracion() {
                     className="btn-secondary"
                     onClick={async () => {
                       if (!selectedTemplateId) return
-                      const ok = await dialog.confirm('¿Archivar todos los runs con error de esta plantilla?', { title: 'Archivar errores', confirmLabel: 'Archivar', variant: 'warning' })
+                      const ok = await dialog.confirm(t('config:integrations.dialogs.archive_errors'), { title: t('config:integrations.dialogs.archive_errors_title'), confirmLabel: t('config:integrations.archive_errors'), variant: 'warning' })
                       if (ok) archiveErrorRuns.mutate()
                     }}
                     disabled={!selectedTemplateId || archiveErrorRuns.isLoading}
                   >
-                    Archivar errores
+                    {t('config:integrations.archive_errors')}
                   </button>
                   <button
                     className="btn-danger"
                     onClick={async () => {
                       if (!selectedTemplateId) return
-                      const ok = await dialog.confirm('¿Eliminar todos los runs con error de esta plantilla?', { title: 'Eliminar errores', confirmLabel: 'Eliminar', variant: 'danger' })
+                      const ok = await dialog.confirm(t('config:integrations.dialogs.delete_errors'), { title: t('config:integrations.dialogs.delete_errors_title'), confirmLabel: t('common:delete'), variant: 'danger' })
                       if (ok) deleteErrorRuns.mutate()
                     }}
                     disabled={!selectedTemplateId || deleteErrorRuns.isLoading}
                   >
-                    Eliminar errores
+                    {t('config:integrations.delete_errors')}
                   </button>
                 </>
               )}
@@ -2492,19 +2688,19 @@ export default function Configuracion() {
                 className={`tab-button ${activeIntegrationTab === tab ? 'active' : ''}`}
                 onClick={() => setActiveIntegrationTab(tab as any)}
               >
-                {tab === 'templates' ? 'Plantillas' : tab === 'targets' ? 'Targets' : tab === 'runs' ? 'Runs' : 'Auth'}
+                {tab === 'templates' ? t('config:integrations.tabs.templates') : tab === 'targets' ? t('config:integrations.tabs.targets') : tab === 'runs' ? t('config:integrations.tabs.runs') : t('config:integrations.tabs.auth')}
               </button>
             ))}
           </div>
 
           {activeIntegrationTab !== 'templates' && (
             <div className="form-group">
-              <label>Plantilla</label>
+              <label>{t('config:integrations.template_label')}</label>
               <select
                 value={selectedTemplateId}
                 onChange={(e) => setSelectedTemplateId(e.target.value ? Number(e.target.value) : '')}
               >
-                <option value="">Selecciona una plantilla</option>
+                <option value="">{t('config:integrations.select_template')}</option>
                 {templates?.map((template) => (
                   <option key={template.id} value={template.id}>
                     {template.name}
@@ -2518,34 +2714,34 @@ export default function Configuracion() {
             <table className="config-table">
               <thead>
                 <tr>
-                  <th>Nombre</th>
-                  <th>Connector</th>
-                  <th>Metrica</th>
-                  <th>Auth</th>
-                  <th>Frecuencia</th>
-                  <th>Plantilla</th>
-                  <th>Estado</th>
-                  <th>Acciones</th>
+                  <th>{t('common:name')}</th>
+                  <th>{t('config:integrations.table.connector')}</th>
+                  <th>{t('config:integrations.table.metric')}</th>
+                  <th>{t('config:integrations.table.auth')}</th>
+                  <th>{t('config:integrations.table.frequency')}</th>
+                  <th>{t('config:integrations.table.template_kind')}</th>
+                  <th>{t('common:status')}</th>
+                  <th>{t('common:actions')}</th>
                 </tr>
               </thead>
               <tbody>
                 {templates?.map((template) => (
                   <tr key={template.id}>
                     <td>{template.name}</td>
-                    <td>{template.connector}</td>
-                    <td>{metricTypeLabel(template.metricType)}</td>
+                    <td>{getConnectorLabel(template.connector)}</td>
+                    <td>{getMetricTypeLabel(template.metricType)}</td>
                     <td>{template.authProfileName || '-'}</td>
                     <td>{template.schedule || '-'}</td>
                     <td>
                       {template.isSpecific ? (
-                        <span className="status-pill review">Especifica</span>
+                        <span className="status-pill review">{t('config:integrations.table.specific')}</span>
                       ) : (
-                        <span className="status-pill ok">Generica</span>
+                        <span className="status-pill ok">{t('config:integrations.table.generic')}</span>
                       )}
                     </td>
                     <td>
                       <span className={`status-pill ${template.enabled ? 'ok' : 'review'}`}>
-                        {template.enabled ? 'Activa' : 'Inactiva'}
+                        {template.enabled ? t('config:template_modal.active') : t('config:template_modal.inactive')}
                       </span>
                     </td>
                     <td>
@@ -2571,7 +2767,7 @@ export default function Configuracion() {
                             setShowTemplateModal(true)
                           }}
                         >
-                          Editar
+                          {t('common:edit')}
                         </button>
                         <button
                           className="btn-secondary"
@@ -2581,7 +2777,7 @@ export default function Configuracion() {
                           }}
                           disabled={!canRunIntegrations || runTemplate.isLoading}
                         >
-                          Ejecutar
+                          {t('config:integrations.actions.run')}
                         </button>
                         <button
                           className="btn-secondary"
@@ -2590,7 +2786,7 @@ export default function Configuracion() {
                             setActiveIntegrationTab('targets')
                           }}
                         >
-                          Targets
+                          {t('config:integrations.actions.targets')}
                         </button>
                         <button
                           className="btn-secondary"
@@ -2599,7 +2795,7 @@ export default function Configuracion() {
                             setActiveIntegrationTab('runs')
                           }}
                         >
-                          Runs
+                          {t('config:integrations.actions.runs')}
                         </button>
                       </div>
                     </td>
@@ -2608,7 +2804,7 @@ export default function Configuracion() {
                 {(!templates || templates.length === 0) && (
                   <tr>
                     <td colSpan={8} className="empty-row">
-                      No hay plantillas configuradas.
+                      {t('config:integrations.table.empty_templates')}
                     </td>
                   </tr>
                 )}
@@ -2620,10 +2816,10 @@ export default function Configuracion() {
             <table className="config-table">
               <thead>
                 <tr>
-                  <th>Área / Equipo</th>
-                  <th>Destino</th>
-                  <th>Enabled</th>
-                  <th>Acciones</th>
+                  <th>{t('config:integrations.targets.scope')}</th>
+                  <th>{t('config:integrations.targets.destination')}</th>
+                  <th>{t('config:integrations.targets.enabled')}</th>
+                  <th>{t('common:actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -2631,26 +2827,26 @@ export default function Configuracion() {
                   <tr key={target.id}>
                     <td>
                       {target.orgScopeName
-                        ? `${target.orgScopeType || target.scopeType} · ${target.orgScopeName}`
-                        : `${target.scopeType} · ${target.scopeId}`}
+                        ? formatTargetScopeLabel(target.orgScopeType || target.scopeType, target.orgScopeName)
+                        : formatTargetScopeLabel(target.scopeType, target.scopeId)}
                       {target.orgScopeId && scopeById.get(target.orgScopeId)?.active === 0 ? (
                         <span className="status-pill review" style={{ marginLeft: 8 }}>
-                          Area inactiva
+                          {t('config:integrations.targets.inactive_area')}
                         </span>
                       ) : null}
                     </td>
                     <td>
                       {target.assignmentId
-                        ? `Asignación #${target.assignmentId}`
+                        ? t('config:integrations.targets.assignment_destination', { id: target.assignmentId })
                         : target.scopeKpiId
-                        ? `${target.scopeKpiName || `Scope KPI #${target.scopeKpiId}`}`
+                        ? `${target.scopeKpiName || t('config:target_modal.fallbacks.scope_kpi', { id: target.scopeKpiId })}`
                         : target.params?.targetMap
-                        ? `Mapping por filas (${Object.keys(target.params.targetMap || {}).length})`
+                        ? t('config:integrations.targets.mapping_destination', { count: Object.keys(target.params.targetMap || {}).length })
                         : '-'}
                     </td>
                     <td>
                       <span className={`status-pill ${target.enabled ? 'ok' : 'review'}`}>
-                        {target.enabled ? 'Activa' : 'Inactiva'}
+                        {target.enabled ? t('common:active') : t('common:inactive')}
                       </span>
                     </td>
                     <td>
@@ -2673,24 +2869,24 @@ export default function Configuracion() {
                             setShowTargetModal(true)
                           }}
                         >
-                          Editar
+                          {t('common:edit')}
                         </button>
                         <button
                           className="btn-secondary"
                           onClick={() => runTarget.mutate(target)}
                           disabled={!canRunIntegrations || runTarget.isLoading}
                         >
-                          Ejecutar
+                          {t('config:integrations.actions.run')}
                         </button>
                         <button
                           className="btn-secondary"
                           onClick={async () => {
-                            const ok = await dialog.confirm('¿Duplicar este target por cada user del params?', { title: 'Duplicar target', confirmLabel: 'Duplicar', variant: 'warning' })
+                            const ok = await dialog.confirm(t('config:integrations.dialogs.duplicate_target_users'), { title: t('config:integrations.dialogs.duplicate_target_users_title'), confirmLabel: t('config:integrations.actions.duplicate_users'), variant: 'warning' })
                             if (ok) openTargetWizard(target)
                           }}
                           disabled={duplicateTargetByUsers.isLoading}
                         >
-                          Duplicar por users
+                          {t('config:integrations.actions.duplicate_users')}
                         </button>
                         <button
                           className="btn-secondary"
@@ -2703,7 +2899,7 @@ export default function Configuracion() {
                           }}
                           disabled={testTarget.isLoading}
                         >
-                          Probar
+                          {t('config:integrations.actions.test')}
                         </button>
                       </div>
                     </td>
@@ -2712,7 +2908,7 @@ export default function Configuracion() {
                 {(!targets || targets.length === 0) && (
                   <tr>
                     <td colSpan={4} className="empty-row">
-                      No hay targets configurados.
+                      {t('config:integrations.targets.empty')}
                     </td>
                   </tr>
                 )}
@@ -2724,12 +2920,12 @@ export default function Configuracion() {
             <table className="config-table">
               <thead>
                 <tr>
-                  <th>Estado</th>
-                  <th>Inicio</th>
-                  <th>Usuario</th>
-                  <th>Resultado</th>
-                  <th>Subperiodo</th>
-                  <th>Acciones</th>
+                  <th>{t('common:status')}</th>
+                  <th>{t('config:integrations.runs.start')}</th>
+                  <th>{t('config:integrations.runs.user')}</th>
+                  <th>{t('config:integrations.runs.result')}</th>
+                  <th>{t('config:integrations.runs.subperiod')}</th>
+                  <th>{t('common:actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -2737,14 +2933,14 @@ export default function Configuracion() {
                   <tr key={run.id}>
                     <td>
                       <span className={`status-pill ${run.status === 'success' ? 'ok' : 'review'}`}>
-                        {run.status}
+                        {getRunStatusLabel(run.status)}
                       </span>
                     </td>
                     <td>{run.startedAt || '-'}</td>
                     <td>{run.triggeredByName || '-'}</td>
                     <td>
                       {run.outputs?.skipped ? (
-                        <span className="status-pill review">Omitido</span>
+                        <span className="status-pill review">{t('config:integrations.runs.skipped')}</span>
                       ) : (
                         run.outputs?.computed ?? '-'
                       )}
@@ -2758,17 +2954,17 @@ export default function Configuracion() {
                         <button
                           className="btn-secondary"
                           onClick={async () => {
-                            const ok = await dialog.confirm('¿Archivar este run?', { title: 'Archivar run', confirmLabel: 'Archivar', variant: 'warning' })
+                            const ok = await dialog.confirm(t('config:integrations.dialogs.archive_run'), { title: t('config:integrations.dialogs.archive_run_title'), confirmLabel: t('config:integrations.runs.archive'), variant: 'warning' })
                             if (ok) archiveRunMutation.mutate(run.id)
                           }}
                           disabled={archiveRunMutation.isLoading}
                         >
-                          Archivar
+                          {t('config:integrations.runs.archive')}
                         </button>
                         <button
                           className="btn-danger"
                           onClick={async () => {
-                            const ok = await dialog.confirm('¿Eliminar este run?', { title: 'Eliminar run', confirmLabel: 'Eliminar', variant: 'danger' })
+                            const ok = await dialog.confirm(t('config:integrations.dialogs.delete_run'), { title: t('config:integrations.dialogs.delete_run_title'), confirmLabel: t('common:delete'), variant: 'danger' })
                             if (ok) deleteRunMutation.mutate(run.id)
                           }}
                           disabled={deleteRunMutation.isLoading}
@@ -2782,7 +2978,7 @@ export default function Configuracion() {
                 {(!templateRuns || templateRuns.length === 0) && (
                   <tr>
                     <td colSpan={6} className="empty-row">
-                      No hay ejecuciones registradas.
+                      {t('config:integrations.runs.empty')}
                     </td>
                   </tr>
                 )}
@@ -2794,20 +2990,20 @@ export default function Configuracion() {
             <table className="config-table">
               <thead>
                 <tr>
-                  <th>Nombre</th>
-                  <th>Connector</th>
-                  <th>Endpoint</th>
-                  <th>Auth</th>
-                  <th>Acciones</th>
+                  <th>{t('common:name')}</th>
+                  <th>{t('config:integrations.table.connector')}</th>
+                  <th>{t('config:auth_modal.endpoint')}</th>
+                  <th>{t('config:integrations.table.auth')}</th>
+                  <th>{t('common:actions')}</th>
                 </tr>
               </thead>
               <tbody>
                 {authProfiles?.map((profile) => (
                   <tr key={profile.id}>
                     <td>{profile.name}</td>
-                    <td>{profile.connector}</td>
+                    <td>{getConnectorLabel(profile.connector)}</td>
                     <td>{profile.endpoint || '-'}</td>
-                    <td>{profile.authType || 'none'}</td>
+                    <td>{getAuthTypeLabel(profile.authType || 'none')}</td>
                     <td>
                       <div className="action-buttons">
                         <button
@@ -2833,7 +3029,7 @@ export default function Configuracion() {
                             setShowAuthModal(true)
                           }}
                         >
-                          Editar
+                          {t('common:edit')}
                         </button>
                       </div>
                     </td>
@@ -2842,7 +3038,7 @@ export default function Configuracion() {
                 {(!authProfiles || authProfiles.length === 0) && (
                   <tr>
                     <td colSpan={5} className="empty-row">
-                      No hay auth profiles configurados.
+                      {t('config:integrations.auth.empty')}
                     </td>
                   </tr>
                 )}
@@ -2857,8 +3053,8 @@ export default function Configuracion() {
         <div className="card">
           <div className="card-header">
             <div>
-              <h3>Calendarios de medición</h3>
-              <p className="muted">Define ciclos de medición por área o equipo (mensual, trimestral o custom).</p>
+              <h3>{t('config:calendar.title')}</h3>
+              <p className="muted">{t('config:calendar.subtitle')}</p>
             </div>
             <button
               className="btn-primary"
@@ -2873,16 +3069,16 @@ export default function Configuracion() {
                 setShowCalendarModal(true)
               }}
             >
-              Nuevo calendario
+              {t('config:calendar.new')}
             </button>
           </div>
           <table className="config-table">
             <thead>
               <tr>
-                <th>Nombre</th>
-                <th>Frecuencia</th>
-                <th>Estado</th>
-                <th>Acciones</th>
+                <th>{t('config:calendar.name')}</th>
+                <th>{t('config:calendar.frequency')}</th>
+                <th>{t('config:calendar.status')}</th>
+                <th>{t('common:actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -2890,11 +3086,11 @@ export default function Configuracion() {
                 <tr key={profile.id}>
                   <td>{profile.name}</td>
                   <td>{profile.frequency}</td>
-                  <td>
-                    <span className={`status-pill ${profile.active ? 'ok' : 'review'}`}>
-                      {profile.active ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </td>
+                    <td>
+                      <span className={`status-pill ${profile.active ? 'ok' : 'review'}`}>
+                        {profile.active ? t('common:active') : t('common:inactive')}
+                      </span>
+                    </td>
                   <td>
                     <div className="action-buttons">
                       <button
@@ -2910,7 +3106,7 @@ export default function Configuracion() {
                           setShowCalendarModal(true)
                         }}
                       >
-                        Editar
+                        {t('common:edit')}
                       </button>
                       <button
                         className="btn-secondary"
@@ -2921,7 +3117,7 @@ export default function Configuracion() {
                           setShowCalendarSubperiods(true)
                         }}
                       >
-                        Subperíodos
+                        {t('config:calendar.subperiods')}
                       </button>
                     </div>
                   </td>
@@ -2930,7 +3126,7 @@ export default function Configuracion() {
               {(!calendarProfiles || calendarProfiles.length === 0) && (
                 <tr>
                   <td colSpan={4} className="empty-row">
-                    No hay calendarios configurados.
+                    {t('config:calendar.empty')}
                   </td>
                 </tr>
               )}
@@ -2943,8 +3139,8 @@ export default function Configuracion() {
         <div className="card">
           <div className="card-header">
             <div>
-              <h3>Estructura Organizacional</h3>
-              <p className="muted">Jerarquía de áreas, equipos y personas con herencia de calendarios.</p>
+              <h3>{t('config:org.title')}</h3>
+              <p className="muted">{t('config:org.subtitle')}</p>
             </div>
             <button
               className="btn-primary"
@@ -2964,29 +3160,29 @@ export default function Configuracion() {
                 setShowScopeModal(true)
               }}
             >
-              Nueva unidad
+              {t('config:org.new')}
             </button>
           </div>
           <div className="config-table-toolbar">
             <div className="config-table-filters">
               <div className="form-group">
-                <label htmlFor="scope-search">Buscar unidad</label>
+                <label htmlFor="scope-search">{t('config:org.search')}</label>
                 <input
                   id="scope-search"
                   type="text"
                   value={scopeSearch}
                   onChange={(e) => setScopeSearch(e.target.value)}
-                  placeholder="Nombre, tipo o unidad padre"
+                  placeholder={t('config:org.search_placeholder')}
                 />
               </div>
               <div className="form-group">
-                <label htmlFor="scope-type-filter">Tipo</label>
+                <label htmlFor="scope-type-filter">{t('config:org.type')}</label>
                 <select
                   id="scope-type-filter"
                   value={scopeTypeFilter}
                   onChange={(e) => setScopeTypeFilter(e.target.value)}
                 >
-                  <option value="all">Todos</option>
+                  <option value="all">{t('config:org.all')}</option>
                   {scopeTypeOptions.map((type) => (
                     <option key={type} value={type}>
                       {getOrgScopeTypeLabel(type)}
@@ -2996,17 +3192,17 @@ export default function Configuracion() {
               </div>
             </div>
             <div className="config-table-toolbar-meta">
-              Mostrando {filteredOrgScopes.length} de {orgScopes?.length || 0} unidades
+              {t('config:org.showing', { shown: filteredOrgScopes.length, total: orgScopes?.length || 0 })}
             </div>
           </div>
           <table className="config-table">
             <thead>
               <tr>
-                <th>Nombre</th>
-                <th>Tipo</th>
-                <th>Unidad padre</th>
-                <th>Estado</th>
-                <th>Acciones</th>
+                <th>{t('config:calendar.name')}</th>
+                <th>{t('config:org.type')}</th>
+                <th>{t('config:org.parent')}</th>
+                <th>{t('config:calendar.status')}</th>
+                <th>{t('common:actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -3017,7 +3213,7 @@ export default function Configuracion() {
                   <td>{scope.parentId ? scopeById.get(Number(scope.parentId))?.name || `#${scope.parentId}` : '—'}</td>
                   <td>
                     <span className={`status-pill ${scope.active ? 'ok' : 'review'}`}>
-                      {scope.active ? 'Activo' : 'Inactivo'}
+                      {scope.active ? t('common:active') : t('common:inactive')}
                     </span>
                   </td>
                   <td>
@@ -3043,20 +3239,20 @@ export default function Configuracion() {
                           setShowScopeModal(true)
                         }}
                       >
-                        Editar
+                        {t('common:edit')}
                       </button>
                       <button
                         className="btn-secondary danger"
                         onClick={async () => {
                           const ok = await dialog.confirm(
-                            `¿Seguro que querés eliminar la unidad "${scope.name}" (${getOrgScopeTypeLabel(scope.type)})? Esta acción no se puede deshacer.`,
-                            { title: 'Confirmar eliminación', confirmLabel: 'Eliminar', variant: 'danger' }
+                            t('config:org.delete_confirm', { name: scope.name, type: getOrgScopeTypeLabel(scope.type) }),
+                            { title: t('config:org.delete_confirm_title'), confirmLabel: t('common:delete'), variant: 'danger' }
                           )
                           if (ok) deleteScope.mutate(scope)
                         }}
                         disabled={deleteScope.isLoading}
                       >
-                        Eliminar
+                        {t('common:delete')}
                       </button>
                     </div>
                   </td>
@@ -3065,7 +3261,7 @@ export default function Configuracion() {
               {orgScopes && orgScopes.length > 0 && filteredOrgScopes.length === 0 && (
                 <tr>
                   <td colSpan={5} className="empty-row">
-                    No hay unidades que coincidan con los filtros actuales.
+                    {t('config:org.empty_filtered')}
                   </td>
                 </tr>
               )}
@@ -3073,8 +3269,8 @@ export default function Configuracion() {
                 <tr>
                   <td colSpan={5} className="empty-row">
                     <div className="empty-state-inline">
-                      <strong>Todavía no hay áreas ni equipos.</strong>
-                      <span>Hacé clic en <em>Nueva unidad</em> para crear la primera área de tu empresa (por ejemplo: Ventas, Tecnología, Operaciones).</span>
+                      <strong>{t('config:org.empty_title')}</strong>
+                      <span>{t('config:org.empty_hint')}</span>
                     </div>
                   </td>
                 </tr>
@@ -3093,7 +3289,7 @@ export default function Configuracion() {
         >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{editingTemplate ? 'Editar plantilla' : 'Nueva plantilla'}</h2>
+              <h2>{editingTemplate ? t('config:modals.template_edit') : t('config:modals.template_new')}</h2>
               <button className="close-button" onClick={() => setShowTemplateModal(false)}>
                 ×
               </button>
@@ -3101,28 +3297,28 @@ export default function Configuracion() {
             <div className="modal-body">
               <div className="form-row">
                 <div className="form-group">
-                  <label>Nombre</label>
+                  <label>{t('common:name')}</label>
                   <input
                     value={templateForm.name}
                     onChange={(e) => setTemplateForm((prev) => ({ ...prev, name: e.target.value }))}
                   />
                 </div>
                 <div className="form-group">
-                  <label>Connector</label>
+                  <label>{t('config:template_modal.connector')}</label>
                   <select
                     value={templateForm.connector}
                     onChange={(e) => setTemplateForm((prev) => ({ ...prev, connector: e.target.value }))}
                   >
-                    <option value="jira">Jira</option>
-                    <option value="xray">Xray</option>
-                    <option value="sheets">Google Sheets</option>
-                    <option value="looker">Looker</option>
-                    <option value="generic_api">Generic API</option>
-                    <option value="manual">Manual / CSV</option>
+                    <option value="jira">{getConnectorLabel('jira')}</option>
+                    <option value="xray">{getConnectorLabel('xray')}</option>
+                    <option value="sheets">{getConnectorLabel('sheets')}</option>
+                    <option value="looker">{getConnectorLabel('looker')}</option>
+                    <option value="generic_api">{getConnectorLabel('generic_api')}</option>
+                    <option value="manual">{getConnectorLabel('manual')}</option>
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Tipo de métrica</label>
+                  <label>{t('config:template_modal.metric_type')}</label>
                   <select
                     value={templateForm.metricType}
                     onChange={(e) =>
@@ -3147,64 +3343,64 @@ export default function Configuracion() {
                       })
                     }
                   >
-                    <option value="count">COUNT — Conteo por filtro</option>
-                    <option value="ratio">RATIO A/B — Cumplimiento / Conversión</option>
-                    <option value="sla">SLA — Cumplimiento temporal</option>
-                    <option value="value">VALUE — Valor directo</option>
-                    <option value="value_agg">VALUE_AGG — Suma / Promedio</option>
-                    <option value="manual">MANUAL — Declarativo</option>
+                    <option value="count">{getMetricTypeLabel('count')}</option>
+                    <option value="ratio">{getMetricTypeLabel('ratio')}</option>
+                    <option value="sla">{getMetricTypeLabel('sla')}</option>
+                    <option value="value">{getMetricTypeLabel('value')}</option>
+                    <option value="value_agg">{getMetricTypeLabel('value_agg')}</option>
+                    <option value="manual">{getMetricTypeLabel('manual')}</option>
                   </select>
                 </div>
               </div>
               <div className="form-group">
-                <label>Plantillas rápidas</label>
+                <label>{t('config:template_modal.quick_templates')}</label>
                 <div className="action-buttons">
                   <button className="btn-secondary" onClick={() => applyTemplatePreset('count')}>
-                    COUNT
+                    {getPresetLabel('count')}
                   </button>
                   <button className="btn-secondary" onClick={() => applyTemplatePreset('ratio')}>
-                    RATIO
+                    {getPresetLabel('ratio')}
                   </button>
                   <button className="btn-secondary" onClick={() => applyTemplatePreset('sla')}>
-                    SLA
+                    {getPresetLabel('sla')}
                   </button>
                   <button className="btn-secondary" onClick={() => applyTemplatePreset('sheets_value')}>
-                    Sheets VALUE
+                    {getPresetLabel('sheets_value')}
                   </button>
                   <button className="btn-secondary" onClick={() => applyTemplatePreset('sheets_agg')}>
-                    Sheets AGG
+                    {getPresetLabel('sheets_agg')}
                   </button>
                   <button className="btn-secondary" onClick={() => applyTemplatePreset('sheets_grid')}>
-                    Sheets GRID
+                    {getPresetLabel('sheets_grid')}
                   </button>
                   <button className="btn-secondary" onClick={() => applyTemplatePreset('sheets_grid_agg')}>
-                    Sheets GRID AGG
+                    {getPresetLabel('sheets_grid_agg')}
                   </button>
                   <button className="btn-secondary" onClick={() => applyTemplatePreset('api_value')}>
-                    API VALUE
+                    {getPresetLabel('api_value')}
                   </button>
                   <button className="btn-secondary" onClick={() => applyTemplatePreset('api_agg')}>
-                    API AGG
+                    {getPresetLabel('api_agg')}
                   </button>
                   <button className="btn-secondary" onClick={() => applyTemplatePreset('looker_value')}>
-                    Looker VALUE
+                    {getPresetLabel('looker_value')}
                   </button>
                   <button className="btn-secondary" onClick={() => applyTemplatePreset('looker_agg')}>
-                    Looker AGG
+                    {getPresetLabel('looker_agg')}
                   </button>
                   <button className="btn-secondary" onClick={() => applyTemplatePreset('manual')}>
-                    Manual / CSV
+                    {getPresetLabel('manual')}
                   </button>
                 </div>
               </div>
               <div className="form-group">
-                <label>Auth Profile</label>
+                <label>{t('config:template_modal.auth_profile')}</label>
                 <select
                   value={templateForm.authProfileId}
                   onChange={(e) => setTemplateForm((prev) => ({ ...prev, authProfileId: e.target.value }))}
                   disabled={templateForm.connector === 'manual'}
                 >
-                  <option value="">Selecciona un auth profile</option>
+                  <option value="">{t('config:template_modal.select_auth_profile')}</option>
                   {authProfilesByConnector?.map((profile) => (
                     <option key={profile.id} value={profile.id}>
                       {profile.name} · {profile.connector}
@@ -3215,7 +3411,7 @@ export default function Configuracion() {
                 {templateForm.connector !== 'manual' &&
                   authProfilesByConnector &&
                   authProfilesByConnector.length === 0 && (
-                    <div className="helper-text">No hay auth profiles para este conector.</div>
+                    <div className="helper-text">{t('config:template_modal.no_auth_profiles')}</div>
                   )}
               </div>
               {templateForm.metricType !== 'value' &&
@@ -3224,13 +3420,7 @@ export default function Configuracion() {
                   <>
                     <div className="form-group">
                       <label>
-                        {templateForm.connector === 'jira' || templateForm.connector === 'xray'
-                          ? 'Filtro A (template)'
-                          : templateForm.connector === 'generic_api'
-                          ? 'Config request (template)'
-                          : templateForm.connector === 'looker'
-                          ? 'Config Looker (template)'
-                          : 'Config A (template)'}
+                        {getTemplatePrimaryLabel(templateForm.connector)}
                       </label>
                       <textarea
                         rows={3}
@@ -3238,29 +3428,13 @@ export default function Configuracion() {
                         onChange={(e) => setTemplateForm((prev) => ({ ...prev, queryTestsTemplate: e.target.value }))}
                       />
                         <div className="helper-text">
-                          {templateForm.connector === 'jira' || templateForm.connector === 'xray'
-                            ? templateForm.metricType === 'sla'
-                              ? `Ejemplo: {baseFilter} AND {endDate} >= {from} AND {endDate} < {to} AND {endDate} <= {limitDate}`
-                              : templateForm.metricType === 'ratio'
-                              ? `Ejemplo: {filterA} AND {dateFieldA} >= {from} AND {dateFieldA} < {to}`
-                              : `Ejemplo: {baseFilter} AND {dateField} >= {from} AND {dateField} < {to}`
-                            : templateForm.connector === 'generic_api'
-                            ? 'Ejemplo: path={path} method={method} resultPath={resultPath} valuePath={valuePath} aggregation={aggregation}'
-                            : templateForm.connector === 'looker'
-                            ? 'Ejemplo: resourceType={query|look|dashboard|dashboard_element|inline_query} resourceId={resourceId} dashboardElementId={dashboardElementId} resultFormat={resultFormat} resultPath={resultPath} valuePath={valuePath}'
-                            : 'Ejemplo: baseFilter={baseFilter} dateField={dateField} from={from} to={to}'}
+                          {getTemplatePrimaryHint(templateForm.connector, templateForm.metricType)}
                         </div>
                       </div>
                     {(templateForm.metricType === 'ratio' || templateForm.metricType === 'sla') && (
                       <div className="form-group">
                           <label>
-                            {templateForm.connector === 'jira' || templateForm.connector === 'xray'
-                              ? 'Filtro B (template)'
-                              : templateForm.connector === 'generic_api'
-                              ? 'Config B (template)'
-                              : templateForm.connector === 'looker'
-                              ? 'Config B (template)'
-                              : 'Config B (template)'}
+                            {getTemplateSecondaryLabel(templateForm.connector)}
                           </label>
                         <textarea
                           rows={3}
@@ -3270,15 +3444,7 @@ export default function Configuracion() {
                           }
                         />
                         <div className="helper-text">
-                          {templateForm.connector === 'jira' || templateForm.connector === 'xray'
-                            ? templateForm.metricType === 'sla'
-                              ? `Ejemplo: {baseFilter} AND {endDate} >= {from} AND {endDate} < {to}`
-                              : `Ejemplo: {filterB} AND {dateFieldB} >= {from} AND {dateFieldB} < {to}`
-                            : templateForm.connector === 'generic_api'
-                            ? 'Opcional. Solo si queres documentar otro bloque de placeholders.'
-                            : templateForm.connector === 'looker'
-                            ? 'Opcional. Para inline_query usá queryBody. Para dashboard podés usar dashboardElementId, dashboardElementTitle o dashboardElementIndex.'
-                            : 'Ejemplo: usa el mismo config A o separa A/B si necesitas dos agregados.'}
+                          {getTemplateSecondaryHint(templateForm.connector, templateForm.metricType)}
                         </div>
                       </div>
                     )}
@@ -3288,33 +3454,27 @@ export default function Configuracion() {
                 templateForm.metricType === 'value_agg' ||
                 templateForm.metricType === 'manual') && (
                 <div className="form-group">
-                  <label>Config (template)</label>
+                  <label>{t('config:template_modal.labels.config')}</label>
                   <textarea
                     rows={3}
                     value={templateForm.queryTestsTemplate}
                     onChange={(e) => setTemplateForm((prev) => ({ ...prev, queryTestsTemplate: e.target.value }))}
                   />
                   <div className="helper-text">
-                    {templateForm.metricType === 'manual'
-                      ? 'Ejemplo: manual'
-                      : templateForm.connector === 'generic_api'
-                      ? 'Ejemplo: path={path} method={method} query={query} resultPath={resultPath} valuePath={valuePath} aggregation={aggregation}'
-                      : templateForm.connector === 'looker'
-                      ? 'Ejemplo: resourceType={query|look|dashboard|dashboard_element|inline_query} resourceId={resourceId} dashboardElementId={dashboardElementId} dashboardElementTitle={dashboardElementTitle} resultFormat={resultFormat} resultPath={resultPath} valuePath={valuePath}'
-                      : 'Ejemplo: sheetKey={sheetKey} range={range} areaColumn={areaColumn} collaboratorColumn={collaboratorColumn} kpiColumn={kpiColumn}. En params: collaboratorValue + valueColumn o valueColumnFromPeriod=true + valueColumnPeriodFormat=YYYYMM'}
+                    {getTemplateSingleConfigHint(templateForm.connector, templateForm.metricType)}
                   </div>
                 </div>
               )}
               <div className="form-row">
                 <div className="form-group">
-                  <label>Fórmula</label>
+                  <label>{t('config:template_modal.formula')}</label>
                   <input
                     value={templateForm.formulaTemplate}
                     onChange={(e) => setTemplateForm((prev) => ({ ...prev, formulaTemplate: e.target.value }))}
                   />
                 </div>
               <div className="form-group">
-                <label>Frecuencia / Cron</label>
+                <label>{t('config:template_modal.schedule')}</label>
                 <div className="form-row">
                   <input
                     value={templateForm.schedule}
@@ -3325,7 +3485,7 @@ export default function Configuracion() {
                     type="button"
                     onClick={() => setTemplateForm((prev) => ({ ...prev, schedule: '0 2 1 * *' }))}
                   >
-                    Mensual (1° 02:00)
+                    {t('config:template_modal.schedule_monthly')}
                   </button>
                 </div>
                 <div className="action-buttons" style={{ marginTop: 6 }}>
@@ -3334,64 +3494,64 @@ export default function Configuracion() {
                     type="button"
                     onClick={() => setTemplateForm((prev) => ({ ...prev, schedule: '0 2 * * *' }))}
                   >
-                    Diario (02:00)
+                    {t('config:template_modal.schedule_daily')}
                   </button>
                   <button
                     className="btn-secondary"
                     type="button"
                     onClick={() => setTemplateForm((prev) => ({ ...prev, schedule: '0 2 * * 1' }))}
                   >
-                    Semanal (Lun 02:00)
+                    {t('config:template_modal.schedule_weekly')}
                   </button>
                 </div>
                 <div className="helper-text">
-                  Cron sugerido para cierre mensual. Ej: 0 2 1 * *. {cronPreview ? `Próxima ejecución: ${cronPreview}` : ''}
+                  {t('config:template_modal.schedule_hint')} {cronPreview ? t('config:template_modal.next_run', { value: cronPreview }) : ''}
                 </div>
               </div>
               </div>
               <div className="form-group">
-                <label>Estado</label>
+                <label>{t('common:status')}</label>
                 <select
                   value={templateForm.enabled ? '1' : '0'}
                   onChange={(e) => setTemplateForm((prev) => ({ ...prev, enabled: e.target.value === '1' }))}
                 >
-                  <option value="1">Activa</option>
-                  <option value="0">Inactiva</option>
+                  <option value="1">{t('config:template_modal.active')}</option>
+                  <option value="0">{t('config:template_modal.inactive')}</option>
                 </select>
               </div>
               {['count', 'ratio', 'sla'].includes(templateForm.metricType) &&
               (templateForm.queryTestsTemplate.trim() || templateForm.queryStoriesTemplate.trim()) &&
               !hasAnyPlaceholders ? (
                 <div className="form-warning">
-                  Sugerencia: usa placeholders (ej: {'{baseFilter}'}, {'{from}'}, {'{to}'}) para que la plantilla sea reutilizable.
+                  {t('config:template_modal.placeholders_hint')}
                 </div>
               ) : null}
               {['count', 'ratio', 'sla'].includes(templateForm.metricType) &&
               (templateForm.queryTestsTemplate.trim() || templateForm.queryStoriesTemplate.trim()) &&
               missingTimePlaceholders ? (
                 <div className="form-warning">
-                  Sugerencia: incluir {'{from}'} y {'{to}'} para filtrar por periodo.
+                  {t('config:template_modal.time_placeholders_hint')}
                 </div>
               ) : null}
               {['count', 'ratio', 'sla'].includes(templateForm.metricType) &&
               (templateForm.queryTestsTemplate.trim() || templateForm.queryStoriesTemplate.trim()) &&
               literalWarning ? (
                 <div className="form-warning">
-                  Sugerencia: evitá valores fijos (Story/Bug/Done). Ponelos en el Target con placeholders.
+                  {t('config:template_modal.literal_values_hint')}
                 </div>
               ) : null}
               {templateFormError ? <div className="form-error">{templateFormError}</div> : null}
             </div>
             <div className="modal-actions">
               <button className="btn-secondary" onClick={() => setShowTemplateModal(false)}>
-                Cancelar
+                {t('common:cancel')}
               </button>
               <button
                 className="btn-primary"
                 onClick={() => saveTemplate.mutate()}
                 disabled={!templateForm.name.trim() || saveTemplate.isLoading}
               >
-                {saveTemplate.isLoading ? 'Guardando...' : 'Guardar plantilla'}
+                {saveTemplate.isLoading ? t('config:actions.saving') : t('config:actions.save_template')}
               </button>
             </div>
           </div>
@@ -3406,7 +3566,7 @@ export default function Configuracion() {
         >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{editingTarget ? 'Editar target' : 'Nuevo target'}</h2>
+              <h2>{editingTarget ? t('config:modals.target_edit') : t('config:modals.target_new')}</h2>
               <button className="close-button" onClick={() => setShowTargetModal(false)}>
                 ×
               </button>
@@ -3414,12 +3574,12 @@ export default function Configuracion() {
             <div className="modal-body">
               <div className="form-row">
                 <div className="form-group">
-                  <label>Template</label>
+                  <label>{t('config:target_modal.template')}</label>
                   <select
                     value={targetForm.templateId || String(selectedTemplateId)}
                     onChange={(e) => setTargetForm((prev) => ({ ...prev, templateId: e.target.value }))}
                   >
-                    <option value="">Selecciona una plantilla</option>
+                    <option value="">{t('config:integrations.select_template')}</option>
                     {templates?.map((template) => (
                       <option key={template.id} value={template.id}>
                         {template.name}
@@ -3428,22 +3588,22 @@ export default function Configuracion() {
                   </select>
                 </div>
               <div className="form-group">
-                  <label>Tipo de unidad</label>
+                  <label>{t('config:target_modal.scope_type')}</label>
                   <select
                     value={targetForm.scopeType}
                     onChange={(e) => setTargetForm((prev) => ({ ...prev, scopeType: e.target.value }))}
                   >
-                    <option value="company">Empresa</option>
-                    <option value="area">Área</option>
-                    <option value="team">Equipo</option>
-                    <option value="person">Persona</option>
-                    <option value="product">Producto</option>
+                    <option value="company">{getOrgScopeTypeLabel('company')}</option>
+                    <option value="area">{getOrgScopeTypeLabel('area')}</option>
+                    <option value="team">{getOrgScopeTypeLabel('team')}</option>
+                    <option value="person">{getOrgScopeTypeLabel('person')}</option>
+                    <option value="product">{getOrgScopeTypeLabel('product')}</option>
                   </select>
                 </div>
               </div>
               <div className="form-row">
                 <div className="form-group">
-                  <label>Unidad organizacional</label>
+                  <label>{t('config:target_modal.org_scope')}</label>
                   <select
                     value={targetForm.orgScopeId}
                     onChange={(e) => {
@@ -3463,16 +3623,16 @@ export default function Configuracion() {
                       }))
                     }}
                   >
-                    <option value="">Seleccioná un área o equipo</option>
+                    <option value="">{t('config:target_modal.select_org_scope')}</option>
                     {orgScopes?.map((scope) => (
                       <option key={scope.id} value={scope.id}>
-                        {scope.type} · {scope.name}
+                        {formatTargetScopeLabel(scope.type, scope.name)}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>ID externo</label>
+                  <label>{t('config:target_modal.external_id')}</label>
                   <input
                     value={targetForm.scopeId}
                     onChange={(e) => setTargetForm((prev) => ({ ...prev, scopeId: e.target.value }))}
@@ -3481,7 +3641,7 @@ export default function Configuracion() {
               </div>
               <div className="form-row">
                 <div className="form-group">
-                  <label>Asignación destino (solo si es individual)</label>
+                  <label>{t('config:target_modal.assignment_destination')}</label>
                   <select
                     value={targetForm.assignmentId}
                     onChange={(e) =>
@@ -3492,21 +3652,19 @@ export default function Configuracion() {
                       }))
                     }
                   >
-                    <option value="">Selecciona una asignación</option>
+                    <option value="">{t('config:target_modal.select_assignment')}</option>
                     {assignmentGroupsForTarget.map((assignment: any) => (
                       <option key={assignment.id} value={assignment.id}>
-                        {assignment.collaboratorName || `Colaborador #${assignment.collaboratorId}`} ·{' '}
-                        {assignment.kpiName || `KPI #${assignment.kpiId}`} ·{' '}
-                        {assignment.periodName || `Período #${assignment.periodId}`}
+                        {formatAssignmentOptionLabel(assignment)}
                       </option>
                     ))}
                   </select>
                   <div className="helper-text">
-                    Seleccioná una asignación base solo si el target debe escribir sobre un KPI colaborador.
+                    {t('config:target_modal.assignment_destination_hint')}
                   </div>
                 </div>
                 <div className="form-group">
-                  <label>KPI Grupal destino</label>
+                  <label>{t('config:target_modal.scope_kpi_destination')}</label>
                   <select
                     value={targetForm.scopeKpiId}
                     onChange={(e) =>
@@ -3530,35 +3688,34 @@ export default function Configuracion() {
                       })
                     }
                   >
-                    <option value="">Seleccioná un KPI Grupal</option>
+                    <option value="">{t('config:target_modal.select_scope_kpi')}</option>
                     {(scopeKpis || [])
                       .filter((scopeKpi: any) =>
                         targetForm.orgScopeId ? Number(scopeKpi.orgScopeId) === Number(targetForm.orgScopeId) : true
                       )
                       .map((scopeKpi: any) => (
                         <option key={scopeKpi.id} value={scopeKpi.id}>
-                          {scopeKpi.name} · {scopeKpi.orgScopeName || `Scope #${scopeKpi.orgScopeId}`} ·{' '}
-                          {scopeKpi.periodName || `Período #${scopeKpi.periodId}`}
+                          {formatScopeKpiOptionLabel(scopeKpi)}
                         </option>
                       ))}
                   </select>
                   <div className="helper-text">
-                    Seleccioná esto si el target debe escribir sobre un KPI organizacional. Solo uno de los dos destinos puede estar informado.
+                    {t('config:target_modal.scope_kpi_destination_hint')}
                   </div>
                 </div>
               </div>
               <div className="form-group">
-                <label>JQL raw (opcional)</label>
-                <div className="helper-text">Usalo solo como ayuda para convertir un JQL en params JSON.</div>
+                <label>{t('config:target_modal.raw_jql')}</label>
+                <div className="helper-text">{t('config:target_modal.raw_jql_hint')}</div>
                 <textarea
                   rows={4}
-                  placeholder="Pegar JQL aqui..."
+                  placeholder={t('config:target_modal.raw_jql_placeholder')}
                   value={rawJqlInput}
                   onChange={(e) => setRawJqlInput(e.target.value)}
                 />
                 <div className="action-buttons" style={{ marginTop: 6 }}>
                   <button className="btn-secondary" type="button" onClick={convertJqlToParams}>
-                    Convertir JQL → JSON
+                    {t('config:target_modal.convert_jql')}
                   </button>
                   <button
                     className="btn-secondary"
@@ -3567,12 +3724,12 @@ export default function Configuracion() {
                       setRawJqlInput('')
                     }}
                   >
-                    Limpiar
+                    {t('config:target_modal.clear')}
                   </button>
                 </div>
-                <label style={{ marginTop: 12, display: 'block' }}>Params JSON (guardado real del target)</label>
+                <label style={{ marginTop: 12, display: 'block' }}>{t('config:target_modal.params_json')}</label>
                 <div className="helper-text">
-                  Este contenido es el que se persiste y usa el runner al ejecutar el target.
+                  {t('config:target_modal.params_json_hint')}
                 </div>
                 <textarea
                   rows={5}
@@ -3581,57 +3738,61 @@ export default function Configuracion() {
                 />
                 {selectedTargetTemplate?.connector === 'sheets' ? (
                   <div className="helper-text">
-                    Para hojas por lider: usa <code>range</code> con A1 notation (ej: <code>'Alexis Cantenys'!A3:Z</code>),
-                    {' '}<code>collaboratorValue</code> para elegir la fila correcta y, si los meses son columnas,
-                    {' '}<code>valueColumnFromPeriod=true</code> + <code>valueColumnPeriodFormat=YYYYMM</code>.
+                    <Trans
+                      ns="config"
+                      i18nKey="target_modal.sheets_params_hint"
+                      components={{ code: <code /> }}
+                    />
                   </div>
                 ) : null}
               </div>
               {targetRequiresStructuredParams && targetRequiredParamKeys.length > 0 ? (
                 <div className="helper-text">
-                  Params requeridos por la plantilla: <strong>{targetRequiredParamKeys.join(', ')}</strong>
+                  {t('config:target_modal.required_params')} <strong>{targetRequiredParamKeys.join(', ')}</strong>
                 </div>
               ) : null}
               {selectedTargetTemplate?.connector === 'looker' || selectedTargetTemplate?.connector === 'generic_api' ? (
                 <div className="helper-text">
-                  Para actualizar multiples destinos desde una sola corrida, podés usar
-                  {' '}<code>targetMap</code>, <code>mappingKeyPath</code>, <code>mappingValuePath</code> y
-                  {' '}<code>mappingOwnerType</code> (<code>assignment</code> o <code>scopeKpi</code>).
-                  {selectedTargetTemplate?.connector === 'looker'
-                    ? ' Looker también soporta resourceType dashboard y dashboard_element.'
-                    : ''}
+                  <Trans
+                    ns="config"
+                    i18nKey={
+                      selectedTargetTemplate?.connector === 'looker'
+                        ? 'target_modal.explicit_mapping_hint_looker'
+                        : 'target_modal.explicit_mapping_hint'
+                    }
+                    components={{ code: <code /> }}
+                  />
                 </div>
               ) : null}
               {supportsTargetMappingEditor ? (
                 <div className="form-group" style={{ marginTop: 14 }}>
-                  <label>Editor de mapping por filas</label>
+                  <label>{t('config:target_modal.mapping_editor')}</label>
                   <div className="helper-text">
-                    Armá el <code>targetMap</code> desde UI. Si usás este editor, quitá el destino directo del target.
-                    Cuando importás desde preview, el sistema intenta autocompletar coincidencias por nombre.
+                    {t('config:target_modal.mapping_editor_hint')}
                   </div>
                   <div className="form-row">
                     <div className="form-group">
-                      <label>Mapping result path</label>
+                      <label>{t('config:target_modal.mapping_result_path')}</label>
                       <input
-                        placeholder="data.rows"
+                        placeholder={t('config:target_modal.placeholders.mapping_result_path')}
                         value={targetMappingDraft.mappingResultPath}
                         onChange={(e) => updateTargetMappingField('mappingResultPath', e.target.value)}
                         disabled={targetParamsInvalidJson}
                       />
                     </div>
                     <div className="form-group">
-                      <label>Mapping key path</label>
+                      <label>{t('config:target_modal.mapping_key_path')}</label>
                       <input
-                        placeholder="qa o area"
+                        placeholder={t('config:target_modal.placeholders.mapping_key_path')}
                         value={targetMappingDraft.mappingKeyPath}
                         onChange={(e) => updateTargetMappingField('mappingKeyPath', e.target.value)}
                         disabled={targetParamsInvalidJson}
                       />
                     </div>
                     <div className="form-group">
-                      <label>Mapping value path</label>
+                      <label>{t('config:target_modal.mapping_value_path')}</label>
                       <input
-                        placeholder="stories_delivered o revenue"
+                        placeholder={t('config:target_modal.placeholders.mapping_value_path')}
                         value={targetMappingDraft.mappingValuePath}
                         onChange={(e) => updateTargetMappingField('mappingValuePath', e.target.value)}
                         disabled={targetParamsInvalidJson}
@@ -3645,18 +3806,18 @@ export default function Configuracion() {
                       onClick={addTargetMappingRow}
                       disabled={targetParamsInvalidJson}
                     >
-                      Agregar fila de mapping
+                      {t('config:target_modal.add_mapping_row')}
                     </button>
                   </div>
                   {targetMappingDraft.rows.length > 0 ? (
                     <table className="config-table" style={{ marginTop: 10 }}>
                       <thead>
                         <tr>
-                          <th>Clave externa</th>
-                          <th>Destino</th>
-                          <th>Asignación</th>
-                          <th>KPI Grupal</th>
-                          <th>Acciones</th>
+                          <th>{t('config:target_modal.table.external_key')}</th>
+                          <th>{t('config:target_modal.table.destination')}</th>
+                          <th>{t('config:target_modal.table.assignment')}</th>
+                          <th>{t('config:target_modal.table.scope_kpi')}</th>
+                          <th>{t('common:actions')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -3665,7 +3826,7 @@ export default function Configuracion() {
                             <td>
                               <input
                                 value={row.externalKey}
-                                placeholder="Johana / Revenue / CS"
+                                placeholder={t('config:target_modal.placeholders.external_key')}
                                 onChange={(e) =>
                                   updateTargetMappingRow(index, {
                                     externalKey: e.target.value,
@@ -3684,8 +3845,8 @@ export default function Configuracion() {
                                 }
                                 disabled={targetParamsInvalidJson}
                               >
-                                <option value="assignment">Asignación</option>
-                                <option value="scopeKpi">KPI Grupal</option>
+                                <option value="assignment">{t('config:target_modal.owner_types.assignment')}</option>
+                                <option value="scopeKpi">{t('config:target_modal.owner_types.scope_kpi')}</option>
                               </select>
                             </td>
                             <td>
@@ -3698,12 +3859,10 @@ export default function Configuracion() {
                                 }
                                 disabled={row.ownerType !== 'assignment' || targetParamsInvalidJson}
                               >
-                                <option value="">Selecciona una asignación</option>
+                                <option value="">{t('config:target_modal.select_assignment')}</option>
                                 {assignmentGroupsForTarget.map((assignment: any) => (
                                   <option key={assignment.id} value={assignment.id}>
-                                    {assignment.collaboratorName || `Colaborador #${assignment.collaboratorId}`} ·{' '}
-                                    {assignment.kpiName || `KPI #${assignment.kpiId}`} ·{' '}
-                                    {assignment.periodName || `Período #${assignment.periodId}`}
+                                    {formatAssignmentOptionLabel(assignment)}
                                   </option>
                                 ))}
                               </select>
@@ -3718,11 +3877,10 @@ export default function Configuracion() {
                                 }
                                 disabled={row.ownerType !== 'scopeKpi' || targetParamsInvalidJson}
                               >
-                                <option value="">Seleccioná un KPI Grupal</option>
+                                <option value="">{t('config:target_modal.select_scope_kpi')}</option>
                                 {(scopeKpis || []).map((scopeKpi: any) => (
                                   <option key={scopeKpi.id} value={scopeKpi.id}>
-                                    {scopeKpi.name} · {scopeKpi.orgScopeName || `Scope #${scopeKpi.orgScopeId}`} ·{' '}
-                                    {scopeKpi.periodName || `Período #${scopeKpi.periodId}`}
+                                    {formatScopeKpiOptionLabel(scopeKpi)}
                                   </option>
                                 ))}
                               </select>
@@ -3734,7 +3892,7 @@ export default function Configuracion() {
                                 onClick={() => removeTargetMappingRow(index)}
                                 disabled={targetParamsInvalidJson}
                               >
-                                Eliminar
+                                {t('common:delete')}
                               </button>
                             </td>
                           </tr>
@@ -3743,27 +3901,34 @@ export default function Configuracion() {
                     </table>
                   ) : (
                     <div className="helper-text" style={{ marginTop: 10 }}>
-                      Sin filas configuradas. Agregá una fila para mapear claves externas a asignaciones o Scope KPIs.
+                      {t('config:target_modal.no_mapping_rows')}
                     </div>
                   )}
                   {targetUnresolvedMappingRows.length > 0 ? (
                     <>
                       <div className="form-warning" style={{ marginTop: 10 }}>
-                        Hay <strong>{targetUnresolvedMappingRows.length}</strong> filas del <code>targetMap</code> sin destino
-                        asignado. Completalas o eliminá las que no quieras usar.
+                        <Trans
+                          ns="config"
+                          i18nKey="target_modal.unresolved_warning"
+                          values={{ count: targetUnresolvedMappingRows.length }}
+                          components={{ strong: <strong />, code: <code /> }}
+                        />
                       </div>
                       <div className="preview-box" style={{ marginTop: 10 }}>
                         <div className="muted">
-                          Podés crear mappings explícitos de <code>data_source_mappings</code> para{' '}
-                          <strong>{getMappingSourceTypeLabel(targetExplicitMappingSourceType)}</strong> sin salir del modal.
-                          Eso guarda la clave externa para futuros previews y además resuelve estas filas ahora.
+                        <Trans
+                          ns="config"
+                          i18nKey="target_modal.explicit_mapping_intro"
+                          values={{ source: getConfigSourceTypeLabel(targetExplicitMappingSourceType) }}
+                          components={{ code: <code />, strong: <strong /> }}
+                        />
                         </div>
                         <table className="config-table" style={{ marginTop: 10 }}>
                           <thead>
                             <tr>
-                              <th>Clave externa</th>
-                              <th>Destino a persistir</th>
-                              <th>Se guarda sobre</th>
+                              <th>{t('config:target_modal.explicit_table.external_key')}</th>
+                              <th>{t('config:target_modal.explicit_table.destination')}</th>
+                              <th>{t('config:target_modal.explicit_table.persisted_on')}</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -3773,11 +3938,11 @@ export default function Configuracion() {
                               return (
                                 <tr key={`pending-mapping-${rowKey}`}>
                                   <td>
-                                    <strong>{row.externalKey || 'Sin clave'}</strong>
+                                    <strong>{row.externalKey || t('config:target_modal.explicit_row.no_key')}</strong>
                                     <div className="helper-text">
                                       {row.ownerType === 'assignment'
-                                        ? 'La clave se guardará contra el colaborador base de la asignación elegida.'
-                                        : 'La clave se guardará contra el org scope base del Scope KPI elegido.'}
+                                        ? t('config:target_modal.explicit_row.assignment_hint')
+                                        : t('config:target_modal.explicit_row.scope_kpi_hint')}
                                     </div>
                                   </td>
                                   <td>
@@ -3796,12 +3961,10 @@ export default function Configuracion() {
                                         }
                                         disabled={targetParamsInvalidJson || saveExplicitTargetMappings.isLoading}
                                       >
-                                        <option value="">Selecciona una asignación</option>
+                                        <option value="">{t('config:target_modal.explicit_row.select_assignment')}</option>
                                         {assignmentGroupsForTarget.map((assignment: any) => (
                                           <option key={`pending-assignment-${assignment.id}`} value={assignment.id}>
-                                            {assignment.collaboratorName || `Colaborador #${assignment.collaboratorId}`} ·{' '}
-                                            {assignment.kpiName || `KPI #${assignment.kpiId}`} ·{' '}
-                                            {assignment.periodName || `Período #${assignment.periodId}`}
+                                            {formatAssignmentOptionLabel(assignment)}
                                           </option>
                                         ))}
                                       </select>
@@ -3820,11 +3983,10 @@ export default function Configuracion() {
                                         }
                                         disabled={targetParamsInvalidJson || saveExplicitTargetMappings.isLoading}
                                       >
-                                        <option value="">Seleccioná un KPI Grupal</option>
+                                        <option value="">{t('config:target_modal.explicit_row.select_scope_kpi')}</option>
                                         {(scopeKpis || []).map((scopeKpi: any) => (
                                           <option key={`pending-scope-${scopeKpi.id}`} value={scopeKpi.id}>
-                                            {scopeKpi.name} · {scopeKpi.orgScopeName || `Scope #${scopeKpi.orgScopeId}`} ·{' '}
-                                            {scopeKpi.periodName || `Período #${scopeKpi.periodId}`}
+                                            {formatScopeKpiOptionLabel(scopeKpi)}
                                           </option>
                                         ))}
                                       </select>
@@ -3836,13 +3998,13 @@ export default function Configuracion() {
                                         {row.ownerType === 'assignment'
                                           ? collaboratorById.get(
                                               Number(assignmentGroupById.get(Number(pending.entityId))?.collaboratorId || 0)
-                                            )?.name || 'Colaborador'
+                                            )?.name || t('config:target_modal.explicit_row.collaborator_fallback')
                                           : scopeById.get(
                                               Number(scopeKpiById.get(Number(pending.entityId))?.orgScopeId || 0)
-                                            )?.name || 'Org scope'}
+                                            )?.name || t('config:target_modal.explicit_row.scope_fallback')}
                                       </span>
                                     ) : (
-                                      <span className="muted">Pendiente</span>
+                                      <span className="muted">{t('config:target_modal.explicit_row.pending')}</span>
                                     )}
                                   </td>
                                 </tr>
@@ -3862,8 +4024,10 @@ export default function Configuracion() {
                             }
                           >
                             {saveExplicitTargetMappings.isLoading
-                              ? 'Guardando mappings...'
-                              : `Guardar mappings explícitos y resolver (${pendingExplicitMappingSelectionsCount})`}
+                              ? t('config:target_modal.explicit_actions.saving')
+                              : t('config:target_modal.explicit_actions.save_and_resolve', {
+                                  count: pendingExplicitMappingSelectionsCount,
+                                })}
                           </button>
                         </div>
                       </div>
@@ -3880,7 +4044,9 @@ export default function Configuracion() {
                       onClick={() => previewTargetDraft.mutate()}
                       disabled={previewTargetDraft.isLoading || targetParamsInvalidJson}
                     >
-                      {previewTargetDraft.isLoading ? 'Probando...' : 'Probar params'}
+                      {previewTargetDraft.isLoading
+                        ? t('config:target_modal.preview_actions.testing')
+                        : t('config:target_modal.preview_actions.test')}
                     </button>
                     {Array.isArray(targetDraftPreviewResult?.sourceMeta?.previewRows) &&
                     targetDraftPreviewResult.sourceMeta.previewRows.length > 0 ? (
@@ -3889,7 +4055,7 @@ export default function Configuracion() {
                         type="button"
                         onClick={() => importPreviewRowsToMapping(targetDraftPreviewResult)}
                       >
-                        Cargar claves desde preview
+                        {t('config:target_modal.preview_actions.load_keys')}
                       </button>
                     ) : null}
                     {Array.isArray(targetDraftPreviewResult?.sourceMeta?.unmappedKeys) &&
@@ -3899,24 +4065,30 @@ export default function Configuracion() {
                         type="button"
                         onClick={() => importPreviewRowsToMapping(targetDraftPreviewResult, 'unmapped')}
                       >
-                        Agregar solo faltantes
+                        {t('config:target_modal.preview_actions.add_missing')}
                       </button>
                     ) : null}
                   </div>
                   <div className="helper-text">
-                    El preview usa la plantilla seleccionada y los params actuales del modal, sin necesidad de guardar el
-                    target antes.
+                    {t('config:target_modal.preview_hint')}
                   </div>
                   {targetDraftPreviewMessage ? <div className="form-error">{targetDraftPreviewMessage}</div> : null}
                   {targetDraftPreviewResult ? (
                     <div className="preview-box" style={{ marginTop: 10 }}>
                       <div className="muted">
                         {targetDraftPreviewResult.sourceMeta
-                          ? `Valor preview: ${targetDraftPreviewResult.computed}`
-                          : `A: ${targetDraftPreviewResult.testsTotal} · B: ${targetDraftPreviewResult.storiesTotal} · Valor: ${targetDraftPreviewResult.computed}`}
+                          ? t('config:target_preview.value_only', { value: targetDraftPreviewResult.computed })
+                          : t('config:target_preview.value_ab', {
+                              a: targetDraftPreviewResult.testsTotal,
+                              b: targetDraftPreviewResult.storiesTotal,
+                              value: targetDraftPreviewResult.computed,
+                            })}
                       </div>
                       <div className="muted">
-                        Rango: {targetDraftPreviewResult.from} → {targetDraftPreviewResult.to}
+                        {t('config:target_preview.range', {
+                          from: targetDraftPreviewResult.from,
+                          to: targetDraftPreviewResult.to,
+                        })}
                       </div>
                       <PreviewSourceMeta sourceMeta={targetDraftPreviewResult.sourceMeta} />
                     </div>
@@ -3924,68 +4096,71 @@ export default function Configuracion() {
                 </div>
               ) : null}
               <div className="helper-text">
-                Periodo calculado: <strong>{targetPeriodPreview.period}</strong> · Rango: {targetPeriodPreview.from} →{' '}
-                {targetPeriodPreview.to}.
+                {t('config:target_modal.calculated_period', {
+                  period: targetPeriodPreview.period,
+                  from: targetPeriodPreview.from,
+                  to: targetPeriodPreview.to,
+                })}
               </div>
               <div className="form-hint">
                 {targetResolvedSubperiod ? (
                   <>
-                    Subperíodo destino: <strong>{targetResolvedSubperiod.name}</strong> ·{' '}
-                    {targetResolvedSubperiod.startDate} → {targetResolvedSubperiod.endDate}
+                    {t('config:target_modal.target_subperiod', {
+                      name: targetResolvedSubperiod.name,
+                      start: targetResolvedSubperiod.startDate,
+                      end: targetResolvedSubperiod.endDate,
+                    })}
                   </>
                 ) : (
-                  <>Subperíodo destino: se resolverá al ejecutar (no hay calendario asociado o subperíodos).</>
+                  <>{t('config:target_modal.target_subperiod_later')}</>
                 )}
               </div>
               {assignmentForTarget?.subPeriodId && (
                 <div className="form-warning">
-                  Esta asignación pertenece a un subperíodo específico. Para que el mes se resuelva automáticamente,
-                  seleccioná la asignación base (sin subperíodo).
+                  {t('config:target_modal.assignment_subperiod_warning')}
                 </div>
               )}
               {scopeKpiForTarget?.subPeriodId && (
                 <div className="form-warning">
-                  Este Scope KPI pertenece a un subperíodo específico. Si querés resolución mensual automática,
-                  usá un Scope KPI base sin subperíodo.
+                  {t('config:target_modal.scope_kpi_subperiod_warning')}
                 </div>
               )}
               {targetAssignmentBlocked ? (
                 <div className="form-error">
-                  Hay multiples users en params. Para asignacion individual, crea un target por persona o quita la asignacion.
+                  {t('config:target_modal.errors.assignment_blocked')}
                 </div>
               ) : null}
               {targetParamsInvalidJson ? (
-                <div className="form-error">El JSON de params no es válido.</div>
+                <div className="form-error">{t('config:target_modal.errors.invalid_json')}</div>
               ) : null}
               {targetRequiresStructuredParams && targetMissingParamKeys.length > 0 ? (
                 <div className="form-error">
-                  Faltan params requeridos para la plantilla: {targetMissingParamKeys.join(', ')}
+                  {t('config:target_modal.errors.missing_required_params')} {targetMissingParamKeys.join(', ')}
                 </div>
               ) : null}
               {targetForm.assignmentId && targetForm.scopeKpiId ? (
-                <div className="form-error">El target no puede apuntar a asignación y KPI Grupal al mismo tiempo.</div>
+                <div className="form-error">{t('config:target_modal.errors.both_destinations')}</div>
               ) : null}
               {targetDirectDestinationBlockedByMapping ? (
                 <div className="form-error">
-                  Si configurás mapping por filas, quitá el destino directo del target. Cada fila debe resolver su propia
-                  asignación o Scope KPI.
+                  {t('config:target_modal.errors.direct_destination_with_mapping')}
                 </div>
               ) : null}
               {targetFormError ? <div className="form-error">{targetFormError}</div> : null}
               <div className="form-group">
-                <label>Estado</label>
+                <label>{t('common:status')}</label>
                 <select
                   value={targetForm.enabled ? '1' : '0'}
                   onChange={(e) => setTargetForm((prev) => ({ ...prev, enabled: e.target.value === '1' }))}
                 >
-                  <option value="1">Activo</option>
-                  <option value="0">Inactivo</option>
+                  <option value="1">{t('common:active')}</option>
+                  <option value="0">{t('common:inactive')}</option>
                 </select>
               </div>
             </div>
             <div className="modal-actions">
               <button className="btn-secondary" onClick={() => setShowTargetModal(false)}>
-                Cancelar
+                {t('common:cancel')}
               </button>
               <button
                 className="btn-primary"
@@ -4000,7 +4175,7 @@ export default function Configuracion() {
                   (targetRequiresStructuredParams && targetMissingParamKeys.length > 0)
                 }
               >
-                {saveTarget.isLoading ? 'Guardando...' : 'Guardar target'}
+                {saveTarget.isLoading ? t('config:actions.saving') : t('config:actions.save_target')}
               </button>
             </div>
           </div>
@@ -4015,24 +4190,24 @@ export default function Configuracion() {
         >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Duplicar target por users</h2>
+              <h2>{t('config:modals.target_wizard')}</h2>
               <button className="close-button" onClick={() => setShowTargetWizard(false)}>
                 ×
               </button>
             </div>
             <div className="modal-body">
               <div className="muted">
-                Template: {templates?.find((t) => t.id === wizardTarget.templateId)?.name || wizardTarget.templateId}
+                {t('config:target_wizard.template')} {templates?.find((t) => t.id === wizardTarget.templateId)?.name || wizardTarget.templateId}
               </div>
               <div className="helper-text">
-                Selecciona el colaborador y, si corresponde, la asignacion destino. Se creara un target por cada user.
+                {t('config:target_wizard.hint')}
               </div>
               <table className="config-table">
                 <thead>
                   <tr>
-                    <th>User Jira</th>
-                    <th>Colaborador</th>
-                    <th>Asignacion</th>
+                    <th>{t('config:target_wizard.user_jira')}</th>
+                    <th>{t('config:target_wizard.collaborator')}</th>
+                    <th>{t('config:target_wizard.assignment')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -4061,7 +4236,7 @@ export default function Configuracion() {
                               )
                             }}
                           >
-                            <option value="">Selecciona colaborador</option>
+                            <option value="">{t('config:target_wizard.select_collaborator')}</option>
                             {collaborators?.map((col) => (
                               <option key={col.id} value={col.id}>
                                 {col.name} · {col.area}
@@ -4087,11 +4262,11 @@ export default function Configuracion() {
                             }}
                             disabled={!row.collaboratorId}
                           >
-                            <option value="">Sin asignacion</option>
+                            <option value="">{t('config:target_wizard.no_assignment')}</option>
                             {assignmentsForColab.map((assignment: any) => (
                               <option key={assignment.id} value={assignment.id}>
-                                {assignment.kpiName || `KPI #${assignment.kpiId}`} ·{' '}
-                                {assignment.periodName || `Período #${assignment.periodId}`}
+                                {assignment.kpiName || t('config:target_modal.fallbacks.kpi', { id: assignment.kpiId })} ·{' '}
+                                {assignment.periodName || t('config:target_modal.fallbacks.period', { id: assignment.periodId })}
                               </option>
                             ))}
                           </select>
@@ -4104,14 +4279,14 @@ export default function Configuracion() {
             </div>
             <div className="modal-actions">
               <button className="btn-secondary" onClick={() => setShowTargetWizard(false)}>
-                Cancelar
+                {t('common:cancel')}
               </button>
               <button
                 className="btn-primary"
                 onClick={() => createTargetsFromWizard.mutate()}
                 disabled={createTargetsFromWizard.isLoading}
               >
-                {createTargetsFromWizard.isLoading ? 'Creando...' : 'Crear targets'}
+                {createTargetsFromWizard.isLoading ? t('config:actions.creating') : t('config:actions.create_targets')}
               </button>
             </div>
           </div>
@@ -4126,7 +4301,7 @@ export default function Configuracion() {
         >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{editingAuth ? 'Editar auth profile' : 'Nuevo auth profile'}</h2>
+              <h2>{editingAuth ? t('config:modals.auth_edit') : t('config:modals.auth_new')}</h2>
               <button className="close-button" onClick={() => setShowAuthModal(false)}>
                 ×
               </button>
@@ -4134,59 +4309,51 @@ export default function Configuracion() {
             <div className="modal-body">
               <div className="form-row">
                 <div className="form-group">
-                  <label>Nombre</label>
+                  <label>{t('common:name')}</label>
                   <input
                     value={authForm.name}
                     onChange={(e) => setAuthForm((prev) => ({ ...prev, name: e.target.value }))}
                   />
                 </div>
                 <div className="form-group">
-                  <label>Connector</label>
+                  <label>{t('config:auth_modal.connector')}</label>
                   <select
                     value={authForm.connector}
                     onChange={(e) => setAuthForm((prev) => ({ ...prev, connector: e.target.value }))}
                   >
-                    <option value="jira">Jira</option>
-                    <option value="xray">Xray</option>
-                    <option value="sheets">Google Sheets</option>
-                    <option value="looker">Looker</option>
-                    <option value="generic_api">Generic API</option>
+                    <option value="jira">{getConnectorLabel('jira')}</option>
+                    <option value="xray">{getConnectorLabel('xray')}</option>
+                    <option value="sheets">{getConnectorLabel('sheets')}</option>
+                    <option value="looker">{getConnectorLabel('looker')}</option>
+                    <option value="generic_api">{getConnectorLabel('generic_api')}</option>
                   </select>
                 </div>
               </div>
               <div className="form-group">
-                <label>Endpoint</label>
+                <label>{t('config:auth_modal.endpoint')}</label>
                 <input
                   value={authForm.endpoint}
                   onChange={(e) => setAuthForm((prev) => ({ ...prev, endpoint: e.target.value }))}
-                  placeholder="https://umsa.atlassian.net"
+                  placeholder={t('config:auth_modal.endpoint_placeholder')}
                 />
-                {authForm.connector === 'sheets' ? (
-                  <div className="helper-text">Opcional. Ejemplo: https://sheets.googleapis.com</div>
-                ) : authForm.connector === 'looker' ? (
-                  <div className="helper-text">Ejemplo: https://mi-looker.empresa.com o https://mi-looker.empresa.com/api/4.0</div>
-                ) : authForm.connector === 'generic_api' ? (
-                  <div className="helper-text">Ejemplo: https://api.empresa.com o https://tu-looker/api/4.0</div>
-                ) : (
-                  <div className="helper-text">Ejemplo: https://tu-dominio.atlassian.net</div>
-                )}
+                <div className="helper-text">{getAuthEndpointHint(authForm.connector)}</div>
               </div>
               <div className="form-group">
-                <label>Auth Type</label>
+                <label>{t('config:auth_modal.auth_type')}</label>
                 <select
                   value={authForm.authType}
                   onChange={(e) => setAuthForm((prev) => ({ ...prev, authType: e.target.value }))}
                 >
-                  <option value="none">Sin auth</option>
-                  <option value="basic">Basic</option>
-                  <option value="bearer">Bearer</option>
-                  <option value="apiKey">API Key</option>
+                  <option value="none">{getAuthTypeLabel('none')}</option>
+                  <option value="basic">{getAuthTypeLabel('basic')}</option>
+                  <option value="bearer">{getAuthTypeLabel('bearer')}</option>
+                  <option value="apiKey">{getAuthTypeLabel('apiKey')}</option>
                 </select>
               </div>
               {authForm.authType === 'basic' && (
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Usuario</label>
+                    <label>{t('config:auth_modal.username')}</label>
                     <input
                       value={authForm.authConfig.username}
                       onChange={(e) =>
@@ -4198,7 +4365,7 @@ export default function Configuracion() {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Password</label>
+                    <label>{t('config:auth_modal.password')}</label>
                     <input
                       type="password"
                       value={authForm.authConfig.password}
@@ -4214,7 +4381,7 @@ export default function Configuracion() {
               )}
               {authForm.authType === 'bearer' && (
                 <div className="form-group">
-                  <label>Token</label>
+                  <label>{t('config:auth_modal.token')}</label>
                   <input
                     value={authForm.authConfig.token}
                     onChange={(e) =>
@@ -4229,7 +4396,7 @@ export default function Configuracion() {
               {authForm.connector === 'looker' && (
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Client ID</label>
+                    <label>{t('config:auth_modal.client_id')}</label>
                     <input
                       value={authForm.authConfig.clientId}
                       onChange={(e) =>
@@ -4241,7 +4408,7 @@ export default function Configuracion() {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Client Secret</label>
+                    <label>{t('config:auth_modal.client_secret')}</label>
                     <input
                       type="password"
                       value={authForm.authConfig.clientSecret}
@@ -4256,14 +4423,14 @@ export default function Configuracion() {
                 </div>
               )}
               {authForm.connector === 'looker' && (
-                <div className="helper-text">
-                  Si cargás `clientId/clientSecret`, KPI Manager hace `POST /api/4.0/login`. También podés usar token directo.
+                  <div className="helper-text">
+                  {t('config:auth_modal.looker_hint')}
                 </div>
               )}
               {authForm.authType === 'apiKey' && (
                 <div className="form-row">
                   <div className="form-group">
-                    <label>API Key</label>
+                    <label>{t('config:auth_modal.api_key')}</label>
                     <input
                       value={authForm.authConfig.apiKey}
                       onChange={(e) =>
@@ -4275,7 +4442,7 @@ export default function Configuracion() {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Header</label>
+                    <label>{t('config:auth_modal.header')}</label>
                     <input
                       value={authForm.authConfig.header}
                       onChange={(e) =>
@@ -4291,14 +4458,14 @@ export default function Configuracion() {
             </div>
             <div className="modal-actions">
               <button className="btn-secondary" onClick={() => setShowAuthModal(false)}>
-                Cancelar
+                {t('common:cancel')}
               </button>
               <button
                 className="btn-primary"
                 onClick={() => saveAuthProfile.mutate()}
                 disabled={!authForm.name.trim() || saveAuthProfile.isLoading}
               >
-                {saveAuthProfile.isLoading ? 'Guardando...' : 'Guardar auth profile'}
+                {saveAuthProfile.isLoading ? t('config:actions.saving') : t('config:actions.save_auth')}
               </button>
             </div>
           </div>
@@ -4313,7 +4480,7 @@ export default function Configuracion() {
         >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{editingCalendar ? 'Editar calendario' : 'Nuevo calendario'}</h2>
+              <h2>{editingCalendar ? t('config:modals.calendar_edit') : t('config:modals.calendar_new')}</h2>
               <button className="close-button" onClick={() => setShowCalendarModal(false)}>
                 ×
               </button>
@@ -4321,28 +4488,28 @@ export default function Configuracion() {
             <div className="modal-body">
               <div className="form-row">
                 <div className="form-group">
-                  <label>Nombre</label>
+                  <label>{t('config:calendar.name')}</label>
                   <input
                     value={calendarForm.name}
                     onChange={(e) => setCalendarForm((prev) => ({ ...prev, name: e.target.value }))}
                   />
                 </div>
                 <div className="form-group">
-                  <label>Frecuencia</label>
+                  <label>{t('config:calendar.frequency')}</label>
                   <select
                     value={calendarForm.frequency}
                     onChange={(e) =>
                       setCalendarForm((prev) => ({ ...prev, frequency: e.target.value }))
                     }
                   >
-                    <option value="monthly">Mensual</option>
-                    <option value="quarterly">Trimestral</option>
-                    <option value="custom">Custom</option>
+                    <option value="monthly">{getFrequencyLabel('monthly')}</option>
+                    <option value="quarterly">{getFrequencyLabel('quarterly')}</option>
+                    <option value="custom">{getFrequencyLabel('custom')}</option>
                   </select>
                 </div>
               </div>
               <div className="form-group">
-                <label>Descripción</label>
+                <label>{t('common:description')}</label>
                 <textarea
                   rows={3}
                   value={calendarForm.description}
@@ -4350,28 +4517,28 @@ export default function Configuracion() {
                 />
               </div>
               <div className="form-group">
-                <label>Estado</label>
+                <label>{t('common:status')}</label>
                 <select
                   value={calendarForm.active ? '1' : '0'}
                   onChange={(e) =>
                     setCalendarForm((prev) => ({ ...prev, active: e.target.value === '1' }))
                   }
                 >
-                  <option value="1">Activo</option>
-                  <option value="0">Inactivo</option>
+                  <option value="1">{t('common:active')}</option>
+                  <option value="0">{t('common:inactive')}</option>
                 </select>
               </div>
             </div>
             <div className="modal-actions">
               <button className="btn-secondary" onClick={() => setShowCalendarModal(false)}>
-                Cancelar
+                {t('common:cancel')}
               </button>
               <button
                 className="btn-primary"
                 onClick={() => saveCalendarProfile.mutate()}
                 disabled={!calendarForm.name.trim() || saveCalendarProfile.isLoading}
               >
-                {saveCalendarProfile.isLoading ? 'Guardando...' : 'Guardar calendario'}
+                {saveCalendarProfile.isLoading ? t('config:actions.saving') : t('config:actions.save_calendar')}
               </button>
             </div>
           </div>
@@ -4391,7 +4558,7 @@ export default function Configuracion() {
         >
           <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Subperíodos · {calendarForSubperiods.name}</h2>
+              <h2>{t('config:modals.subperiods', { name: calendarForSubperiods.name })}</h2>
               <button
                 className="close-button"
                 onClick={() => {
@@ -4405,7 +4572,7 @@ export default function Configuracion() {
             <div className="modal-body">
               <div className="form-row">
                 <div className="form-group">
-                  <label>Período</label>
+                  <label>{t('common:period')}</label>
                   <select
                     value={selectedPeriodForCalendar}
                     disabled={periodsLoading || !periods?.length}
@@ -4415,10 +4582,10 @@ export default function Configuracion() {
                   >
                     <option value="">
                       {periodsLoading
-                        ? 'Cargando períodos...'
+                        ? t('config:subperiod_modal.loading_periods')
                         : periods?.length
-                          ? 'Selecciona un período'
-                          : 'No hay períodos disponibles'}
+                          ? t('config:subperiod_modal.select_period')
+                          : t('config:subperiod_modal.no_periods')}
                     </option>
                     {periods?.map((p: any) => (
                       <option key={p.id} value={p.id}>
@@ -4427,28 +4594,28 @@ export default function Configuracion() {
                     ))}
                   </select>
                   {periodsError ? (
-                    <div className="form-error">No se pudieron cargar los períodos.</div>
+                    <div className="form-error">{t('config:subperiod_modal.load_error')}</div>
                   ) : null}
                   {!periodsLoading && !periodsError && (!periods || periods.length === 0) ? (
                     <div className="form-hint">
-                      No hay períodos creados. Primero tenés que crear uno en la pantalla Períodos.
+                      {t('config:subperiod_modal.no_periods_hint')}
                     </div>
                   ) : null}
                 </div>
                 <div className="form-group">
-                  <label>Frecuencia</label>
-                  <div className="readonly-field">{calendarForSubperiods.frequency}</div>
+                  <label>{t('config:calendar.frequency')}</label>
+                  <div className="readonly-field">{getFrequencyLabel(calendarForSubperiods.frequency)}</div>
                 </div>
                 <div className="form-group">
-                  <label>Estado</label>
+                  <label>{t('common:status')}</label>
                   <div className="readonly-field">
-                    {calendarForSubperiods.active !== false ? 'Activo' : 'Inactivo'}
+                    {calendarForSubperiods.active !== false ? t('common:active') : t('common:inactive')}
                   </div>
                 </div>
               </div>
 
               {!selectedPeriodForCalendar && periods && periods.length > 0 && (
-                <div className="form-hint">Selecciona un período para ver los subperíodos.</div>
+                <div className="form-hint">{t('config:subperiod_modal.select_period_hint')}</div>
               )}
 
               {selectedPeriodForCalendar && (
@@ -4458,18 +4625,18 @@ export default function Configuracion() {
                       className="btn-primary"
                       onClick={() => setEditingCalendarSubperiod(null)}
                     >
-                      Nuevo subperíodo
+                      {t('config:subperiod_modal.new')}
                     </button>
                   </div>
                   <table className="config-table">
                     <thead>
                       <tr>
-                        <th>Nombre</th>
-                        <th>Inicio</th>
-                        <th>Fin</th>
-                        <th>Peso</th>
-                        <th>Estado</th>
-                        <th>Acciones</th>
+                        <th>{t('common:name')}</th>
+                        <th>{t('config:subperiod_modal.start')}</th>
+                        <th>{t('config:subperiod_modal.end')}</th>
+                        <th>{t('common:weight')}</th>
+                        <th>{t('common:status')}</th>
+                        <th>{t('common:actions')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -4481,7 +4648,7 @@ export default function Configuracion() {
                           <td>{sp.weight ? `${sp.weight}%` : '-'}</td>
                           <td>
                             <span className={`status-pill ${sp.status === 'closed' ? 'review' : 'ok'}`}>
-                              {sp.status === 'closed' ? 'Cerrado' : 'Abierto'}
+                              {sp.status === 'closed' ? t('common:closed') : t('common:open')}
                             </span>
                           </td>
                           <td>
@@ -4491,21 +4658,21 @@ export default function Configuracion() {
                                 disabled={sp.status === 'closed'}
                                 onClick={() => setEditingCalendarSubperiod(sp)}
                               >
-                                Editar
+                                {t('common:edit')}
                               </button>
                               <button
                                 className="btn-secondary"
                                 disabled={sp.status === 'closed'}
                                 onClick={() => closeCalendarSubperiod.mutate(sp)}
                               >
-                                Cerrar
+                                {t('common:close')}
                               </button>
                               <button
                                 className="btn-danger"
                                 disabled={sp.status === 'closed'}
                                 onClick={() => deleteCalendarSubperiod.mutate(sp)}
                               >
-                                Eliminar
+                                {t('common:delete')}
                               </button>
                             </div>
                           </td>
@@ -4514,7 +4681,7 @@ export default function Configuracion() {
                       {(!calendarSubperiods || calendarSubperiods.length === 0) && (
                         <tr>
                           <td colSpan={6} className="empty-row">
-                            No hay subperíodos para este calendario y período.
+                            {t('config:subperiod_modal.empty')}
                           </td>
                         </tr>
                       )}
@@ -4563,7 +4730,7 @@ export default function Configuracion() {
         >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Preview de target</h2>
+              <h2>{t('config:modals.target_preview')}</h2>
               <button className="close-button" onClick={() => setShowTargetPreview(false)}>
                 ×
               </button>
@@ -4572,8 +4739,8 @@ export default function Configuracion() {
               <div className="form-group">
                 <div className="muted">
                   {targetPreviewTarget?.orgScopeName
-                    ? `${targetPreviewTarget.orgScopeType || targetPreviewTarget.scopeType} · ${targetPreviewTarget.orgScopeName}`
-                    : `${targetPreviewTarget?.scopeType || ''} · ${targetPreviewTarget?.scopeId || ''}`}
+                    ? `${getOrgScopeTypeLabel(targetPreviewTarget.orgScopeType || targetPreviewTarget.scopeType)} · ${targetPreviewTarget.orgScopeName}`
+                    : `${targetPreviewTarget?.scopeType ? getOrgScopeTypeLabel(targetPreviewTarget.scopeType) : ''} · ${targetPreviewTarget?.scopeId || ''}`}
                 </div>
               </div>
               {targetPreviewMessage ? <div className="form-error">{targetPreviewMessage}</div> : null}
@@ -4581,11 +4748,15 @@ export default function Configuracion() {
                 <div className="preview-box">
                   <div className="muted">
                     {targetPreviewResult.sourceMeta
-                      ? `Valor: ${targetPreviewResult.computed}`
-                      : `A: ${targetPreviewResult.testsTotal} · B: ${targetPreviewResult.storiesTotal} · Valor: ${targetPreviewResult.computed}`}
+                      ? t('config:target_preview.value_only', { value: targetPreviewResult.computed })
+                      : t('config:target_preview.value_ab', {
+                          a: targetPreviewResult.testsTotal,
+                          b: targetPreviewResult.storiesTotal,
+                          value: targetPreviewResult.computed,
+                        })}
                   </div>
                   <div className="muted">
-                    Rango: {targetPreviewResult.from} → {targetPreviewResult.to}
+                    {t('config:target_preview.range', { from: targetPreviewResult.from, to: targetPreviewResult.to })}
                   </div>
                   {targetPreviewResult.warnings?.length ? (
                     <div className="form-error">{targetPreviewResult.warnings.join(' · ')}</div>
@@ -4595,23 +4766,23 @@ export default function Configuracion() {
                   ) : (
                     <>
                       <div className="preview-jql">
-                        <strong>Filtro A</strong>
+                        <strong>{t('config:target_preview.filter_a')}</strong>
                         <pre>{targetPreviewResult.testsJql}</pre>
                       </div>
                       <div className="preview-jql">
-                        <strong>Filtro B</strong>
+                        <strong>{t('config:target_preview.filter_b')}</strong>
                         <pre>{targetPreviewResult.storiesJql}</pre>
                       </div>
                     </>
                   )}
                 </div>
               ) : (
-                <div className="muted">Probando target…</div>
+                <div className="muted">{t('config:target_preview.loading')}</div>
               )}
             </div>
             <div className="modal-actions">
               <button className="btn-secondary" onClick={() => setShowTargetPreview(false)}>
-                Cerrar
+                {t('common:close')}
               </button>
             </div>
           </div>
@@ -4626,7 +4797,7 @@ export default function Configuracion() {
         >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{editingScope ? 'Editar unidad' : 'Nueva unidad organizacional'}</h2>
+              <h2>{editingScope ? t('config:modals.scope_edit') : t('config:modals.scope_new')}</h2>
               <button className="close-button" onClick={() => setShowScopeModal(false)}>
                 ×
               </button>
@@ -4634,58 +4805,58 @@ export default function Configuracion() {
             <div className="modal-body scope-form-body">
               <div className="scope-form-section">
                 <div className="form-group">
-                  <label>Nombre <span className="field-required">*</span></label>
+                  <label>{t('common:name')} <span className="field-required">*</span></label>
                   <input
                     autoFocus
-                    placeholder="Ej: Comercial, Tecnología, Operaciones"
+                    placeholder={t('config:scope_modal.name_placeholder')}
                     value={scopeForm.name}
                     onChange={(e) => setScopeForm((prev) => ({ ...prev, name: e.target.value }))}
                   />
                 </div>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Tipo</label>
+                    <label>{t('config:org.type')}</label>
                     <select
                       value={scopeForm.type}
                       onChange={(e) => setScopeForm((prev) => ({ ...prev, type: e.target.value }))}
                     >
-                      <option value="company">🏢 Empresa</option>
-                      <option value="area">🗂 Área</option>
-                      <option value="team">👥 Equipo</option>
-                      <option value="person">👤 Persona</option>
-                      <option value="product">📦 Producto</option>
+                      <option value="company">🏢 {getOrgScopeTypeLabel('company')}</option>
+                      <option value="area">🗂 {getOrgScopeTypeLabel('area')}</option>
+                      <option value="team">👥 {getOrgScopeTypeLabel('team')}</option>
+                      <option value="person">👤 {getOrgScopeTypeLabel('person')}</option>
+                      <option value="product">📦 {getOrgScopeTypeLabel('product')}</option>
                     </select>
                     <small className="form-hint">
-                      {scopeForm.type === 'area' && 'Sector estable: Comercial, RRHH, Tecnología…'}
-                      {scopeForm.type === 'team' && 'Subgrupo dentro de un área: Soporte Técnico, Ventas B2B…'}
-                      {scopeForm.type === 'company' && 'Unidad raíz de la organización.'}
-                      {scopeForm.type === 'person' && 'Persona individual como unidad de estructura.'}
-                      {scopeForm.type === 'product' && 'Producto o línea de negocio.'}
+                      {scopeForm.type === 'area' && t('config:scope_modal.type_hints.area')}
+                      {scopeForm.type === 'team' && t('config:scope_modal.type_hints.team')}
+                      {scopeForm.type === 'company' && t('config:scope_modal.type_hints.company')}
+                      {scopeForm.type === 'person' && t('config:scope_modal.type_hints.person')}
+                      {scopeForm.type === 'product' && t('config:scope_modal.type_hints.product')}
                     </small>
                   </div>
                   <div className="form-group">
-                    <label>Estado</label>
+                    <label>{t('common:status')}</label>
                     <select
                       value={scopeForm.active ? '1' : '0'}
                       onChange={(e) => setScopeForm((prev) => ({ ...prev, active: e.target.value === '1' }))}
                     >
-                      <option value="1">✅ Activo</option>
-                      <option value="0">⏸ Inactivo</option>
+                      <option value="1">✅ {t('common:active')}</option>
+                      <option value="0">⏸ {t('common:inactive')}</option>
                     </select>
-                    <small className="form-hint">Las unidades inactivas no aparecen en nuevas asignaciones.</small>
+                    <small className="form-hint">{t('config:scope_modal.inactive_hint')}</small>
                   </div>
                 </div>
               </div>
 
               <div className="scope-form-section">
-                <div className="scope-form-section-title">Jerarquía y calendario</div>
+                <div className="scope-form-section-title">{t('config:scope_modal.hierarchy_title')}</div>
                 <div className="form-group">
-                  <label>Depende de</label>
+                  <label>{t('config:scope_modal.parent')}</label>
                   <select
                     value={scopeForm.parentId}
                     onChange={(e) => setScopeForm((prev) => ({ ...prev, parentId: e.target.value }))}
                   >
-                    <option value="">— Sin superior (unidad raíz) —</option>
+                    <option value="">{t('config:scope_modal.no_parent')}</option>
                     {orgScopes?.filter((s: any) => s.id !== editingScope?.id).map((scope: any) => (
                       <option key={scope.id} value={scope.id}>
                         {scope.type === 'company' ? '🏢' : scope.type === 'area' ? '🗂' : scope.type === 'team' ? '👥' : '📦'} {scope.name}
@@ -4693,18 +4864,18 @@ export default function Configuracion() {
                     ))}
                   </select>
                   <small className="form-hint">
-                    Elegí la unidad de la que depende esta. Dejalo vacío si es un área raíz.
+                    {t('config:scope_modal.parent_hint')}
                   </small>
                 </div>
                 <div className="form-group">
-                  <label>Calendario de medición</label>
+                  <label>{t('config:scope_modal.calendar')}</label>
                   <select
                     value={scopeForm.calendarProfileId}
                     onChange={(e) =>
                       setScopeForm((prev) => ({ ...prev, calendarProfileId: e.target.value }))
                     }
                   >
-                    <option value="">📅 Hereda el calendario del superior</option>
+                    <option value="">{t('config:scope_modal.calendar_inherit')}</option>
                     {calendarProfiles?.map((profile: any) => (
                       <option key={profile.id} value={profile.id}>
                         {profile.name}
@@ -4712,7 +4883,7 @@ export default function Configuracion() {
                     ))}
                   </select>
                   <small className="form-hint">
-                    Define la frecuencia de medición de KPIs (mensual, trimestral, etc.). Si no lo cambiás, hereda del padre.
+                    {t('config:scope_modal.calendar_hint')}
                   </small>
                 </div>
               </div>
@@ -4723,46 +4894,46 @@ export default function Configuracion() {
                 onClick={() => setScopeAdvancedOpen((v) => !v)}
               >
                 <span>{scopeAdvancedOpen ? '▲' : '▼'}</span>
-                {scopeAdvancedOpen ? 'Ocultar' : 'Mostrar'} opciones avanzadas
-                <span className="scope-advanced-hint">Solo si usás conectores externos (Jira, Sheets, etc.)</span>
+                {scopeAdvancedOpen ? t('config:scope_modal.hide_advanced') : t('config:scope_modal.show_advanced')}
+                <span className="scope-advanced-hint">{t('config:scope_modal.advanced_hint')}</span>
               </button>
               {scopeAdvancedOpen && (
                 <div className="scope-form-section scope-advanced-section">
                   <div className="form-group">
-                    <label>Parámetros de integración (JSON)</label>
+                    <label>{t('config:scope_modal.integration_params')}</label>
                     <textarea
                       rows={3}
                       value={scopeForm.metadataText}
                       onChange={(e) => setScopeForm((prev) => ({ ...prev, metadataText: e.target.value }))}
-                      placeholder='{"projects":["GT_MISIM"],"authProfileId":1}'
+                      placeholder={t('config:scope_modal.integration_params_placeholder')}
                     />
                     <small className="form-hint">
-                      Parámetros técnicos heredables para integraciones. Dejalo vacío si no usás conectores.
+                      {t('config:scope_modal.integration_params_hint')}
                     </small>
                   </div>
                   <div className="form-row">
                     <div className="form-group">
-                      <label>Conector externo</label>
+                      <label>{t('config:scope_modal.external_connector')}</label>
                       <select
                         value={scopeMappingSourceType}
                         onChange={(e) => setScopeMappingSourceType(normalizeMappingSourceType(e.target.value))}
                       >
                         {MAPPING_SOURCE_TYPE_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>
-                            {option.label}
+                            {getConfigSourceTypeLabel(option.value)}
                           </option>
                         ))}
                       </select>
                     </div>
                     <div className="form-group">
-                      <label>Alias en el conector</label>
+                      <label>{t('config:scope_modal.connector_alias')}</label>
                       <input
                         value={scopeExternalKeysBySourceType[scopeMappingSourceType] || ''}
                         onChange={(e) => updateScopeExternalKeysForSourceType(e.target.value)}
-                        placeholder="comercial, ventas, sales"
+                        placeholder={t('config:scope_modal.connector_alias_placeholder')}
                       />
                       <small className="form-hint">
-                        Nombre con el que aparece esta unidad en {getMappingSourceTypeLabel(scopeMappingSourceType)}. Podés poner varios separados por coma.
+                        {t('config:scope_modal.connector_alias_hint', { source: getConfigSourceTypeLabel(scopeMappingSourceType) })}
                       </small>
                     </div>
                   </div>
@@ -4771,14 +4942,14 @@ export default function Configuracion() {
             </div>
             <div className="modal-actions">
               <button className="btn-secondary" onClick={() => setShowScopeModal(false)}>
-                Cancelar
+                {t('common:cancel')}
               </button>
               <button
                 className="btn-primary"
                 onClick={() => saveScope.mutate()}
                 disabled={!scopeForm.name.trim() || saveScope.isLoading}
               >
-                {saveScope.isLoading ? 'Guardando...' : 'Guardar unidad'}
+                {saveScope.isLoading ? t('config:actions.saving') : t('config:actions.save_unit')}
               </button>
             </div>
           </div>

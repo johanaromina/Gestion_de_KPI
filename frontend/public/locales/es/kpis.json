@@ -1,0 +1,122 @@
+{
+  "title": "KPIs",
+  "subtitle": "Gestiona las definiciones de KPIs",
+  "header": {
+    "create": "+ Crear KPI"
+  },
+  "filters": {
+    "search_label": "Buscar:",
+    "search_placeholder": "Buscar por nombre o descripción...",
+    "type": "Tipo:",
+    "all_types": "Todos los tipos",
+    "period": "Período:",
+    "all_periods": "Todos",
+    "clear": "Limpiar filtros"
+  },
+  "stats": {
+    "total": "Total"
+  },
+  "results": {
+    "showing": "Mostrando {{shown}} de {{total}} KPIs"
+  },
+  "direction": {
+    "growth": "Crecimiento",
+    "reduction": "Reducción",
+    "exact": "Exacto"
+  },
+  "card": {
+    "no_description": "Sin descripción",
+    "criteria_label": "Criterio",
+    "criteria_none": "No definido",
+    "formula_label": "Fórmula",
+    "formula_custom": "Personalizada",
+    "formula_default": "Por defecto",
+    "macro_label": "KPI agrupador ⓘ",
+    "macro_tooltip": "KPI Macro: agrupa varios KPIs individuales bajo un mismo indicador padre. Su resultado es el promedio ponderado de los KPIs que lo componen.",
+    "usage_label": "Uso",
+    "usage_value": "{{count}} asignaciones · {{periods}} períodos",
+    "periods_label": "Períodos",
+    "no_assignments": "Sin asignaciones",
+    "read_only": "Solo lectura",
+    "formula_sample_growth": "Ej: target 100, actual 120 → 120%",
+    "formula_sample_reduction": "Ej: target 100, actual 80 → 125%",
+    "formula_sample_exact": "Ej: target 100, actual 120 → 80% (penaliza desvío)"
+  },
+  "actions": {
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "close_period": "Cerrar KPI (período)",
+    "close_period_title_active": "Cerrar KPI en el período seleccionado",
+    "close_period_title_inactive": "Selecciona un período para cerrar el KPI"
+  },
+  "dialogs": {
+    "delete_title": "Eliminar KPI",
+    "delete_msg": "¿Estás seguro de eliminar el KPI \"{{name}}\"? Esta acción no se puede deshacer y eliminará todas las asignaciones asociadas.",
+    "delete_confirm": "Eliminar",
+    "delete_error_title": "Error al eliminar",
+    "delete_error_msg": "Error al eliminar KPI. Verificá que no tenga asignaciones asociadas.",
+    "close_period_title": "Cerrar KPI en período",
+    "close_period_msg": "¿Cerrar el KPI \"{{name}}\" en {{period}}? Esta acción cerrará todas sus asignaciones en ese período.",
+    "close_period_confirm": "Cerrar",
+    "close_period_error": "Error al cerrar el KPI en el período.",
+    "api_errors": {
+      "delete_forbidden": "No tenés permisos para eliminar este KPI.",
+      "delete_in_use": "No se puede eliminar el KPI porque tiene asignaciones asociadas.",
+      "close_period_required": "Seleccioná un período para cerrar el KPI."
+    }
+  },
+  "empty": {
+    "no_results_title": "No se encontraron KPIs",
+    "no_results_subtitle": "Intenta ajustar los filtros de búsqueda",
+    "no_results_clear": "Limpiar filtros",
+    "no_data_title": "Todavía no hay KPIs definidos",
+    "no_data_subtitle": "Un KPI es el indicador que vas a medir: ventas mensuales, tickets resueltos, NPS, cumplimiento de entregas, etc.",
+    "no_data_btn": "Crear primer KPI",
+    "no_data_hint_pre": "Antes de crear KPIs asegurate de tener al menos un área configurada en ",
+    "no_data_hint_link": "Configuración"
+  },
+  "loading": "Cargando KPIs...",
+  "form": {
+    "title_create": "Crear KPI",
+    "title_edit": "Editar KPI",
+    "name_label": "Nombre del KPI *",
+    "name_placeholder": "Ej: Tiempo de respuesta promedio",
+    "description_label": "Descripción",
+    "description_placeholder": "Describe el KPI y cómo se mide...",
+    "type_label": "Tipo de KPI *",
+    "type_hint": "Manual para iniciar sin integraciones. Count/Ratio/SLA/Value se automatizan cuando el criterio este estable.",
+    "direction_label": "Direccion de calculo",
+    "direction_growth": "Crecimiento (mayor es mejor)",
+    "direction_reduction": "Reduccion (menor es mejor)",
+    "direction_exact": "Exacto (debe coincidir)",
+    "direction_hint": "Afecta el calculo de cumplimiento (variacion).",
+    "macro_label": "KPI agrupador (Opcional)",
+    "macro_none": "Sin KPI agrupador",
+    "macro_hint": "Si este KPI forma parte de un indicador más amplio, seleccioná el KPI padre que lo agrupa. El resultado del agrupador se calcula como promedio ponderado de sus KPIs hijos.",
+    "periods_label": "Períodos",
+    "periods_hint": "Selecciona los períodos donde estará vigente este KPI.",
+    "scope_weights_label": "Ponderación por área (opcional)",
+    "scope_weights_no_areas": "No hay áreas activas para configurar.",
+    "scope_weights_placeholder": "Ej: 25",
+    "scope_weights_hint": "Define el peso del KPI según el área. En Asignaciones se precarga este valor y se puede ajustar por persona.",
+    "scope_weights_total": "Suma actual de pesos definidos: {{value}}%",
+    "criteria_label": "Criterio de Cálculo",
+    "criteria_placeholder": "Describe cómo se calcula este KPI (fórmulas, reglas, etc.)",
+    "criteria_hint": "Ej: (Actual - Target) / Target * 100 para crecimiento",
+    "formula_label": "Fórmula Personalizada (Opcional)",
+    "formula_placeholder": "Ej: (actual / target) * 100",
+    "formula_help_title": "Ver ayuda",
+    "formula_vars_label": "Variables disponibles",
+    "formula_ops_label": "Operadores",
+    "formula_examples_label": "Ejemplos",
+    "formula_hint": "Si se deja vacío, se usará la fórmula por defecto según el tipo de KPI.",
+    "cancel": "Cancelar",
+    "saving": "Guardando...",
+    "update": "Actualizar",
+    "create": "Crear",
+    "errors": {
+      "name_required": "El nombre es requerido",
+      "type_required": "El tipo es requerido"
+    }
+  }
+}

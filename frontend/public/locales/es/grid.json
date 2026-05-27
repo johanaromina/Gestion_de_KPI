@@ -1,0 +1,132 @@
+{
+  "title": "Mi Parrilla",
+  "period_label": "Período activo:",
+  "no_period": "Sin período activo",
+  "global_result": "Resultado global",
+  "weighted_result": "Resultado ponderado",
+  "result_description": "Promedio ponderado de todos los KPIs asignados",
+  "kpis_section_title": "Lista de KPIs",
+  "chart_title": "Gráfico de Resultados",
+  "source_none": "Sin fuente",
+  "input_label": "Input:",
+  "last_update_label": "Último dato:",
+  "pending_badge": "⏳ En revisión",
+  "error_collaborator_not_found": "No se pudo identificar al colaborador",
+  "error_collaborator_hint": "Volvé a iniciar sesión para cargar tu parrilla.",
+  "filters": {
+    "all_periods": "Todos los períodos",
+    "show_subperiods": "Ver subperíodos"
+  },
+  "period_status": {
+    "open": "Abierta",
+    "in_review": "En Revisión",
+    "closed": "Cerrada"
+  },
+  "table": {
+    "kpi": "KPI",
+    "description": "Descripción",
+    "target": "Meta",
+    "actual": "Real",
+    "compliance": "Cumplimiento",
+    "weight": "Pond.",
+    "weighted_result": "Res. pond.",
+    "criteria": "Criterio",
+    "status": "Estado",
+    "comments": "Comentarios",
+    "actions": "Acciones"
+  },
+  "status": {
+    "draft": "Borrador",
+    "proposed": "Propuesto",
+    "approved": "Aprobado",
+    "closed": "Cerrado"
+  },
+  "curation": {
+    "pending": "Criterio pendiente",
+    "in_review": "En revisión",
+    "approved": "Criterio aprobado",
+    "rejected": "Criterio rechazado",
+    "changes_requested": "Cambios solicitados"
+  },
+  "input": {
+    "auto": "Auto",
+    "import": "Import",
+    "manual": "Manual"
+  },
+  "block": {
+    "kpi_closed": "KPI cerrado",
+    "period_closed": "Período cerrado",
+    "auto_input": "Carga automática — usá Proponer para override",
+    "curation_pending": "Criterio pendiente de aprobación",
+    "use_propose": "Usá el botón Proponer para sugerir un valor"
+  },
+  "actions": {
+    "edit_actual": "Editar valor real",
+    "propose": "Proponer valor",
+    "propose_title": "Proponer valores para revisión",
+    "export_pdf": "Exportar a PDF",
+    "export_excel": "Exportar a Excel",
+    "save": "Guardar",
+    "cancel": "Cancelar"
+  },
+  "inline_edit": {
+    "label": "Nuevo valor real",
+    "placeholder": "Ingresar valor",
+    "error": "Ingresá un valor numérico válido."
+  },
+  "alert": {
+    "updated": "Valor actualizado correctamente.",
+    "error_default": "Error al actualizar el valor. Verificá que el período no esté cerrado."
+  },
+  "empty": "No hay KPIs asignados para este colaborador.",
+  "loading": "Cargando parrilla...",
+  "general": {
+    "title": "Parrilla General (solo superpoderes)",
+    "subtitle": "Resumen de KPI por colaborador",
+    "filters": {
+      "search_label": "Buscar",
+      "search_placeholder": "Buscar por colaborador o KPI...",
+      "period_label": "Período",
+      "all": "Todos",
+      "collaborator_label": "Colaborador"
+    },
+    "card": {
+      "kpis": "KPIs: {{count}}",
+      "total_weight": "Peso total",
+      "avg_variation": "Avg variación",
+      "worst_variation": "Peor variación"
+    },
+    "types": {
+      "kpi": "KPI",
+      "manual": "Manual",
+      "count": "Conteo",
+      "ratio": "Ratio",
+      "sla": "SLA",
+      "value": "Valor",
+      "growth": "Crecimiento",
+      "reduction": "Reducción",
+      "exact": "Exacto"
+    },
+    "loading": "Cargando…",
+    "empty": {
+      "select_filter_title": "Seleccioná un período o colaborador",
+      "select_filter_text": "Elegí un período o colaborador en los filtros de arriba para ver los datos.",
+      "no_data_title": "Sin datos",
+      "no_data_text": "Prueba con otros filtros"
+    },
+    "table": {
+      "collaborator": "Colaborador",
+      "kpi": "KPI",
+      "period": "Período",
+      "type": "Tipo",
+      "target": "Target",
+      "actual": "Actual",
+      "weight": "Peso",
+      "variation": "Variación",
+      "status": "Estado",
+      "trend": "Tendencia",
+      "actions": "Acciones",
+      "view_detail": "Ver detalle"
+    }
+  }
+}

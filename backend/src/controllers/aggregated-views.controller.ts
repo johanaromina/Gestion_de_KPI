@@ -3,6 +3,7 @@ import { pool } from '../config/database'
 import { calculateVariation } from '../utils/kpi-formulas'
 import { KPIDirection, KPIType } from '../types'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 // Función auxiliar para calcular estadísticas
 function calculateStatistics(results: number[]): {
@@ -98,7 +99,7 @@ export const getAggregatedByDirection = async (req: Request, res: Response) => {
     const { periodId } = req.query
 
     if (!periodId) {
-      return res.status(400).json({ error: 'periodId es requerido' })
+      return sendApiError(res, 400, 'AGGREGATED_VIEW_PERIOD_REQUIRED', 'periodId es requerido')
     }
 
     // Obtener colaboradores por área (dirección)
@@ -145,7 +146,7 @@ export const getAggregatedByDirection = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     logger.error('Error fetching aggregated by direction:', error)
-    res.status(500).json({ error: 'Error al obtener datos agregados' })
+    return sendApiError(res, 500, 'AGGREGATED_VIEW_FETCH_FAILED', 'Error al obtener datos agregados')
   }
 }
 
@@ -157,7 +158,7 @@ export const getAggregatedByManagement = async (
     const { periodId } = req.query
 
     if (!periodId) {
-      return res.status(400).json({ error: 'periodId es requerido' })
+      return sendApiError(res, 400, 'AGGREGATED_VIEW_PERIOD_REQUIRED', 'periodId es requerido')
     }
 
     // Obtener gerentes (managers)
@@ -210,7 +211,7 @@ export const getAggregatedByManagement = async (
     })
   } catch (error: any) {
     logger.error('Error fetching aggregated by management:', error)
-    res.status(500).json({ error: 'Error al obtener datos agregados' })
+    return sendApiError(res, 500, 'AGGREGATED_VIEW_FETCH_FAILED', 'Error al obtener datos agregados')
   }
 }
 
@@ -222,7 +223,7 @@ export const getAggregatedByLeadership = async (
     const { periodId } = req.query
 
     if (!periodId) {
-      return res.status(400).json({ error: 'periodId es requerido' })
+      return sendApiError(res, 400, 'AGGREGATED_VIEW_PERIOD_REQUIRED', 'periodId es requerido')
     }
 
     // Obtener líderes
@@ -275,7 +276,7 @@ export const getAggregatedByLeadership = async (
     })
   } catch (error: any) {
     logger.error('Error fetching aggregated by leadership:', error)
-    res.status(500).json({ error: 'Error al obtener datos agregados' })
+    return sendApiError(res, 500, 'AGGREGATED_VIEW_FETCH_FAILED', 'Error al obtener datos agregados')
   }
 }
 
@@ -284,7 +285,7 @@ export const getAggregatedByArea = async (req: Request, res: Response) => {
     const { periodId } = req.query
 
     if (!periodId) {
-      return res.status(400).json({ error: 'periodId es requerido' })
+      return sendApiError(res, 400, 'AGGREGATED_VIEW_PERIOD_REQUIRED', 'periodId es requerido')
     }
 
     // Obtener todas las áreas únicas
@@ -330,7 +331,7 @@ export const getAggregatedByArea = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     logger.error('Error fetching aggregated by area:', error)
-    res.status(500).json({ error: 'Error al obtener datos agregados' })
+    return sendApiError(res, 500, 'AGGREGATED_VIEW_FETCH_FAILED', 'Error al obtener datos agregados')
   }
 }
 

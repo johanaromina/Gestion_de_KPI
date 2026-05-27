@@ -1,0 +1,91 @@
+{
+  "title": "Curation",
+  "subtitle": "Validate where each data point comes from and how it is calculated. A KPI only appears in dashboards once its criteria is approved.",
+  "header": {
+    "export_csv": "Export CSV",
+    "export_excel": "Export Excel",
+    "new_criteria": "New criteria"
+  },
+  "tabs": {
+    "pending": "Pending",
+    "in_review": "In review",
+    "changes_requested": "Changes requested",
+    "approved": "Approved",
+    "rejected": "Rejected",
+    "all": "Recent changes"
+  },
+  "filters": {
+    "period": "Period:",
+    "kpi": "KPI:",
+    "collaborator": "Collaborator:",
+    "scope": "Scope:",
+    "all": "All",
+    "hint": "The visible KPI only uses approved data."
+  },
+  "table": {
+    "collaborator": "Collaborator",
+    "kpi": "KPI",
+    "period": "Period",
+    "source": "Source",
+    "criteria": "Criteria",
+    "ai": "AI",
+    "status": "Status",
+    "updated": "Updated",
+    "actions": "Actions"
+  },
+  "status": {
+    "pending": "Pending",
+    "in_review": "In review",
+    "approved": "Approved",
+    "rejected": "Rejected",
+    "changes_requested": "Changes requested"
+  },
+  "outlier": {
+    "ok_title": "No anomalies detected",
+    "unusual": "⚠ Unusual",
+    "review": "🔍 Review",
+    "info": "ℹ Info"
+  },
+  "source_none": "No source",
+  "actions": {
+    "approve": "Approve",
+    "reject": "Reject",
+    "request_changes": "Request changes",
+    "create_criteria": "Create criteria"
+  },
+  "loading": "Loading inbox...",
+  "empty": "No items to curate with this filter.",
+  "criteria_modal": {
+    "title": "New criteria",
+    "assignment_label": "Assignment",
+    "assignment_placeholder": "Select an assignment",
+    "source_label": "Source",
+    "source_placeholder": "Jira, Google Sheet, DB, Manual, API...",
+    "source_hint": "Where the data comes from: system, tool or process that generates it.",
+    "config_label": "Query / Endpoint (optional)",
+    "config_placeholder": "JQL, SQL, URL or sheet name",
+    "config_hint": "Exact query or reference to obtain the data (e.g.: Jira filter, sheet name).",
+    "criteria_label": "Criteria",
+    "criteria_placeholder": "E.g.: Sum of closed tickets with High priority in the period, excluding cancelled ones.",
+    "criteria_hint": "Explain how the KPI value is calculated. This text is recorded for audit purposes and must be clear enough for someone else to replicate it.",
+    "evidence_label": "Evidence (optional)",
+    "evidence_placeholder": "Link or attachment",
+    "validation_error": "Fill in assignment, source and criteria before submitting.",
+    "cancel": "Cancel",
+    "submit": "Submit for curation",
+    "submitting": "Submitting..."
+  },
+  "review_modal": {
+    "title_reject": "Reject criteria",
+    "title_request": "Request changes",
+    "comment_label_reject": "Rejection reason (required)",
+    "comment_label_request": "Comment for adjustment (optional)",
+    "comment_placeholder_reject": "E.g.: The indicated source does not match the agreed system.",
+    "comment_placeholder_request": "E.g.: Missing date range specification for the calculation.",
+    "comment_required_hint": "Required: explain the reason so the responsible person can correct it.",
+    "cancel": "Cancel",
+    "confirm_reject": "Confirm rejection",
+    "confirm_request": "Send change request",
+    "submitting": "Submitting..."
+  }
+}

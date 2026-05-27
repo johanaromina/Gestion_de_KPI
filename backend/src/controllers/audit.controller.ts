@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { getAuditLogs, getAuditHistory } from '../utils/audit'
 import { EntityType, AuditAction } from '../utils/audit'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 /**
  * Obtiene el historial de auditoría con filtros
@@ -63,7 +64,7 @@ export const getAuditLogsController = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     logger.error('Error fetching audit logs:', error)
-    res.status(500).json({ error: 'Error al obtener logs de auditoría' })
+    return sendApiError(res, 500, 'AUDIT_LOGS_FETCH_FAILED', 'Error al obtener logs de auditoría')
   }
 }
 
@@ -75,9 +76,7 @@ export const getEntityAuditHistory = async (req: Request, res: Response) => {
     const { entityType, entityId } = req.params
 
     if (!entityType || !entityId) {
-      return res.status(400).json({
-        error: 'entityType y entityId son requeridos',
-      })
+      return sendApiError(res, 400, 'AUDIT_FIELDS_REQUIRED', 'entityType y entityId son requeridos')
     }
 
     const history = await getAuditHistory(
@@ -88,7 +87,7 @@ export const getEntityAuditHistory = async (req: Request, res: Response) => {
     res.json(history)
   } catch (error: any) {
     logger.error('Error fetching entity audit history:', error)
-    res.status(500).json({ error: 'Error al obtener historial de auditoría' })
+    return sendApiError(res, 500, 'AUDIT_HISTORY_FETCH_FAILED', 'Error al obtener historial de auditoría')
   }
 }
 

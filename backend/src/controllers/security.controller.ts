@@ -3,6 +3,7 @@ import { pool } from '../config/database'
 import { AuthRequest } from '../middleware/auth.middleware'
 import { logAudit } from '../utils/audit'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 const canManageSecurity = (req: Request) => {
   const user = (req as AuthRequest).user
@@ -28,6 +29,9 @@ const getAuditMeta = (req: Request) => {
   }
 }
 
+const sendSecurityForbidden = (res: Response) =>
+  sendApiError(res, 403, 'SECURITY_FORBIDDEN', 'No autorizado')
+
 const fetchRolePermissions = async (roleIds: number[]) => {
   if (!roleIds.length) return new Map<number, string[]>()
   const [rows] = await pool.query<any[]>(
@@ -47,7 +51,7 @@ const fetchRolePermissions = async (roleIds: number[]) => {
 
 export const listRoles = async (req: Request, res: Response) => {
   try {
-    if (!canViewSecurity(req)) return res.status(403).json({ error: 'No autorizado' })
+    if (!canViewSecurity(req)) return sendSecurityForbidden(res)
     const [roles] = await pool.query<any[]>(
       `SELECT r.*, COUNT(cr.collaboratorId) as usersCount
        FROM roles r
@@ -65,24 +69,24 @@ export const listRoles = async (req: Request, res: Response) => {
     )
   } catch (error) {
     logger.error('Error listing roles:', error)
-    res.status(500).json({ error: 'Error al obtener roles' })
+    return sendApiError(res, 500, 'SECURITY_ROLES_FETCH_FAILED', 'Error al obtener roles')
   }
 }
 
 export const createRole = async (req: Request, res: Response) => {
   try {
-    if (!canManageSecurity(req)) return res.status(403).json({ error: 'No autorizado' })
+    if (!canManageSecurity(req)) return sendSecurityForbidden(res)
     const { code, name, description, permissions } = req.body as {
       code: string
       name: string
       description?: string
       permissions?: string[]
     }
-    if (!code || !name) return res.status(400).json({ error: 'Nombre y código requeridos' })
+    if (!code || !name) return sendApiError(res, 400, 'SECURITY_ROLE_FIELDS_REQUIRED', 'Nombre y código requeridos')
 
     const [existing] = await pool.query<any[]>('SELECT id FROM roles WHERE code = ? LIMIT 1', [code])
     if (Array.isArray(existing) && existing.length > 0) {
-      return res.status(400).json({ error: 'Código de rol ya existe' })
+      return sendApiError(res, 400, 'SECURITY_ROLE_CODE_EXISTS', 'Código de rol ya existe')
     }
 
     const [result] = await pool.query<any>(
@@ -107,13 +111,13 @@ export const createRole = async (req: Request, res: Response) => {
     res.json({ message: 'Rol creado', roleId })
   } catch (error) {
     logger.error('Error creating role:', error)
-    res.status(500).json({ error: 'Error al crear rol' })
+    return sendApiError(res, 500, 'SECURITY_ROLE_CREATE_FAILED', 'Error al crear rol')
   }
 }
 
 export const updateRole = async (req: Request, res: Response) => {
   try {
-    if (!canManageSecurity(req)) return res.status(403).json({ error: 'No autorizado' })
+    if (!canManageSecurity(req)) return sendSecurityForbidden(res)
     const { roleId } = req.params
     const { name, description, permissions } = req.body as {
       name?: string
@@ -126,10 +130,10 @@ export const updateRole = async (req: Request, res: Response) => {
       [roleId]
     )
     if (!Array.isArray(rows) || rows.length === 0) {
-      return res.status(404).json({ error: 'Rol no encontrado' })
+      return sendApiError(res, 404, 'SECURITY_ROLE_NOT_FOUND', 'Rol no encontrado')
     }
     if (!rows[0].editable) {
-      return res.status(400).json({ error: 'Rol protegido' })
+      return sendApiError(res, 400, 'SECURITY_ROLE_PROTECTED', 'Rol protegido')
     }
 
     const [beforePerms] = await pool.query<any[]>(
@@ -179,20 +183,20 @@ export const updateRole = async (req: Request, res: Response) => {
     res.json({ message: 'Rol actualizado' })
   } catch (error) {
     logger.error('Error updating role:', error)
-    res.status(500).json({ error: 'Error al actualizar rol' })
+    return sendApiError(res, 500, 'SECURITY_ROLE_UPDATE_FAILED', 'Error al actualizar rol')
   }
 }
 
 export const cloneRole = async (req: Request, res: Response) => {
   try {
-    if (!canManageSecurity(req)) return res.status(403).json({ error: 'No autorizado' })
+    if (!canManageSecurity(req)) return sendSecurityForbidden(res)
     const { roleId } = req.params
     const { code, name } = req.body as { code: string; name: string }
-    if (!code || !name) return res.status(400).json({ error: 'Nombre y código requeridos' })
+    if (!code || !name) return sendApiError(res, 400, 'SECURITY_ROLE_FIELDS_REQUIRED', 'Nombre y código requeridos')
 
     const [existing] = await pool.query<any[]>('SELECT id FROM roles WHERE code = ? LIMIT 1', [code])
     if (Array.isArray(existing) && existing.length > 0) {
-      return res.status(400).json({ error: 'Código de rol ya existe' })
+      return sendApiError(res, 400, 'SECURITY_ROLE_CODE_EXISTS', 'Código de rol ya existe')
     }
 
     const [permRows] = await pool.query<any[]>(
@@ -223,23 +227,23 @@ export const cloneRole = async (req: Request, res: Response) => {
     res.json({ message: 'Rol clonado', roleId: newRoleId })
   } catch (error) {
     logger.error('Error cloning role:', error)
-    res.status(500).json({ error: 'Error al clonar rol' })
+    return sendApiError(res, 500, 'SECURITY_ROLE_CLONE_FAILED', 'Error al clonar rol')
   }
 }
 
 export const deleteRole = async (req: Request, res: Response) => {
   try {
-    if (!canManageSecurity(req)) return res.status(403).json({ error: 'No autorizado' })
+    if (!canManageSecurity(req)) return sendSecurityForbidden(res)
     const { roleId } = req.params
     const [rows] = await pool.query<any[]>(
       'SELECT id, name, code, description, editable FROM roles WHERE id = ? LIMIT 1',
       [roleId]
     )
     if (!Array.isArray(rows) || rows.length === 0) {
-      return res.status(404).json({ error: 'Rol no encontrado' })
+      return sendApiError(res, 404, 'SECURITY_ROLE_NOT_FOUND', 'Rol no encontrado')
     }
     if (!rows[0].editable) {
-      return res.status(400).json({ error: 'Rol protegido' })
+      return sendApiError(res, 400, 'SECURITY_ROLE_PROTECTED', 'Rol protegido')
     }
 
     const [counts] = await pool.query<any[]>(
@@ -249,7 +253,7 @@ export const deleteRole = async (req: Request, res: Response) => {
       [roleId, roleId]
     )
     if (counts?.[0] && (counts[0].userCount > 0 || counts[0].scopeCount > 0)) {
-      return res.status(400).json({ error: 'Rol en uso' })
+      return sendApiError(res, 400, 'SECURITY_ROLE_IN_USE', 'Rol en uso')
     }
 
     await pool.query('DELETE FROM roles WHERE id = ?', [roleId])
@@ -259,13 +263,13 @@ export const deleteRole = async (req: Request, res: Response) => {
     res.json({ message: 'Rol eliminado' })
   } catch (error) {
     logger.error('Error deleting role:', error)
-    res.status(500).json({ error: 'Error al eliminar rol' })
+    return sendApiError(res, 500, 'SECURITY_ROLE_DELETE_FAILED', 'Error al eliminar rol')
   }
 }
 
 export const listScopeRoles = async (req: Request, res: Response) => {
   try {
-    if (!canViewSecurity(req)) return res.status(403).json({ error: 'No autorizado' })
+    if (!canViewSecurity(req)) return sendSecurityForbidden(res)
     const [rows] = await pool.query<any[]>(
       `SELECT s.id as scopeId, s.name, s.type, s.parentId, s.active,
               sr.roleId, r.code as roleCode, r.name as roleName
@@ -277,13 +281,13 @@ export const listScopeRoles = async (req: Request, res: Response) => {
     res.json(rows)
   } catch (error) {
     logger.error('Error listing scope roles:', error)
-    res.status(500).json({ error: 'Error al obtener roles por scope' })
+    return sendApiError(res, 500, 'SECURITY_SCOPE_ROLES_FETCH_FAILED', 'Error al obtener roles por scope')
   }
 }
 
 export const assignScopeRole = async (req: Request, res: Response) => {
   try {
-    if (!canManageSecurity(req)) return res.status(403).json({ error: 'No autorizado' })
+    if (!canManageSecurity(req)) return sendSecurityForbidden(res)
     const { scopeId } = req.params
     const { roleId } = req.body as { roleId?: number | null }
     const [beforeRows] = await pool.query<any[]>(
@@ -320,13 +324,13 @@ export const assignScopeRole = async (req: Request, res: Response) => {
     res.json({ message: 'Rol asignado al scope' })
   } catch (error) {
     logger.error('Error assigning scope role:', error)
-    res.status(500).json({ error: 'Error al asignar rol al scope' })
+    return sendApiError(res, 500, 'SECURITY_SCOPE_ROLE_ASSIGN_FAILED', 'Error al asignar rol al scope')
   }
 }
 
 export const listUserRoles = async (req: Request, res: Response) => {
   try {
-    if (!canViewSecurity(req)) return res.status(403).json({ error: 'No autorizado' })
+    if (!canViewSecurity(req)) return sendSecurityForbidden(res)
     const [rows] = await pool.query<any[]>(
       `SELECT c.id, c.name, c.email, c.role as legacyRole, c.orgScopeId,
               cr.roleId as userRoleId, r.name as userRoleName, r.code as userRoleCode,
@@ -342,13 +346,13 @@ export const listUserRoles = async (req: Request, res: Response) => {
     res.json(rows)
   } catch (error) {
     logger.error('Error listing user roles:', error)
-    res.status(500).json({ error: 'Error al obtener roles por usuario' })
+    return sendApiError(res, 500, 'SECURITY_USER_ROLES_FETCH_FAILED', 'Error al obtener roles por usuario')
   }
 }
 
 export const assignUserRole = async (req: Request, res: Response) => {
   try {
-    if (!canManageSecurity(req)) return res.status(403).json({ error: 'No autorizado' })
+    if (!canManageSecurity(req)) return sendSecurityForbidden(res)
     const { collaboratorId } = req.params
     const { roleId } = req.body as { roleId?: number | null }
     const [beforeRows] = await pool.query<any[]>(
@@ -385,13 +389,13 @@ export const assignUserRole = async (req: Request, res: Response) => {
     res.json({ message: 'Rol asignado al usuario' })
   } catch (error) {
     logger.error('Error assigning user role:', error)
-    res.status(500).json({ error: 'Error al asignar rol al usuario' })
+    return sendApiError(res, 500, 'SECURITY_USER_ROLE_ASSIGN_FAILED', 'Error al asignar rol al usuario')
   }
 }
 
 export const listUserOverrides = async (req: Request, res: Response) => {
   try {
-    if (!canViewSecurity(req)) return res.status(403).json({ error: 'No autorizado' })
+    if (!canViewSecurity(req)) return sendSecurityForbidden(res)
     const { collaboratorId } = req.params
     const [rows] = await pool.query<any[]>(
       `SELECT p.code
@@ -403,17 +407,17 @@ export const listUserOverrides = async (req: Request, res: Response) => {
     res.json({ collaboratorId: Number(collaboratorId), permissions: rows?.map((r: any) => r.code) || [] })
   } catch (error) {
     logger.error('Error listing user overrides:', error)
-    res.status(500).json({ error: 'Error al obtener permisos del usuario' })
+    return sendApiError(res, 500, 'SECURITY_USER_OVERRIDES_FETCH_FAILED', 'Error al obtener permisos del usuario')
   }
 }
 
 export const updateUserOverrides = async (req: Request, res: Response) => {
   try {
-    if (!canManageSecurity(req)) return res.status(403).json({ error: 'No autorizado' })
+    if (!canManageSecurity(req)) return sendSecurityForbidden(res)
     const { collaboratorId } = req.params
     const { permissions } = req.body as { permissions: string[] }
     if (!Array.isArray(permissions)) {
-      return res.status(400).json({ error: 'Permisos inválidos' })
+      return sendApiError(res, 400, 'SECURITY_PERMISSIONS_INVALID', 'Permisos inválidos')
     }
     const [beforeRows] = await pool.query<any[]>(
       `SELECT p.code
@@ -442,13 +446,13 @@ export const updateUserOverrides = async (req: Request, res: Response) => {
     res.json({ message: 'Overrides actualizados', permissions })
   } catch (error) {
     logger.error('Error updating user overrides:', error)
-    res.status(500).json({ error: 'Error al actualizar permisos' })
+    return sendApiError(res, 500, 'SECURITY_USER_OVERRIDES_UPDATE_FAILED', 'Error al actualizar permisos')
   }
 }
 
 export const resetUserOverrides = async (req: Request, res: Response) => {
   try {
-    if (!canManageSecurity(req)) return res.status(403).json({ error: 'No autorizado' })
+    if (!canManageSecurity(req)) return sendSecurityForbidden(res)
     const { collaboratorId } = req.params
     const [beforeRows] = await pool.query<any[]>(
       `SELECT p.code
@@ -469,6 +473,6 @@ export const resetUserOverrides = async (req: Request, res: Response) => {
     res.json({ message: 'Overrides eliminados' })
   } catch (error) {
     logger.error('Error resetting user overrides:', error)
-    res.status(500).json({ error: 'Error al limpiar overrides' })
+    return sendApiError(res, 500, 'SECURITY_USER_OVERRIDES_RESET_FAILED', 'Error al limpiar overrides')
   }
 }

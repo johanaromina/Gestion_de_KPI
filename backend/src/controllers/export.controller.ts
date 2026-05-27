@@ -5,6 +5,7 @@ import ExcelJS from 'exceljs'
 import { calculateVariation } from '../utils/kpi-formulas'
 import { KPIDirection, KPIType } from '../types'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 // ── Colores OKR ───────────────────────────────────────────────
 const OKR_BLUE  = '#2563eb'
@@ -52,7 +53,7 @@ export const exportParrillaPDF = async (req: Request, res: Response) => {
     const { collaboratorId, periodId } = req.params
 
     if (!collaboratorId || !periodId) {
-      return res.status(400).json({ error: 'collaboratorId y periodId son requeridos' })
+      return sendApiError(res, 400, 'EXPORT_PARRILLA_FIELDS_REQUIRED', 'collaboratorId y periodId son requeridos')
     }
 
     // Obtener datos del colaborador
@@ -62,7 +63,7 @@ export const exportParrillaPDF = async (req: Request, res: Response) => {
     )
 
     if (!Array.isArray(collaboratorRows) || collaboratorRows.length === 0) {
-      return res.status(404).json({ error: 'Colaborador no encontrado' })
+      return sendApiError(res, 404, 'EXPORT_COLLABORATOR_NOT_FOUND', 'Colaborador no encontrado')
     }
 
     const collaborator = collaboratorRows[0]
@@ -74,7 +75,7 @@ export const exportParrillaPDF = async (req: Request, res: Response) => {
     )
 
     if (!Array.isArray(periodRows) || periodRows.length === 0) {
-      return res.status(404).json({ error: 'Período no encontrado' })
+      return sendApiError(res, 404, 'EXPORT_PERIOD_NOT_FOUND', 'Período no encontrado')
     }
 
     const period = periodRows[0]
@@ -234,7 +235,7 @@ export const exportParrillaPDF = async (req: Request, res: Response) => {
   } catch (error: any) {
     logger.error('Error exporting PDF:', error)
     if (!res.headersSent) {
-      res.status(500).json({ error: 'Error al exportar PDF' })
+      return sendApiError(res, 500, 'EXPORT_PARRILLA_PDF_FAILED', 'Error al exportar PDF')
     }
   }
 }
@@ -247,7 +248,7 @@ export const exportParrillaExcel = async (req: Request, res: Response) => {
     const { collaboratorId, periodId } = req.params
 
     if (!collaboratorId || !periodId) {
-      return res.status(400).json({ error: 'collaboratorId y periodId son requeridos' })
+      return sendApiError(res, 400, 'EXPORT_PARRILLA_FIELDS_REQUIRED', 'collaboratorId y periodId son requeridos')
     }
 
     // Obtener datos del colaborador
@@ -257,7 +258,7 @@ export const exportParrillaExcel = async (req: Request, res: Response) => {
     )
 
     if (!Array.isArray(collaboratorRows) || collaboratorRows.length === 0) {
-      return res.status(404).json({ error: 'Colaborador no encontrado' })
+      return sendApiError(res, 404, 'EXPORT_COLLABORATOR_NOT_FOUND', 'Colaborador no encontrado')
     }
 
     const collaborator = collaboratorRows[0]
@@ -269,7 +270,7 @@ export const exportParrillaExcel = async (req: Request, res: Response) => {
     )
 
     if (!Array.isArray(periodRows) || periodRows.length === 0) {
-      return res.status(404).json({ error: 'Período no encontrado' })
+      return sendApiError(res, 404, 'EXPORT_PERIOD_NOT_FOUND', 'Período no encontrado')
     }
 
     const period = periodRows[0]
@@ -448,7 +449,7 @@ export const exportParrillaExcel = async (req: Request, res: Response) => {
   } catch (error: any) {
     logger.error('Error exporting Excel:', error)
     if (!res.headersSent) {
-      res.status(500).json({ error: 'Error al exportar Excel' })
+      return sendApiError(res, 500, 'EXPORT_PARRILLA_EXCEL_FAILED', 'Error al exportar Excel')
     }
   }
 }
@@ -550,7 +551,7 @@ export const exportOKRObjectivePDF = async (req: Request, res: Response) => {
   try {
     const objectiveId = parseInt(req.params.objectiveId, 10)
     const obj = await fetchObjectiveWithKRs(objectiveId)
-    if (!obj) return res.status(404).json({ error: 'Objetivo no encontrado' })
+    if (!obj) return sendApiError(res, 404, 'EXPORT_OKR_OBJECTIVE_NOT_FOUND', 'Objetivo no encontrado')
 
     const doc = new PDFDocument({ margin: 50, size: 'A4' })
     res.setHeader('Content-Type', 'application/pdf')
@@ -646,7 +647,7 @@ export const exportOKRObjectivePDF = async (req: Request, res: Response) => {
     doc.end()
   } catch (error: any) {
     logger.error('Error exporting OKR PDF:', error)
-    if (!res.headersSent) res.status(500).json({ error: 'Error al exportar PDF' })
+    if (!res.headersSent) return sendApiError(res, 500, 'EXPORT_OKR_OBJECTIVE_PDF_FAILED', 'Error al exportar PDF')
   }
 }
 
@@ -658,7 +659,7 @@ export const exportOKRObjectiveExcel = async (req: Request, res: Response) => {
   try {
     const objectiveId = parseInt(req.params.objectiveId, 10)
     const obj = await fetchObjectiveWithKRs(objectiveId)
-    if (!obj) return res.status(404).json({ error: 'Objetivo no encontrado' })
+    if (!obj) return sendApiError(res, 404, 'EXPORT_OKR_OBJECTIVE_NOT_FOUND', 'Objetivo no encontrado')
 
     const workbook  = new ExcelJS.Workbook()
     const wsInfo    = workbook.addWorksheet('Objetivo')
@@ -752,7 +753,7 @@ export const exportOKRObjectiveExcel = async (req: Request, res: Response) => {
     res.end()
   } catch (error: any) {
     logger.error('Error exporting OKR Excel:', error)
-    if (!res.headersSent) res.status(500).json({ error: 'Error al exportar Excel' })
+    if (!res.headersSent) return sendApiError(res, 500, 'EXPORT_OKR_OBJECTIVE_EXCEL_FAILED', 'Error al exportar Excel')
   }
 }
 
@@ -765,7 +766,7 @@ export const exportOKRPeriodPDF = async (req: Request, res: Response) => {
     const periodId = parseInt(req.params.periodId, 10)
     const [periodRows] = await pool.query<any[]>('SELECT * FROM periods WHERE id = ?', [periodId])
     if (!Array.isArray(periodRows) || periodRows.length === 0)
-      return res.status(404).json({ error: 'Período no encontrado' })
+      return sendApiError(res, 404, 'EXPORT_OKR_PERIOD_NOT_FOUND', 'Período no encontrado')
     const period = periodRows[0]
 
     const objectives = await fetchObjectivesByPeriod(periodId)
@@ -845,7 +846,7 @@ export const exportOKRPeriodPDF = async (req: Request, res: Response) => {
     doc.end()
   } catch (error: any) {
     logger.error('Error exporting OKR period PDF:', error)
-    if (!res.headersSent) res.status(500).json({ error: 'Error al exportar PDF' })
+    if (!res.headersSent) return sendApiError(res, 500, 'EXPORT_OKR_PERIOD_PDF_FAILED', 'Error al exportar PDF')
   }
 }
 
@@ -858,7 +859,7 @@ export const exportOKRPeriodExcel = async (req: Request, res: Response) => {
     const periodId = parseInt(req.params.periodId, 10)
     const [periodRows] = await pool.query<any[]>('SELECT * FROM periods WHERE id = ?', [periodId])
     if (!Array.isArray(periodRows) || periodRows.length === 0)
-      return res.status(404).json({ error: 'Período no encontrado' })
+      return sendApiError(res, 404, 'EXPORT_OKR_PERIOD_NOT_FOUND', 'Período no encontrado')
     const period = periodRows[0]
 
     const objectives = await fetchObjectivesByPeriod(periodId)
@@ -964,7 +965,7 @@ export const exportOKRPeriodExcel = async (req: Request, res: Response) => {
     res.end()
   } catch (error: any) {
     logger.error('Error exporting OKR period Excel:', error)
-    if (!res.headersSent) res.status(500).json({ error: 'Error al exportar Excel' })
+    if (!res.headersSent) return sendApiError(res, 500, 'EXPORT_OKR_PERIOD_EXCEL_FAILED', 'Error al exportar Excel')
   }
 }
 

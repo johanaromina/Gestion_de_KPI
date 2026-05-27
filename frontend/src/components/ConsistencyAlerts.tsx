@@ -1,4 +1,5 @@
 import { useQuery } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import './ConsistencyAlerts.css'
@@ -30,6 +31,7 @@ export default function ConsistencyAlerts({
   collaboratorId,
   periodId,
 }: ConsistencyAlertsProps) {
+  const { t } = useTranslation('assignments')
   const { data: validation, isLoading } = useQuery<ValidationResponse>(
     ['validation', collaboratorId, periodId],
     async () => {
@@ -65,12 +67,37 @@ export default function ConsistencyAlerts({
     return `alert-${severity}`
   }
 
+  const getIssueMessage = (issue: ValidationIssue) => {
+    switch (issue.type) {
+      case 'weight_sum':
+        return t('consistency_alerts.messages.weight_sum', {
+          total: Number(issue.details?.totalWeight || 0).toFixed(2),
+        })
+      case 'macro_kpi_missing':
+        return t('consistency_alerts.messages.macro_kpi_missing', {
+          kpi: issue.details?.kpiName || '',
+          macro: issue.details?.macroKpiName || '',
+        })
+      case 'unlinked_kpis':
+        return t('consistency_alerts.messages.unlinked_kpis', {
+          count: Number(issue.details?.count || issue.details?.kpis?.length || 0),
+        })
+      case 'kpi_saturation':
+        return t('consistency_alerts.messages.kpi_saturation', {
+          count: Number(issue.details?.kpiCount || 0),
+          max: Number(issue.details?.recommendedMax || 0),
+        })
+      default:
+        return issue.message
+    }
+  }
+
   return (
     <div className="consistency-alerts">
       <div className="alerts-header">
-        <h3>Validaciones de Consistencia</h3>
+        <h3>{t('consistency_alerts.title')}</h3>
         {validation.valid && (
-          <span className="valid-badge">✅ Todo correcto</span>
+          <span className="valid-badge">✅ {t('consistency_alerts.valid')}</span>
         )}
       </div>
 
@@ -78,7 +105,7 @@ export default function ConsistencyAlerts({
         <div key={index} className={`alert ${getSeverityClass(issue.severity)}`}>
           <div className="alert-icon">{getSeverityIcon(issue.severity)}</div>
           <div className="alert-content">
-            <div className="alert-message">{issue.message}</div>
+            <div className="alert-message">{getIssueMessage(issue)}</div>
             {issue.details && (
               <div className="alert-details">
                 {issue.type === 'unlinked_kpis' && issue.details.kpis && (
@@ -90,14 +117,16 @@ export default function ConsistencyAlerts({
                 )}
                 {issue.type === 'weight_sum' && (
                   <div className="detail-item">
-                    <strong>Diferencia:</strong>{' '}
+                    <strong>{t('consistency_alerts.details.difference')}</strong>{' '}
                     {issue.details.difference.toFixed(2)}%
                   </div>
                 )}
                 {issue.type === 'kpi_saturation' && (
                   <div className="detail-item">
-                    <strong>Recomendado:</strong> Máximo{' '}
-                    {issue.details.recommendedMax} KPIs
+                    <strong>{t('consistency_alerts.details.recommended')}</strong>{' '}
+                    {t('consistency_alerts.details.maximum_kpis', {
+                      count: issue.details.recommendedMax,
+                    })}
                   </div>
                 )}
               </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
 import './SubPeriodForm.css'
@@ -54,6 +55,7 @@ export default function SubPeriodForm({
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const queryClient = useQueryClient()
+  const { t } = useTranslation('periods')
 
   useEffect(() => {
     setFormData({
@@ -101,15 +103,15 @@ export default function SubPeriodForm({
     const newErrors: Record<string, string> = {}
 
     if (!formData.name.trim()) {
-      newErrors.name = 'El nombre del subperíodo es requerido'
+      newErrors.name = t('subperiod_form.errors.name_required')
     }
 
     if (!formData.startDate) {
-      newErrors.startDate = 'La fecha de inicio es requerida'
+      newErrors.startDate = t('subperiod_form.errors.start_required')
     }
 
     if (!formData.endDate) {
-      newErrors.endDate = 'La fecha de fin es requerida'
+      newErrors.endDate = t('subperiod_form.errors.end_required')
     }
 
     if (formData.startDate && formData.endDate) {
@@ -117,13 +119,13 @@ export default function SubPeriodForm({
       const end = new Date(formData.endDate)
 
       if (start >= end) {
-        newErrors.endDate = 'La fecha de fin debe ser posterior a la fecha de inicio'
+        newErrors.endDate = t('subperiod_form.errors.end_after_start')
       }
     }
 
     if (formData.weight !== undefined && formData.weight !== null) {
       if (formData.weight < 0 || formData.weight > 100) {
-        newErrors.weight = 'El peso debe estar entre 0 y 100'
+        newErrors.weight = t('subperiod_form.errors.weight_range')
       }
     }
 
@@ -153,19 +155,19 @@ export default function SubPeriodForm({
     >
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{subPeriod?.id ? 'Editar Subperíodo' : 'Crear Subperíodo'}</h2>
+          <h2>{subPeriod?.id ? t('subperiod_form.title_edit') : t('subperiod_form.title_create')}</h2>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
 
         <form onSubmit={handleSubmit} className="subperiod-form">
           <div className="form-group">
-            <label htmlFor="name">Nombre del Subperíodo *</label>
+            <label htmlFor="name">{t('subperiod_form.name_label')}</label>
             <input
               type="text"
               id="name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Ej: Q1 2025, Enero 2025, etc."
+              placeholder={t('subperiod_form.name_placeholder')}
               className={errors.name ? 'error' : ''}
             />
             {errors.name && <span className="error-message">{errors.name}</span>}
@@ -173,7 +175,7 @@ export default function SubPeriodForm({
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="startDate">Fecha de Inicio *</label>
+              <label htmlFor="startDate">{t('subperiod_form.start_date_label')}</label>
               <input
                 type="date"
                 id="startDate"
@@ -189,7 +191,7 @@ export default function SubPeriodForm({
             </div>
 
             <div className="form-group">
-              <label htmlFor="endDate">Fecha de Fin *</label>
+              <label htmlFor="endDate">{t('subperiod_form.end_date_label')}</label>
               <input
                 type="date"
                 id="endDate"
@@ -206,7 +208,7 @@ export default function SubPeriodForm({
           </div>
 
           <div className="form-group">
-            <label htmlFor="weight">Peso Relativo (%)</label>
+            <label htmlFor="weight">{t('subperiod_form.weight_label')}</label>
             <input
               type="number"
               id="weight"
@@ -220,20 +222,20 @@ export default function SubPeriodForm({
                   weight: e.target.value ? parseFloat(e.target.value) : 0,
                 })
               }
-              placeholder="Ej: 25.00"
+              placeholder={t('subperiod_form.weight_placeholder')}
               className={errors.weight ? 'error' : ''}
             />
             {errors.weight && (
               <span className="error-message">{errors.weight}</span>
             )}
             <small className="form-hint">
-              Peso relativo del subperíodo dentro del período (0-100%)
+              {t('subperiod_form.weight_hint')}
             </small>
           </div>
 
           <div className="form-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>
-              Cancelar
+              {t('subperiod_form.cancel')}
             </button>
             <button
               type="submit"
@@ -241,10 +243,10 @@ export default function SubPeriodForm({
               disabled={createMutation.isLoading || updateMutation.isLoading}
             >
               {createMutation.isLoading || updateMutation.isLoading
-                ? 'Guardando...'
+                ? t('subperiod_form.saving')
                 : subPeriod?.id
-                ? 'Actualizar'
-                : 'Crear'}
+                ? t('subperiod_form.update')
+                : t('subperiod_form.create')}
             </button>
           </div>
         </form>
@@ -252,4 +254,3 @@ export default function SubPeriodForm({
     </div>
   )
 }
-

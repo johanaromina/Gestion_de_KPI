@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { resolveDirection, calculateVariationPercent } from '../utils/kpi'
 import './MiSemana.css'
@@ -67,19 +68,12 @@ const progressColor = (p: number) => {
   return '#dc2626'
 }
 
-const formatWeek = (dateStr: string) => {
+const formatWeek = (dateStr: string, locale: string) => {
   const d = new Date(dateStr + 'T12:00:00')
   const end = new Date(d)
   end.setDate(d.getDate() + 6)
-  return `${d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })} – ${end.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}`
-}
-
-const daysSince = (dateStr: string | null) => {
-  if (!dateStr) return null
-  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000)
-  if (diff === 0) return 'hoy'
-  if (diff === 1) return 'ayer'
-  return `hace ${diff} días`
+  const formatter = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' })
+  return `${formatter.format(d)} – ${formatter.format(end)}`
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -87,6 +81,7 @@ const daysSince = (dateStr: string | null) => {
 export default function MiSemana() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { t, i18n } = useTranslation(['week', 'common'])
 
   // inline edit state: krId or kpiId → input value string
   const [editing, setEditing] = useState<{ type: 'kr' | 'kpi'; id: number; value: string; note: string } | null>(null)
@@ -139,9 +134,17 @@ export default function MiSemana() {
   }
 
   const isSubmitting = krMutation.isLoading || kpiMutation.isLoading
+  const locale = i18n.resolvedLanguage?.startsWith('en') ? 'en-US' : 'es-AR'
+  const daysSince = (dateStr: string | null) => {
+    if (!dateStr) return null
+    const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000)
+    if (diff === 0) return t('week:relative_day.today')
+    if (diff === 1) return t('week:relative_day.yesterday')
+    return t('week:relative_day.days_ago', { count: diff })
+  }
 
   if (isLoading) {
-    return <div className="mi-semana-loading">Cargando tu semana...</div>
+    return <div className="mi-semana-loading">{t('week:loading')}</div>
   }
 
   const { krs = [], kpis = [], checkIn, weekStart = '' } = data ?? {}
@@ -152,17 +155,17 @@ export default function MiSemana() {
       {/* Header */}
       <div className="ms-header">
         <div>
-          <h2 className="ms-title">Mi semana</h2>
+          <h2 className="ms-title">{t('week:title')}</h2>
           {weekStart && (
-            <p className="ms-subtitle">Semana del {formatWeek(weekStart)}</p>
+            <p className="ms-subtitle">{t('week:subtitle', { range: formatWeek(weekStart, locale) })}</p>
           )}
         </div>
         <div className="ms-header-right">
           {checkIn ? (
-            <span className="ms-checkin-done">Check-in ✓</span>
+            <span className="ms-checkin-done">{t('week:checkin_done')}</span>
           ) : (
             <button className="ms-btn-checkin" onClick={() => navigate('/check-ins')}>
-              Hacer check-in semanal
+              {t('week:actions.weekly_checkin')}
             </button>
           )}
         </div>
@@ -170,14 +173,14 @@ export default function MiSemana() {
 
       {!hasAnything && (
         <div className="ms-empty">
-          <p>No tenés KRs ni KPIs activos asignados esta semana.</p>
+          <p>{t('week:empty')}</p>
         </div>
       )}
 
       {/* Key Results */}
       {krs.length > 0 && (
         <section className="ms-section">
-          <h3 className="ms-section-title">Key Results que te asignaron</h3>
+          <h3 className="ms-section-title">{t('week:sections.assigned_krs')}</h3>
           <div className="ms-cards">
             {krs.map((kr) => {
               const pct = krProgress(kr)
@@ -191,7 +194,7 @@ export default function MiSemana() {
                     <span
                       className="ms-card-obj"
                       onClick={() => navigate(`/okr/${kr.objectiveId}`)}
-                      title="Ver objetivo"
+                      title={t('week:objective_link_title')}
                     >
                       {kr.objectiveTitle}
                     </span>
@@ -214,7 +217,7 @@ export default function MiSemana() {
                       {kr.unit ? ` ${kr.unit}` : ''}
                     </span>
                     {kr.lastCheckin && (
-                      <span className="ms-last-update">Último: {daysSince(kr.lastCheckin)}</span>
+                      <span className="ms-last-update">{t('week:last_update', { value: daysSince(kr.lastCheckin) })}</span>
                     )}
                   </div>
 
@@ -224,7 +227,7 @@ export default function MiSemana() {
                       <input
                         type="number"
                         className="ms-input"
-                        placeholder="Nuevo valor"
+                        placeholder={t('week:input.new_value')}
                         value={editing.value}
                         onChange={(e) => setEditing({ ...editing, value: e.target.value })}
                         autoFocus
@@ -232,16 +235,16 @@ export default function MiSemana() {
                       <input
                         type="text"
                         className="ms-input ms-input--note"
-                        placeholder="Nota (opcional)"
+                        placeholder={t('week:input.optional_note')}
                         value={editing.note}
                         onChange={(e) => setEditing({ ...editing, note: e.target.value })}
                       />
                       <div className="ms-inline-actions">
                         <button className="ms-btn-save" onClick={handleSave} disabled={isSubmitting}>
-                          {isSubmitting ? '...' : 'Guardar'}
+                          {isSubmitting ? '...' : t('common:save')}
                         </button>
                         <button className="ms-btn-cancel" onClick={() => setEditing(null)}>
-                          Cancelar
+                          {t('common:cancel')}
                         </button>
                       </div>
                     </div>
@@ -250,7 +253,7 @@ export default function MiSemana() {
                       className={`ms-btn-update ${isSaved ? 'ms-btn-update--saved' : ''}`}
                       onClick={() => setEditing({ type: 'kr', id: kr.krId, value: String(kr.currentValue ?? ''), note: '' })}
                     >
-                      {isSaved ? '✓ Guardado' : 'Actualizar'}
+                      {isSaved ? t('week:actions.saved') : t('week:actions.update')}
                     </button>
                   )}
                 </div>
@@ -263,7 +266,7 @@ export default function MiSemana() {
       {/* KPIs */}
       {kpis.length > 0 && (
         <section className="ms-section">
-          <h3 className="ms-section-title">Mis KPIs del período</h3>
+          <h3 className="ms-section-title">{t('week:sections.my_kpis')}</h3>
           <div className="ms-cards">
             {kpis.map((kpi) => {
               const pct = kpiProgress(kpi)
@@ -294,7 +297,7 @@ export default function MiSemana() {
                       {kpi.actual ?? '—'} / {kpi.target ?? '—'}
                     </span>
                     {kpi.weightedResult != null && (
-                      <span className="ms-weighted">Resultado: {Number(kpi.weightedResult).toFixed(1)}%</span>
+                      <span className="ms-weighted">{t('week:result', { value: Number(kpi.weightedResult).toFixed(1) })}</span>
                     )}
                   </div>
 
@@ -303,17 +306,17 @@ export default function MiSemana() {
                       <input
                         type="number"
                         className="ms-input"
-                        placeholder="Nuevo valor"
+                        placeholder={t('week:input.new_value')}
                         value={editing.value}
                         onChange={(e) => setEditing({ ...editing, value: e.target.value })}
                         autoFocus
                       />
                       <div className="ms-inline-actions">
                         <button className="ms-btn-save" onClick={handleSave} disabled={isSubmitting}>
-                          {isSubmitting ? '...' : 'Guardar'}
+                          {isSubmitting ? '...' : t('common:save')}
                         </button>
                         <button className="ms-btn-cancel" onClick={() => setEditing(null)}>
-                          Cancelar
+                          {t('common:cancel')}
                         </button>
                       </div>
                     </div>
@@ -322,7 +325,7 @@ export default function MiSemana() {
                       className={`ms-btn-update ${isSaved ? 'ms-btn-update--saved' : ''}`}
                       onClick={() => setEditing({ type: 'kpi', id: kpi.id, value: String(kpi.actual ?? ''), note: '' })}
                     >
-                      {isSaved ? '✓ Guardado' : 'Actualizar'}
+                      {isSaved ? t('week:actions.saved') : t('week:actions.update')}
                     </button>
                   )}
                 </div>

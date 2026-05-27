@@ -1,15 +1,14 @@
 import { Request, Response } from 'express'
 import { pool } from '../config/database'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 export const validateConsistency = async (req: Request, res: Response) => {
   try {
     const { collaboratorId, periodId } = req.query
 
     if (!collaboratorId || !periodId) {
-      return res.status(400).json({
-        error: 'collaboratorId y periodId son requeridos',
-      })
+      return sendApiError(res, 400, 'VALIDATION_FIELDS_REQUIRED', 'collaboratorId y periodId son requeridos')
     }
 
     const issues: any[] = []
@@ -140,7 +139,7 @@ export const validateConsistency = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     logger.error('Error validating consistency:', error)
-    res.status(500).json({ error: 'Error al validar consistencia' })
+    return sendApiError(res, 500, 'VALIDATION_CONSISTENCY_FAILED', 'Error al validar consistencia')
   }
 }
 
@@ -197,6 +196,6 @@ export const validatePeriodConsistency = async (req: Request, res: Response) => 
     })
   } catch (error: any) {
     logger.error('Error validating period consistency:', error)
-    res.status(500).json({ error: 'Error al validar consistencia del período' })
+    return sendApiError(res, 500, 'VALIDATION_PERIOD_CONSISTENCY_FAILED', 'Error al validar consistencia del período')
   }
 }

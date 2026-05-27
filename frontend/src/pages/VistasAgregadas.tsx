@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { useAuth } from '../hooks/useAuth'
 import {
@@ -35,6 +36,7 @@ interface AggregatedData {
 }
 
 export default function VistasAgregadas() {
+  const { t } = useTranslation('views')
   const [viewType, setViewType] = useState<ViewType>('area')
   const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null)
   const { user } = useAuth()
@@ -66,15 +68,7 @@ export default function VistasAgregadas() {
     }
   )
 
-  const getViewLabel = (type: ViewType): string => {
-    const labels = {
-      direction: 'Por Dirección',
-      management: 'Por Gerencia',
-      leadership: 'Por Jefatura',
-      area: 'Por Área',
-    }
-    return labels[type]
-  }
+  const getViewLabel = (type: ViewType): string => t(`aggregated.view_types.${type}`)
 
   const formatStandardDeviation = (stdDev: number): string => {
     return `±${stdDev.toFixed(2)}%`
@@ -97,7 +91,7 @@ export default function VistasAgregadas() {
         item.area ||
         item.manager?.name ||
         item.leader?.name ||
-        'Sin nombre'
+        t('aggregated.no_name')
       return {
         name: label,
         promedio: item.statistics.average,
@@ -120,16 +114,14 @@ export default function VistasAgregadas() {
     <div className="vistas-agregadas-page">
       <div className="page-header">
         <div>
-          <h1>Vistas Agregadas</h1>
-          <p className="subtitle">
-            Tableros de cumplimiento por nivel organizacional
-          </p>
+          <h1>{t('aggregated.title')}</h1>
+          <p className="subtitle">{t('aggregated.subtitle')}</p>
         </div>
       </div>
 
       <div className="filters-section">
         <div className="filter-group">
-          <label htmlFor="period-select">Período:</label>
+          <label htmlFor="period-select">{t('aggregated.filters.period_label')}:</label>
           <select
             id="period-select"
             value={selectedPeriodId || ''}
@@ -140,7 +132,7 @@ export default function VistasAgregadas() {
             }
             className="filter-select"
           >
-            <option value="">Selecciona un período</option>
+            <option value="">{t('aggregated.filters.select_period')}</option>
             {periods?.map((period: any) => (
               <option key={period.id} value={period.id}>
                 {period.name}
@@ -154,7 +146,7 @@ export default function VistasAgregadas() {
             className={`view-type-btn ${viewType === 'area' ? 'active' : ''}`}
             onClick={() => setViewType('area')}
           >
-            Por Área
+            {t('aggregated.view_types.area')}
           </button>
           {canViewCompany && (
             <>
@@ -162,19 +154,19 @@ export default function VistasAgregadas() {
                 className={`view-type-btn ${viewType === 'direction' ? 'active' : ''}`}
                 onClick={() => setViewType('direction')}
               >
-                Por Dirección
+                {t('aggregated.view_types.direction')}
               </button>
               <button
                 className={`view-type-btn ${viewType === 'management' ? 'active' : ''}`}
                 onClick={() => setViewType('management')}
               >
-                Por Gerencia
+                {t('aggregated.view_types.management')}
               </button>
               <button
                 className={`view-type-btn ${viewType === 'leadership' ? 'active' : ''}`}
                 onClick={() => setViewType('leadership')}
               >
-                Por Jefatura
+                {t('aggregated.view_types.leadership')}
               </button>
             </>
           )}
@@ -184,16 +176,16 @@ export default function VistasAgregadas() {
       {!selectedPeriodId ? (
         <div className="empty-state">
           <div className="empty-icon">📊</div>
-          <h3>Selecciona un período</h3>
-          <p>Elige un período para ver las vistas agregadas</p>
+          <h3>{t('aggregated.empty.no_period_title')}</h3>
+          <p>{t('aggregated.empty.no_period_text')}</p>
         </div>
       ) : isLoading ? (
-        <div className="loading">Cargando datos agregados...</div>
+        <div className="loading">{t('aggregated.loading')}</div>
       ) : filteredAggregated.length > 0 ? (
         <>
           {/* Gráfico de barras con promedio */}
           <div className="chart-section">
-            <h2>Promedio de Cumplimiento - {getViewLabel(viewType)}</h2>
+            <h2>{t('aggregated.chart.avg_title', { view: getViewLabel(viewType) })}</h2>
             <div className="chart-container">
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={chartData}>
@@ -207,7 +199,7 @@ export default function VistasAgregadas() {
                   <YAxis domain={[0, 100]} />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="promedio" fill="#f97316" name="Promedio %" />
+                  <Bar dataKey="promedio" fill="#f97316" name={t('aggregated.chart.bar_avg')} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -215,7 +207,7 @@ export default function VistasAgregadas() {
 
           {/* Gráfico de rango (min-max) */}
           <div className="chart-section">
-            <h2>Rango de Cumplimiento - {getViewLabel(viewType)}</h2>
+            <h2>{t('aggregated.chart.range_title', { view: getViewLabel(viewType) })}</h2>
             <div className="chart-container">
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={chartData}>
@@ -229,8 +221,8 @@ export default function VistasAgregadas() {
                   <YAxis domain={[0, 100]} />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="minimo" fill="#ef4444" name="Mínimo %" />
-                  <Bar dataKey="maximo" fill="#10b981" name="Máximo %" />
+                  <Bar dataKey="minimo" fill="#ef4444" name={t('aggregated.chart.bar_min')} />
+                  <Bar dataKey="maximo" fill="#10b981" name={t('aggregated.chart.bar_max')} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -238,24 +230,24 @@ export default function VistasAgregadas() {
 
           {/* Tabla de datos detallados */}
           <div className="table-section">
-            <h2>Datos Detallados - {getViewLabel(viewType)}</h2>
+            <h2>{t('aggregated.chart.detailed_title', { view: getViewLabel(viewType) })}</h2>
             <div className="table-container">
               <table className="data-table">
                 <thead>
                   <tr>
                     <th>
-                      {viewType === 'area' || viewType === 'direction'
-                        ? 'Área'
-                        : viewType === 'management'
-                        ? 'Gerente'
-                        : 'Líder'}
+                      {viewType === 'management'
+                        ? t('aggregated.table.header_manager')
+                        : viewType === 'leadership'
+                        ? t('aggregated.table.header_leader')
+                        : t('aggregated.table.header_area')}
                     </th>
-                    <th>Colaboradores</th>
-                    <th>Promedio</th>
-                    <th>Mínimo</th>
-                    <th>Máximo</th>
-                    <th>Dispersión (σ)</th>
-                    <th>Rango</th>
+                    <th>{t('aggregated.table.header_collaborators')}</th>
+                    <th>{t('aggregated.table.header_avg')}</th>
+                    <th>{t('aggregated.table.header_min')}</th>
+                    <th>{t('aggregated.table.header_max')}</th>
+                    <th>{t('aggregated.table.header_dispersion')}</th>
+                    <th>{t('aggregated.table.header_range')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -264,7 +256,7 @@ export default function VistasAgregadas() {
                       item.area ||
                       item.manager?.name ||
                       item.leader?.name ||
-                      'Sin nombre'
+                      t('aggregated.no_name')
                     const stats = item.statistics
                     const range = stats.max - stats.min
 
@@ -304,10 +296,8 @@ export default function VistasAgregadas() {
       ) : (
         <div className="empty-state">
           <div className="empty-icon">📊</div>
-          <h3>No hay datos disponibles</h3>
-          <p>
-            No se encontraron datos agregados para el período seleccionado
-          </p>
+          <h3>{t('aggregated.empty.no_data_title')}</h3>
+          <p>{t('aggregated.empty.no_data_text')}</p>
         </div>
       )}
     </div>

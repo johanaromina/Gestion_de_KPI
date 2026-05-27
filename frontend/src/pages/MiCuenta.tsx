@@ -1,9 +1,23 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { useAuth } from '../hooks/useAuth'
+import { resolveApiErrorMessage } from '../utils/apiErrors'
 import './MiCuenta.css'
 
+const CHANGE_PASSWORD_API_ERROR_KEYS: Record<string, string> = {
+  AUTH_SESSION_INVALID: 'account:errors.session_invalid',
+  AUTH_CHANGE_PASSWORD_REQUIRED: 'account:errors.required_fields',
+  AUTH_CHANGE_PASSWORD_TOO_SHORT: 'account:errors.min_length',
+  AUTH_USER_NOT_FOUND: 'account:errors.user_not_found',
+  AUTH_LOCAL_PASSWORD_NOT_SET: 'account:errors.local_password_not_set',
+  AUTH_CURRENT_PASSWORD_INCORRECT: 'account:errors.current_password_incorrect',
+  AUTH_NEW_PASSWORD_SAME_AS_CURRENT: 'account:errors.same_password',
+  AUTH_CHANGE_PASSWORD_FAILED: 'account:errors.change_failed',
+}
+
 export default function MiCuenta() {
+  const { t } = useTranslation(['account', 'common'])
   const { user } = useAuth()
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -18,17 +32,17 @@ export default function MiCuenta() {
     setSuccess(null)
 
     if (!currentPassword || !newPassword || !confirmPassword) {
-      setError('Completa todos los campos.')
+      setError(t('account:errors.required_fields'))
       return
     }
 
     if (newPassword.length < 8) {
-      setError('La nueva contrasena debe tener al menos 8 caracteres.')
+      setError(t('account:errors.min_length'))
       return
     }
 
     if (newPassword !== confirmPassword) {
-      setError('Las nuevas contrasenas no coinciden.')
+      setError(t('account:errors.password_mismatch'))
       return
     }
 
@@ -38,12 +52,15 @@ export default function MiCuenta() {
         currentPassword,
         newPassword,
       })
-      setSuccess(response.data?.message || 'Contrasena actualizada correctamente.')
+      setSuccess(response.data?.message || t('account:success.updated'))
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
     } catch (err: any) {
-      setError(err.response?.data?.error || 'No se pudo cambiar la contrasena.')
+      setError(resolveApiErrorMessage(err, t, {
+        codeMap: CHANGE_PASSWORD_API_ERROR_KEYS,
+        fallbackKey: 'account:errors.change_failed',
+      }))
     } finally {
       setLoading(false)
     }
@@ -53,28 +70,30 @@ export default function MiCuenta() {
     <div className="account-page">
       <div className="account-card">
         <div className="account-header">
-          <h2>Mi cuenta</h2>
-          <p>Administra tu acceso personal a esta instancia.</p>
+          <h2>{t('account:title')}</h2>
+          <p>{t('account:subtitle')}</p>
         </div>
 
         <div className="account-summary">
           <div className="account-summary-item">
-            <div className="account-summary-label">Nombre</div>
-            <div className="account-summary-value">{user?.name || 'Usuario'}</div>
+            <div className="account-summary-label">{t('common:name')}</div>
+            <div className="account-summary-value">{user?.name || t('account:fallbacks.user')}</div>
           </div>
           <div className="account-summary-item">
-            <div className="account-summary-label">Email</div>
-            <div className="account-summary-value">{user?.email || 'Sin email configurado'}</div>
+            <div className="account-summary-label">{t('common:email')}</div>
+            <div className="account-summary-value">{user?.email || t('account:fallbacks.no_email')}</div>
           </div>
           <div className="account-summary-item">
-            <div className="account-summary-label">Rol</div>
-            <div className="account-summary-value">{user?.role || 'Sin rol'}</div>
+            <div className="account-summary-label">{t('common:role')}</div>
+            <div className="account-summary-value">
+              {user?.role ? t(`common:roles.${user.role}`, { defaultValue: user.role }) : t('account:fallbacks.no_role')}
+            </div>
           </div>
         </div>
 
         <form className="account-form" onSubmit={handleSubmit}>
           <div className="account-field">
-            <label htmlFor="currentPassword">Contrasena actual</label>
+            <label htmlFor="currentPassword">{t('account:form.current_password')}</label>
             <input
               id="currentPassword"
               type="password"
@@ -85,7 +104,7 @@ export default function MiCuenta() {
           </div>
 
           <div className="account-field">
-            <label htmlFor="newPassword">Nueva contrasena</label>
+            <label htmlFor="newPassword">{t('account:form.new_password')}</label>
             <input
               id="newPassword"
               type="password"
@@ -96,7 +115,7 @@ export default function MiCuenta() {
           </div>
 
           <div className="account-field">
-            <label htmlFor="confirmPassword">Confirmar nueva contrasena</label>
+            <label htmlFor="confirmPassword">{t('account:form.confirm_password')}</label>
             <input
               id="confirmPassword"
               type="password"
@@ -107,7 +126,7 @@ export default function MiCuenta() {
           </div>
 
           <p className="account-hint">
-            Si no recordas tu contrasena actual, usa “Olvide mi contrasena” desde la pantalla de login.
+            {t('account:hint')}
           </p>
 
           {error ? <div className="account-error">{error}</div> : null}
@@ -115,7 +134,7 @@ export default function MiCuenta() {
 
           <div className="account-actions">
             <button className="account-submit" type="submit" disabled={loading}>
-              {loading ? 'Guardando...' : 'Actualizar contrasena'}
+              {loading ? t('account:actions.saving') : t('account:actions.update_password')}
             </button>
           </div>
         </form>

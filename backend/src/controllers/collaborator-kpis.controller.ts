@@ -9,7 +9,10 @@ import { applyMeasurementToCollaboratorAssignment } from '../services/measuremen
 import { recalcOKRsLinkedToCollaboratorKpi } from '../services/okr.service'
 import { recalculateScopeKPI } from '../services/scope-kpi-aggregation.service'
 import { logger } from '../utils/logger'
+import { validateNumber, validateEnum, collectErrors } from '../utils/validate'
 import { recalcScopeKPIsLinkedToAssignment } from '../services/scope-kpi-propagation.service'
+import { KPI_STATUS } from '../utils/constants'
+import { sendApiError } from '../utils/api-errors'
 export { recalcScopeKPIsLinkedToAssignment } from '../services/scope-kpi-propagation.service'
 
 const canEditAssignment = async (user: AuthRequest['user'], collaboratorId: number) => {
@@ -293,8 +296,9 @@ export const recalcSummaryAssignment = async (collaboratorId: number, kpiId: num
 
 export const getCollaboratorKPIs = async (req: Request, res: Response) => {
   try {
-    const [rows] = await pool.query<CollaboratorKPI[]>(
-      `SELECT ck.*, 
+    const limit = req.query.limit !== undefined ? Math.max(1, Math.min(1000, Number(req.query.limit))) : null
+    const offset = req.query.offset !== undefined ? Math.max(0, Number(req.query.offset)) : 0
+    const baseQuery = `SELECT ck.*,
               k.type as kpiType,
               k.direction as kpiDirection,
               k.name as kpiName,
@@ -318,20 +322,27 @@ export const getCollaboratorKPIs = async (req: Request, res: Response) => {
        JOIN periods p ON ck.periodId = p.id
        LEFT JOIN calendar_subperiods sp ON ck.subPeriodId = sp.id
        LEFT JOIN kpi_criteria_versions cv_active ON cv_active.id = ck.activeCriteriaVersionId
-       LEFT JOIN kpi_criteria_versions cv_latest 
+       LEFT JOIN kpi_criteria_versions cv_latest
          ON cv_latest.id = (
-           SELECT id FROM kpi_criteria_versions 
-           WHERE assignmentId = ck.id 
+           SELECT id FROM kpi_criteria_versions
+           WHERE assignmentId = ck.id
            ORDER BY createdAt DESC LIMIT 1
          )
        LEFT JOIN kpi_measurements km ON km.id = ck.lastMeasurementId
        LEFT JOIN collaborators mc ON km.capturedBy = mc.id
        ORDER BY ck.createdAt DESC`
-    )
+
+    if (limit !== null) {
+      const [[{ total }]] = await pool.query<any[]>(`SELECT COUNT(*) as total FROM collaborator_kpis ck`)
+      const [rows] = await pool.query<CollaboratorKPI[]>(`${baseQuery} LIMIT ? OFFSET ?`, [limit, offset])
+      return res.json({ data: rows, total: Number(total), limit, offset })
+    }
+
+    const [rows] = await pool.query<CollaboratorKPI[]>(baseQuery)
     res.json(rows)
   } catch (error: any) {
     logger.error('Error fetching collaborator KPIs:', error)
-    res.status(500).json({ error: 'Error al obtener asignaciones' })
+    return sendApiError(res, 500, 'ASSIGNMENT_FETCH_FAILED', 'Error al obtener asignaciones')
   }
 }
 
@@ -370,13 +381,13 @@ export const getCollaboratorKPIById = async (req: Request, res: Response) => {
     )
 
     if (Array.isArray(rows) && rows.length === 0) {
-      return res.status(404).json({ error: 'Asignación no encontrada' })
+      return sendApiError(res, 404, 'ASSIGNMENT_NOT_FOUND', 'Asignación no encontrada')
     }
 
     res.json(rows[0])
   } catch (error: any) {
     logger.error('Error fetching collaborator KPI:', error)
-    res.status(500).json({ error: 'Error al obtener asignación' })
+    return sendApiError(res, 500, 'ASSIGNMENT_FETCH_ONE_FAILED', 'Error al obtener asignación')
   }
 }
 
@@ -384,8 +395,14 @@ export const getCollaboratorKPIsByCollaborator = async (req: Request, res: Respo
   try {
     const { collaboratorId } = req.params
     const { periodId } = req.query
+    const limit = req.query.limit !== undefined ? Math.max(1, Math.min(1000, Number(req.query.limit))) : null
+    const offset = req.query.offset !== undefined ? Math.max(0, Number(req.query.offset)) : 0
 
-    let query = `SELECT ck.*, 
+    const params: any[] = [collaboratorId]
+    let whereExtra = ''
+    if (periodId) { whereExtra = ' AND ck.periodId = ?'; params.push(periodId) }
+
+    const baseQuery = `SELECT ck.*,
                         k.type as kpiType,
                         k.direction as kpiDirection,
                         k.name as kpiName,
@@ -407,38 +424,41 @@ export const getCollaboratorKPIsByCollaborator = async (req: Request, res: Respo
                  JOIN periods p ON ck.periodId = p.id
                  LEFT JOIN calendar_subperiods sp ON ck.subPeriodId = sp.id
                  LEFT JOIN kpi_criteria_versions cv_active ON cv_active.id = ck.activeCriteriaVersionId
-                 LEFT JOIN kpi_criteria_versions cv_latest 
+                 LEFT JOIN kpi_criteria_versions cv_latest
                    ON cv_latest.id = (
-                     SELECT id FROM kpi_criteria_versions 
-                     WHERE assignmentId = ck.id 
+                     SELECT id FROM kpi_criteria_versions
+                     WHERE assignmentId = ck.id
                      ORDER BY createdAt DESC LIMIT 1
                    )
                  LEFT JOIN kpi_measurements km ON km.id = ck.lastMeasurementId
                  LEFT JOIN collaborators mc ON km.capturedBy = mc.id
-                 WHERE ck.collaboratorId = ?`
+                 WHERE ck.collaboratorId = ?${whereExtra}
+                 ORDER BY p.startDate DESC, ck.createdAt DESC`
 
-    const params: any[] = [collaboratorId]
-
-    if (periodId) {
-      query += ' AND ck.periodId = ?'
-      params.push(periodId)
+    if (limit !== null) {
+      const [[{ total }]] = await pool.query<any[]>(
+        `SELECT COUNT(*) as total FROM collaborator_kpis ck WHERE ck.collaboratorId = ?${whereExtra}`,
+        params
+      )
+      const [rows] = await pool.query<CollaboratorKPI[]>(`${baseQuery} LIMIT ? OFFSET ?`, [...params, limit, offset])
+      return res.json({ data: rows, total: Number(total), limit, offset })
     }
 
-    query += ' ORDER BY p.startDate DESC, ck.createdAt DESC'
-
-    const [rows] = await pool.query<CollaboratorKPI[]>(query, params)
+    const [rows] = await pool.query<CollaboratorKPI[]>(baseQuery, params)
     res.json(rows)
   } catch (error: any) {
     logger.error('Error fetching collaborator KPIs:', error)
-    res.status(500).json({ error: 'Error al obtener asignaciones' })
+    return sendApiError(res, 500, 'ASSIGNMENT_FETCH_FAILED', 'Error al obtener asignaciones')
   }
 }
 
 export const getCollaboratorKPIsByPeriod = async (req: Request, res: Response) => {
   try {
     const { periodId } = req.params
-    const [rows] = await pool.query<CollaboratorKPI[]>(
-      `SELECT ck.*, 
+    const limit = req.query.limit !== undefined ? Math.max(1, Math.min(1000, Number(req.query.limit))) : null
+    const offset = req.query.offset !== undefined ? Math.max(0, Number(req.query.offset)) : 0
+
+    const baseQuery = `SELECT ck.*,
               k.type as kpiType,
               k.direction as kpiDirection,
               k.name as kpiName,
@@ -459,22 +479,31 @@ export const getCollaboratorKPIsByPeriod = async (req: Request, res: Response) =
        JOIN collaborators c ON ck.collaboratorId = c.id
        LEFT JOIN calendar_subperiods sp ON ck.subPeriodId = sp.id
        LEFT JOIN kpi_criteria_versions cv_active ON cv_active.id = ck.activeCriteriaVersionId
-       LEFT JOIN kpi_criteria_versions cv_latest 
+       LEFT JOIN kpi_criteria_versions cv_latest
          ON cv_latest.id = (
-           SELECT id FROM kpi_criteria_versions 
-           WHERE assignmentId = ck.id 
+           SELECT id FROM kpi_criteria_versions
+           WHERE assignmentId = ck.id
            ORDER BY createdAt DESC LIMIT 1
          )
        LEFT JOIN kpi_measurements km ON km.id = ck.lastMeasurementId
        LEFT JOIN collaborators mc ON km.capturedBy = mc.id
        WHERE ck.periodId = ?
-       ORDER BY c.name ASC`,
-      [periodId]
-    )
+       ORDER BY c.name ASC`
+
+    if (limit !== null) {
+      const [[{ total }]] = await pool.query<any[]>(
+        `SELECT COUNT(*) as total FROM collaborator_kpis ck WHERE ck.periodId = ?`,
+        [periodId]
+      )
+      const [rows] = await pool.query<CollaboratorKPI[]>(`${baseQuery} LIMIT ? OFFSET ?`, [periodId, limit, offset])
+      return res.json({ data: rows, total: Number(total), limit, offset })
+    }
+
+    const [rows] = await pool.query<CollaboratorKPI[]>(baseQuery, [periodId])
     res.json(rows)
   } catch (error: any) {
     logger.error('Error fetching collaborator KPIs:', error)
-    res.status(500).json({ error: 'Error al obtener asignaciones' })
+    return sendApiError(res, 500, 'ASSIGNMENT_FETCH_FAILED', 'Error al obtener asignaciones')
   }
 }
 
@@ -499,21 +528,33 @@ export const createCollaboratorKPI = async (req: Request, res: Response) => {
       curatorAssignee,
     } = req.body
 
-    if (!collaboratorId || !kpiId || !periodId || !target || !weight) {
-      return res.status(400).json({ error: 'Faltan campos requeridos' })
-    }
+    const createErrors = collectErrors([
+      validateNumber(collaboratorId, 'collaboratorId', { min: 1 }),
+      validateNumber(kpiId, 'kpiId', { min: 1 }),
+      validateNumber(periodId, 'periodId', { min: 1 }),
+      target === undefined || target === null ? { field: 'target', message: 'target es requerido' } : validateNumber(target, 'target'),
+      validateNumber(weight, 'weight', { min: 0.01, max: 100 }),
+      ])
+      if (createErrors.length > 0) {
+        return sendApiError(
+          res,
+          400,
+          'ASSIGNMENT_NUMERIC_VALIDATION_FAILED',
+          createErrors[0].message,
+          undefined,
+          { fields: createErrors }
+        )
+      }
 
     const canEdit = await canEditAssignment((req as AuthRequest).user, Number(collaboratorId))
     if (!canEdit) {
-      return res.status(403).json({ error: 'No autorizado para crear asignaciones fuera de tu área' })
+      return sendApiError(res, 403, 'ASSIGNMENT_CREATE_FORBIDDEN', 'No autorizado para crear asignaciones fuera de tu área')
     }
 
     const [periodRows] = await pool.query<any[]>('SELECT status FROM periods WHERE id = ?', [periodId])
 
     if (Array.isArray(periodRows) && periodRows.length > 0 && periodRows[0].status === 'closed') {
-      return res.status(403).json({
-        error: 'No se pueden crear asignaciones en períodos cerrados',
-      })
+      return sendApiError(res, 403, 'ASSIGNMENT_PERIOD_CLOSED', 'No se pueden crear asignaciones en períodos cerrados')
     }
 
     // Validación de ponderación: solo aplica a filas resumen (subPeriodId NULL)
@@ -530,9 +571,7 @@ export const createCollaboratorKPI = async (req: Request, res: Response) => {
         const newTotal = currentTotal + (Number(weight) || 0)
 
         if (newTotal > 100.01) {
-          return res.status(400).json({
-            error: `La suma de ponderaciones no puede superar el 100%`,
-          })
+          return sendApiError(res, 400, 'ASSIGNMENT_WEIGHT_EXCEEDED', 'La suma de ponderaciones no puede superar el 100%')
         }
       }
     }
@@ -540,7 +579,7 @@ export const createCollaboratorKPI = async (req: Request, res: Response) => {
     const [kpiRows] = await pool.query<any[]>('SELECT id FROM kpis WHERE id = ?', [kpiId])
 
     if (Array.isArray(kpiRows) && kpiRows.length === 0) {
-      return res.status(404).json({ error: 'KPI no encontrado' })
+      return sendApiError(res, 404, 'KPI_NOT_FOUND', 'KPI no encontrado')
     }
 
     let resolvedCuratorId = curatorUserId || null
@@ -607,13 +646,10 @@ export const createCollaboratorKPI = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     if (error?.code === 'ER_DUP_ENTRY') {
-      return res.status(400).json({
-        error:
-          'Ya existe una asignación para este colaborador, KPI, período y subperíodo. Edítala en lugar de crearla nuevamente.',
-      })
+      return sendApiError(res, 400, 'ASSIGNMENT_DUPLICATE', 'Ya existe una asignación para este colaborador, KPI, período y subperíodo. Edítala en lugar de crearla nuevamente.')
     }
     logger.error('Error creating collaborator KPI:', error)
-    res.status(500).json({ error: 'Error al crear asignación' })
+    return sendApiError(res, 500, 'ASSIGNMENT_CREATE_FAILED', 'Error al crear asignación')
   }
 }
 
@@ -650,7 +686,7 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
     )
 
     if (Array.isArray(ckRows) && ckRows.length === 0) {
-      return res.status(404).json({ error: 'Asignación no encontrada' })
+      return sendApiError(res, 404, 'ASSIGNMENT_NOT_FOUND', 'Asignación no encontrada')
     }
 
     const { assignmentStatus, periodStatus, collaboratorId: collabId } = ckRows[0]
@@ -667,7 +703,7 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
 
     const canEdit = await canEditAssignment((req as AuthRequest).user, Number(collaboratorId || 0))
     if (!canEdit) {
-      return res.status(403).json({ error: 'No autorizado para editar asignaciones fuera de tu área' })
+      return sendApiError(res, 403, 'ASSIGNMENT_EDIT_FORBIDDEN', 'No autorizado para editar asignaciones fuera de tu área')
     }
 
     if (assignmentStatus === 'closed' || periodStatus === 'closed') {
@@ -675,19 +711,42 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
       const canReopen = ['admin', 'director'].includes(userRole)
 
       if (status !== 'closed' && !canReopen) {
-        return res.status(403).json({
-          error: 'No se puede editar una asignación cerrada. Solo administradores y directores pueden reabrir.',
-        })
+        return sendApiError(res, 403, 'ASSIGNMENT_CLOSED_EDIT_FORBIDDEN', 'No se puede editar una asignación cerrada. Solo administradores y directores pueden reabrir.')
       }
 
       if (assignmentStatus === 'closed' && !canReopen) {
-        return res.status(403).json({
-          error: 'Esta asignación está cerrada y no puede ser editada. Solo administradores y directores pueden reabrir.',
-        })
+        return sendApiError(res, 403, 'ASSIGNMENT_CLOSED_EDIT_FORBIDDEN', 'Esta asignación está cerrada y no puede ser editada. Solo administradores y directores pueden reabrir.')
       }
     }
 
-    if (weight !== undefined) {
+    const updateNumericErrors = collectErrors([
+      target !== undefined && target !== null ? validateNumber(target, 'target') : null,
+      actual !== undefined && actual !== null ? validateNumber(actual, 'actual') : null,
+      ])
+      if (updateNumericErrors.length > 0) {
+        return sendApiError(
+          res,
+          400,
+          'ASSIGNMENT_NUMERIC_VALIDATION_FAILED',
+          updateNumericErrors[0].message,
+          undefined,
+          { fields: updateNumericErrors }
+        )
+      }
+
+      if (weight !== undefined) {
+        const weightErr = validateNumber(weight, 'weight', { min: 0.01, max: 100 })
+        if (weightErr) {
+          return sendApiError(
+            res,
+            400,
+            'ASSIGNMENT_WEIGHT_VALIDATION_FAILED',
+            weightErr.message,
+            undefined,
+            { fields: [weightErr] }
+          )
+        }
+
       // Valida ponderación solo si esta fila es resumen (sin subperiodo)
       const [selfRow] = await pool.query<any[]>(
         `SELECT subPeriodId FROM collaborator_kpis WHERE id = ?`,
@@ -711,9 +770,7 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
           const newTotal = currentTotal + (Number(weight) || 0)
 
           if (newTotal > 100.01) {
-            return res.status(400).json({
-              error: `La suma de ponderaciones no puede superar el 100%`,
-            })
+            return sendApiError(res, 400, 'ASSIGNMENT_WEIGHT_EXCEEDED', 'La suma de ponderaciones no puede superar el 100%')
           }
         }
       }
@@ -728,15 +785,17 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
         [collaboratorId, kpiId, periodId, subPeriodId || null, id]
       )
       if (Array.isArray(dupRows) && dupRows.length > 0) {
-        return res.status(400).json({
-          error: 'Ya existe una asignación para este KPI y subperiodo. Edita la existente en lugar de moverla.',
-        })
+        return sendApiError(res, 400, 'ASSIGNMENT_SUBPERIOD_DUPLICATE', 'Ya existe una asignación para este KPI y subperiodo. Edita la existente en lugar de moverla.')
       }
     }
 
-    let updateQuery = `UPDATE collaborator_kpis 
-                       SET target = ?, weight = ?, status = ?, comments = ?, subPeriodId = ?`
-    const params: any[] = [target, weight, status, comments, subPeriodId || null]
+    const setClauses: string[] = []
+    const params: any[] = []
+    if (target !== undefined)      { setClauses.push('target = ?');    params.push(target) }
+    if (weight !== undefined)      { setClauses.push('weight = ?');    params.push(weight) }
+    if (status !== undefined)      { setClauses.push('status = ?');    params.push(status) }
+    if ('comments' in req.body)    { setClauses.push('comments = ?'); params.push(comments ?? null) }
+    if (subPeriodId !== undefined) { setClauses.push('subPeriodId = ?'); params.push(subPeriodId || null) }
 
     let resolvedCuratorId = curatorUserId || null
     if (!resolvedCuratorId && curatorAssignee) {
@@ -747,30 +806,11 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
       resolvedCuratorId = Array.isArray(curatorRows) && curatorRows.length > 0 ? curatorRows[0].id : null
     }
 
-    if (dataSource !== undefined) {
-      updateQuery += `, dataSource = ?`
-      params.push(dataSource || null)
-    }
-
-    if (sourceConfig !== undefined) {
-      updateQuery += `, sourceConfig = ?`
-      params.push(sourceConfig || null)
-    }
-
-    if (curationStatus !== undefined) {
-      updateQuery += `, curationStatus = ?`
-      params.push(curationStatus)
-    }
-
-    if (inputMode !== undefined) {
-      updateQuery += `, inputMode = ?`
-      params.push(inputMode || 'manual')
-    }
-
-    if (resolvedCuratorId !== null) {
-      updateQuery += `, curatorUserId = ?`
-      params.push(resolvedCuratorId)
-    }
+    if (dataSource !== undefined)    { setClauses.push('dataSource = ?');   params.push(dataSource || null) }
+    if (sourceConfig !== undefined)  { setClauses.push('sourceConfig = ?'); params.push(sourceConfig || null) }
+    if (curationStatus !== undefined){ setClauses.push('curationStatus = ?'); params.push(curationStatus) }
+    if (inputMode !== undefined)     { setClauses.push('inputMode = ?');    params.push(inputMode || 'manual') }
+    if (resolvedCuratorId !== null)  { setClauses.push('curatorUserId = ?'); params.push(resolvedCuratorId) }
 
     if (actual !== undefined) {
       const [ckDataRows] = await pool.query<any[]>(
@@ -789,7 +829,7 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
           formula: ckDataRows[0].formula,
         })
         if (actualValidationError) {
-          return res.status(400).json({ error: actualValidationError })
+          return sendApiError(res, 400, 'ASSIGNMENT_ACTUAL_VALUE_INVALID', actualValidationError)
         }
 
         const kpiDirection = resolveDirection(ckDataRows[0].direction, ckDataRows[0].type)
@@ -799,27 +839,25 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
         const actualValue = Number(actual)
 
         if (!currentTarget || currentTarget <= 0) {
-          return res.status(400).json({
-            error:
-              'No se puede actualizar el valor actual porque el target es 0 o no está definido. Ajusta el target antes de registrar el alcance.',
-          })
+          return sendApiError(res, 400, 'ASSIGNMENT_TARGET_ZERO', 'No se puede actualizar el valor actual porque el target es 0 o no está definido. Ajusta el target antes de registrar el alcance.')
         }
 
         const variation = calculateVariation(kpiDirection, currentTarget, actualValue, customFormula)
         const weightedResult = calculateWeightedResult(variation, currentWeight)
-
-        updateQuery += `, actual = ?, variation = ?, weightedResult = ?`
+        setClauses.push('actual = ?', 'variation = ?', 'weightedResult = ?')
         params.push(actualValue, variation, weightedResult)
       } else {
-        updateQuery += `, actual = ?`
+        setClauses.push('actual = ?')
         params.push(Number(actual))
       }
     }
 
-    updateQuery += ' WHERE id = ?'
-    params.push(id)
+    if (setClauses.length === 0) {
+      return sendApiError(res, 400, 'ASSIGNMENT_UPDATE_NO_FIELDS', 'No hay campos para actualizar')
+    }
 
-    await pool.query(updateQuery, params)
+    params.push(id)
+    await pool.query(`UPDATE collaborator_kpis SET ${setClauses.join(', ')} WHERE id = ?`, params)
 
     if (createCriteriaVersion && hasCriteriaVersionPayload({ criteriaText, dataSource, sourceConfig, evidenceUrl })) {
       const criteriaStatus = resolveCriteriaVersionStatus(curationStatus, 'in_review')
@@ -854,7 +892,7 @@ export const updateCollaboratorKPI = async (req: Request, res: Response) => {
     res.json({ message: 'Asignación actualizada correctamente' })
   } catch (error: any) {
     logger.error('Error updating collaborator KPI:', error)
-    res.status(500).json({ error: 'Error al actualizar asignación' })
+    return sendApiError(res, 500, 'ASSIGNMENT_UPDATE_FAILED', 'Error al actualizar asignación')
   }
 }
 
@@ -864,7 +902,7 @@ export const updateActualValue = async (req: Request, res: Response) => {
     const { actual } = req.body
 
     if (actual === undefined) {
-      return res.status(400).json({ error: 'El valor actual es requerido' })
+      return sendApiError(res, 400, 'ASSIGNMENT_ACTUAL_REQUIRED', 'El valor actual es requerido')
     }
 
     const [ckRows] = await pool.query<any[]>(
@@ -877,7 +915,7 @@ export const updateActualValue = async (req: Request, res: Response) => {
     )
 
     if (Array.isArray(ckRows) && ckRows.length === 0) {
-      return res.status(404).json({ error: 'Asignación no encontrada' })
+      return sendApiError(res, 404, 'ASSIGNMENT_NOT_FOUND', 'Asignación no encontrada')
     }
 
     try {
@@ -887,12 +925,12 @@ export const updateActualValue = async (req: Request, res: Response) => {
         closedMessage: 'No se puede actualizar el valor de una asignación cerrada',
       })
     } catch (error: any) {
-      return res.status(403).json({ error: error?.message || 'No se puede actualizar la asignación' })
+      return sendApiError(res, 403, 'ASSIGNMENT_CLOSED', error?.message || 'No se puede actualizar la asignación')
     }
 
     const canEdit = await canEditAssignment((req as AuthRequest).user, ckRows[0].collaboratorId)
     if (!canEdit) {
-      return res.status(403).json({ error: 'No autorizado para editar asignaciones fuera de tu área' })
+      return sendApiError(res, 403, 'ASSIGNMENT_EDIT_FORBIDDEN', 'No autorizado para editar asignaciones fuera de tu área')
     }
 
     const kpiId = ckRows[0].kpiId
@@ -916,15 +954,12 @@ export const updateActualValue = async (req: Request, res: Response) => {
       formula,
     })
     if (actualValidationError) {
-      return res.status(400).json({ error: actualValidationError })
+      return sendApiError(res, 400, 'ASSIGNMENT_ACTUAL_VALUE_INVALID', actualValidationError)
     }
     const actualValue = Number(actual)
 
     if (!currentTarget || currentTarget <= 0) {
-      return res.status(400).json({
-        error:
-          'No se puede actualizar el valor actual porque el target es 0 o no está definido. Ajusta el target antes de registrar el alcance.',
-      })
+      return sendApiError(res, 400, 'ASSIGNMENT_TARGET_ZERO', 'No se puede actualizar el valor actual porque el target es 0 o no está definido. Ajusta el target antes de registrar el alcance.')
     }
 
     const userId = (req as AuthRequest).user?.id || null
@@ -970,7 +1005,7 @@ export const updateActualValue = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     logger.error('Error updating actual value:', error)
-    res.status(500).json({ error: 'Error al actualizar valor' })
+    return sendApiError(res, 500, 'ASSIGNMENT_UPDATE_ACTUAL_FAILED', 'Error al actualizar valor')
   }
 }
 
@@ -981,16 +1016,16 @@ export const closeCollaboratorKPI = async (req: Request, res: Response) => {
     const [ckRows] = await pool.query<any[]>('SELECT status, collaboratorId FROM collaborator_kpis WHERE id = ?', [id])
 
     if (Array.isArray(ckRows) && ckRows.length === 0) {
-      return res.status(404).json({ error: 'Asignación no encontrada' })
+      return sendApiError(res, 404, 'ASSIGNMENT_NOT_FOUND', 'Asignación no encontrada')
     }
 
     const canEdit = await canEditAssignment((req as AuthRequest).user, ckRows[0].collaboratorId)
     if (!canEdit) {
-      return res.status(403).json({ error: 'No autorizado para cerrar asignaciones fuera de tu área' })
+      return sendApiError(res, 403, 'ASSIGNMENT_CLOSE_FORBIDDEN', 'No autorizado para cerrar asignaciones fuera de tu área')
     }
 
     if (ckRows[0].status === 'closed') {
-      return res.status(400).json({ error: 'La asignación ya está cerrada' })
+      return sendApiError(res, 400, 'ASSIGNMENT_ALREADY_CLOSED', 'La asignación ya está cerrada')
     }
 
     await closeKpiRecord('collaborator_kpis', Number(id))
@@ -998,7 +1033,7 @@ export const closeCollaboratorKPI = async (req: Request, res: Response) => {
     res.json({ message: 'Asignación cerrada correctamente' })
   } catch (error: any) {
     logger.error('Error closing collaborator KPI:', error)
-    res.status(500).json({ error: 'Error al cerrar asignación' })
+    return sendApiError(res, 500, 'ASSIGNMENT_CLOSE_FAILED', 'Error al cerrar asignación')
   }
 }
 
@@ -1008,19 +1043,22 @@ export const reopenCollaboratorKPI = async (req: Request, res: Response) => {
     const userRole = (req as any).user?.role
 
     if (!['admin', 'director'].includes(userRole)) {
-      return res.status(403).json({
-        error: 'Solo administradores y directores pueden reabrir asignaciones cerradas',
-      })
+      return sendApiError(
+        res,
+        403,
+        'ASSIGNMENT_REOPEN_FORBIDDEN',
+        'Solo administradores y directores pueden reabrir asignaciones cerradas'
+      )
     }
 
     const [ckRows] = await pool.query<any[]>('SELECT status FROM collaborator_kpis WHERE id = ?', [id])
 
     if (Array.isArray(ckRows) && ckRows.length === 0) {
-      return res.status(404).json({ error: 'Asignación no encontrada' })
+      return sendApiError(res, 404, 'ASSIGNMENT_NOT_FOUND', 'Asignación no encontrada')
     }
 
     if (ckRows[0].status !== 'closed') {
-      return res.status(400).json({ error: 'La asignación no está cerrada' })
+      return sendApiError(res, 400, 'ASSIGNMENT_NOT_CLOSED', 'La asignación no está cerrada')
     }
 
     await reopenKpiRecord('collaborator_kpis', Number(id), 'approved')
@@ -1028,7 +1066,7 @@ export const reopenCollaboratorKPI = async (req: Request, res: Response) => {
     res.json({ message: 'Asignación reabierta correctamente' })
   } catch (error: any) {
     logger.error('Error reopening collaborator KPI:', error)
-    res.status(500).json({ error: 'Error al reabrir asignación' })
+    return sendApiError(res, 500, 'ASSIGNMENT_REOPEN_FAILED', 'Error al reabrir asignación')
   }
 }
 
@@ -1046,20 +1084,18 @@ export const proposeCollaboratorKPI = async (req: Request, res: Response) => {
     )
 
     if (Array.isArray(ckRows) && ckRows.length === 0) {
-      return res.status(404).json({ error: 'Asignación no encontrada' })
+      return sendApiError(res, 404, 'ASSIGNMENT_NOT_FOUND', 'Asignación no encontrada')
     }
 
     const assignment = ckRows[0]
 
     if (assignment.status === 'closed' || assignment.periodStatus === 'closed') {
-      return res.status(403).json({
-        error: 'No se puede proponer valores en asignaciones o períodos cerrados',
-      })
+      return sendApiError(res, 403, 'ASSIGNMENT_PROPOSE_CLOSED', 'No se puede proponer valores en asignaciones o períodos cerrados')
     }
 
     const canEdit = await canEditAssignment((req as AuthRequest).user, assignment.collaboratorId)
     if (!canEdit) {
-      return res.status(403).json({ error: 'No autorizado para editar asignaciones fuera de tu área' })
+      return sendApiError(res, 403, 'ASSIGNMENT_EDIT_FORBIDDEN', 'No autorizado para editar asignaciones fuera de tu área')
     }
 
     let updateData: any = {
@@ -1078,7 +1114,7 @@ export const proposeCollaboratorKPI = async (req: Request, res: Response) => {
           formula: kpiRows[0].formula,
         })
         if (actualValidationError) {
-          return res.status(400).json({ error: actualValidationError })
+          return sendApiError(res, 400, 'ASSIGNMENT_ACTUAL_VALUE_INVALID', actualValidationError)
         }
 
         const kpiDirection = resolveDirection(kpiRows[0].direction, kpiRows[0].type)
@@ -1089,10 +1125,7 @@ export const proposeCollaboratorKPI = async (req: Request, res: Response) => {
         const actualValue = Number(actual)
 
         if (!targetValue || targetValue <= 0) {
-          return res.status(400).json({
-            error:
-              'No se puede actualizar el valor actual porque el target es 0 o no está definido. Ajusta el target antes de registrar el alcance.',
-          })
+          return sendApiError(res, 400, 'ASSIGNMENT_TARGET_ZERO', 'No se puede actualizar el valor actual porque el target es 0 o no está definido. Ajusta el target antes de registrar el alcance.')
         }
 
         const variation = calculateVariation(kpiDirection, targetValue, actualValue, customFormula)
@@ -1137,7 +1170,7 @@ export const proposeCollaboratorKPI = async (req: Request, res: Response) => {
     res.json({ message: 'Valores propuestos correctamente' })
   } catch (error: any) {
     logger.error('Error proposing collaborator KPI:', error)
-    res.status(500).json({ error: 'Error al proponer valores' })
+    return sendApiError(res, 500, 'ASSIGNMENT_PROPOSE_FAILED', 'Error al proponer valores')
   }
 }
 
@@ -1149,9 +1182,7 @@ export const approveCollaboratorKPI = async (req: Request, res: Response) => {
 
     const allowedRoles = ['admin', 'director', 'manager', 'leader']
     if (!allowedRoles.includes(userRole)) {
-      return res.status(403).json({
-        error: 'No tienes permisos para aprobar asignaciones',
-      })
+      return sendApiError(res, 403, 'ASSIGNMENT_APPROVE_FORBIDDEN', 'No tienes permisos para aprobar asignaciones')
     }
 
     const [ckRows] = await pool.query<any[]>(
@@ -1163,31 +1194,27 @@ export const approveCollaboratorKPI = async (req: Request, res: Response) => {
     )
 
     if (Array.isArray(ckRows) && ckRows.length === 0) {
-      return res.status(404).json({ error: 'Asignación no encontrada' })
+      return sendApiError(res, 404, 'ASSIGNMENT_NOT_FOUND', 'Asignación no encontrada')
     }
 
     const assignment = ckRows[0]
 
     if (assignment.status !== 'proposed') {
-      return res.status(400).json({
-        error: 'Solo se pueden aprobar asignaciones en estado "propuesto"',
-      })
+      return sendApiError(res, 400, 'ASSIGNMENT_NOT_PROPOSED', 'Solo se pueden aprobar asignaciones en estado "propuesto"')
     }
 
     if (assignment.periodStatus === 'closed') {
-      return res.status(403).json({
-        error: 'No se puede aprobar asignaciones en períodos cerrados',
-      })
+      return sendApiError(res, 403, 'ASSIGNMENT_PERIOD_CLOSED', 'No se puede aprobar asignaciones en períodos cerrados')
     }
 
     const canEdit = await canEditAssignment((req as AuthRequest).user, assignment.collaboratorId)
     if (!canEdit) {
-      return res.status(403).json({ error: 'No autorizado para editar asignaciones fuera de tu área' })
+      return sendApiError(res, 403, 'ASSIGNMENT_EDIT_FORBIDDEN', 'No autorizado para editar asignaciones fuera de tu área')
     }
 
     await pool.query(
-      `UPDATE collaborator_kpis 
-       SET status = ?, comments = ? 
+      `UPDATE collaborator_kpis
+       SET status = ?, comments = ?
        WHERE id = ?`,
       ['approved', comments || assignment.comments || null, id]
     )
@@ -1217,7 +1244,7 @@ export const approveCollaboratorKPI = async (req: Request, res: Response) => {
     res.json({ message: 'Asignación aprobada correctamente' })
   } catch (error: any) {
     logger.error('Error approving collaborator KPI:', error)
-    res.status(500).json({ error: 'Error al aprobar asignación' })
+    return sendApiError(res, 500, 'ASSIGNMENT_APPROVE_FAILED', 'Error al aprobar asignación')
   }
 }
 
@@ -1229,9 +1256,7 @@ export const rejectCollaboratorKPI = async (req: Request, res: Response) => {
 
     const allowedRoles = ['admin', 'director', 'manager', 'leader']
     if (!allowedRoles.includes(userRole)) {
-      return res.status(403).json({
-        error: 'No tienes permisos para rechazar asignaciones',
-      })
+      return sendApiError(res, 403, 'ASSIGNMENT_REJECT_FORBIDDEN', 'No tienes permisos para rechazar asignaciones')
     }
 
     const [ckRows] = await pool.query<any[]>(
@@ -1243,26 +1268,22 @@ export const rejectCollaboratorKPI = async (req: Request, res: Response) => {
     )
 
     if (Array.isArray(ckRows) && ckRows.length === 0) {
-      return res.status(404).json({ error: 'Asignación no encontrada' })
+      return sendApiError(res, 404, 'ASSIGNMENT_NOT_FOUND', 'Asignación no encontrada')
     }
 
     const assignment = ckRows[0]
 
     if (assignment.status !== 'proposed') {
-      return res.status(400).json({
-        error: 'Solo se pueden rechazar asignaciones en estado "propuesto"',
-      })
+      return sendApiError(res, 400, 'ASSIGNMENT_NOT_PROPOSED', 'Solo se pueden rechazar asignaciones en estado "propuesto"')
     }
 
     if (assignment.periodStatus === 'closed') {
-      return res.status(403).json({
-        error: 'No se puede rechazar asignaciones en períodos cerrados',
-      })
+      return sendApiError(res, 403, 'ASSIGNMENT_PERIOD_CLOSED', 'No se puede rechazar asignaciones en períodos cerrados')
     }
 
     const canEdit = await canEditAssignment((req as AuthRequest).user, assignment.collaboratorId)
     if (!canEdit) {
-      return res.status(403).json({ error: 'No autorizado para editar asignaciones fuera de tu área' })
+      return sendApiError(res, 403, 'ASSIGNMENT_EDIT_FORBIDDEN', 'No autorizado para editar asignaciones fuera de tu área')
     }
 
     await pool.query(
@@ -1275,7 +1296,7 @@ export const rejectCollaboratorKPI = async (req: Request, res: Response) => {
     res.json({ message: 'Asignación rechazada correctamente' })
   } catch (error: any) {
     logger.error('Error rejecting collaborator KPI:', error)
-    res.status(500).json({ error: 'Error al rechazar asignación' })
+    return sendApiError(res, 500, 'ASSIGNMENT_REJECT_FAILED', 'Error al rechazar asignación')
   }
 }
 
@@ -1284,7 +1305,7 @@ export const closePeriodAssignments = async (req: Request, res: Response) => {
     const { periodId, collaboratorId, kpiId } = req.body
 
     if (!periodId) {
-      return res.status(400).json({ error: 'El período es requerido' })
+      return sendApiError(res, 400, 'ASSIGNMENT_CLOSE_PERIOD_REQUIRED', 'El período es requerido')
     }
 
     let query = 'UPDATE collaborator_kpis SET status = ? WHERE periodId = ?'
@@ -1312,7 +1333,7 @@ export const closePeriodAssignments = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     logger.error('Error closing period assignments:', error)
-    res.status(500).json({ error: 'Error al cerrar parrillas' })
+    return sendApiError(res, 500, 'ASSIGNMENT_CLOSE_PERIOD_FAILED', 'Error al cerrar parrillas')
   }
 }
 
@@ -1329,21 +1350,19 @@ export const deleteCollaboratorKPI = async (req: Request, res: Response) => {
     )
 
     if (Array.isArray(ckRows) && ckRows.length === 0) {
-      return res.status(404).json({ error: 'Asignación no encontrada' })
+      return sendApiError(res, 404, 'ASSIGNMENT_NOT_FOUND', 'Asignación no encontrada')
     }
 
     const canEdit = await canEditAssignment((req as AuthRequest).user, ckRows[0].collaboratorId)
     if (!canEdit) {
-      return res.status(403).json({ error: 'No autorizado para eliminar asignaciones fuera de tu área' })
+      return sendApiError(res, 403, 'ASSIGNMENT_DELETE_FORBIDDEN', 'No autorizado para eliminar asignaciones fuera de tu área')
     }
 
     const userRole = (req as any).user?.role
 
     if (ckRows[0].status === 'closed' || ckRows[0].periodStatus === 'closed') {
       if (!['admin', 'director'].includes(userRole)) {
-        return res.status(403).json({
-          error: 'No se puede eliminar una asignación cerrada. Solo administradores y directores pueden hacerlo.',
-        })
+        return sendApiError(res, 403, 'ASSIGNMENT_CLOSED_DELETE_FORBIDDEN', 'No se puede eliminar una asignación cerrada. Solo administradores y directores pueden hacerlo.')
       }
     }
 
@@ -1352,7 +1371,7 @@ export const deleteCollaboratorKPI = async (req: Request, res: Response) => {
     res.json({ message: 'Asignación eliminada correctamente' })
   } catch (error: any) {
     logger.error('Error deleting collaborator KPI:', error)
-    res.status(500).json({ error: 'Error al eliminar asignación' })
+    return sendApiError(res, 500, 'ASSIGNMENT_DELETE_FAILED', 'Error al eliminar asignación')
   }
 }
 
@@ -1361,17 +1380,13 @@ export const generateBaseGrids = async (req: Request, res: Response) => {
     const { area, orgScopeId, periodId, kpiIds, defaultTarget, defaultWeight, kpiOverrides } = req.body
 
     if ((!area && !orgScopeId) || !periodId) {
-      return res.status(400).json({
-        error: 'El scope/área y el período son requeridos',
-      })
+      return sendApiError(res, 400, 'ASSIGNMENT_GRID_SCOPE_REQUIRED', 'El scope/área y el período son requeridos')
     }
 
     const [periodRows] = await pool.query<any[]>('SELECT status FROM periods WHERE id = ?', [periodId])
 
     if (Array.isArray(periodRows) && periodRows.length > 0 && periodRows[0].status === 'closed') {
-      return res.status(403).json({
-        error: 'No se pueden generar parrillas en períodos cerrados',
-      })
+      return sendApiError(res, 403, 'ASSIGNMENT_GRID_PERIOD_CLOSED', 'No se pueden generar parrillas en períodos cerrados')
     }
 
     let collaborators: any[] = []
@@ -1387,9 +1402,7 @@ export const generateBaseGrids = async (req: Request, res: Response) => {
     }
 
     if (!Array.isArray(collaborators) || collaborators.length === 0) {
-      return res.status(404).json({
-        error: `No se encontraron colaboradores para el scope/área indicado`,
-      })
+      return sendApiError(res, 404, 'ASSIGNMENT_GRID_NO_COLLABORATORS', 'No se encontraron colaboradores para el scope/área indicado')
     }
 
     let kpis: any[] = []
@@ -1403,9 +1416,7 @@ export const generateBaseGrids = async (req: Request, res: Response) => {
     }
 
     if (kpis.length === 0) {
-      return res.status(404).json({
-        error: 'No se encontraron KPIs para asignar',
-      })
+      return sendApiError(res, 404, 'ASSIGNMENT_GRID_NO_KPIS', 'No se encontraron KPIs para asignar')
     }
 
     const overridesMap = new Map<
@@ -1601,7 +1612,7 @@ export const generateBaseGrids = async (req: Request, res: Response) => {
     })
   } catch (error: any) {
     logger.error('Error generating base grids:', error)
-    res.status(500).json({ error: 'Error al generar parrillas base' })
+    return sendApiError(res, 500, 'ASSIGNMENT_GRID_GENERATE_FAILED', 'Error al generar parrillas base')
   }
 }
 
@@ -1612,7 +1623,12 @@ export const getMonthlyPlan = async (req: Request, res: Response) => {
     const { collaboratorId, kpiId, periodId } = req.params
 
     if (!collaboratorId || !kpiId || !periodId) {
-      return res.status(400).json({ error: 'collaboratorId, kpiId y periodId son requeridos' })
+      return sendApiError(
+        res,
+        400,
+        'ASSIGNMENT_PLAN_IDENTIFIERS_REQUIRED',
+        'collaboratorId, kpiId y periodId son requeridos'
+      )
     }
 
     const [rows] = await pool.query<any[]>(
@@ -1634,7 +1650,7 @@ export const getMonthlyPlan = async (req: Request, res: Response) => {
     res.json(rows)
   } catch (error: any) {
     logger.error('Error fetching monthly plan:', error)
-    res.status(500).json({ error: 'Error al obtener el plan mensual' })
+    return sendApiError(res, 500, 'ASSIGNMENT_PLAN_FETCH_FAILED', 'Error al obtener el plan mensual')
   }
 }
 
@@ -1644,16 +1660,26 @@ export const upsertMonthlyPlan = async (req: Request, res: Response) => {
     const { items } = req.body
 
     if (!collaboratorId || !kpiId || !periodId) {
-      return res.status(400).json({ error: 'collaboratorId, kpiId y periodId son requeridos' })
+      return sendApiError(res, 400, 'ASSIGNMENT_PLAN_IDENTIFIERS_REQUIRED', 'collaboratorId, kpiId y periodId son requeridos')
     }
 
     const user = (req as AuthRequest).user
     if (!canManageConfig(user)) {
-      return res.status(403).json({ error: 'No autorizado: se requieren permisos de configuración' })
+      return sendApiError(
+        res,
+        403,
+        'ASSIGNMENT_PLAN_CONFIG_FORBIDDEN',
+        'No autorizado: se requieren permisos de configuración'
+      )
     }
 
     if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: 'Debe enviar al menos un item con subPeriodId y target' })
+      return sendApiError(
+        res,
+        400,
+        'ASSIGNMENT_PLAN_ITEMS_REQUIRED',
+        'Debe enviar al menos un item con subPeriodId y target'
+      )
     }
 
     const conn = await pool.getConnection()
@@ -1674,12 +1700,17 @@ export const upsertMonthlyPlan = async (req: Request, res: Response) => {
 
         if (target < 0) {
           await conn.rollback()
-          return res.status(400).json({ error: 'Target no puede ser negativo' })
+          return sendApiError(res, 400, 'ASSIGNMENT_PLAN_TARGET_NEGATIVE', 'Target no puede ser negativo')
         }
 
         if (weightOverride !== null && (!canOverrideWeight || weightOverride < 0 || weightOverride > 100)) {
           await conn.rollback()
-          return res.status(400).json({ error: 'La ponderación override debe estar entre 0 y 100' })
+          return sendApiError(
+            res,
+            400,
+            'ASSIGNMENT_PLAN_WEIGHT_OVERRIDE_INVALID',
+            'La ponderación override debe estar entre 0 y 100'
+          )
         }
 
         await conn.query(
@@ -1766,7 +1797,7 @@ export const upsertMonthlyPlan = async (req: Request, res: Response) => {
     res.json({ message: 'Plan mensual actualizado' })
   } catch (error: any) {
     logger.error('Error upserting monthly plan:', error)
-    res.status(500).json({ error: 'Error al actualizar plan mensual' })
+    return sendApiError(res, 500, 'ASSIGNMENT_PLAN_SAVE_FAILED', 'Error al actualizar plan mensual')
   }
 }
 
@@ -1776,7 +1807,7 @@ export const getConsolidatedByCollaborator = async (req: Request, res: Response)
     const { periodId } = req.query
 
     if (!periodId) {
-      return res.status(400).json({ error: 'El periodo es requerido' })
+      return sendApiError(res, 400, 'ASSIGNMENT_PERIOD_REQUIRED', 'El periodo es requerido')
     }
 
     const [rows] = await pool.query<any[]>(
@@ -1804,9 +1835,7 @@ export const getConsolidatedByCollaborator = async (req: Request, res: Response)
     )
 
     if (!Array.isArray(rows) || rows.length === 0) {
-      return res.status(404).json({
-        error: 'No hay asignaciones para el colaborador y periodo seleccionados',
-      })
+      return sendApiError(res, 404, 'ASSIGNMENT_CONSOLIDATED_EMPTY', 'No hay asignaciones para el colaborador y periodo seleccionados')
     }
 
     const assignments = rows.map((row) => {
@@ -1901,14 +1930,14 @@ export const getConsolidatedByCollaborator = async (req: Request, res: Response)
     })
   } catch (error: any) {
     logger.error('Error fetching consolidated data:', error)
-    res.status(500).json({ error: 'Error al obtener consolidado' })
+    return sendApiError(res, 500, 'ASSIGNMENT_CONSOLIDATED_FETCH_FAILED', 'Error al obtener consolidado')
   }
 }
 
 export const bulkCreateCollaboratorKPIs = async (req: AuthRequest, res: Response) => {
   try {
     if (!canManageConfig(req.user)) {
-      return res.status(403).json({ error: 'Sin permisos para crear asignaciones' })
+      return sendApiError(res, 403, 'ASSIGNMENT_BULK_CREATE_FORBIDDEN', 'Sin permisos para crear asignaciones')
     }
 
     const {
@@ -1927,10 +1956,31 @@ export const bulkCreateCollaboratorKPIs = async (req: AuthRequest, res: Response
     } = req.body
 
     if (!kpiId || !periodId || !Array.isArray(collaboratorIds) || collaboratorIds.length === 0) {
-      return res.status(400).json({ error: 'Faltan campos requeridos: kpiId, periodId, collaboratorIds' })
+      return sendApiError(res, 400, 'ASSIGNMENT_BULK_FIELDS_REQUIRED', 'Faltan campos requeridos: kpiId, periodId, collaboratorIds')
     }
-    if (target == null || Number(target) <= 0) {
-      return res.status(400).json({ error: 'La meta debe ser mayor a 0' })
+    if (collaboratorIds.some((cid: unknown) => isNaN(Number(cid)) || Number(cid) < 1)) {
+      return sendApiError(res, 400, 'ASSIGNMENT_BULK_COLLABORATOR_IDS_INVALID', 'collaboratorIds contiene valores no válidos')
+    }
+    if (target == null || isNaN(Number(target))) {
+      return sendApiError(res, 400, 'ASSIGNMENT_BULK_TARGET_REQUIRED', 'target debe ser un número')
+    }
+    const bulkWeightErr = validateNumber(weight, 'weight', { min: 0.01, max: 100 })
+    if (bulkWeightErr) return sendApiError(res, 400, 'ASSIGNMENT_BULK_WEIGHT_INVALID', bulkWeightErr.message)
+
+    const BULK_VALID_STATUSES = Object.values(KPI_STATUS)
+    const BULK_VALID_CURATION = ['pending', 'in_review', 'approved', 'rejected', 'changes_requested'] as const
+    const BULK_VALID_INPUT_MODES = ['manual', 'import', 'auto'] as const
+    if (status !== undefined) {
+      const e = validateEnum(status, 'status', BULK_VALID_STATUSES)
+      if (e) return sendApiError(res, 400, 'ASSIGNMENT_BULK_STATUS_INVALID', e.message)
+    }
+    if (curationStatus !== undefined) {
+      const e = validateEnum(curationStatus, 'curationStatus', BULK_VALID_CURATION)
+      if (e) return sendApiError(res, 400, 'ASSIGNMENT_BULK_CURATION_STATUS_INVALID', e.message)
+    }
+    if (inputMode !== undefined) {
+      const e = validateEnum(inputMode, 'inputMode', BULK_VALID_INPUT_MODES)
+      if (e) return sendApiError(res, 400, 'ASSIGNMENT_BULK_INPUT_MODE_INVALID', e.message)
     }
 
     // Buscar asignaciones ya existentes para el mismo kpi+periodo (sin subperiodo)
@@ -1960,7 +2010,7 @@ export const bulkCreateCollaboratorKPIs = async (req: AuthRequest, res: Response
         [
           Number(collaboratorId), kpiId, periodId,
           calendarProfileId,
-          Number(target), Number(weight) || 0,
+          Number(target), Number(weight),
           status || 'draft',
           curationStatus || 'pending',
           normalizeOptionalText(dataSource),
@@ -1991,6 +2041,6 @@ export const bulkCreateCollaboratorKPIs = async (req: AuthRequest, res: Response
     })
   } catch (error: any) {
     logger.error('[CollaboratorKPI] bulkCreate:', error)
-    return res.status(500).json({ error: 'Error al crear asignaciones masivas' })
+    return sendApiError(res, 500, 'ASSIGNMENT_BULK_CREATE_FAILED', 'Error al crear asignaciones masivas')
   }
 }

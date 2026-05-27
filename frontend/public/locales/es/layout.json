@@ -1,0 +1,44 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "my_week": "Mi semana",
+    "my_grid": "Mi Parrilla",
+    "check_ins": "Check-ins",
+    "strategy": "Estrategia",
+    "okrs": "OKRs",
+    "okr_alignment": "Alineacion OKR",
+    "objective_tree": "Arbol de Objetivos",
+    "org_chart": "Organigrama",
+    "operations": "Operacion",
+    "collaborators": "Colaboradores",
+    "import_data": "Importar datos",
+    "periods": "Periodos",
+    "kpis": "KPIs",
+    "assignments": "Asignaciones",
+    "group_kpis": "KPIs Grupales",
+    "data_input": "Input de datos",
+    "curation": "Curaduria",
+    "analytics": "Analitica",
+    "executive_board": "Tablero Ejecutivo",
+    "risk_map": "Mapa de Riesgo",
+    "simulator": "Simulador",
+    "views": "Vistas",
+    "history": "Historico",
+    "analytics_page": "Analítica",
+    "audit": "Auditoria",
+    "configuration": "Configuracion",
+    "config": "Configuracion",
+    "security": "Seguridad",
+    "external_mappings": "Mappings externos",
+    "kpi_templates": "Templates KPI"
+  },
+  "footer": {
+    "my_account": "Mi cuenta",
+    "logout": "Cerrar sesion",
+    "language": "Idioma"
+  },
+  "aria": {
+    "open_menu": "Abrir menú",
+    "close_menu": "Cerrar menú"
+  }
+}

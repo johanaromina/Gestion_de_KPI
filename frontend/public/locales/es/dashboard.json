@@ -1,0 +1,155 @@
+{
+  "loading": "Cargando dashboard...",
+  "hr": {
+    "title": "Dashboard - Recursos Humanos",
+    "subtitle": "Vista global del sistema de gestion de KPIs",
+    "role": "Recursos Humanos",
+    "stats": {
+      "collaborators": "Colaboradores",
+      "collaborators_label": "Total registrados",
+      "periods": "Periodos Activos",
+      "periods_label": "En evaluacion",
+      "kpis": "KPIs",
+      "kpis_label": "Definidos",
+      "compliance": "Cumplimiento",
+      "compliance_label": "Promedio general",
+      "assignments": "Asignaciones",
+      "assignments_label": "Total",
+      "pending": "Pendientes",
+      "pending_label": "Por completar"
+    },
+    "quick_actions": {
+      "title": "Accesos Rapidos",
+      "create_period": "Crear Periodo",
+      "add_collaborator": "Agregar Colaborador",
+      "define_kpi": "Definir KPI",
+      "new_assignment": "Nueva Asignacion",
+      "aggregate_views": "Vistas Agregadas",
+      "audit": "Auditoria"
+    },
+    "charts": {
+      "compliance_by_area": "Cumplimiento por Area",
+      "compliance_evolution": "Evolucion de Cumplimiento",
+      "collaborators_by_area": "Distribucion de Colaboradores por Area"
+    }
+  },
+  "leadership": {
+    "title": "Dashboard - Liderazgo",
+    "subtitle": "Gestion de tu equipo y estadisticas",
+    "role": "Lider",
+    "stats": {
+      "team_members": "Miembros del Equipo",
+      "team_members_label": "Colaboradores",
+      "team_compliance": "Cumplimiento del Equipo",
+      "team_compliance_label": "Promedio",
+      "completed_kpis": "KPIs Completados",
+      "completed_label": "Del equipo",
+      "pending_kpis": "KPIs Pendientes",
+      "pending_label": "Por completar"
+    },
+    "quick_actions": {
+      "title": "Acciones Rapidas",
+      "manage_assignments": "Gestionar Asignaciones",
+      "my_grid": "Mi Parrilla",
+      "stats": "Estadisticas",
+      "view_collaborators": "Ver Colaboradores"
+    },
+    "charts": {
+      "team_compliance_evolution": "Evolucion de Cumplimiento del Equipo"
+    }
+  },
+  "collab": {
+    "title": "Mi Dashboard",
+    "subtitle": "Mis avances y los de mi equipo",
+    "role": "Colaborador",
+    "section_summary": "Mi resumen",
+    "section_kpis": "Mis KPIs y avances",
+    "section_progress": "Mi progreso",
+    "section_monthly": "Ponderacion y avances mensuales",
+    "section_team_kpis": "Avances del Equipo",
+    "quick_actions": {
+      "title": "Acciones Rapidas",
+      "my_grid": "Ver Mi Parrilla",
+      "my_history": "Mi Historial",
+      "my_okrs": "Mis OKRs"
+    },
+    "summary": {
+      "assigned_kpis": "KPIs asignados",
+      "weighted_progress": "Progreso ponderado",
+      "annual_gap": "Gap anual (objetivo - actual)",
+      "total_weight": "Peso total"
+    },
+    "table": {
+      "kpi": "KPI",
+      "target": "Objetivo",
+      "actual": "Actual",
+      "progress": "Avance",
+      "gap": "Gap",
+      "weight": "Peso",
+      "no_actual": "No registrado"
+    },
+    "empty": "No tienes KPIs asignados aun",
+    "progress": {
+      "on_track": "KPIs al dia",
+      "without_actual": "KPIs sin carga",
+      "at_risk": "KPIs en riesgo",
+      "on_track_caption": "Cumpliendo o superando objetivo",
+      "without_actual_caption": "Pendientes de actualizacion",
+      "at_risk_caption": "Por debajo del 80%"
+    },
+    "progress_detail": {
+      "critical_targets": "Metas criticas",
+      "no_at_risk": "No hay KPIs en riesgo por ahora.",
+      "next_step_title": "Proximo paso",
+      "next_step_pending": "Carga los avances pendientes para reflejar el progreso real.",
+      "next_step_risk": "Prioriza los KPIs en riesgo y ajusta tu plan.",
+      "next_step_ok": "Buen ritmo. Mantene el seguimiento para cerrar el periodo fuerte.",
+      "see_grid": "Ver mi parrilla"
+    },
+    "monthly": {
+      "target": "Objetivo:",
+      "actual": "Actual:",
+      "progress": "Avance:"
+    },
+    "team_chart": {
+      "target": "Objetivo",
+      "actual": "Actual"
+    }
+  },
+  "notifications": {
+    "pending_actions": "Acciones pendientes",
+    "pending_assignments_one": "{{count}} asignacion sin completar en el período activo",
+    "pending_assignments_many": "{{count}} asignaciones sin completar en el período activo",
+    "all_assignments_complete": "Todas las asignaciones del período activo están completas",
+    "team_all_complete": "Tu equipo tiene todos los KPIs al día",
+    "missing_actual": "{{count}} colaboradores sin datos cargados",
+    "at_risk": "{{count}} KPIs en riesgo (cumplimiento <80%)",
+    "periods_expiring": "{{count}} período(s) por vencer pronto",
+    "team_pending_one": "{{count}} KPI del equipo pendiente de completar",
+    "team_pending_many": "{{count}} KPIs del equipo pendientes de completar",
+    "collab_without_actual_one": "{{count}} KPI sin datos cargados este período",
+    "collab_without_actual_many": "{{count}} KPIs sin datos cargados este período",
+    "collab_all_data_loaded": "Todos tus KPIs tienen datos cargados",
+    "collab_at_risk_one": "{{count}} KPI en riesgo — cumplimiento por debajo del 80%",
+    "collab_at_risk_many": "{{count}} KPIs en riesgo — cumplimiento por debajo del 80%",
+    "collab_all_on_track": "Todos tus KPIs están en camino (≥100% de cumplimiento)",
+    "see_assignments": "Ver asignaciones →",
+    "go_to_input": "Ir a Input →",
+    "see_kpis": "Ver KPIs →",
+    "see_periods": "Ver períodos →",
+    "load_data": "Cargar datos →",
+    "see_grid": "Ver mi parrilla →"
+  },
+  "okr_widget": {
+    "see_all": "Ver todos →",
+    "active_objectives": "Objetivos activos",
+    "avg_progress": "Progreso promedio",
+    "at_risk": "En riesgo (<40%)",
+    "hr_title": "OKRs activos",
+    "leadership_title": "OKRs activos",
+    "collab_title": "Mis OKRs"
+  },
+  "charts": {
+    "compliance_pct": "Cumplimiento %"
+  }
+}

@@ -1,0 +1,168 @@
+{
+  "title": "Data Input",
+  "subtitle": "Automated or manual loading with technical validations.",
+  "actions": {
+    "configure_integrations": "Configure integrations",
+    "new_manual": "New manual entry",
+    "manual_load": "Manual entry",
+    "download_template": "Download template",
+    "upload_file": "Upload file",
+    "uploading": "Uploading...",
+    "run_auto_fetch": "Run fetch (auto)",
+    "run_jobs_now": "Run jobs now",
+    "running": "Running...",
+    "go_curation": "Go to Curation →"
+  },
+  "auto_ingest": {
+    "title": "Automatic ingestion",
+    "description": "Active jobs and integration health.",
+    "active": "Active integration: {{name}}",
+    "none": "No active integrations for the selected assignment.",
+    "no_target": "No target linked to this assignment. Configure it in Integrations > Targets.",
+    "api_errors": {
+      "target_not_found": "The integration target no longer exists."
+    }
+  },
+  "filters": {
+    "area_label": "Area",
+    "all_areas": "All areas",
+    "kpi_label": "KPI",
+    "all_kpis": "All KPIs",
+    "assignment_label": "Assignment",
+    "select_assignment": "Select an assignment",
+    "no_assignments": "No assignments for those filters.",
+    "subperiod_label": "Sub-period",
+    "subperiod_summary": "Summary (no sub-period)",
+    "collaborator_fallback": "Collaborator #{{id}}",
+    "kpi_fallback": "KPI #{{id}}",
+    "period_fallback": "Period #{{id}}",
+    "subperiod_fallback": "Sub-period #{{id}}"
+  },
+  "measurements": {
+    "title": "Measurement history",
+    "only_pending": "Pending only",
+    "loading": "Loading measurements...",
+    "empty_no_assignment": "Select an assignment to view measurements.",
+    "empty": "No measurements recorded.",
+    "table": {
+      "value": "Value",
+      "mode": "Mode",
+      "date": "Date",
+      "source": "User/Source",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "approve": "Approve",
+    "reject": "Reject",
+    "mode_manual": "Manual",
+    "mode_import": "Import",
+    "mode_auto": "Auto",
+    "status_approved": "Approved",
+    "status_rejected": "Rejected",
+    "status_proposed": "Proposed",
+    "status_draft": "Draft",
+    "loaded_ok": "Measurement loaded successfully.",
+    "save_error": "Could not save the measurement.",
+    "job_ok": "Job executed successfully. Check the measurement history.",
+    "api_errors": {
+      "owner_invalid": "The measurement must be linked to a valid assignment.",
+      "value_required": "You must enter a measurement value.",
+      "curation_required": "The measurement cannot be approved until curation is approved.",
+      "subperiod_closed": "The sub-period is closed and does not allow new measurements."
+    }
+  },
+  "cycle": {
+    "assignment": "Assignment",
+    "criteria": "Criteria",
+    "measurement": "Measurement",
+    "approval": "Approval"
+  },
+  "meta": {
+    "source_label": "Source:",
+    "no_source": "No source",
+    "curation_label": "Curation:",
+    "criteria_label": "Active criteria:",
+    "no_criteria": "No criteria",
+    "calendar_label": "Calendar:",
+    "integration_fallback": "Integration",
+    "calendar_frequency_monthly": "Monthly",
+    "calendar_frequency_quarterly": "Quarterly",
+    "calendar_frequency_custom": "Custom"
+  },
+  "job": {
+    "title": "Job status",
+    "last_run": "Last run:",
+    "next_run": "Next run:",
+    "subperiod_label": "Target sub-period:",
+    "no_subperiod": "No sub-period",
+    "skipped_label": "Skipped:",
+    "skipped_default": "The job already had a measurement.",
+    "no_cron": "No cron",
+    "target_fallback": "Target #{{id}}",
+    "status_success": "Success",
+    "status_error": "Error",
+    "status_running": "Running",
+    "status_queued": "Queued"
+  },
+  "curation": {
+    "warning": "Curation under review: approval will be recorded with a warning.",
+    "blocked": "Curation pending, cannot approve",
+    "blocked_detail": "Measurements cannot be approved until curation is approved.",
+    "hint_blocked": "Curation is not approved. Only proposing or drafting is allowed.",
+    "hint_warning": "Curation under review: approval will carry a warning."
+  },
+  "duplicate_dialog": {
+    "message": "An approved measurement with value {{value}}{{date}} already exists. Do you want to replace it?",
+    "date_part": " ({{date}})",
+    "title": "Duplicate value",
+    "confirm": "Replace"
+  },
+  "auto_fetch": {
+    "no_assignment": "Select an assignment first to run the fetch.",
+    "prompt": "Enter the automatically obtained value:",
+    "prompt_title": "Automatic value",
+    "prompt_placeholder": "E.g.: 95.5",
+    "prompt_confirm": "Load",
+    "success": "Value loaded automatically as proposed."
+  },
+  "modal": {
+    "title": "Load measurement",
+    "assignment_fallback": "Selected assignment",
+    "current_value": "Current approved value:",
+    "value_label": "Value",
+    "value_placeholder": "E.g.: 82.5",
+    "mode_label": "Mode",
+    "mode_manual": "Manual — direct entry by user",
+    "mode_import": "Import — load from CSV file",
+    "mode_auto": "Auto — obtained via external integration",
+    "status_label": "Status",
+    "reason_label": "Reason (override)",
+    "reason_placeholder": "Override reason (if applicable)",
+    "evidence_label": "Evidence",
+    "evidence_placeholder": "Link or attachment",
+    "save": "Save measurement",
+    "saving": "Saving...",
+    "cancel": "Cancel"
+  },
+  "upload": {
+    "empty": "The file is empty.",
+    "no_assignment_warning": "Select an assignment first to load data.",
+    "partial": "{{created}} measurements loaded. Errors: {{errors}}",
+    "success": "{{created}} measurements loaded successfully.",
+    "row_invalid_assignment": "Row {{row}}: invalid assignmentId.",
+    "row_invalid_value": "Row {{row}}: invalid value.",
+    "row_error": "Row {{row}}: {{error}}",
+    "row_error_fallback": "Error creating measurement"
+  },
+  "validations": {
+    "title": "Technical validations",
+    "types_title": "Data types",
+    "types_desc": "Integers, decimals, and expected dates are validated.",
+    "nulls_title": "Nulls",
+    "nulls_desc": "Required fields with no value are blocked.",
+    "ranges_title": "Ranges",
+    "ranges_desc": "Min and max limits per KPI.",
+    "duplicates_title": "Duplicates",
+    "duplicates_desc": "Duplicate source + period keys are prevented."
+  }
+}

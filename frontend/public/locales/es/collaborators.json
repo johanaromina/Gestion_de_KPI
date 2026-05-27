@@ -1,0 +1,134 @@
+{
+  "title": "Colaboradores",
+  "subtitle": "Gestiona los colaboradores del sistema",
+  "header": {
+    "manage_areas": "Gestionar Áreas",
+    "add": "+ Agregar Colaborador"
+  },
+  "filters": {
+    "search_label": "Buscar:",
+    "search_placeholder": "Buscar por nombre o cargo...",
+    "area": "Área:",
+    "all_areas": "Todas las áreas",
+    "role": "Rol:",
+    "all_roles": "Todos los roles",
+    "show_inactive": "Mostrar inactivos",
+    "clear": "Limpiar Filtros"
+  },
+  "table": {
+    "id": "ID",
+    "name": "Nombre",
+    "position": "Cargo",
+    "area": "Area",
+    "status": "Estado",
+    "role": "Rol",
+    "manager": "Jefe directo",
+    "actions": "Acciones"
+  },
+  "status": {
+    "active": "Activo",
+    "inactive": "Inactivo"
+  },
+  "actions": {
+    "edit": "Editar",
+    "deactivate": "Desactivar",
+    "delete": "Eliminar",
+    "resend_invite": "Reenviar invitación",
+    "resending": "Enviando..."
+  },
+  "results": {
+    "showing": "Mostrando {{shown}} de {{total}} colaboradores"
+  },
+  "invite": {
+    "sent": "Invitación reenviada correctamente",
+    "error": "Error al reenviar invitación",
+    "api_errors": {
+      "forbidden": "No tenés permisos para reenviar invitaciones.",
+      "not_found": "No se encontró el colaborador.",
+      "email_missing": "El colaborador no tiene email configurado.",
+      "password_already_set": "El colaborador ya tiene contraseña configurada."
+    }
+  },
+  "dialogs": {
+    "delete_title": "Eliminar colaborador",
+    "delete_msg": "¿Estás seguro de eliminar al colaborador \"{{name}}\"? Esta acción no se puede deshacer y eliminará todas sus asignaciones asociadas.",
+    "delete_confirm": "Eliminar",
+    "delete_error_title": "Error al eliminar",
+    "delete_error_msg": "Error al eliminar colaborador. Verifica que no tenga asignaciones asociadas.",
+    "deactivate_title": "Desactivar colaborador",
+    "deactivate_msg": "Desactivar a \"{{name}}\". Opcional: indicá un motivo (desvinculación, cambio de rol, licencia).",
+    "deactivate_placeholder": "Ej: desvinculación voluntaria",
+    "deactivate_confirm": "Desactivar",
+    "deactivate_error": "Error al desactivar colaborador",
+    "api_errors": {
+      "delete_forbidden": "No tenés permisos para eliminar este colaborador.",
+      "deactivate_forbidden": "No tenés permisos para desactivar este colaborador.",
+      "not_found": "No se encontró el colaborador."
+    }
+  },
+  "empty": {
+    "no_results_title": "No se encontraron colaboradores",
+    "no_results_subtitle": "Intenta ajustar los filtros de busqueda",
+    "no_results_clear": "Limpiar Filtros",
+    "no_data_title": "No hay colaboradores registrados",
+    "no_data_subtitle": "Comienza agregando tu primer colaborador al sistema",
+    "no_data_btn": "Agregar Colaborador"
+  },
+  "loading": "Cargando colaboradores...",
+  "form": {
+    "title_create": "Crear Colaborador",
+    "title_edit": "Editar Colaborador",
+    "name_label": "Nombre Completo *",
+    "name_placeholder": "Ej: Juan Perez",
+    "position_label": "Cargo *",
+    "position_placeholder": "Ej: Desarrollador Senior",
+    "area_label": "Area *",
+    "area_placeholder": "Seleccione un área o equipo",
+    "area_new_btn": "+ Nueva",
+    "area_new_title": "Crear área",
+    "area_new_prompt": "Nombre del área nueva:",
+    "area_new_placeholder": "Ej: Tecnología",
+    "area_new_confirm": "Crear",
+    "area_error_create": "Error al crear área",
+    "email_label": "Email",
+    "email_placeholder": "usuario@empresa.com",
+    "mfa_label": "Requiere MFA",
+    "mfa_hint": "Activar verificacion por email",
+    "mapping_source_type_label": "Tipo de origen",
+    "external_keys_label": "Claves externas",
+    "external_keys_placeholder": "johana, j.garcia, jgarcia@empresa.com",
+    "external_keys_hint_global": "Nombres o apodos con los que esta persona aparece en tus sistemas externos (Jira, Google Sheets, etc.). Se usa como comodín si no hay un alias específico para el conector.",
+    "external_keys_hint_specific": "Nombres o identificadores de esta persona en {{source}}. Separados por coma. Ej: johana, j.garcia",
+    "role_label": "Rol *",
+    "manager_label": "Jefe directo",
+    "manager_placeholder": "Buscar por nombre o cargo...",
+    "manager_none": "Sin manager",
+    "manager_no_results": "Sin resultados",
+    "manager_remove_aria": "Quitar manager",
+    "manager_warning": "Este jefe pertenece a una unidad que depende del área de este colaborador. Verificá si es correcto.",
+    "person_scope_label": "Nodo en el organigrama",
+    "person_scope_optional": "(opcional)",
+    "person_scope_no_node": "Sin nodo personal asignado",
+    "person_scope_hint": "Si esta persona tiene un nodo de tipo \"Persona\" en la estructura organizacional, vinculala aquí para que aparezca en el organigrama.",
+    "cancel": "Cancelar",
+    "saving": "Guardando...",
+    "update": "Actualizar",
+    "create": "Crear",
+    "errors": {
+      "name_required": "El nombre es requerido",
+      "position_required": "El cargo es requerido",
+      "area_required": "El area es requerida",
+      "role_required": "El rol es requerido",
+      "email_invalid": "Email invalido",
+      "email_duplicate": "Ya existe un colaborador con ese email",
+      "circular_manager": "Este jefe genera una relación circular en la jerarquía",
+      "save_failed": "No se pudo guardar el colaborador"
+    },
+    "api_errors": {
+      "scope_not_found": "El área o scope seleccionado ya no existe.",
+      "create_forbidden": "No tenés permisos para crear colaboradores en esa área.",
+      "update_forbidden": "No tenés permisos para editar este colaborador.",
+      "not_found": "No se encontró el colaborador."
+    }
+  }
+}

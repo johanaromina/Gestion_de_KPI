@@ -1,10 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { KPI } from '../types'
 import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
 import { useDialog } from './Dialog'
+import { resolveApiErrorMessage } from '../utils/apiErrors'
 import './GenerateBaseGridModal.css'
 
 interface GenerateBaseGridModalProps {
@@ -16,6 +18,7 @@ export default function GenerateBaseGridModal({
   onClose,
   onSuccess,
 }: GenerateBaseGridModalProps) {
+  const { t } = useTranslation(['assignments', 'common'])
   const [formData, setFormData] = useState({
     scopeId: '',
     periodId: '',
@@ -61,20 +64,22 @@ export default function GenerateBaseGridModal({
       onSuccess: (data) => {
         queryClient.invalidateQueries('collaborator-kpis')
         void dialog.alert(
-          `Parrillas base generadas exitosamente.\n` +
-            `Asignaciones creadas: ${data.created} — ` +
-            `Colaboradores: ${data.details.collaboratorsCount} — ` +
-            `KPIs: ${data.details.kpisCount}`,
-          { title: 'Parrillas generadas', variant: 'info' }
+          t('assignments:generate_grid_modal.success_message', {
+            created: data.created,
+            collaborators: data.details.collaboratorsCount,
+            kpis: data.details.kpisCount,
+          }),
+          { title: t('assignments:generate_grid_modal.success_title'), variant: 'info' }
         )
         onSuccess?.()
         onClose()
       },
       onError: (error: any) => {
         void dialog.alert(
-          error.response?.data?.error ||
-            'Error al generar parrillas base. Verificá los datos ingresados.',
-          { title: 'Error', variant: 'danger' }
+          resolveApiErrorMessage(error, t, {
+            fallbackKey: 'assignments:generate_grid_modal.error_default',
+          }),
+          { title: t('assignments:generate_grid_modal.error_title'), variant: 'danger' }
         )
       },
     }
@@ -89,15 +94,15 @@ export default function GenerateBaseGridModal({
     const newErrors: Record<string, string> = {}
 
     if (!formData.scopeId) {
-      newErrors.scopeId = 'El scope es requerido'
+      newErrors.scopeId = t('assignments:generate_grid_modal.scope_required')
     }
 
     if (!formData.periodId) {
-      newErrors.periodId = 'El período es requerido'
+      newErrors.periodId = t('assignments:generate_grid_modal.period_required')
     }
 
     if (!formData.useAllKPIs && formData.kpiIds.length === 0) {
-      newErrors.kpiIds = 'Debes seleccionar al menos un KPI'
+      newErrors.kpiIds = t('assignments:generate_grid_modal.kpis_required')
     }
 
     setErrors(newErrors)
@@ -175,7 +180,7 @@ export default function GenerateBaseGridModal({
     >
       <div className="modal-content generate-grid-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Generar Parrillas Base</h2>
+          <h2>{t('assignments:generate_grid_modal.title')}</h2>
           <button className="close-button" onClick={onClose}>
             ×
           </button>
@@ -183,14 +188,14 @@ export default function GenerateBaseGridModal({
 
         <form onSubmit={handleSubmit} className="generate-grid-form">
           <div className="form-group">
-            <label htmlFor="scopeId">Scope *</label>
+            <label htmlFor="scopeId">{t('assignments:generate_grid_modal.scope_label')}</label>
             <select
               id="scopeId"
               value={formData.scopeId}
               onChange={(e) => setFormData({ ...formData, scopeId: e.target.value })}
               className={errors.scopeId ? 'error' : ''}
             >
-              <option value="">Selecciona un scope</option>
+              <option value="">{t('assignments:generate_grid_modal.scope_placeholder')}</option>
               {areaScopes.map((scope: any) => (
                 <option key={scope.id} value={scope.id}>
                   {scope.name}
@@ -199,12 +204,12 @@ export default function GenerateBaseGridModal({
             </select>
             {errors.scopeId && <span className="error-message">{errors.scopeId}</span>}
             <small className="form-hint">
-              Se generarán parrillas para todos los colaboradores de este scope
+              {t('assignments:generate_grid_modal.scope_hint')}
             </small>
           </div>
 
           <div className="form-group">
-            <label htmlFor="periodId">Período *</label>
+            <label htmlFor="periodId">{t('assignments:generate_grid_modal.period_label')}</label>
             <select
               id="periodId"
               value={formData.periodId}
@@ -213,7 +218,7 @@ export default function GenerateBaseGridModal({
               }
               className={errors.periodId ? 'error' : ''}
             >
-              <option value="">Selecciona un período</option>
+              <option value="">{t('assignments:generate_grid_modal.period_placeholder')}</option>
               {periods?.map((period: any) => (
                 <option key={period.id} value={period.id}>
                   {period.name}
@@ -235,20 +240,20 @@ export default function GenerateBaseGridModal({
                 }
               />
               <span style={{ marginLeft: '8px' }}>
-                Usar todos los KPIs disponibles
+                {t('assignments:generate_grid_modal.use_all_kpis')}
               </span>
             </label>
           </div>
 
           {!formData.useAllKPIs && (
             <small className="form-hint">
-              Se listan los KPIs disponibles del sistema.
+              {t('assignments:generate_grid_modal.available_kpis_hint')}
             </small>
           )}
 
           {!formData.useAllKPIs && (
             <div className="form-group">
-              <label>Seleccionar KPIs *</label>
+              <label>{t('assignments:generate_grid_modal.select_kpis')}</label>
               <div className="kpi-selection">
                 {kpis && kpis.length > 0 ? (
                   kpis.map((kpi) => (
@@ -271,7 +276,7 @@ export default function GenerateBaseGridModal({
                           <input
                             type="number"
                             step="any"
-                            placeholder="Target"
+                            placeholder={t('assignments:generate_grid_modal.override_target_placeholder')}
                             value={formData.overrides[kpi.id]?.target || ''}
                             onChange={(e) =>
                               setFormData({
@@ -289,7 +294,7 @@ export default function GenerateBaseGridModal({
                           <input
                             type="number"
                             step="any"
-                            placeholder="Ponderación"
+                            placeholder={t('assignments:generate_grid_modal.override_weight_placeholder')}
                             value={formData.overrides[kpi.id]?.weight || ''}
                             onChange={(e) =>
                               setFormData({
@@ -309,7 +314,7 @@ export default function GenerateBaseGridModal({
                     </div>
                   ))
                 ) : (
-                  <p className="no-kpis">No hay KPIs disponibles</p>
+                  <p className="no-kpis">{t('assignments:generate_grid_modal.no_kpis')}</p>
                 )}
               </div>
               {errors.kpiIds && (
@@ -320,7 +325,7 @@ export default function GenerateBaseGridModal({
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="defaultTarget">Target por Defecto (Opcional)</label>
+              <label htmlFor="defaultTarget">{t('assignments:generate_grid_modal.default_target_label')}</label>
               <input
                 type="number"
                 step="any"
@@ -332,12 +337,12 @@ export default function GenerateBaseGridModal({
                 placeholder="0"
               />
               <small className="form-hint">
-                Si no se especifica, se usará 0 como valor inicial
+                {t('assignments:generate_grid_modal.default_target_hint')}
               </small>
             </div>
 
             <div className="form-group">
-              <label htmlFor="defaultWeight">Ponderación por Defecto (Opcional)</label>
+              <label htmlFor="defaultWeight">{t('assignments:generate_grid_modal.default_weight_label')}</label>
               <input
                 type="number"
                 step="any"
@@ -346,17 +351,17 @@ export default function GenerateBaseGridModal({
                 onChange={(e) =>
                   setFormData({ ...formData, defaultWeight: e.target.value })
                 }
-                placeholder="Auto (100% / cantidad de KPIs)"
+                placeholder={t('assignments:generate_grid_modal.default_weight_placeholder')}
               />
               <small className="form-hint">
-                Si no se especifica, se distribuirá equitativamente
+                {t('assignments:generate_grid_modal.default_weight_hint')}
               </small>
             </div>
           </div>
 
           <div className="form-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>
-              Cancelar
+              {t('common:cancel')}
             </button>
             <button
               type="submit"
@@ -364,8 +369,8 @@ export default function GenerateBaseGridModal({
               disabled={generateMutation.isLoading}
             >
               {generateMutation.isLoading
-                ? 'Generando...'
-                : 'Generar Parrillas Base'}
+                ? t('assignments:generate_grid_modal.submitting')
+                : t('assignments:generate_grid_modal.submit')}
             </button>
           </div>
         </form>

@@ -1,0 +1,33 @@
+{
+  "title": "My account",
+  "subtitle": "Manage your personal access to this instance.",
+  "hint": "If you do not remember your current password, use “Forgot my password” from the login screen.",
+  "fallbacks": {
+    "user": "User",
+    "no_email": "No email configured",
+    "no_role": "No role"
+  },
+  "form": {
+    "current_password": "Current password",
+    "new_password": "New password",
+    "confirm_password": "Confirm new password"
+  },
+  "actions": {
+    "saving": "Saving...",
+    "update_password": "Update password"
+  },
+  "success": {
+    "updated": "Password updated successfully."
+  },
+  "errors": {
+    "required_fields": "Complete all fields.",
+    "min_length": "The new password must be at least 8 characters long.",
+    "password_mismatch": "The new passwords do not match.",
+    "change_failed": "Could not change the password.",
+    "session_invalid": "Your session expired. Log in again.",
+    "user_not_found": "Your user could not be found.",
+    "local_password_not_set": "Your account does not have a local password configured. Use password recovery or corporate access.",
+    "current_password_incorrect": "The current password is incorrect.",
+    "same_password": "The new password must be different from the current one."
+  }
+}

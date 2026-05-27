@@ -1,0 +1,44 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "my_week": "My Week",
+    "my_grid": "My Grid",
+    "check_ins": "Check-ins",
+    "strategy": "Strategy",
+    "okrs": "OKRs",
+    "okr_alignment": "OKR Alignment",
+    "objective_tree": "Objective Tree",
+    "org_chart": "Org Chart",
+    "operations": "Operations",
+    "collaborators": "Collaborators",
+    "import_data": "Import Data",
+    "periods": "Periods",
+    "kpis": "KPIs",
+    "assignments": "Assignments",
+    "group_kpis": "Group KPIs",
+    "data_input": "Data Input",
+    "curation": "Curation",
+    "analytics": "Analytics",
+    "executive_board": "Executive Board",
+    "risk_map": "Risk Map",
+    "simulator": "Simulator",
+    "views": "Views",
+    "history": "History",
+    "analytics_page": "Analytics",
+    "audit": "Audit",
+    "configuration": "Configuration",
+    "config": "Configuration",
+    "security": "Security",
+    "external_mappings": "External Mappings",
+    "kpi_templates": "KPI Templates"
+  },
+  "footer": {
+    "my_account": "My Account",
+    "logout": "Log out",
+    "language": "Language"
+  },
+  "aria": {
+    "open_menu": "Open menu",
+    "close_menu": "Close menu"
+  }
+}

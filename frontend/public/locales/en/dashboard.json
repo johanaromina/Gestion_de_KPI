@@ -1,0 +1,155 @@
+{
+  "loading": "Loading dashboard...",
+  "hr": {
+    "title": "Dashboard - Human Resources",
+    "subtitle": "Global view of the KPI management system",
+    "role": "Human Resources",
+    "stats": {
+      "collaborators": "Collaborators",
+      "collaborators_label": "Total registered",
+      "periods": "Active Periods",
+      "periods_label": "Under evaluation",
+      "kpis": "KPIs",
+      "kpis_label": "Defined",
+      "compliance": "Compliance",
+      "compliance_label": "Overall average",
+      "assignments": "Assignments",
+      "assignments_label": "Total",
+      "pending": "Pending",
+      "pending_label": "To complete"
+    },
+    "quick_actions": {
+      "title": "Quick Access",
+      "create_period": "Create Period",
+      "add_collaborator": "Add Collaborator",
+      "define_kpi": "Define KPI",
+      "new_assignment": "New Assignment",
+      "aggregate_views": "Aggregate Views",
+      "audit": "Audit"
+    },
+    "charts": {
+      "compliance_by_area": "Compliance by Area",
+      "compliance_evolution": "Compliance Evolution",
+      "collaborators_by_area": "Collaborator Distribution by Area"
+    }
+  },
+  "leadership": {
+    "title": "Dashboard - Leadership",
+    "subtitle": "Manage your team and statistics",
+    "role": "Leader",
+    "stats": {
+      "team_members": "Team Members",
+      "team_members_label": "Collaborators",
+      "team_compliance": "Team Compliance",
+      "team_compliance_label": "Average",
+      "completed_kpis": "Completed KPIs",
+      "completed_label": "Team's",
+      "pending_kpis": "Pending KPIs",
+      "pending_label": "To complete"
+    },
+    "quick_actions": {
+      "title": "Quick Actions",
+      "manage_assignments": "Manage Assignments",
+      "my_grid": "My Grid",
+      "stats": "Statistics",
+      "view_collaborators": "View Collaborators"
+    },
+    "charts": {
+      "team_compliance_evolution": "Team Compliance Evolution"
+    }
+  },
+  "collab": {
+    "title": "My Dashboard",
+    "subtitle": "My progress and my team's",
+    "role": "Collaborator",
+    "section_summary": "My summary",
+    "section_kpis": "My KPIs and progress",
+    "section_progress": "My progress",
+    "section_monthly": "Weighting and monthly progress",
+    "section_team_kpis": "Team Progress",
+    "quick_actions": {
+      "title": "Quick Actions",
+      "my_grid": "View My Grid",
+      "my_history": "My History",
+      "my_okrs": "My OKRs"
+    },
+    "summary": {
+      "assigned_kpis": "Assigned KPIs",
+      "weighted_progress": "Weighted progress",
+      "annual_gap": "Annual gap (target - actual)",
+      "total_weight": "Total weight"
+    },
+    "table": {
+      "kpi": "KPI",
+      "target": "Target",
+      "actual": "Actual",
+      "progress": "Progress",
+      "gap": "Gap",
+      "weight": "Weight",
+      "no_actual": "Not recorded"
+    },
+    "empty": "You have no KPIs assigned yet",
+    "progress": {
+      "on_track": "KPIs on track",
+      "without_actual": "KPIs without data",
+      "at_risk": "KPIs at risk",
+      "on_track_caption": "Meeting or exceeding target",
+      "without_actual_caption": "Pending update",
+      "at_risk_caption": "Below 80%"
+    },
+    "progress_detail": {
+      "critical_targets": "Critical targets",
+      "no_at_risk": "No KPIs at risk right now.",
+      "next_step_title": "Next step",
+      "next_step_pending": "Upload the pending progress to reflect real results.",
+      "next_step_risk": "Prioritize the at-risk KPIs and adjust your plan.",
+      "next_step_ok": "Good pace. Keep tracking to close the period strong.",
+      "see_grid": "View my grid"
+    },
+    "monthly": {
+      "target": "Target:",
+      "actual": "Actual:",
+      "progress": "Progress:"
+    },
+    "team_chart": {
+      "target": "Target",
+      "actual": "Actual"
+    }
+  },
+  "notifications": {
+    "pending_actions": "Pending actions",
+    "pending_assignments_one": "{{count}} incomplete assignment in the active period",
+    "pending_assignments_many": "{{count}} incomplete assignments in the active period",
+    "all_assignments_complete": "All assignments for the active period are complete",
+    "team_all_complete": "Your team has all KPIs up to date",
+    "missing_actual": "{{count}} collaborators without loaded data",
+    "at_risk": "{{count}} KPIs at risk (compliance <80%)",
+    "periods_expiring": "{{count}} period(s) expiring soon",
+    "team_pending_one": "{{count}} team KPI pending completion",
+    "team_pending_many": "{{count}} team KPIs pending completion",
+    "collab_without_actual_one": "{{count}} KPI without data this period",
+    "collab_without_actual_many": "{{count}} KPIs without data this period",
+    "collab_all_data_loaded": "All your KPIs have data loaded",
+    "collab_at_risk_one": "{{count}} KPI at risk — compliance below 80%",
+    "collab_at_risk_many": "{{count}} KPIs at risk — compliance below 80%",
+    "collab_all_on_track": "All your KPIs are on track (≥100% compliance)",
+    "see_assignments": "View assignments →",
+    "go_to_input": "Go to Input →",
+    "see_kpis": "View KPIs →",
+    "see_periods": "View periods →",
+    "load_data": "Load data →",
+    "see_grid": "View my grid →"
+  },
+  "okr_widget": {
+    "see_all": "View all →",
+    "active_objectives": "Active objectives",
+    "avg_progress": "Average progress",
+    "at_risk": "At risk (<40%)",
+    "hr_title": "Active OKRs",
+    "leadership_title": "Active OKRs",
+    "collab_title": "My OKRs"
+  },
+  "charts": {
+    "compliance_pct": "Compliance %"
+  }
+}

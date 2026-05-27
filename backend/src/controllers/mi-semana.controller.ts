@@ -6,6 +6,7 @@ import { applyMeasurementToCollaboratorAssignment } from '../services/measuremen
 import { recalcSummaryAssignment } from '../controllers/collaborator-kpis.controller'
 import { recalcScopeKPIsLinkedToAssignment } from '../services/scope-kpi-propagation.service'
 import { logger } from '../utils/logger'
+import { sendApiError } from '../utils/api-errors'
 
 /**
  * GET /api/mi-semana
@@ -102,7 +103,7 @@ export const getMiSemana = async (req: AuthRequest, res: Response) => {
     })
   } catch (error) {
     logger.error('[MiSemana] getMiSemana:', error)
-    res.status(500).json({ error: 'Error al obtener datos de la semana' })
+    return sendApiError(res, 500, 'MI_SEMANA_FETCH_FAILED', 'Error al obtener datos de la semana')
   }
 }
 
@@ -118,10 +119,10 @@ export const updateKRValue = async (req: AuthRequest, res: Response) => {
     const authorId = req.user!.collaboratorId
 
     if (value === undefined || value === null) {
-      return res.status(400).json({ error: 'value es requerido' })
+      return sendApiError(res, 400, 'MI_SEMANA_KR_VALUE_REQUIRED', 'value es requerido')
     }
     if (!authorId) {
-      return res.status(403).json({ error: 'No autorizado' })
+      return sendApiError(res, 403, 'MI_SEMANA_UNAUTHORIZED', 'No autorizado')
     }
 
     // Verificar que el KR le pertenece al usuario
@@ -130,10 +131,10 @@ export const updateKRValue = async (req: AuthRequest, res: Response) => {
       [krId]
     )
     if (!Array.isArray(krRows) || krRows.length === 0) {
-      return res.status(404).json({ error: 'Key Result no encontrado' })
+      return sendApiError(res, 404, 'MI_SEMANA_KR_NOT_FOUND', 'Key Result no encontrado')
     }
     if (krRows[0].ownerId !== authorId) {
-      return res.status(403).json({ error: 'No sos el responsable de este KR' })
+      return sendApiError(res, 403, 'MI_SEMANA_KR_OWNER_FORBIDDEN', 'No sos el responsable de este KR')
     }
 
     // Registrar check-in
@@ -169,7 +170,7 @@ export const updateKRValue = async (req: AuthRequest, res: Response) => {
     res.json({ success: true, kr: Array.isArray(updated) ? updated[0] : null })
   } catch (error) {
     logger.error('[MiSemana] updateKRValue:', error)
-    res.status(500).json({ error: 'Error al actualizar KR' })
+    return sendApiError(res, 500, 'MI_SEMANA_KR_UPDATE_FAILED', 'Error al actualizar KR')
   }
 }
 
@@ -185,10 +186,10 @@ export const updateKPIActual = async (req: AuthRequest, res: Response) => {
     const collaboratorId = req.user!.collaboratorId
 
     if (actual === undefined || actual === null) {
-      return res.status(400).json({ error: 'actual es requerido' })
+      return sendApiError(res, 400, 'MI_SEMANA_KPI_ACTUAL_REQUIRED', 'actual es requerido')
     }
     if (!collaboratorId) {
-      return res.status(403).json({ error: 'No autorizado' })
+      return sendApiError(res, 403, 'MI_SEMANA_UNAUTHORIZED', 'No autorizado')
     }
 
     // Verificar que la asignación le pertenece
@@ -202,13 +203,13 @@ export const updateKPIActual = async (req: AuthRequest, res: Response) => {
       [kpiId]
     )
     if (!Array.isArray(ckRows) || ckRows.length === 0) {
-      return res.status(404).json({ error: 'Asignación no encontrada' })
+      return sendApiError(res, 404, 'MI_SEMANA_ASSIGNMENT_NOT_FOUND', 'Asignación no encontrada')
     }
     if (ckRows[0].collaboratorId !== collaboratorId) {
-      return res.status(403).json({ error: 'No sos el responsable de esta asignación' })
+      return sendApiError(res, 403, 'MI_SEMANA_ASSIGNMENT_OWNER_FORBIDDEN', 'No sos el responsable de esta asignación')
     }
     if (ckRows[0].status === 'closed') {
-      return res.status(403).json({ error: 'La asignación está cerrada' })
+      return sendApiError(res, 403, 'MI_SEMANA_ASSIGNMENT_CLOSED', 'La asignación está cerrada')
     }
 
     const ck = ckRows[0]
@@ -252,6 +253,6 @@ export const updateKPIActual = async (req: AuthRequest, res: Response) => {
     res.json({ success: true, actual: updated?.actual, weightedResult: updated?.weightedResult })
   } catch (error) {
     logger.error('[MiSemana] updateKPIActual:', error)
-    res.status(500).json({ error: 'Error al actualizar KPI' })
+    return sendApiError(res, 500, 'MI_SEMANA_KPI_UPDATE_FAILED', 'Error al actualizar KPI')
   }
 }

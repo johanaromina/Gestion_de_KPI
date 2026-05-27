@@ -1,6 +1,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { Collaborator, Period, CollaboratorKPI } from '../types'
 import { calculateVariationPercent, calculateWeightedImpact, resolveDirection } from '../utils/kpi'
@@ -44,14 +45,13 @@ function formatPercent(value: number) {
   return `${value.toFixed(1)}%`
 }
 
-function formatDate(date: string) {
-  const parsed = new Date(date)
-  return parsed.toLocaleDateString('es-CL')
-}
-
 export default function ConsolidadoColaborador() {
+  const { t, i18n } = useTranslation('history')
+  const locale = i18n.resolvedLanguage?.startsWith('en') ? 'en-US' : 'es-AR'
   const [selectedCollaboratorId, setSelectedCollaboratorId] = useState<number | null>(null)
   const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null)
+
+  const formatDate = (date: string) => new Date(date).toLocaleDateString(locale)
 
   const { data: collaborators, isLoading: loadingCollaborators } = useQuery<Collaborator[]>(
     'collaborators',
@@ -115,12 +115,12 @@ export default function ConsolidadoColaborador() {
     <div className="consolidado-page">
       <div className="page-header">
         <div>
-          <h1>Consolidado por colaborador</h1>
-          <p className="subtitle">Promedio ponderado por subperiodo y KPIs</p>
+          <h1>{t('consolidado.title')}</h1>
+          <p className="subtitle">{t('consolidado.subtitle')}</p>
         </div>
         {consolidated && (
           <div className="period-chip">
-            <span className="chip-label">Periodo</span>
+            <span className="chip-label">{t('consolidado.period_chip_label')}</span>
             <div className="chip-value">
               <strong>{consolidated.period.name}</strong>
               <span>
@@ -133,13 +133,13 @@ export default function ConsolidadoColaborador() {
 
       <div className="filters">
         <div className="filter-group">
-          <label htmlFor="collaborator-select">Colaborador</label>
+          <label htmlFor="collaborator-select">{t('consolidado.filter_collaborator_label')}</label>
           <select
             id="collaborator-select"
             value={selectedCollaboratorId || ''}
             onChange={(e) => setSelectedCollaboratorId(e.target.value ? parseInt(e.target.value) : null)}
           >
-            <option value="">Seleccione</option>
+            <option value="">{t('consolidado.filter_collaborator_placeholder')}</option>
             {collaborators?.map((collaborator) => (
               <option key={collaborator.id} value={collaborator.id}>
                 {collaborator.name}
@@ -149,13 +149,13 @@ export default function ConsolidadoColaborador() {
         </div>
 
         <div className="filter-group">
-          <label htmlFor="period-select">Periodo</label>
+          <label htmlFor="period-select">{t('consolidado.filter_period_label')}</label>
           <select
             id="period-select"
             value={selectedPeriodId || ''}
             onChange={(e) => setSelectedPeriodId(e.target.value ? parseInt(e.target.value) : null)}
           >
-            <option value="">Seleccione</option>
+            <option value="">{t('consolidado.filter_period_placeholder')}</option>
             {periods?.map((period) => (
               <option key={period.id} value={period.id}>
                 {period.name}
@@ -168,20 +168,20 @@ export default function ConsolidadoColaborador() {
       {(!selectedCollaboratorId || !selectedPeriodId) && (
         <div className="empty-state">
           <div className="empty-icon">📊</div>
-          <h3>Seleccione colaborador y periodo</h3>
-          <p>El consolidado se muestra una vez elegidos los filtros.</p>
+          <h3>{t('consolidado.empty_select_title')}</h3>
+          <p>{t('consolidado.empty_select_subtitle')}</p>
         </div>
       )}
 
       {selectedCollaboratorId && selectedPeriodId && isLoading && (
-        <div className="loading">Cargando consolidado...</div>
+        <div className="loading">{t('consolidado.loading')}</div>
       )}
 
       {selectedCollaboratorId && selectedPeriodId && !isLoading && !consolidated && (
         <div className="empty-state">
           <div className="empty-icon">ℹ️</div>
-          <h3>Sin datos para los filtros</h3>
-          <p>No hay asignaciones para el colaborador y periodo seleccionados.</p>
+          <h3>{t('consolidado.no_data_title')}</h3>
+          <p>{t('consolidado.no_data_subtitle')}</p>
         </div>
       )}
 
@@ -189,21 +189,19 @@ export default function ConsolidadoColaborador() {
         <>
           <div className="summary-cards">
             <div className="summary-card primary">
-              <div className="card-label">Resultado ponderado por subperiodo</div>
+              <div className="card-label">{t('consolidado.card_subperiod_weight_label')}</div>
               <div className="card-value">{formatPercent(consolidated.overall.resultBySubPeriodWeight)}</div>
-              <p className="card-help">
-                Usa peso de subperiodos (o peso total de KPIs cuando no hay peso definido).
-              </p>
+              <p className="card-help">{t('consolidado.card_subperiod_weight_help')}</p>
             </div>
             <div className="summary-card">
-              <div className="card-label">Resultado ponderado por KPI</div>
+              <div className="card-label">{t('consolidado.card_kpi_weight_label')}</div>
               <div className="card-value">{formatPercent(consolidated.overall.resultByKpiWeight)}</div>
-              <p className="card-help">Basado en el peso individual de cada KPI.</p>
+              <p className="card-help">{t('consolidado.card_kpi_weight_help')}</p>
             </div>
             <div className="summary-card compact">
-              <div className="card-label">Peso total subperiodos</div>
+              <div className="card-label">{t('consolidado.card_totals_label')}</div>
               <div className="card-value small">{subPeriodTotals}%</div>
-              <p className="card-help">Suma de pesos definidos en subperiodos.</p>
+              <p className="card-help">{t('consolidado.card_totals_help')}</p>
             </div>
           </div>
 
@@ -213,27 +211,31 @@ export default function ConsolidadoColaborador() {
                 <div className="subperiod-header">
                   <div>
                     <h3>{sub.name}</h3>
-                    <p>{sub.kpiCount} KPI(s)</p>
+                    <p>{t('consolidado.kpi_count', { count: sub.kpiCount })}</p>
                   </div>
                   <div className="subperiod-score">
                     <span>{formatPercent(sub.result)}</span>
-                    <small>Ponderado</small>
+                    <small>{t('consolidado.score_label')}</small>
                   </div>
                 </div>
                 <div className="subperiod-meta">
-                  <span>Peso: {sub.weight ?? 's/d'}%</span>
-                  <span>Peso KPIs: {sub.totalWeight}%</span>
+                  <span>
+                    {sub.weight != null
+                      ? t('consolidado.meta_weight', { value: sub.weight })
+                      : t('consolidado.meta_weight_sd')}
+                  </span>
+                  <span>{t('consolidado.meta_kpi_weight', { value: sub.totalWeight })}</span>
                 </div>
                 <div className="table-wrapper">
                   <table>
                     <thead>
                       <tr>
-                        <th>KPI</th>
-                        <th>Target</th>
-                        <th>Alcance</th>
-                        <th>Variacion</th>
-                        <th>Ponderacion</th>
-                        <th>Ponderado</th>
+                        <th>{t('consolidado.table_kpi')}</th>
+                        <th>{t('consolidado.table_target')}</th>
+                        <th>{t('consolidado.table_actual')}</th>
+                        <th>{t('consolidado.table_variation')}</th>
+                        <th>{t('consolidado.table_weight')}</th>
+                        <th>{t('consolidado.table_weighted')}</th>
                       </tr>
                     </thead>
                     <tbody>

@@ -1,0 +1,28 @@
+{
+  "loading": "Cargando tu semana...",
+  "title": "Mi semana",
+  "subtitle": "Semana del {{range}}",
+  "checkin_done": "Check-in ✓",
+  "empty": "No tenés KRs ni KPIs activos asignados esta semana.",
+  "objective_link_title": "Ver objetivo",
+  "last_update": "Último: {{value}}",
+  "result": "Resultado: {{value}}%",
+  "sections": {
+    "assigned_krs": "Key Results que te asignaron",
+    "my_kpis": "Mis KPIs del período"
+  },
+  "actions": {
+    "weekly_checkin": "Hacer check-in semanal",
+    "update": "Actualizar",
+    "saved": "✓ Guardado"
+  },
+  "input": {
+    "new_value": "Nuevo valor",
+    "optional_note": "Nota (opcional)"
+  },
+  "relative_day": {
+    "today": "hoy",
+    "yesterday": "ayer",
+    "days_ago": "hace {{count}} días"
+  }
+}

@@ -1,0 +1,826 @@
+{
+  "title": "Configuration",
+  "restricted": "You do not have permission to manage configuration.",
+  "subtitle": "Organizational structure, calendars, and integrations",
+  "guide": {
+    "hide": "Hide setup guide",
+    "show": "View setup guide",
+    "title": "Initial setup guide",
+    "completed": "The basic setup is already complete. You can reopen this guide whenever you want.",
+    "progress": "You completed {{done}} of {{total}} base steps.",
+    "how_to": "How do I configure the system for the first time?",
+    "steps": {
+      "areas": "<strong>Create your company areas and teams</strong> in <em>Organizational Structure</em> (below ↓)",
+      "collaborators": "Add <strong>collaborators</strong> and assign them an area and manager → <a href=\"/colaboradores\">Collaborators</a>",
+      "kpis": "Define the <strong>KPIs</strong> you will measure → <a href=\"/kpis\">KPIs</a>",
+      "periods": "Create an <strong>active period</strong> (yearly, semiannual, quarterly) → <a href=\"/periodos\">Periods</a>",
+      "assignments": "Assign KPIs to each collaborator with a target → <a href=\"/asignaciones\">Assignments</a>"
+    },
+    "note": "Calendars and integrations are optional and can be configured later.",
+    "save_hide": "Save and hide",
+    "checklist": {
+      "areas_label": "Areas and teams",
+      "areas_desc": "Create the base organizational structure.",
+      "collaborators_label": "Collaborators",
+      "collaborators_desc": "Load people and assign them an area and manager.",
+      "periods_label": "Periods",
+      "periods_desc": "Define at least one active period to operate.",
+      "assignments_label": "Assignments",
+      "assignments_desc": "Assign KPIs with targets to each collaborator."
+    }
+  },
+  "banners": {
+    "sheets_title": "Connect Google Sheets",
+    "sheets_text": "Import KPI values directly from your spreadsheets, without technical setup.",
+    "sheets_action": "Connect spreadsheet →",
+    "slack_title": "Connect Slack",
+    "slack_text": "Receive at-risk KPI alerts directly in your Slack channel.",
+    "slack_action": "Configure Slack →",
+    "email_title": "Email notifications",
+    "email_active": "SMTP active — sending from {{from}} via {{host}}",
+    "email_inactive": "Set SMTP_HOST, SMTP_USER, and SMTP_PASS in the server .env to enable email alerts.",
+    "email_sent": "Email sent to {{to}}",
+    "email_test_placeholder": "test email",
+    "email_test_error": "Could not send test email",
+    "email_test_sending": "Sending...",
+    "email_test_action": "Send test email"
+  },
+  "advanced": {
+    "title": "Advanced configuration — Integrations",
+    "hint": "Jira, Zendesk, external connectors. Technical administrators only."
+  },
+  "integrations": {
+    "title": "Integrations (templates)",
+    "subtitle": "Configure reusable templates, targets, and auth profiles.",
+    "new_template": "New template",
+    "create_targets_all": "Create targets (all areas)",
+    "create_targets_new": "Create for new areas",
+    "deactivate_inactive": "Deactivate inactive areas",
+    "new_target": "New target",
+    "new_auth": "New auth profile",
+    "archive_errors": "Archive errors",
+    "delete_errors": "Delete errors",
+    "tabs": {
+      "templates": "Templates",
+      "targets": "Targets",
+      "runs": "Runs",
+      "auth": "Auth"
+    },
+    "template_label": "Template",
+    "select_template": "Select a template",
+    "dialogs": {
+      "archive_errors": "Archive all error runs for this template?",
+      "delete_errors": "Delete all error runs for this template?",
+      "archive_errors_title": "Archive errors",
+      "delete_errors_title": "Delete errors"
+    }
+  },
+  "calendar": {
+    "title": "Measurement calendars",
+    "subtitle": "Define measurement cycles by area or team (monthly, quarterly, or custom).",
+    "new": "New calendar",
+    "name": "Name",
+    "frequency": "Frequency",
+    "status": "Status",
+    "subperiods": "Sub-periods",
+    "empty": "No configured calendars."
+  },
+  "org": {
+    "title": "Organizational structure",
+    "subtitle": "Hierarchy of areas, teams, and people with calendar inheritance.",
+    "new": "New unit",
+    "search": "Search unit",
+    "search_placeholder": "Name, type, or parent unit",
+    "type": "Type",
+    "all": "All",
+    "showing": "Showing {{shown}} of {{total}} units",
+    "parent": "Parent unit",
+    "empty_filtered": "No units match the current filters.",
+    "empty_title": "There are no areas or teams yet.",
+    "empty_hint": "Click New unit to create your company’s first area (for example: Sales, Technology, Operations).",
+    "delete_confirm": "Are you sure you want to delete unit \"{{name}}\" ({{type}})? This action cannot be undone.",
+    "delete_confirm_title": "Confirm deletion",
+    "delete_error": "Could not delete the organizational unit"
+  },
+  "modals": {
+    "template_new": "New template",
+    "template_edit": "Edit template",
+    "target_new": "New target",
+    "target_edit": "Edit target",
+    "target_wizard": "Duplicate target by users",
+    "auth_new": "New auth profile",
+    "auth_edit": "Edit auth profile",
+    "calendar_new": "New calendar",
+    "calendar_edit": "Edit calendar",
+    "subperiods": "Sub-periods · {{name}}",
+    "target_preview": "Target preview",
+    "scope_new": "New organizational unit",
+    "scope_edit": "Edit unit"
+  },
+  "dialog_titles": {
+    "warning": "Warning"
+  },
+  "actions": {
+    "saving": "Saving...",
+    "save_template": "Save template",
+    "save_target": "Save target",
+    "create_targets": "Create targets",
+    "creating": "Creating...",
+    "save_auth": "Save auth profile",
+    "save_calendar": "Save calendar",
+    "save_unit": "Save unit"
+  },
+  "errors": {
+    "paste_jql": "Paste a JQL to convert.",
+    "invalid_params_json_editor": "The params JSON is not valid. Fix it before using the mapping editor.",
+    "save_template": "Could not save template",
+    "required_params": "Required params are missing: {{keys}}",
+    "invalid_params_json": "The params JSON is not valid",
+    "multiple_users_assignment": "A target with multiple users cannot be assigned to an individual KPI. Use one target per person or remove the assignment.",
+    "mapping_and_direct_destination": "A target with row-based mapping cannot also point to a direct assignment or Scope KPI.",
+    "single_destination_only": "A target can only point to an assignment or a Scope KPI.",
+    "save_target": "Could not save target",
+    "select_mapping_destination": "Select at least one destination to create explicit mappings.",
+    "assignment_unavailable": "The selected assignment is no longer available for {{key}}.",
+    "base_collaborator_unresolved": "Could not resolve the base collaborator for {{key}}.",
+    "scope_kpi_unavailable": "The selected Scope KPI is no longer available for {{key}}.",
+    "base_scope_unresolved": "Could not resolve the base scope for {{key}}.",
+    "save_explicit_mappings": "Could not save explicit mappings",
+    "target_missing_users": "This target does not have a users list to duplicate.",
+    "target_min_users": "You need at least 2 users to duplicate.",
+    "select_template_to_test": "Select a template to test the target."
+  },
+  "api_errors": {
+    "template_name_required": "Template name is required.",
+    "template_cron_invalid": "The configured cron expression is invalid.",
+    "mapping_entity_type_invalid": "The mapping entity type is invalid.",
+    "mapping_entity_id_required": "The mapping entity is missing.",
+    "mapping_entity_not_found": "The selected mapping entity no longer exists.",
+    "mapping_items_required": "You must send at least one mapping to save.",
+    "org_delete_has_children": "This unit cannot be deleted because it has child units.",
+    "org_delete_has_collaborators": "This unit cannot be deleted because it has assigned collaborators.",
+    "org_delete_has_assignments": "This unit cannot be deleted because it has linked assignments.",
+    "org_delete_has_targets": "This unit cannot be deleted because it has linked targets or integrations.",
+    "template_not_found": "The selected template no longer exists.",
+    "template_test_required_fields": "Required data is missing to test the template.",
+    "template_test_ratio_required": "Ratio templates require the stories query.",
+    "email_smtp_not_configured": "SMTP is not configured on the server.",
+    "email_smtp_connection_failed": "The SMTP connection could not be validated.",
+    "email_to_required": "Enter a destination email for the test."
+  },
+  "messages": {
+    "create_targets_error": "Could not create targets",
+    "targets_created": "Targets created: {{count}}",
+    "targets_created_with_existing": "Targets created: {{created}} · already existed: {{skipped}}",
+    "targets_created_with_skipped": "Targets created: {{created}} · skipped: {{skipped}}",
+    "targets_by_user": "Targets per user: {{created}}",
+    "targets_by_user_with_skipped": "Targets per user: {{created}} · already existed: {{skipped}}",
+    "duplicate_targets_error": "Could not duplicate targets",
+    "no_changes_to_apply": "There are no changes to apply.",
+    "targets_enabled": "Targets enabled: {{count}}",
+    "no_users_to_duplicate": "There are no users in params to duplicate.",
+    "no_new_areas": "There are no new areas to create targets for.",
+    "preview_rows_loaded": "Rows loaded from preview: {{count}}",
+    "preview_rows_unmapped_loaded": "Missing keys added to the editor: {{count}}",
+    "targets_deactivated": "Targets deactivated: {{count}}",
+    "no_targets_to_deactivate": "There are no targets to deactivate.",
+    "explicit_mappings_saved": "Explicit mappings saved and rows resolved: {{count}}",
+    "target_run_success": "Target executed. Check Runs.",
+    "test_target_error": "Could not test target",
+    "test_params_error": "Could not test params"
+  },
+  "options": {
+    "connectors": {
+      "jira": "Jira",
+      "xray": "Xray",
+      "sheets": "Google Sheets",
+      "looker": "Looker",
+      "generic_api": "Generic API",
+      "manual": "Manual / CSV"
+    },
+    "metric_types": {
+      "count": "COUNT — Filter count",
+      "ratio": "RATIO A/B — Compliance / Conversion",
+      "sla": "SLA — Time compliance",
+      "value": "VALUE — Direct value",
+      "value_agg": "VALUE_AGG — Sum / Average",
+      "manual": "MANUAL — Declarative"
+    },
+    "auth_types": {
+      "none": "No auth",
+      "basic": "Basic",
+      "bearer": "Bearer",
+      "apiKey": "API Key"
+    },
+    "frequencies": {
+      "monthly": "Monthly",
+      "quarterly": "Quarterly",
+      "custom": "Custom"
+    },
+    "run_status": {
+      "success": "Success",
+      "error": "Error",
+      "failed": "Failed",
+      "running": "Running",
+      "queued": "Queued",
+      "archived": "Archived"
+    }
+  },
+  "template_modal": {
+    "connector": "Connector",
+    "metric_type": "Metric type",
+    "quick_templates": "Quick templates",
+    "auth_profile": "Auth Profile",
+    "select_auth_profile": "Select an auth profile",
+    "no_auth_profiles": "There are no auth profiles for this connector.",
+    "formula": "Formula",
+    "schedule": "Schedule / Cron",
+    "schedule_monthly": "Monthly (1st 02:00)",
+    "schedule_daily": "Daily (02:00)",
+    "schedule_weekly": "Weekly (Mon 02:00)",
+    "schedule_hint": "Suggested cron for monthly close. Example: 0 2 1 * *.",
+    "next_run": "Next run: {{value}}",
+    "active": "Active",
+    "inactive": "Inactive",
+    "labels": {
+      "filter_a": "Filter A (template)",
+      "request_config": "Request config (template)",
+      "looker_config": "Looker config (template)",
+      "config_a": "Config A (template)",
+      "filter_b": "Filter B (template)",
+      "config_b": "Config B (template)",
+      "config": "Config (template)"
+    },
+    "examples": {
+      "primary_sla_jira": "Example: {baseFilter} AND {endDate} >= {from} AND {endDate} < {to} AND {endDate} <= {limitDate}",
+      "primary_ratio_jira": "Example: {filterA} AND {dateFieldA} >= {from} AND {dateFieldA} < {to}",
+      "primary_default_jira": "Example: {baseFilter} AND {dateField} >= {from} AND {dateField} < {to}",
+      "primary_generic_api": "Example: path={path} method={method} resultPath={resultPath} valuePath={valuePath} aggregation={aggregation}",
+      "primary_looker": "Example: resourceType={query|look|dashboard|dashboard_element|inline_query} resourceId={resourceId} dashboardElementId={dashboardElementId} resultFormat={resultFormat} resultPath={resultPath} valuePath={valuePath}",
+      "primary_default": "Example: baseFilter={baseFilter} dateField={dateField} from={from} to={to}",
+      "secondary_sla_jira": "Example: {baseFilter} AND {endDate} >= {from} AND {endDate} < {to}",
+      "secondary_default_jira": "Example: {filterB} AND {dateFieldB} >= {from} AND {dateFieldB} < {to}",
+      "secondary_generic_api": "Optional. Only if you want to document another placeholder block.",
+      "secondary_looker": "Optional. For inline_query use queryBody. For dashboards you can use dashboardElementId, dashboardElementTitle, or dashboardElementIndex.",
+      "secondary_default": "Example: use the same config A or split A/B if you need two aggregations.",
+      "single_manual": "Example: manual",
+      "single_generic_api": "Example: path={path} method={method} query={query} resultPath={resultPath} valuePath={valuePath} aggregation={aggregation}",
+      "single_looker": "Example: resourceType={query|look|dashboard|dashboard_element|inline_query} resourceId={resourceId} dashboardElementId={dashboardElementId} dashboardElementTitle={dashboardElementTitle} resultFormat={resultFormat} resultPath={resultPath} valuePath={valuePath}",
+      "single_default": "Example: sheetKey={sheetKey} range={range} areaColumn={areaColumn} collaboratorColumn={collaboratorColumn} kpiColumn={kpiColumn}. In params: collaboratorValue + valueColumn or valueColumnFromPeriod=true + valueColumnPeriodFormat=YYYYMM"
+    },
+    "placeholders_hint": "Suggestion: use placeholders (e.g. {baseFilter}, {from}, {to}) so the template remains reusable.",
+    "time_placeholders_hint": "Suggestion: include {from} and {to} to filter by period.",
+    "literal_values_hint": "Suggestion: avoid fixed values (Story/Bug/Done). Put them in the Target with placeholders.",
+    "quick_template_labels": {
+      "count": "COUNT",
+      "ratio": "RATIO",
+      "sla": "SLA",
+      "sheets_value": "Sheets VALUE",
+      "sheets_agg": "Sheets AGG",
+      "sheets_grid": "Sheets GRID",
+      "sheets_grid_agg": "Sheets GRID AGG",
+      "api_value": "API VALUE",
+      "api_agg": "API AGG",
+      "looker_value": "Looker VALUE",
+      "looker_agg": "Looker AGG",
+      "manual": "Manual / CSV"
+    }
+  },
+  "target_modal": {
+    "template": "Template",
+    "scope_type": "Unit type",
+    "org_scope": "Organizational unit",
+    "select_org_scope": "Select an area or team",
+    "external_id": "External ID",
+    "assignment_destination": "Destination assignment (only if individual)",
+    "select_assignment": "Select an assignment",
+    "assignment_destination_hint": "Select a base assignment only if the target must write to a collaborator KPI.",
+    "scope_kpi_destination": "Destination Scope KPI",
+    "select_scope_kpi": "Select a Scope KPI",
+    "scope_kpi_destination_hint": "Select this if the target must write to an organizational KPI. Only one of the two destinations can be informed.",
+    "raw_jql": "Raw JQL (optional)",
+    "raw_jql_hint": "Use it only as help to convert a JQL into JSON params.",
+    "raw_jql_placeholder": "Paste JQL here...",
+    "convert_jql": "Convert JQL → JSON",
+    "clear": "Clear",
+    "params_json": "Params JSON (actual target payload)",
+    "params_json_hint": "This content is what gets persisted and used by the runner when executing the target.",
+    "sheets_params_hint": "For leader-based sheets: use <code>range</code> with A1 notation (e.g. <code>'Alexis Cantenys'!A3:Z</code>), <code>collaboratorValue</code> to choose the correct row and, if months are columns, <code>valueColumnFromPeriod=true</code> + <code>valueColumnPeriodFormat=YYYYMM</code>.",
+    "required_params": "Params required by the template:",
+    "explicit_mapping_hint": "To update multiple destinations from a single run, you can use <code>targetMap</code>, <code>mappingKeyPath</code>, <code>mappingValuePath</code>, and <code>mappingOwnerType</code> (<code>assignment</code> or <code>scopeKpi</code>).",
+    "explicit_mapping_hint_looker": "To update multiple destinations from a single run, you can use <code>targetMap</code>, <code>mappingKeyPath</code>, <code>mappingValuePath</code>, and <code>mappingOwnerType</code> (<code>assignment</code> or <code>scopeKpi</code>). Looker also supports <code>resourceType</code> dashboard and dashboard_element.",
+    "mapping_editor": "Row-based mapping editor",
+    "mapping_editor_hint": "Build the targetMap from the UI. If you use this editor, remove the direct destination from the target. When importing from preview, the system tries to autocomplete matches by name.",
+    "mapping_result_path": "Mapping result path",
+    "mapping_key_path": "Mapping key path",
+    "mapping_value_path": "Mapping value path",
+    "placeholders": {
+      "mapping_result_path": "data.rows",
+      "mapping_key_path": "qa or area",
+      "mapping_value_path": "stories_delivered or revenue",
+      "external_key": "Johana / Revenue / CS"
+    },
+    "add_mapping_row": "Add mapping row",
+    "no_mapping_rows": "No configured rows yet. Add a row to map external keys to assignments or Scope KPIs.",
+    "unresolved_warning": "There are <strong>{{count}}</strong> <code>targetMap</code> rows without an assigned destination. Complete them or remove the ones you do not want to use.",
+    "explicit_mapping_intro": "You can create explicit <code>data_source_mappings</code> for <strong>{{source}}</strong> without leaving the modal. This stores the external key for future previews and also resolves these rows now.",
+    "calculated_period": "Calculated period: {{period}} · Range: {{from}} → {{to}}.",
+    "target_subperiod": "Target sub-period: {{name}} · {{start}} → {{end}}",
+    "target_subperiod_later": "Target sub-period: it will be resolved on execution (no associated calendar or sub-periods).",
+    "assignment_subperiod_warning": "This assignment belongs to a specific sub-period. To resolve the month automatically, select the base assignment (without sub-period).",
+    "scope_kpi_subperiod_warning": "This Scope KPI belongs to a specific sub-period. If you want automatic monthly resolution, use a base Scope KPI without sub-period.",
+    "owner_types": {
+      "assignment": "Assignment",
+      "scope_kpi": "Scope KPI"
+    },
+    "table": {
+      "external_key": "External key",
+      "destination": "Destination",
+      "assignment": "Assignment",
+      "scope_kpi": "Scope KPI"
+    },
+    "explicit_table": {
+      "external_key": "External key",
+      "destination": "Destination to persist",
+      "persisted_on": "Stored on"
+    },
+    "explicit_row": {
+      "no_key": "No key",
+      "assignment_hint": "The key will be stored against the base collaborator of the selected assignment.",
+      "scope_kpi_hint": "The key will be stored against the base org scope of the selected Scope KPI.",
+      "select_assignment": "Select an assignment",
+      "select_scope_kpi": "Select a Scope KPI",
+      "collaborator_fallback": "Collaborator",
+      "scope_fallback": "Org scope",
+      "pending": "Pending"
+    },
+    "explicit_actions": {
+      "saving": "Saving mappings...",
+      "save_and_resolve": "Save explicit mappings and resolve ({{count}})"
+    },
+    "preview_actions": {
+      "testing": "Testing...",
+      "test": "Test params",
+      "load_keys": "Load keys from preview",
+      "add_missing": "Add only missing"
+    },
+    "preview_hint": "The preview uses the selected template and the current modal params, without needing to save the target first.",
+    "fallbacks": {
+      "collaborator": "Collaborator #{{id}}",
+      "kpi": "KPI #{{id}}",
+      "period": "Period #{{id}}",
+      "scope": "Scope #{{id}}",
+      "scope_kpi": "Scope KPI #{{id}}"
+    },
+    "errors": {
+      "assignment_blocked": "There are multiple users in params. For an individual assignment, create one target per person or remove the assignment.",
+      "invalid_json": "The params JSON is not valid.",
+      "missing_required_params": "Required params are missing for the template:",
+      "both_destinations": "The target cannot point to an assignment and a Scope KPI at the same time.",
+      "direct_destination_with_mapping": "If you configure row-based mapping, remove the direct destination from the target. Each row must resolve its own assignment or Scope KPI."
+    }
+  },
+  "target_wizard": {
+    "template": "Template:",
+    "hint": "Select the collaborator and, if applicable, the destination assignment. One target will be created for each user.",
+    "user_jira": "Jira user",
+    "collaborator": "Collaborator",
+    "assignment": "Assignment",
+    "select_collaborator": "Select collaborator",
+    "no_assignment": "No assignment"
+  },
+  "auth_modal": {
+    "connector": "Connector",
+    "endpoint": "Endpoint",
+    "endpoint_placeholder": "https://your-domain.atlassian.net",
+    "auth_type": "Auth Type",
+    "username": "Username",
+    "password": "Password",
+    "token": "Token",
+    "client_id": "Client ID",
+    "client_secret": "Client Secret",
+    "api_key": "API Key",
+    "header": "Header",
+    "auth_profile_hints": {
+      "jira_xray": "Jira/Xray: use email + API token (Basic) or Bearer token.",
+      "sheets": "Google Sheets: supports leader-based sheets with KPI/Area/Collaborator and months in columns. If the sheet is public, you can leave it without auth or use an API Key.",
+      "generic_api": "Generic API: use a base endpoint + Bearer, API Key, Basic, or no auth, depending on the source.",
+      "looker": "Looker: use the instance base endpoint and auth by token or clientId/clientSecret.",
+      "manual": "Manual/CSV does not require an auth profile."
+    },
+    "endpoint_hints": {
+      "sheets": "Optional. Example: https://sheets.googleapis.com",
+      "looker": "Example: https://your-looker.company.com or https://your-looker.company.com/api/4.0",
+      "generic_api": "Example: https://api.company.com or https://your-looker/api/4.0",
+      "default": "Example: https://your-domain.atlassian.net"
+    },
+    "looker_hint": "If you load clientId/clientSecret, KPI Manager performs POST /api/4.0/login. You can also use a direct token."
+  },
+  "subperiod_modal": {
+    "loading_periods": "Loading periods...",
+    "select_period": "Select a period",
+    "no_periods": "No periods available",
+    "load_error": "Could not load periods.",
+    "no_periods_hint": "There are no created periods yet. First create one in the Periods screen.",
+    "select_period_hint": "Select a period to view sub-periods.",
+    "new": "New sub-period",
+    "start": "Start",
+    "end": "End",
+    "empty": "There are no sub-periods for this calendar and period."
+  },
+  "target_preview": {
+    "filter_a": "Filter A",
+    "filter_b": "Filter B",
+    "loading": "Testing target…",
+    "value_only": "Value: {{value}}",
+    "value_ab": "A: {{a}} · B: {{b}} · Value: {{value}}",
+    "range": "Range: {{from}} → {{to}}"
+  },
+  "preview_meta": {
+    "not_available": "N/A",
+    "labels": {
+      "connector": "Connector",
+      "requested_resource": "Requested resource",
+      "resolved_resource": "Resolved resource",
+      "format": "Format",
+      "aggregation": "Aggregation",
+      "rows": "Rows",
+      "result_path": "Result path",
+      "key_path": "Key path",
+      "value_path": "Value path",
+      "extracted_value": "Extracted value"
+    },
+    "rows_summary": "{{matched}} evaluated · {{mapped}} mapped · {{unmapped}} without mapping",
+    "dashboard_element_resolved": "Resolved dashboard element:",
+    "unmapped_warning": "Unmapped keys detected",
+    "unmapped_more": "and {{count}} more.",
+    "sample_rows": "Sample detected rows",
+    "request_url": "Request URL",
+    "table": {
+      "external_key": "External key",
+      "preview_value": "Preview value"
+    }
+  },
+  "scope_kpi_form": {
+    "title_new": "New Group KPI",
+    "title_edit": "Edit Group KPI",
+    "name_label": "Name",
+    "base_kpi_label": "Base KPI",
+    "base_kpi_placeholder": "Select a KPI",
+    "scope_label": "Area / Team",
+    "scope_placeholder": "Select an area or team",
+    "period_label": "Period",
+    "period_placeholder": "Select a period",
+    "subperiod_label": "Sub-period",
+    "subperiod_placeholder": "No sub-period",
+    "owner_level_label": "Organizational level",
+    "source_mode_label": "Calculation mode",
+    "target_label": "Target",
+    "weight_label": "Weight (%) ⓘ",
+    "weight_hint": "Weight of this KPI inside the area (1–100%). The sum of all area KPIs should be 100%.",
+    "status_label": "Status",
+    "curation_label": "Curation",
+    "actual_label": "Initial actual",
+    "actual_direct_label": "Initial direct actual",
+    "mixed_note": "The manual or integrated value will be used as the direct component. Aggregation from links will complete the aggregated component.",
+    "direct_weight_label": "Direct weight",
+    "aggregated_weight_label": "Aggregated weight",
+    "direct_label_label": "Direct label",
+    "aggregated_label_label": "Aggregated label",
+    "direct_label_default": "Direct component",
+    "aggregated_label_default": "Aggregated component",
+    "description_label": "Description",
+    "error_required": "Complete name, KPI, area/team, and period",
+    "error_weight_range": "Weight must be between 1 and 100 (%)",
+    "error_mixed_weight": "In mixed mode, direct and aggregated weights must add up to more than 0",
+    "error_save": "Could not save the Group KPI",
+    "save": "Save",
+    "saving": "Saving..."
+  },
+  "scope_kpi_links": {
+    "title": "Group KPI Contributions",
+    "child_type_label": "Child type",
+    "child_types": {
+      "collaborator": "Collaborator KPI",
+      "scope": "Group KPI"
+    },
+    "collaborator_assignment_label": "Collaborator assignment",
+    "collaborator_assignment_placeholder": "Select an assignment",
+    "child_scope_label": "Child Group KPI",
+    "child_scope_placeholder": "Select a Group KPI",
+    "aggregation_method_label": "Method",
+    "aggregation_methods": {
+      "weighted_avg": "Weighted average",
+      "avg": "Average",
+      "sum": "Sum"
+    },
+    "contribution_weight_label": "Contribution weight",
+    "sort_order_label": "Order",
+    "reset": "Clear",
+    "add": "Add link",
+    "update": "Update link",
+    "saving": "Saving...",
+    "recalculate": "Recalculate",
+    "recalculating": "Recalculating...",
+    "table": {
+      "type": "Type",
+      "origin": "Origin",
+      "method": "Method",
+      "weight": "Weight",
+      "order": "Order",
+      "actions": "Actions"
+    },
+    "type_labels": {
+      "collaborator": "Collaborator",
+      "scope": "Group KPI"
+    }
+  },
+  "scope_kpi_detail": {
+    "title_fallback": "Scope KPI Detail",
+    "base_kpi": "Base KPI",
+    "scope": "Scope",
+    "owner": "Owner",
+    "source": "Source",
+    "status": "Status",
+    "loading": "Loading detail...",
+    "summary": "Summary",
+    "actual": "Actual",
+    "target": "Target",
+    "variation": "Variation",
+    "result": "Result",
+    "mixed_title": "Mixed Composition",
+    "mixed_note": "The final value combines the direct and aggregated components. Manual or imported measurements feed the direct component; recalculation from links updates the aggregated component.",
+    "direct_component": "Direct component",
+    "aggregated_component": "Aggregated component",
+    "final_result": "Final result",
+    "weight": "Weight: {{value}}",
+    "mix_ratio": "Mix {{direct}}/{{aggregated}}",
+    "contributions": "Contributions",
+    "open_child": "Open child",
+    "type": "Type",
+    "order": "Order",
+    "child_scope": "Child scope #{{id}}",
+    "assignment": "Assignment #{{id}}",
+    "no_links": "This Scope KPI does not have configured links yet.",
+    "objectives": "Linked objectives",
+    "no_objectives": "No linked strategic objectives.",
+    "runs": "Aggregation runs",
+    "no_message": "No message",
+    "inputs": "Inputs: {{count}}",
+    "system": "System",
+    "no_runs": "There are no aggregation runs for this Scope KPI.",
+    "measurements": "Recent measurements",
+    "no_measurements": "There are no recent measurements for this Scope KPI.",
+    "fallbacks": {
+      "scope_kpi": "Scope KPI #{{id}}",
+      "collaborator": "Collaborator",
+      "kpi": "KPI",
+      "child_scope": "Scope KPI"
+    },
+    "child_types": {
+      "collaborator": "Collaborator",
+      "scope": "Group KPI"
+    }
+  },
+  "sheets_wizard": {
+    "title": "Connect Google Sheets",
+    "subtitle": "Import KPI values directly from your spreadsheet",
+    "progress": "Step {{current}} of {{total}}",
+    "errors": {
+      "preview": "Could not read the spreadsheet",
+      "create": "Could not create the integration",
+      "url_required": "Paste the Google Sheets URL",
+      "tab_required": "Select a tab",
+      "column_required": "Select the column with the KPI value",
+      "bulk_required": "Select at least one collaborator",
+      "bulk_name_required": "Fill in the spreadsheet name for every collaborator",
+      "kpi_required": "Select the target KPI"
+    },
+    "defaults": {
+      "integration_name": "Google Sheets - {{tab}}"
+    },
+    "schedule_options": {
+      "daily": "Every day at 6am",
+      "hourly": "Every hour",
+      "weekly": "Every week (Monday 6am)",
+      "manual": "Manual only"
+    },
+    "kpi_option_fallbacks": {
+      "collaborator": "Collaborator",
+      "kpi": "KPI #{{id}}",
+      "period": "period",
+      "scope_prefix": "[Area]"
+    },
+    "steps": {
+      "url_title": "Which spreadsheet is it?",
+      "url_hint": "Open your Google Sheet and copy the full URL from the browser bar.",
+      "tab_title": "Which tab has the data?",
+      "tab_hint": "Select the sheet tab that contains the KPI values.",
+      "column_title": "Which column contains the KPI value?",
+      "column_hint": "Choose the column that contains the number you want to use as the measurement.",
+      "kpi_title": "Which KPI should receive the data?",
+      "schedule_title": "How often should it sync?",
+      "schedule_hint": "The app will read the spreadsheet automatically at that frequency and update the KPI.",
+      "done_title_one": "{{count}} integration created!",
+      "done_title_other": "{{count}} integrations created!"
+    },
+    "fields": {
+      "sheet_url": "Google Sheets URL",
+      "api_key": "Google API Key",
+      "api_key_optional": "(optional if it is configured on the server)",
+      "aggregation": "If there are multiple rows, use:",
+      "agent_column": "Is there a column that identifies each person?",
+      "agent_column_optional": "(optional - to connect several agents at once)",
+      "integration_name": "Integration name"
+    },
+    "placeholders": {
+      "sheet_url": "https://docs.google.com/spreadsheets/d/...",
+      "api_key": "AIza...",
+      "search_assignment": "Search by collaborator or KPI...",
+      "search_scope": "Search by area or KPI name...",
+      "agent_name": "Exact name in the spreadsheet",
+      "single_value_option": "- No, the spreadsheet has a single value -"
+    },
+    "hints": {
+      "public_or_api_key": "The spreadsheet must be public or your API key must have access to it.",
+      "api_key_help": "How to get an API Key ↗",
+      "no_tabs": "No tabs were found. Check the URL and the API key.",
+      "preview_label": "Preview (first rows):",
+      "agent_column_hint": "The system will filter each row by agent name. In the next step you will choose which collaborators to connect.",
+      "scope_destination": "The data goes to the consolidated area or team KPI. Use this when a single spreadsheet has the aggregated value for the whole group.",
+      "bulk_destination": "Select the collaborators to connect. The system will filter each row using the {{column}} column. You can edit the name if it does not match the spreadsheet exactly.",
+      "single_destination": "The data goes to one specific person. Use this when the spreadsheet has a single value.",
+      "empty_search": "No KPIs were found with that name.",
+      "next_sync": "The next automatic synchronization will occur according to the configured schedule.",
+      "manual_run": "You can also run it manually from the Integrations section."
+    },
+    "loading": {
+      "sheet": "Reading spreadsheet...",
+      "columns": "Loading columns..."
+    },
+    "actions": {
+      "connect": "Connect",
+      "connecting": "Connecting...",
+      "create": "Create integration",
+      "creating": "Creating integration...",
+      "done": "Done"
+    },
+    "aggregation_options": {
+      "FIRST": "First value found",
+      "SUM": "Sum of all values",
+      "AVG": "Average",
+      "MAX": "Maximum value",
+      "MIN": "Minimum value"
+    },
+    "kpi_tabs": {
+      "assignment": "Individual KPI",
+      "scope_kpi": "Area or team KPI"
+    },
+    "bulk_selection_one": "{{count}} collaborator selected - {{count}} integration will be created.",
+    "bulk_selection_other": "{{count}} collaborators selected - {{count}} integrations will be created.",
+    "summary": {
+      "sheet": "Spreadsheet:",
+      "tab": "Tab:",
+      "column": "Column:",
+      "collaborators": "Collaborators:",
+      "destination_kpi": "Target KPI:"
+    },
+    "done": {
+      "bulk_message": "Your {{tab}} spreadsheet is now connected to {{count}} collaborators filtered by the {{column}} column.",
+      "single_message": "Your {{tab}} spreadsheet is now connected to KPI {{kpi}}.",
+      "template_id": "Template #{{id}}",
+      "targets_created": "{{count}} targets created",
+      "target_id": "Target #{{id}}"
+    }
+  },
+  "slack_wizard": {
+    "title": "Connect Slack",
+    "subtitle": "Receive KPI alerts directly in your channel",
+    "progress": "Step {{current}} of {{total}}",
+    "errors": {
+      "save": "Could not save the configuration",
+      "test": "Could not send the test message",
+      "url_required": "Paste the webhook URL",
+      "url_invalid": "The URL must start with https://hooks.slack.com/"
+    },
+    "loading": "Checking configuration...",
+    "status": {
+      "configured": "Slack connected",
+      "configured_hint": "Alerts are sent to the configured webhook:",
+      "change_channel_hint": "To change the channel, disconnect Slack and configure it again.",
+      "not_configured": "Slack not configured",
+      "not_configured_hint": "Connect your Slack workspace to receive automatic alerts when:"
+    },
+    "benefits": {
+      "risk": "A KPI drops below 80% compliance",
+      "missing": "A collaborator has not entered their values",
+      "deadline": "A period is about to expire"
+    },
+    "instructions": {
+      "title": "Create an Incoming Webhook in Slack",
+      "hint": "Follow these steps in Slack. It takes less than 2 minutes:",
+      "step_1": "Open <link>api.slack.com/apps</link> and sign in with your Slack account.",
+      "step_2": "Click <strong>Create New App</strong> and choose <strong>From scratch</strong>.",
+      "step_3": "Give it a name, for example <code>KPI Manager</code>, and choose your workspace.",
+      "step_4": "In the left menu, click <strong>Incoming Webhooks</strong>.",
+      "step_5": "Enable the <strong>Activate Incoming Webhooks</strong> toggle.",
+      "step_6": "Click <strong>Add New Webhook to Workspace</strong>, choose the channel where you want to receive alerts, and confirm.",
+      "step_7": "Copy the generated URL. It starts with <code>https://hooks.slack.com/services/...</code>."
+    },
+    "paste": {
+      "title": "Paste the webhook URL",
+      "hint": "Copy the URL from your Slack app page and paste it here.",
+      "label": "Webhook URL",
+      "placeholder": "https://hooks.slack.com/services/T.../B.../...",
+      "security_hint": "The URL is stored securely. It is not shown in full once saved."
+    },
+    "test": {
+      "title": "Test the connection",
+      "hint": "Webhook saved. Send a test message to verify it reaches your Slack channel.",
+      "preview_title": "KPI Manager",
+      "preview_badge": "App",
+      "preview_message": "KPI Manager connected to Slack",
+      "preview_hint": "You will receive alerts here when KPIs are at risk..."
+    },
+    "done": {
+      "title": "Slack connected!",
+      "message": "The test message was sent successfully. From now on you will receive automatic alerts in your Slack channel.",
+      "hint": "Alerts are triggered when data changes: at-risk KPIs, missing values, or periods close to expiration."
+    },
+    "actions": {
+      "disconnect": "Disconnect Slack",
+      "disconnecting": "Removing...",
+      "send_test": "Send test message",
+      "sending": "Sending...",
+      "not_now": "Not now",
+      "configure": "Configure →",
+      "have_url": "I already have the URL →",
+      "save": "Save →",
+      "saving": "Saving...",
+      "skip_test": "Skip test",
+      "done": "Done"
+    }
+  },
+  "onboarding": {
+    "title": "Initial setup",
+    "progress": "{{done}} of {{total}} steps completed",
+    "hide": "Hide",
+    "completed_label": "Completed",
+    "blocked": "Complete step {{step}} first",
+    "done": {
+      "title": "System configured!",
+      "message": "You can now start loading data and reviewing results."
+    },
+    "steps": {
+      "org": {
+        "title": "Define the organizational structure",
+        "description": "Create your company areas and teams. This defines who is responsible for each KPI.",
+        "action": "Go to Configuration →"
+      },
+      "kpis": {
+        "title": "Create your company KPIs",
+        "description": "Define what you will measure: sales, resolved tickets, NPS, delivery compliance, and more.",
+        "action": "Go to KPIs →"
+      },
+      "period": {
+        "title": "Create an active period",
+        "description": "Define the evaluation cycle (yearly, semiannual, quarterly) and its sub-periods.",
+        "action": "Go to Periods →"
+      },
+      "assignments": {
+        "title": "Assign KPIs to collaborators",
+        "description": "Define which KPI each person owns, including its target and evaluation weight.",
+        "action": "Go to Assignments →"
+      }
+    }
+  },
+  "scope_modal": {
+    "unknown_type": "Unknown type",
+    "name_placeholder": "Ex: Sales, Technology, Operations",
+    "inactive_hint": "Inactive units do not appear in new assignments.",
+    "type_hints": {
+      "area": "Stable area: Sales, HR, Technology…",
+      "team": "Sub-group within an area: Technical Support, B2B Sales…",
+      "company": "Root unit of the organization.",
+      "person": "Individual person as a structure unit.",
+      "product": "Product or business line."
+    },
+    "hierarchy_title": "Hierarchy and calendar",
+    "parent": "Depends on",
+    "no_parent": "— No parent (root unit) —",
+    "parent_hint": "Choose the unit this one depends on. Leave empty if it is a root area.",
+    "calendar": "Measurement calendar",
+    "calendar_inherit": "📅 Inherit the parent calendar",
+    "calendar_hint": "Defines KPI measurement frequency (monthly, quarterly, etc.). If unchanged, it inherits from the parent.",
+    "hide_advanced": "Hide advanced options",
+    "show_advanced": "Show advanced options",
+    "advanced_hint": "Only if you use external connectors (Jira, Sheets, etc.)",
+    "integration_params": "Integration parameters (JSON)",
+    "integration_params_placeholder": "{\"projects\":[\"GT_MISIM\"],\"authProfileId\":1}",
+    "integration_params_hint": "Technical inheritable parameters for integrations. Leave empty if you do not use connectors.",
+    "external_connector": "External connector",
+    "connector_alias": "Connector alias",
+    "connector_alias_placeholder": "sales, commercial, revenue",
+    "connector_alias_hint": "Name under which this unit appears in {{source}}. You can enter several separated by commas."
+  }
+}

@@ -1,11 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { KPI } from '../types'
 import KPIForm from '../components/KPIForm'
 import { useAuth } from '../hooks/useAuth'
 import { useDialog } from '../components/Dialog'
+import { resolveApiErrorMessage } from '../utils/apiErrors'
 import './KPIs.css'
 
 const defaultFormula = (direction?: KPI['direction']) => {
@@ -19,15 +21,14 @@ const defaultFormula = (direction?: KPI['direction']) => {
   }
 }
 
-const sampleResult = (direction?: KPI['direction']) => {
-  switch (direction) {
-    case 'reduction':
-      return 'Ej: target 100, actual 80 → 125%'
-    case 'exact':
-      return 'Ej: target 100, actual 120 → 80% (penaliza desvío)'
-    default:
-      return 'Ej: target 100, actual 120 → 120%'
-  }
+const KPI_DELETE_API_ERROR_KEYS: Record<string, string> = {
+  KPI_NOT_FOUND: 'kpis:dialogs.delete_error_msg',
+  KPI_FORBIDDEN_DELETE: 'kpis:dialogs.api_errors.delete_forbidden',
+  KPI_DELETE_IN_USE: 'kpis:dialogs.api_errors.delete_in_use',
+}
+
+const KPI_CLOSE_PERIOD_API_ERROR_KEYS: Record<string, string> = {
+  ASSIGNMENT_CLOSE_PERIOD_REQUIRED: 'kpis:dialogs.api_errors.close_period_required',
 }
 
 export default function KPIs() {
@@ -35,11 +36,12 @@ export default function KPIs() {
   const [editingKPI, setEditingKPI] = useState<KPI | undefined>(undefined)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState('')
-  const [filterPeriodId, setFilterPeriodId] = useState<number | ''>('') // filtro por período
+  const [filterPeriodId, setFilterPeriodId] = useState<number | ''>('')
 
   const queryClient = useQueryClient()
   const { isCollaborator } = useAuth()
   const dialog = useDialog()
+  const { t } = useTranslation(['kpis', 'common'])
 
   const { data: kpis, isLoading } = useQuery<KPI[]>(
     'kpis',
@@ -87,7 +89,13 @@ export default function KPIs() {
         queryClient.invalidateQueries('kpis')
       },
       onError: (error: any) => {
-        void dialog.alert(error.response?.data?.error || 'Error al eliminar KPI. Verificá que no tenga asignaciones asociadas.', { title: 'Error al eliminar', variant: 'danger' })
+        void dialog.alert(
+          resolveApiErrorMessage(error, t, {
+            codeMap: KPI_DELETE_API_ERROR_KEYS,
+            fallbackKey: 'dialogs.delete_error_msg',
+          }),
+          { title: t('dialogs.delete_error_title'), variant: 'danger' }
+        )
       },
     }
   )
@@ -102,7 +110,13 @@ export default function KPIs() {
         queryClient.invalidateQueries('collaborator-kpis-summary')
       },
       onError: (error: any) => {
-        void dialog.alert(error.response?.data?.error || 'Error al cerrar el KPI en el período.', { title: 'Error', variant: 'danger' })
+        void dialog.alert(
+          resolveApiErrorMessage(error, t, {
+            codeMap: KPI_CLOSE_PERIOD_API_ERROR_KEYS,
+            fallbackKey: 'dialogs.close_period_error',
+          }),
+          { title: t('common:error_title'), variant: 'danger' }
+        )
       },
     }
   )
@@ -126,31 +140,37 @@ export default function KPIs() {
 
   const getDirectionBadge = (direction?: KPI['direction']) => {
     const dirConfig = {
-      growth: { label: 'Crecimiento', class: 'type-growth' },
-      reduction: { label: 'Reducción', class: 'type-reduction' },
-      exact: { label: 'Exacto', class: 'type-exact' },
+      growth: { key: 'direction.growth', class: 'type-growth' },
+      reduction: { key: 'direction.reduction', class: 'type-reduction' },
+      exact: { key: 'direction.exact', class: 'type-exact' },
     }
     const config = dirConfig[direction || 'growth']
-    return <span className={`type-badge ${config.class}`}>{config.label}</span>
+    return <span className={`type-badge ${config.class}`}>{t(config.key)}</span>
+  }
+
+  const getFormulaSample = (direction?: KPI['direction']) => {
+    if (direction === 'reduction') return t('card.formula_sample_reduction')
+    if (direction === 'exact') return t('card.formula_sample_exact')
+    return t('card.formula_sample_growth')
   }
 
   const handleCreate = () => {
-  if (isCollaborator) return
-  setEditingKPI(undefined)
-  setShowForm(true)
-}
+    if (isCollaborator) return
+    setEditingKPI(undefined)
+    setShowForm(true)
+  }
 
   const handleEdit = (kpi: KPI) => {
-  if (isCollaborator) return
-  setEditingKPI(kpi)
-  setShowForm(true)
-}
+    if (isCollaborator) return
+    setEditingKPI(kpi)
+    setShowForm(true)
+  }
 
   const handleDelete = async (id: number, name: string) => {
     if (isCollaborator) return
     const ok = await dialog.confirm(
-      `¿Estás seguro de eliminar el KPI "${name}"? Esta acción no se puede deshacer y eliminará todas las asignaciones asociadas.`,
-      { title: 'Eliminar KPI', confirmLabel: 'Eliminar', variant: 'danger' }
+      t('dialogs.delete_msg', { name }),
+      { title: t('dialogs.delete_title'), confirmLabel: t('dialogs.delete_confirm'), variant: 'danger' }
     )
     if (ok) deleteMutation.mutate(id)
   }
@@ -184,31 +204,31 @@ export default function KPIs() {
       <div className="page-header">
         <div>
           <h1>KPIs</h1>
-          <p className="subtitle">Gestiona las definiciones de KPIs</p>
+          <p className="subtitle">{t('subtitle')}</p>
         </div>
         {!isCollaborator && (
           <button className="btn-primary" onClick={handleCreate}>
-            + Crear KPI
+            {t('header.create')}
           </button>
         )}
       </div>
 
       <div className="filters-section">
         <div className="search-group">
-          <label htmlFor="search">Buscar:</label>
+          <label htmlFor="search">{t('filters.search_label')}</label>
           <input
             type="text"
             id="search"
-            placeholder="Buscar por nombre o descripción..."
+            placeholder={t('filters.search_placeholder')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="search-input"
           />
         </div>
         <div className="filter-group">
-          <label htmlFor="filter-type">Tipo:</label>
+          <label htmlFor="filter-type">{t('filters.type')}</label>
           <select id="filter-type" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-            <option value="">Todos los tipos</option>
+            <option value="">{t('filters.all_types')}</option>
             <option value="manual">Manual</option>
             <option value="count">Count</option>
             <option value="ratio">Ratio</option>
@@ -217,13 +237,13 @@ export default function KPIs() {
           </select>
         </div>
         <div className="filter-group">
-          <label htmlFor="filter-period">Período:</label>
+          <label htmlFor="filter-period">{t('filters.period')}</label>
           <select
             id="filter-period"
             value={filterPeriodId}
             onChange={(e) => setFilterPeriodId(e.target.value ? Number(e.target.value) : '')}
           >
-            <option value="">Todos</option>
+            <option value="">{t('filters.all_periods')}</option>
             {periods?.map((p: any) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -240,7 +260,7 @@ export default function KPIs() {
               setFilterPeriodId('')
             }}
           >
-            Limpiar filtros
+            {t('filters.clear')}
           </button>
         )}
       </div>
@@ -248,7 +268,7 @@ export default function KPIs() {
       {!isLoading && filteredKPIs && filteredKPIs.length > 0 && (
         <div className="kpi-stats">
           <div className="stat-pill">
-            <span className="stat-label">Total</span>
+            <span className="stat-label">{t('stats.total')}</span>
             <span className="stat-value">{totals.total}</span>
           </div>
           <div className="stat-pill stat-manual">
@@ -276,11 +296,11 @@ export default function KPIs() {
 
       <div className="table-container">
         {isLoading ? (
-          <div className="loading">Cargando KPIs...</div>
+          <div className="loading">{t('loading')}</div>
         ) : filteredKPIs && filteredKPIs.length > 0 ? (
           <>
             <div className="results-info">
-              Mostrando {filteredKPIs.length} de {kpis?.length || 0} KPIs
+              {t('results.showing', { shown: filteredKPIs.length, total: kpis?.length || 0 })}
             </div>
             <div className="kpi-grid">
               {filteredKPIs.map((kpi) => (
@@ -295,25 +315,25 @@ export default function KPIs() {
                       {getDirectionBadge(kpi.direction)}
                     </div>
                   </div>
-                  <p className="kpi-description">{kpi.description || 'Sin descripción'}</p>
+                  <p className="kpi-description">{kpi.description || t('card.no_description')}</p>
                   <div className="kpi-meta">
                     <div>
-                      <span className="meta-label">Criterio</span>
-                      <p className="meta-value">{kpi.criteria || 'No definido'}</p>
+                      <span className="meta-label">{t('card.criteria_label')}</span>
+                      <p className="meta-value">{kpi.criteria || t('card.criteria_none')}</p>
                     </div>
                     <div>
-                      <span className="meta-label">Fórmula</span>
+                      <span className="meta-label">{t('card.formula_label')}</span>
                       <p className="meta-value mono" title={kpi.formula || defaultFormula(kpi.direction)}>
-                        {kpi.formula ? 'Personalizada' : 'Por defecto'} - {sampleResult(kpi.direction)}
+                        {kpi.formula ? t('card.formula_custom') : t('card.formula_default')} - {getFormulaSample(kpi.direction)}
                       </p>
                     </div>
                     {kpi.macroKPIId && (
                       <div>
                         <span
                           className="meta-label"
-                          title="KPI Macro: agrupa varios KPIs individuales bajo un mismo indicador padre. Su resultado es el promedio ponderado de los KPIs que lo componen."
+                          title={t('card.macro_tooltip')}
                         >
-                          KPI agrupador ⓘ
+                          {t('card.macro_label')}
                         </span>
                         <p className="meta-value">
                           {kpis?.find((k: any) => k.id === kpi.macroKPIId)?.name || `KPI #${kpi.macroKPIId}`}
@@ -321,14 +341,16 @@ export default function KPIs() {
                       </div>
                     )}
                     <div>
-                      <span className="meta-label">Uso</span>
+                      <span className="meta-label">{t('card.usage_label')}</span>
                       <p className="meta-value">
-                        {usageByKpi[kpi.id]?.count || 0} asignaciones ·{' '}
-                        {usageByKpi[kpi.id] ? usageByKpi[kpi.id].periods.size : 0} períodos
+                        {t('card.usage_value', {
+                          count: usageByKpi[kpi.id]?.count || 0,
+                          periods: usageByKpi[kpi.id] ? usageByKpi[kpi.id].periods.size : 0,
+                        })}
                       </p>
                     </div>
                     <div>
-                      <span className="meta-label">Períodos</span>
+                      <span className="meta-label">{t('card.periods_label')}</span>
                       <p className="meta-value">
                         {kpi.periodIds && kpi.periodIds.length > 0
                           ? kpi.periodIds
@@ -338,24 +360,24 @@ export default function KPIs() {
                           ? Array.from(usageByKpi[kpi.id].periods)
                               .map((pid) => periods?.find((p: any) => p.id === pid)?.name || `Período #${pid}`)
                               .join(', ')
-                          : 'Sin asignaciones'}
+                          : t('card.no_assignments')}
                       </p>
                     </div>
                   </div>
                   <div className="action-row">
                     {isCollaborator ? (
-                      <span className="read-only-pill">Solo lectura</span>
+                      <span className="read-only-pill">{t('card.read_only')}</span>
                     ) : (
                       <>
                         <button className="btn-text" onClick={() => handleEdit(kpi)}>
-                          Editar
+                          {t('actions.edit')}
                         </button>
                         <button
                           className="btn-text danger"
                           onClick={() => handleDelete(kpi.id, kpi.name)}
                           disabled={deleteMutation.isLoading}
                         >
-                          Eliminar
+                          {t('actions.delete')}
                         </button>
                         <button
                           className="btn-text warning"
@@ -363,8 +385,8 @@ export default function KPIs() {
                             if (!filterPeriodId) return
                             const periodName = getPeriodName(filterPeriodId)
                             const ok = await dialog.confirm(
-                              `¿Cerrar el KPI "${kpi.name}" en ${periodName}? Esta acción cerrará todas sus asignaciones en ese período.`,
-                              { title: 'Cerrar KPI en período', confirmLabel: 'Cerrar', variant: 'warning' }
+                              t('dialogs.close_period_msg', { name: kpi.name, period: periodName }),
+                              { title: t('dialogs.close_period_title'), confirmLabel: t('dialogs.close_period_confirm'), variant: 'warning' }
                             )
                             if (ok) {
                               closePeriodKpiMutation.mutate({
@@ -376,11 +398,11 @@ export default function KPIs() {
                           disabled={!filterPeriodId || closePeriodKpiMutation.isLoading}
                           title={
                             filterPeriodId
-                              ? 'Cerrar KPI en el período seleccionado'
-                              : 'Selecciona un período para cerrar el KPI'
+                              ? t('actions.close_period_title_active')
+                              : t('actions.close_period_title_inactive')
                           }
                         >
-                          Cerrar KPI (período)
+                          {t('actions.close_period')}
                         </button>
                       </>
                     )}
@@ -392,8 +414,8 @@ export default function KPIs() {
         ) : kpis && kpis.length > 0 ? (
           <div className="empty-state">
             <div className="empty-icon">:(</div>
-            <h3>No se encontraron KPIs</h3>
-            <p>Intenta ajustar los filtros de búsqueda</p>
+            <h3>{t('empty.no_results_title')}</h3>
+            <p>{t('empty.no_results_subtitle')}</p>
             <button
               className="btn-primary"
               onClick={() => {
@@ -402,17 +424,19 @@ export default function KPIs() {
                 setFilterPeriodId('')
               }}
             >
-              Limpiar filtros
+              {t('empty.no_results_clear')}
             </button>
           </div>
         ) : (
           <div className="empty-state">
             <div className="empty-icon">📊</div>
-            <h3>Todavía no hay KPIs definidos</h3>
-            <p>Un KPI es el indicador que vas a medir: ventas mensuales, tickets resueltos, NPS, cumplimiento de entregas, etc.</p>
-            <p className="empty-state-hint">Antes de crear KPIs asegurate de tener al menos un área configurada en <a href="/configuracion">Configuración</a>.</p>
+            <h3>{t('empty.no_data_title')}</h3>
+            <p>{t('empty.no_data_subtitle')}</p>
+            <p className="empty-state-hint">
+              {t('empty.no_data_hint_pre')}<a href="/configuracion">{t('empty.no_data_hint_link')}</a>.
+            </p>
             <button className="btn-primary" onClick={handleCreate}>
-              Crear primer KPI
+              {t('empty.no_data_btn')}
             </button>
           </div>
         )}

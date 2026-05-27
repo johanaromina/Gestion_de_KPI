@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react'
 import { useQuery } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import {
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -10,9 +11,9 @@ import './Analytics.css'
 
 type Tab = 'tree' | 'trends' | 'checkins'
 
-const formatWeek = (dateStr: string) => {
+const formatWeek = (dateStr: string, locale: string) => {
   const d = new Date(dateStr + 'T12:00:00')
-  return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
+  return d.toLocaleDateString(locale, { day: 'numeric', month: 'short' })
 }
 
 const flattenTree = (nodes: any[], depth = 0): any[] => {
@@ -28,9 +29,11 @@ const completionColor = (rate: number) =>
   rate >= 80 ? '#16a34a' : rate >= 50 ? '#d97706' : '#dc2626'
 
 export default function Analytics() {
+  const { t, i18n } = useTranslation(['analytics', 'common'])
   const [tab, setTab] = useState<Tab>('tree')
   const [periodId, setPeriodId] = useState<number | null>(null)
   const [checkInWeeks, setCheckInWeeks] = useState(12)
+  const locale = i18n.resolvedLanguage?.startsWith('en') ? 'en-US' : 'es-AR'
 
   const { data: periods } = useQuery<any[]>(
     'periods',
@@ -70,17 +73,17 @@ export default function Analytics() {
     .slice()
     .reverse()
     .map((row) => ({
-      semana: formatWeek(row.weekStart),
-      'Check-ins': Number(row.total),
-      'Mood': row.avgMood ? Number(Number(row.avgMood).toFixed(1)) : null,
+      week: formatWeek(row.weekStart, locale),
+      checkIns: Number(row.total),
+      mood: row.avgMood ? Number(Number(row.avgMood).toFixed(1)) : null,
     }))
 
   return (
     <div className="analytics-page">
       <div className="analytics-header">
         <div>
-          <h1>Analítica</h1>
-          <p className="subtitle">Árbol ejecutivo, tendencias de KPIs y pulso del equipo</p>
+          <h1>{t('analytics:title')}</h1>
+          <p className="subtitle">{t('analytics:subtitle')}</p>
         </div>
         <select
           className="analytics-period-select"
@@ -95,13 +98,13 @@ export default function Analytics() {
 
       <div className="analytics-tabs">
         <button className={`analytics-tab ${tab === 'tree' ? 'active' : ''}`} onClick={() => setTab('tree')}>
-          Árbol ejecutivo
+          {t('analytics:tabs.tree')}
         </button>
         <button className={`analytics-tab ${tab === 'trends' ? 'active' : ''}`} onClick={() => setTab('trends')}>
-          Tendencias KPI
+          {t('analytics:tabs.trends')}
         </button>
         <button className={`analytics-tab ${tab === 'checkins' ? 'active' : ''}`} onClick={() => setTab('checkins')}>
-          Check-ins
+          {t('analytics:tabs.checkins')}
         </button>
       </div>
 
@@ -109,20 +112,20 @@ export default function Analytics() {
       {tab === 'tree' && (
         <div className="analytics-section">
           {loadingTree ? (
-            <div className="analytics-empty">Cargando...</div>
+            <div className="analytics-empty">{t('common:loading')}</div>
           ) : treeRows.length === 0 ? (
-            <div className="analytics-empty">No hay datos para este período.</div>
+            <div className="analytics-empty">{t('analytics:empty.period_data')}</div>
           ) : (
             <div className="analytics-table-wrap">
               <table className="analytics-table">
                 <thead>
                   <tr>
-                    <th>Scope</th>
-                    <th>KPIs totales</th>
-                    <th>Aprobados</th>
-                    <th>Completitud</th>
-                    <th>Variación prom.</th>
-                    <th>Resultado pond.</th>
+                    <th>{t('analytics:table.scope')}</th>
+                    <th>{t('analytics:table.total_kpis')}</th>
+                    <th>{t('analytics:table.approved')}</th>
+                    <th>{t('analytics:table.completion')}</th>
+                    <th>{t('analytics:table.average_variation')}</th>
+                    <th>{t('analytics:table.weighted_result')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -174,18 +177,18 @@ export default function Analytics() {
         <div className="analytics-section">
           {trends?.scope && (
             <p className="analytics-meta">
-              Scope: <strong>{trends.scope.name}</strong>
-              {trends.periodName && <> · Período: <strong>{trends.periodName}</strong></>}
+              {t('analytics:meta.scope')} <strong>{trends.scope.name}</strong>
+              {trends.periodName && <> · {t('analytics:meta.period')} <strong>{trends.periodName}</strong></>}
             </p>
           )}
           {loadingTrends ? (
-            <div className="analytics-empty">Cargando...</div>
+            <div className="analytics-empty">{t('common:loading')}</div>
           ) : !trends?.periodSeries?.length ? (
-            <div className="analytics-empty">No hay tendencias disponibles para este período.</div>
+            <div className="analytics-empty">{t('analytics:empty.trends')}</div>
           ) : (
             <div className="analytics-charts">
               <div className="analytics-chart-card">
-                <h3>Resultado ponderado y variación por período</h3>
+                <h3>{t('analytics:charts.weighted_and_variation')}</h3>
                 <ResponsiveContainer width="100%" height={280}>
                   <LineChart data={trends.periodSeries}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -193,35 +196,35 @@ export default function Analytics() {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Line type="monotone" dataKey="weightedResultTotal" stroke="#f97316" name="Resultado pond." dot strokeWidth={2} />
-                    <Line type="monotone" dataKey="averageVariation" stroke="#6366f1" name="Variación prom. %" dot strokeDasharray="4 2" strokeWidth={2} />
+                    <Line type="monotone" dataKey="weightedResultTotal" stroke="#f97316" name={t('analytics:series.weighted_result')} dot strokeWidth={2} />
+                    <Line type="monotone" dataKey="averageVariation" stroke="#6366f1" name={t('analytics:series.average_variation')} dot strokeDasharray="4 2" strokeWidth={2} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
 
               <div className="analytics-chart-card">
-                <h3>Completitud por período</h3>
+                <h3>{t('analytics:charts.completion_by_period')}</h3>
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={trends.periodSeries}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="periodName" tick={{ fontSize: 12 }} />
                     <YAxis unit="%" domain={[0, 100]} />
                     <Tooltip />
-                    <Bar dataKey="completionRate" fill="#f97316" name="Completitud %" />
+                    <Bar dataKey="completionRate" fill="#f97316" name={t('analytics:series.completion')} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
 
               {trends.subPeriodSeries?.length > 0 && (
                 <div className="analytics-chart-card">
-                  <h3>Resultado pond. por subperíodo ({trends.periodName})</h3>
+                  <h3>{t('analytics:charts.weighted_by_subperiod', { period: trends.periodName })}</h3>
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={trends.subPeriodSeries}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="subPeriodName" tick={{ fontSize: 12 }} />
                       <YAxis />
                       <Tooltip />
-                      <Bar dataKey="weightedResultTotal" fill="#6366f1" name="Resultado pond." />
+                      <Bar dataKey="weightedResultTotal" fill="#6366f1" name={t('analytics:series.weighted_result')} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -236,7 +239,7 @@ export default function Analytics() {
         <div className="analytics-section">
           <div className="analytics-toolbar">
             <label>
-              Últimas semanas
+              {t('analytics:toolbar.last_weeks')}
               <select value={checkInWeeks} onChange={(e) => setCheckInWeeks(Number(e.target.value))}>
                 <option value={4}>4</option>
                 <option value={8}>8</option>
@@ -247,36 +250,37 @@ export default function Analytics() {
           </div>
 
           {loadingCheckIns ? (
-            <div className="analytics-empty">Cargando...</div>
+            <div className="analytics-empty">{t('common:loading')}</div>
           ) : !checkInChartData.length ? (
-            <div className="analytics-empty">No hay check-ins registrados en este período.</div>
+            <div className="analytics-empty">{t('analytics:empty.checkins')}</div>
           ) : (
             <div className="analytics-charts">
               <div className="analytics-chart-card">
-                <h3>Participación semanal</h3>
+                <h3>{t('analytics:charts.weekly_participation')}</h3>
                 <ResponsiveContainer width="100%" height={240}>
                   <BarChart data={checkInChartData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="semana" tick={{ fontSize: 11 }} />
+                    <XAxis dataKey="week" tick={{ fontSize: 11 }} />
                     <YAxis allowDecimals={false} />
                     <Tooltip />
-                    <Bar dataKey="Check-ins" fill="#f97316" />
+                    <Bar dataKey="checkIns" fill="#f97316" name={t('analytics:series.checkins')} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
 
               <div className="analytics-chart-card">
-                <h3>Mood promedio del equipo (1 = muy mal · 5 = muy bien)</h3>
+                <h3>{t('analytics:charts.team_mood')}</h3>
                 <ResponsiveContainer width="100%" height={240}>
                   <LineChart data={checkInChartData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="semana" tick={{ fontSize: 11 }} />
+                    <XAxis dataKey="week" tick={{ fontSize: 11 }} />
                     <YAxis domain={[1, 5]} ticks={[1, 2, 3, 4, 5]} />
                     <Tooltip />
                     <Line
                       type="monotone"
-                      dataKey="Mood"
+                      dataKey="mood"
                       stroke="#6366f1"
+                      name={t('analytics:series.mood')}
                       dot
                       strokeWidth={2}
                       connectNulls

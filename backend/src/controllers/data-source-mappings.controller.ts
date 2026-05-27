@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { pool } from '../config/database'
 import { logger } from '../utils/logger'
+import { apiError, sendApiError, sendCaughtApiError } from '../utils/api-errors'
 
 const normalizeExternalKey = (value: any) =>
   String(value ?? '')
@@ -71,15 +72,15 @@ const syncMappingsForEntity = async (connection: any, payload: SyncMappingsPaylo
   const { sourceType, entityType, entityId, mappings } = payload
 
   if (!['collaborator', 'org_scope'].includes(entityType)) {
-    throw new Error('entityType soportado: collaborator, org_scope')
+    throw apiError(400, 'DATASOURCE_MAPPING_ENTITY_TYPE_INVALID', 'entityType soportado: collaborator, org_scope')
   }
   if (!Number.isFinite(entityId) || entityId <= 0) {
-    throw new Error('entityId es requerido')
+    throw apiError(400, 'DATASOURCE_MAPPING_ENTITY_ID_REQUIRED', 'entityId es requerido')
   }
 
   const exists = await validateEntityExists(entityType, entityId)
   if (!exists) {
-    throw new Error('Entidad no encontrada para el mapping')
+    throw apiError(404, 'DATASOURCE_MAPPING_ENTITY_NOT_FOUND', 'Entidad no encontrada para el mapping')
   }
 
   const deduped = new Map<string, { externalKey: string; externalLabel?: string | null; metadata?: any }>()
@@ -152,7 +153,7 @@ export const listDataSourceMappings = async (req: Request, res: Response) => {
     )
   } catch (error: any) {
     logger.error('Error listing data source mappings:', error)
-    res.status(500).json({ error: 'Error al obtener data source mappings' })
+    return sendApiError(res, 500, 'DATASOURCE_MAPPING_FETCH_FAILED', 'Error al obtener data source mappings')
   }
 }
 
@@ -167,9 +168,11 @@ export const syncDataSourceMappings = async (req: Request, res: Response) => {
   } catch (error: any) {
     await connection.rollback()
     logger.error('Error syncing data source mappings:', error)
-    const message = error?.message || 'Error al sincronizar data source mappings'
-    const status = message === 'Entidad no encontrada para el mapping' ? 404 : 400
-    res.status(status).json({ error: message })
+    return sendCaughtApiError(res, error, {
+      status: 400,
+      code: 'DATASOURCE_MAPPING_SYNC_FAILED',
+      error: 'Error al sincronizar data source mappings',
+    })
   } finally {
     connection.release()
   }
@@ -181,7 +184,7 @@ export const bulkSyncDataSourceMappings = async (req: Request, res: Response) =>
     const items = Array.isArray(req.body?.items) ? req.body.items.map(parseSyncPayload) : []
 
     if (items.length === 0) {
-      return res.status(400).json({ error: 'items es requerido y debe tener al menos un elemento' })
+      return sendApiError(res, 400, 'DATASOURCE_MAPPING_ITEMS_REQUIRED', 'items es requerido y debe tener al menos un elemento')
     }
 
     await connection.beginTransaction()
@@ -202,9 +205,11 @@ export const bulkSyncDataSourceMappings = async (req: Request, res: Response) =>
   } catch (error: any) {
     await connection.rollback()
     logger.error('Error bulk syncing data source mappings:', error)
-    const message = error?.message || 'Error al sincronizar data source mappings'
-    const status = message === 'Entidad no encontrada para el mapping' ? 404 : 400
-    res.status(status).json({ error: message })
+    return sendCaughtApiError(res, error, {
+      status: 400,
+      code: 'DATASOURCE_MAPPING_SYNC_FAILED',
+      error: 'Error al sincronizar data source mappings',
+    })
   } finally {
     connection.release()
   }

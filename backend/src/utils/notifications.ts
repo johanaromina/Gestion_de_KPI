@@ -20,8 +20,8 @@ const hashValue = (value: string) => crypto.createHash('sha256').update(value).d
 
 export async function buildNotificationSummary(): Promise<NotificationSummary> {
   const [kpiRows] = await pool.query<any[]>(
-    `SELECT ck.id as assignmentId, ck.collaboratorId, ck.kpiId, ck.target, ck.actual, ck.status,
-            c.name as collaboratorName, k.name as kpiName, k.type as kpiType, k.direction as kpiDirection
+    `SELECT ck.id as assignmentId, ck.collaboratorId, ck.kpiId, ck.actual, ck.variation, ck.status,
+            c.name as collaboratorName, k.name as kpiName
      FROM collaborator_kpis ck
      JOIN collaborators c ON c.id = ck.collaboratorId
      JOIN kpis k ON k.id = ck.kpiId
@@ -32,7 +32,6 @@ export async function buildNotificationSummary(): Promise<NotificationSummary> {
   const atRisk: { collaboratorId: number; collaboratorName: string; kpiName: string; variation: number }[] = []
 
   for (const row of kpiRows || []) {
-    const targetValue = Number(row.target) || 0
     const actualValue = row.actual !== null && row.actual !== undefined ? Number(row.actual) : null
 
     if (actualValue === null) {
@@ -49,15 +48,8 @@ export async function buildNotificationSummary(): Promise<NotificationSummary> {
       continue
     }
 
-    if (targetValue <= 0) continue
-
-    const direction = row.kpiDirection || row.kpiType || 'growth'
-    const variation =
-      direction === 'reduction'
-        ? actualValue > 0
-          ? (targetValue / actualValue) * 100
-          : 0
-        : (actualValue / targetValue) * 100
+    const variation = row.variation !== null && row.variation !== undefined ? Number(row.variation) : null
+    if (variation === null) continue
 
     if (variation < 80) {
       atRisk.push({

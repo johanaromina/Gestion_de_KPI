@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
+import { Trans, useTranslation } from 'react-i18next'
 import api from '../services/api'
+import { resolveApiErrorMessage } from '../utils/apiErrors'
 import './SlackWizard.css'
 
 interface SlackWizardProps {
@@ -10,6 +12,7 @@ interface SlackWizardProps {
 type Step = 'status' | 'instructions' | 'paste' | 'test' | 'done'
 
 export default function SlackWizard({ onClose }: SlackWizardProps) {
+  const { t } = useTranslation(['config', 'common'])
   const [step, setStep] = useState<Step>('status')
   const [webhookUrl, setWebhookUrl] = useState('')
   const [error, setError] = useState('')
@@ -41,7 +44,11 @@ export default function SlackWizard({ onClose }: SlackWizardProps) {
         setStep('test')
       },
       onError: (err: any) => {
-        setError(err?.response?.data?.error || 'Error al guardar')
+        setError(
+          resolveApiErrorMessage(err, t, {
+            fallbackKey: 'config:slack_wizard.errors.save',
+          })
+        )
       },
     }
   )
@@ -56,7 +63,11 @@ export default function SlackWizard({ onClose }: SlackWizardProps) {
         setStep('done')
       },
       onError: (err: any) => {
-        setError(err?.response?.data?.error || 'No se pudo enviar el mensaje de prueba')
+        setError(
+          resolveApiErrorMessage(err, t, {
+            fallbackKey: 'config:slack_wizard.errors.test',
+          })
+        )
       },
     }
   )
@@ -75,11 +86,11 @@ export default function SlackWizard({ onClose }: SlackWizardProps) {
 
   const handleSave = () => {
     if (!webhookUrl.trim()) {
-      setError('Pegá la URL del webhook')
+      setError(t('config:slack_wizard.errors.url_required'))
       return
     }
     if (!webhookUrl.startsWith('https://hooks.slack.com/')) {
-      setError('La URL debe empezar con https://hooks.slack.com/')
+      setError(t('config:slack_wizard.errors.url_invalid'))
       return
     }
     setError('')
@@ -97,8 +108,8 @@ export default function SlackWizard({ onClose }: SlackWizardProps) {
           <div className="slack-wizard-title">
             <span className="slack-wizard-icon">💬</span>
             <div>
-              <h2>Conectar Slack</h2>
-              <p>Recibí alertas de KPIs directamente en tu canal</p>
+              <h2>{t('config:slack_wizard.title')}</h2>
+              <p>{t('config:slack_wizard.subtitle')}</p>
             </div>
           </div>
           <button className="slack-wizard-close" onClick={onClose}>✕</button>
@@ -112,7 +123,9 @@ export default function SlackWizard({ onClose }: SlackWizardProps) {
                 className={`progress-dot ${n < stepIndex[step] ? 'done' : n === stepIndex[step] ? 'active' : ''}`}
               />
             ))}
-            <span className="progress-label">Paso {stepIndex[step]} de {totalSteps}</span>
+            <span className="progress-label">
+              {t('config:slack_wizard.progress', { current: stepIndex[step], total: totalSteps })}
+            </span>
           </div>
         )}
 
@@ -124,14 +137,14 @@ export default function SlackWizard({ onClose }: SlackWizardProps) {
           {step === 'status' && (
             <div className="wizard-step">
               {isLoading ? (
-                <div className="slack-loading">Verificando configuración…</div>
+                <div className="slack-loading">{t('config:slack_wizard.loading')}</div>
               ) : config?.configured ? (
                 <>
                   <div className="slack-status-badge slack-status-badge--ok">
-                    <span>✅</span> Slack conectado
+                    <span>✅</span> {t('config:slack_wizard.status.configured')}
                   </div>
                   <p className="step-hint">
-                    Las alertas se envían al webhook configurado:
+                    {t('config:slack_wizard.status.configured_hint')}
                     <br />
                     <code className="slack-preview">{config.preview}</code>
                   </p>
@@ -141,37 +154,39 @@ export default function SlackWizard({ onClose }: SlackWizardProps) {
                       onClick={() => deleteMutation.mutate()}
                       disabled={deleteMutation.isLoading}
                     >
-                      {deleteMutation.isLoading ? 'Eliminando…' : '🗑 Desconectar Slack'}
+                      {deleteMutation.isLoading ? t('config:slack_wizard.actions.disconnecting') : `🗑 ${t('config:slack_wizard.actions.disconnect')}`}
                     </button>
                     <button
                       className="btn-wizard-primary"
                       onClick={() => testMutation.mutate()}
                       disabled={testMutation.isLoading}
                     >
-                      {testMutation.isLoading ? 'Enviando…' : '📨 Enviar mensaje de prueba'}
+                      {testMutation.isLoading ? t('config:slack_wizard.actions.sending') : `📨 ${t('config:slack_wizard.actions.send_test')}`}
                     </button>
                   </div>
                   <p className="step-hint step-hint-sm" style={{ marginTop: 16 }}>
-                    Para cambiar el canal, desconectá y volvé a configurar.
+                    {t('config:slack_wizard.status.change_channel_hint')}
                   </p>
                 </>
               ) : (
                 <>
                   <div className="slack-status-badge slack-status-badge--off">
-                    <span>⚪</span> Slack no configurado
+                    <span>⚪</span> {t('config:slack_wizard.status.not_configured')}
                   </div>
                   <p className="step-hint">
-                    Conectá tu workspace de Slack para recibir alertas automáticas cuando:
+                    {t('config:slack_wizard.status.not_configured_hint')}
                   </p>
                   <ul className="slack-benefits">
-                    <li>🔴 Un KPI está por debajo del 80% de cumplimiento</li>
-                    <li>📭 Un colaborador no cargó sus valores</li>
-                    <li>📅 Un período está por vencer</li>
+                    <li>🔴 {t('config:slack_wizard.benefits.risk')}</li>
+                    <li>📭 {t('config:slack_wizard.benefits.missing')}</li>
+                    <li>📅 {t('config:slack_wizard.benefits.deadline')}</li>
                   </ul>
                   <div className="wizard-actions">
-                    <button className="btn-wizard-secondary" onClick={onClose}>Ahora no</button>
+                    <button className="btn-wizard-secondary" onClick={onClose}>
+                      {t('config:slack_wizard.actions.not_now')}
+                    </button>
                     <button className="btn-wizard-primary" onClick={() => setStep('instructions')}>
-                      Configurar →
+                      {t('config:slack_wizard.actions.configure')}
                     </button>
                   </div>
                 </>
@@ -182,35 +197,72 @@ export default function SlackWizard({ onClose }: SlackWizardProps) {
           {/* PASO 1: INSTRUCCIONES */}
           {step === 'instructions' && (
             <div className="wizard-step">
-              <h3>Crear un Incoming Webhook en Slack</h3>
-              <p className="step-hint">Seguí estos pasos en Slack (tarda menos de 2 minutos):</p>
+              <h3>{t('config:slack_wizard.instructions.title')}</h3>
+              <p className="step-hint">{t('config:slack_wizard.instructions.hint')}</p>
               <ol className="slack-steps">
                 <li>
-                  Abrí <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer">api.slack.com/apps</a> e iniciá sesión con tu cuenta de Slack.
+                  <Trans
+                    i18nKey="config:slack_wizard.instructions.step_1"
+                    components={{
+                      link: <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer" />,
+                    }}
+                  />
                 </li>
                 <li>
-                  Hacé clic en <strong>Create New App</strong> → elegí <strong>From scratch</strong>.
+                  <Trans
+                    i18nKey="config:slack_wizard.instructions.step_2"
+                    components={{
+                      strong: <strong />,
+                    }}
+                  />
                 </li>
                 <li>
-                  Poné un nombre (ej. <code>KPI Manager</code>) y elegí tu workspace.
+                  <Trans
+                    i18nKey="config:slack_wizard.instructions.step_3"
+                    components={{
+                      code: <code />,
+                    }}
+                  />
                 </li>
                 <li>
-                  En el menú izquierdo, hacé clic en <strong>Incoming Webhooks</strong>.
+                  <Trans
+                    i18nKey="config:slack_wizard.instructions.step_4"
+                    components={{
+                      strong: <strong />,
+                    }}
+                  />
                 </li>
                 <li>
-                  Activá el toggle <strong>Activate Incoming Webhooks</strong>.
+                  <Trans
+                    i18nKey="config:slack_wizard.instructions.step_5"
+                    components={{
+                      strong: <strong />,
+                    }}
+                  />
                 </li>
                 <li>
-                  Hacé clic en <strong>Add New Webhook to Workspace</strong>, elegí el canal donde querés recibir las alertas y confirmá.
+                  <Trans
+                    i18nKey="config:slack_wizard.instructions.step_6"
+                    components={{
+                      strong: <strong />,
+                    }}
+                  />
                 </li>
                 <li>
-                  Copiá la URL que aparece. Empieza con <code>https://hooks.slack.com/services/...</code>
+                  <Trans
+                    i18nKey="config:slack_wizard.instructions.step_7"
+                    components={{
+                      code: <code />,
+                    }}
+                  />
                 </li>
               </ol>
               <div className="wizard-actions">
-                <button className="btn-wizard-secondary" onClick={() => setStep('status')}>← Atrás</button>
+                <button className="btn-wizard-secondary" onClick={() => setStep('status')}>
+                  ← {t('common:back')}
+                </button>
                 <button className="btn-wizard-primary" onClick={() => setStep('paste')}>
-                  Ya tengo la URL →
+                  {t('config:slack_wizard.actions.have_url')}
                 </button>
               </div>
             </div>
@@ -219,30 +271,32 @@ export default function SlackWizard({ onClose }: SlackWizardProps) {
           {/* PASO 2: PEGAR URL */}
           {step === 'paste' && (
             <div className="wizard-step">
-              <h3>Pegá la URL del webhook</h3>
+              <h3>{t('config:slack_wizard.paste.title')}</h3>
               <p className="step-hint">
-                Copiá la URL desde la página de tu app en Slack y pegala acá.
+                {t('config:slack_wizard.paste.hint')}
               </p>
-              <label className="field-label">Webhook URL</label>
+              <label className="field-label">{t('config:slack_wizard.paste.label')}</label>
               <input
                 className="wizard-input"
                 type="text"
-                placeholder="https://hooks.slack.com/services/T.../B.../..."
+                placeholder={t('config:slack_wizard.paste.placeholder')}
                 value={webhookUrl}
                 onChange={(e) => setWebhookUrl(e.target.value)}
                 autoFocus
               />
               <p className="step-hint step-hint-sm">
-                La URL se guarda de forma segura. No se muestra completa una vez guardada.
+                {t('config:slack_wizard.paste.security_hint')}
               </p>
               <div className="wizard-actions">
-                <button className="btn-wizard-secondary" onClick={() => setStep('instructions')}>← Atrás</button>
+                <button className="btn-wizard-secondary" onClick={() => setStep('instructions')}>
+                  ← {t('common:back')}
+                </button>
                 <button
                   className="btn-wizard-primary"
                   onClick={handleSave}
                   disabled={saveMutation.isLoading}
                 >
-                  {saveMutation.isLoading ? 'Guardando…' : 'Guardar →'}
+                  {saveMutation.isLoading ? t('config:slack_wizard.actions.saving') : t('config:slack_wizard.actions.save')}
                 </button>
               </div>
             </div>
@@ -251,26 +305,28 @@ export default function SlackWizard({ onClose }: SlackWizardProps) {
           {/* PASO 3: PRUEBA */}
           {step === 'test' && (
             <div className="wizard-step">
-              <h3>Probar la conexión</h3>
+              <h3>{t('config:slack_wizard.test.title')}</h3>
               <p className="step-hint">
-                Webhook guardado. Enviá un mensaje de prueba para verificar que llegue a tu canal de Slack.
+                {t('config:slack_wizard.test.hint')}
               </p>
               <div className="slack-test-preview">
                 <div className="slack-test-msg">
-                  <strong>KPI Manager</strong>
-                  <span className="slack-test-badge">App</span>
-                  <p>✅ <em>KPI Manager conectado a Slack</em></p>
-                  <p style={{ fontSize: 12, color: '#6b7280' }}>Vas a recibir alertas aquí cuando haya KPIs en riesgo…</p>
+                  <strong>{t('config:slack_wizard.test.preview_title')}</strong>
+                  <span className="slack-test-badge">{t('config:slack_wizard.test.preview_badge')}</span>
+                  <p>✅ <em>{t('config:slack_wizard.test.preview_message')}</em></p>
+                  <p style={{ fontSize: 12, color: '#6b7280' }}>{t('config:slack_wizard.test.preview_hint')}</p>
                 </div>
               </div>
               <div className="wizard-actions">
-                <button className="btn-wizard-secondary" onClick={onClose}>Omitir prueba</button>
+                <button className="btn-wizard-secondary" onClick={onClose}>
+                  {t('config:slack_wizard.actions.skip_test')}
+                </button>
                 <button
                   className="btn-wizard-primary"
                   onClick={() => testMutation.mutate()}
                   disabled={testMutation.isLoading}
                 >
-                  {testMutation.isLoading ? 'Enviando…' : '📨 Enviar mensaje de prueba'}
+                  {testMutation.isLoading ? t('config:slack_wizard.actions.sending') : `📨 ${t('config:slack_wizard.actions.send_test')}`}
                 </button>
               </div>
             </div>
@@ -280,17 +336,17 @@ export default function SlackWizard({ onClose }: SlackWizardProps) {
           {step === 'done' && (
             <div className="wizard-step wizard-done">
               <div className="done-icon">🎉</div>
-              <h3>¡Slack conectado!</h3>
+              <h3>{t('config:slack_wizard.done.title')}</h3>
               <p>
-                El mensaje de prueba se envió correctamente. A partir de ahora vas a recibir alertas
-                automáticas en tu canal de Slack.
+                {t('config:slack_wizard.done.message')}
               </p>
               <p className="step-hint">
-                Las alertas se disparan cuando cambian los datos: KPIs en riesgo, valores faltantes
-                o períodos por vencer.
+                {t('config:slack_wizard.done.hint')}
               </p>
               <div className="wizard-actions">
-                <button className="btn-wizard-primary" onClick={onClose}>Listo</button>
+                <button className="btn-wizard-primary" onClick={onClose}>
+                  {t('config:slack_wizard.actions.done')}
+                </button>
               </div>
             </div>
           )}

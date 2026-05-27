@@ -1,0 +1,43 @@
+{
+  "title": "Analítica",
+  "subtitle": "Árbol ejecutivo, tendencias de KPIs y pulso del equipo",
+  "tabs": {
+    "tree": "Árbol ejecutivo",
+    "trends": "Tendencias KPI",
+    "checkins": "Check-ins"
+  },
+  "empty": {
+    "period_data": "No hay datos para este período.",
+    "trends": "No hay tendencias disponibles para este período.",
+    "checkins": "No hay check-ins registrados en este período."
+  },
+  "table": {
+    "scope": "Scope",
+    "total_kpis": "KPIs totales",
+    "approved": "Aprobados",
+    "completion": "Completitud",
+    "average_variation": "Variación prom.",
+    "weighted_result": "Resultado pond."
+  },
+  "meta": {
+    "scope": "Scope:",
+    "period": "Período:"
+  },
+  "toolbar": {
+    "last_weeks": "Últimas semanas"
+  },
+  "series": {
+    "checkins": "Check-ins",
+    "mood": "Mood",
+    "weighted_result": "Resultado pond.",
+    "average_variation": "Variación prom. %",
+    "completion": "Completitud %"
+  },
+  "charts": {
+    "weighted_and_variation": "Resultado ponderado y variación por período",
+    "completion_by_period": "Completitud por período",
+    "weighted_by_subperiod": "Resultado pond. por subperíodo ({{period}})",
+    "weekly_participation": "Participación semanal",
+    "team_mood": "Mood promedio del equipo (1 = muy mal · 5 = muy bien)"
+  }
+}

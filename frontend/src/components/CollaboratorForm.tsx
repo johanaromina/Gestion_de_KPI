@@ -1,11 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { OrgScope, Collaborator, DataSourceMapping } from '../types'
 import { closeOnOverlayClick, markOverlayPointerDown } from '../utils/modal'
 import { useDialog } from './Dialog'
 import './CollaboratorForm.css'
+import { getApiErrorPayload, resolveApiErrorMessage } from '../utils/apiErrors'
 import {
   buildExternalKeysTextBySourceType,
   DEFAULT_MAPPING_SOURCE_TYPE,
@@ -15,6 +17,20 @@ import {
   normalizeMappingSourceType,
   parseExternalKeysText,
 } from '../utils/dataSourceMappings'
+
+const CREATE_AREA_API_ERROR_KEYS: Record<string, string> = {
+  ORG_SCOPE_NAME_REQUIRED: 'collaborators:form.errors.area_required',
+  ORG_SCOPE_CREATE_FAILED: 'collaborators:form.area_error_create',
+}
+
+const COLLABORATOR_FORM_API_ERROR_KEYS: Record<string, string> = {
+  COLLABORATOR_SCOPE_NOT_FOUND: 'collaborators:form.api_errors.scope_not_found',
+  COLLABORATOR_CREATE_FORBIDDEN: 'collaborators:form.api_errors.create_forbidden',
+  COLLABORATOR_UPDATE_FORBIDDEN: 'collaborators:form.api_errors.update_forbidden',
+  COLLABORATOR_EMAIL_EXISTS: 'collaborators:form.errors.email_duplicate',
+  COLLABORATOR_MANAGER_CYCLE: 'collaborators:form.errors.circular_manager',
+  COLLABORATOR_NOT_FOUND: 'collaborators:form.api_errors.not_found',
+}
 
 interface CollaboratorFormProps {
   collaborator?: Collaborator
@@ -49,6 +65,7 @@ export default function CollaboratorForm({
 
   const queryClient = useQueryClient()
   const dialog = useDialog()
+  const { t } = useTranslation(['collaborators', 'common'])
 
   const { data: collaborators } = useQuery<Collaborator[]>(
     'collaborators',
@@ -171,28 +188,38 @@ export default function CollaboratorForm({
         }))
       },
       onError: (error: any) => {
-        void dialog.alert(error.response?.data?.error || 'Error al crear área', { title: 'Error', variant: 'danger' })
+        void dialog.alert(
+          resolveApiErrorMessage(error, t, {
+            codeMap: CREATE_AREA_API_ERROR_KEYS,
+            fallbackKey: 'form.area_error_create',
+          }),
+          { title: t('common:error_title'), variant: 'danger' }
+        )
       },
     }
   )
 
   const handleCollaboratorMutationError = (error: any) => {
-    const message = error?.response?.data?.error || 'No se pudo guardar el colaborador'
-    const normalized = String(message).toLowerCase()
+    const payload = getApiErrorPayload(error)
+    const code = payload?.code
+    const message = resolveApiErrorMessage(error, t, {
+      codeMap: COLLABORATOR_FORM_API_ERROR_KEYS,
+      fallbackKey: 'form.errors.save_failed',
+    })
 
-    if (normalized.includes('email')) {
+    if (code === 'COLLABORATOR_EMAIL_EXISTS') {
       setErrors((prev) => ({
         ...prev,
-        email: 'Ya existe un colaborador con ese email',
+        email: t('form.errors.email_duplicate'),
       }))
       setSubmitError('')
       return
     }
 
-    if (normalized.includes('circular')) {
+    if (code === 'COLLABORATOR_MANAGER_CYCLE') {
       setErrors((prev) => ({
         ...prev,
-        managerId: 'Este jefe genera una relación circular en la jerarquía',
+        managerId: t('form.errors.circular_manager'),
       }))
       setSubmitError('')
       return
@@ -245,23 +272,23 @@ export default function CollaboratorForm({
     const newErrors: Record<string, string> = {}
 
     if (!formData.name?.trim()) {
-      newErrors.name = 'El nombre es requerido'
+      newErrors.name = t('form.errors.name_required')
     }
 
     if (!formData.position?.trim()) {
-      newErrors.position = 'El cargo es requerido'
+      newErrors.position = t('form.errors.position_required')
     }
 
     if (!formData.area?.trim() && !formData.orgScopeId) {
-      newErrors.area = 'El area es requerida'
+      newErrors.area = t('form.errors.area_required')
     }
 
     if (!formData.role) {
-      newErrors.role = 'El rol es requerido'
+      newErrors.role = t('form.errors.role_required')
     }
 
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Email invalido'
+      newErrors.email = t('form.errors.email_invalid')
     }
 
     setSubmitError('')
@@ -313,7 +340,7 @@ export default function CollaboratorForm({
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>
-            {collaborator?.id ? 'Editar Colaborador' : 'Crear Colaborador'}
+            {collaborator?.id ? t('form.title_edit') : t('form.title_create')}
           </h2>
           <button className="close-button" onClick={onClose}>
             x
@@ -324,7 +351,7 @@ export default function CollaboratorForm({
           {submitError && <div className="form-submit-error">{submitError}</div>}
 
           <div className="form-group">
-            <label htmlFor="name">Nombre Completo *</label>
+            <label htmlFor="name">{t('form.name_label')}</label>
             <input
               type="text"
               id="name"
@@ -333,7 +360,7 @@ export default function CollaboratorForm({
                 setSubmitError('')
                 setFormData({ ...formData, name: e.target.value })
               }}
-              placeholder="Ej: Juan Perez"
+              placeholder={t('form.name_placeholder')}
               className={errors.name ? 'error' : ''}
             />
             {errors.name && (
@@ -343,7 +370,7 @@ export default function CollaboratorForm({
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="position">Cargo *</label>
+              <label htmlFor="position">{t('form.position_label')}</label>
               <input
                 type="text"
                 id="position"
@@ -351,7 +378,7 @@ export default function CollaboratorForm({
                 onChange={(e) =>
                   setFormData({ ...formData, position: e.target.value })
                 }
-                placeholder="Ej: Desarrollador Senior"
+                placeholder={t('form.position_placeholder')}
                 className={errors.position ? 'error' : ''}
               />
               {errors.position && (
@@ -360,7 +387,7 @@ export default function CollaboratorForm({
             </div>
 
             <div className="form-group">
-              <label htmlFor="area">Area *</label>
+              <label htmlFor="area">{t('form.area_label')}</label>
               <div className="area-input">
                 <select
                   id="area"
@@ -377,7 +404,7 @@ export default function CollaboratorForm({
                   }}
                   className={errors.area ? 'error' : ''}
                 >
-                  <option value="">Seleccione un área o equipo</option>
+                  <option value="">{t('form.area_placeholder')}</option>
                   {sortedAssignableScopes.map((a) => (
                     <option key={a.id} value={a.name}>
                       {scopeLabel(a)}
@@ -388,15 +415,15 @@ export default function CollaboratorForm({
                   type="button"
                   className="btn-secondary small"
                   onClick={async () => {
-                    const name = await dialog.prompt('Nombre del área nueva:', {
-                      title: 'Crear área', placeholder: 'Ej: Tecnología', confirmLabel: 'Crear'
+                    const name = await dialog.prompt(t('form.area_new_prompt'), {
+                      title: t('form.area_new_title'), placeholder: t('form.area_new_placeholder'), confirmLabel: t('form.area_new_confirm')
                     })
                     if (name && name.trim()) {
                       createAreaMutation.mutate(name.trim())
                     }
                   }}
                 >
-                  + Nueva
+                  {t('form.area_new_btn')}
                 </button>
               </div>
               {errors.area && (
@@ -407,7 +434,7 @@ export default function CollaboratorForm({
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="email">Email</label>
+              <label htmlFor="email">{t('form.email_label')}</label>
               <input
                 type="email"
                 id="email"
@@ -422,7 +449,7 @@ export default function CollaboratorForm({
                   })
                   setFormData({ ...formData, email: e.target.value })
                 }}
-                placeholder="usuario@empresa.com"
+                placeholder={t('form.email_placeholder')}
                 className={errors.email ? 'error' : ''}
               />
               {errors.email && (
@@ -430,7 +457,7 @@ export default function CollaboratorForm({
               )}
             </div>
             <div className="form-group">
-              <label htmlFor="mfaEnabled">Requiere MFA</label>
+              <label htmlFor="mfaEnabled">{t('form.mfa_label')}</label>
               <div className="checkbox-row">
                 <input
                   type="checkbox"
@@ -440,14 +467,14 @@ export default function CollaboratorForm({
                     setFormData({ ...formData, mfaEnabled: e.target.checked })
                   }
                 />
-                <span>Activar verificacion por email</span>
+                <span>{t('form.mfa_hint')}</span>
               </div>
             </div>
           </div>
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="mappingSourceType">Tipo de origen</label>
+              <label htmlFor="mappingSourceType">{t('form.mapping_source_type_label')}</label>
               <select
                 id="mappingSourceType"
                 value={mappingSourceType}
@@ -461,25 +488,25 @@ export default function CollaboratorForm({
               </select>
             </div>
             <div className="form-group">
-              <label htmlFor="externalKeys">Claves externas</label>
+              <label htmlFor="externalKeys">{t('form.external_keys_label')}</label>
               <input
                 type="text"
                 id="externalKeys"
                 value={externalKeysBySourceType[mappingSourceType] || ''}
                 onChange={(e) => updateExternalKeysForSourceType(e.target.value)}
-                placeholder="johana, j.garcia, jgarcia@empresa.com"
+                placeholder={t('form.external_keys_placeholder')}
               />
               <span className="helper-text">
                 {mappingSourceType === 'global'
-                  ? 'Nombres o apodos con los que esta persona aparece en tus sistemas externos (Jira, Google Sheets, etc.). Se usa como comodín si no hay un alias específico para el conector.'
-                  : `Nombres o identificadores de esta persona en ${getMappingSourceTypeLabel(mappingSourceType)}. Separados por coma. Ej: johana, j.garcia`}
+                  ? t('form.external_keys_hint_global')
+                  : t('form.external_keys_hint_specific', { source: getMappingSourceTypeLabel(mappingSourceType) })}
               </span>
             </div>
           </div>
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="role">Rol *</label>
+              <label htmlFor="role">{t('form.role_label')}</label>
               <select
                 id="role"
                 value={formData.role || 'collaborator'}
@@ -491,11 +518,11 @@ export default function CollaboratorForm({
                 }
                 className={errors.role ? 'error' : ''}
               >
-                <option value="collaborator">Colaborador</option>
-                <option value="leader">Líder</option>
-                <option value="manager">Gerente</option>
-                <option value="director">Director</option>
-                <option value="admin">Administrador</option>
+                <option value="collaborator">{t('common:roles.collaborator')}</option>
+                <option value="leader">{t('common:roles.leader')}</option>
+                <option value="manager">{t('common:roles.manager')}</option>
+                <option value="director">{t('common:roles.director')}</option>
+                <option value="admin">{t('common:roles.admin')}</option>
               </select>
               {errors.role && (
                 <span className="error-message">{errors.role}</span>
@@ -503,13 +530,13 @@ export default function CollaboratorForm({
             </div>
 
             <div className="form-group manager-search-group">
-              <label htmlFor="managerSearch">Jefe directo</label>
+              <label htmlFor="managerSearch">{t('form.manager_label')}</label>
               <div className="manager-search-wrap">
                 <input
                   id="managerSearch"
                   type="text"
                   autoComplete="off"
-                  placeholder="Buscar por nombre o cargo..."
+                  placeholder={t('form.manager_placeholder')}
                   value={managerOpen ? managerSearch : (selectedManager ? `${selectedManager.name} — ${selectedManager.position}` : '')}
                   className={errors.managerId ? 'error' : ''}
                   onFocus={() => {
@@ -531,7 +558,7 @@ export default function CollaboratorForm({
                       setManagerSearch('')
                       setErrors((prev) => { const n = { ...prev }; delete n.managerId; return n })
                     }}
-                    aria-label="Quitar manager"
+                    aria-label={t('form.manager_remove_aria')}
                   >
                     ×
                   </button>
@@ -547,10 +574,10 @@ export default function CollaboratorForm({
                         setErrors((prev) => { const n = { ...prev }; delete n.managerId; return n })
                       }}
                     >
-                      <span className="manager-option-name">Sin manager</span>
+                      <span className="manager-option-name">{t('form.manager_none')}</span>
                     </li>
                     {filteredManagers.length === 0 ? (
-                      <li className="manager-no-results">Sin resultados</li>
+                      <li className="manager-no-results">{t('form.manager_no_results')}</li>
                     ) : (
                       filteredManagers.map((m) => (
                         <li
@@ -579,11 +606,10 @@ export default function CollaboratorForm({
                 if (!selectedManager || !formData.orgScopeId || !selectedManager.orgScopeId) return null
                 const managerScope = orgScopes?.find((s) => s.id === selectedManager.orgScopeId)
                 const myScope = orgScopes?.find((s) => s.id === formData.orgScopeId)
-                // Aviso si el jefe está bajo el mismo scope o un scope hijo
                 if (managerScope && myScope && managerScope.parentId === myScope.id) {
                   return (
                     <span className="helper-text warning-text">
-                      Este jefe pertenece a una unidad que depende del área de este colaborador. Verificá si es correcto.
+                      {t('form.manager_warning')}
                     </span>
                   )
                 }
@@ -595,7 +621,7 @@ export default function CollaboratorForm({
           {personScopes.length > 0 && (
             <div className="form-group">
               <label htmlFor="personScope">
-                Nodo en el organigrama <span className="field-optional">(opcional)</span>
+                {t('form.person_scope_label')} <span className="field-optional">{t('form.person_scope_optional')}</span>
               </label>
               <select
                 id="personScope"
@@ -605,20 +631,20 @@ export default function CollaboratorForm({
                   setFormData((prev) => ({ ...prev, orgScopeId: val }))
                 }}
               >
-                <option value="">Sin nodo personal asignado</option>
+                <option value="">{t('form.person_scope_no_node')}</option>
                 {personScopes.map((s) => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>
               <span className="helper-text">
-                Si esta persona tiene un nodo de tipo "Persona" en la estructura organizacional, vinculala aquí para que aparezca en el organigrama.
+                {t('form.person_scope_hint')}
               </span>
             </div>
           )}
 
           <div className="form-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>
-              Cancelar
+              {t('form.cancel')}
             </button>
             <button
               type="submit"
@@ -626,10 +652,10 @@ export default function CollaboratorForm({
               disabled={createMutation.isLoading || updateMutation.isLoading}
             >
               {createMutation.isLoading || updateMutation.isLoading
-                ? 'Guardando...'
+                ? t('form.saving')
                 : collaborator?.id
-                ? 'Actualizar'
-                : 'Crear'}
+                ? t('form.update')
+                : t('form.create')}
             </button>
           </div>
         </form>

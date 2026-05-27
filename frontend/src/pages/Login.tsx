@@ -1,8 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { persistSsoRememberMe } from '../utils/authStorage'
+import { resolveApiErrorMessage } from '../utils/apiErrors'
 import { selfRegisterEnabled } from '../config/runtime'
 import './Login.css'
 
@@ -13,7 +15,30 @@ type SsoProvider = {
   providerType: string
 }
 
+const LANGUAGES = [
+  { code: 'es', label: 'Español' },
+  { code: 'en', label: 'English' },
+]
+
+const LOGIN_API_ERROR_KEYS: Record<string, string> = {
+  AUTH_CREDENTIALS_REQUIRED: 'login.api_errors.credentials_required',
+  AUTH_INVALID_CREDENTIALS: 'login.api_errors.invalid_credentials',
+  AUTH_USER_INACTIVE: 'login.api_errors.user_inactive',
+  AUTH_PASSWORD_NOT_SET: 'login.api_errors.password_not_set',
+  AUTH_LOGIN_FAILED: 'login.error_default',
+}
+
+const MFA_API_ERROR_KEYS: Record<string, string> = {
+  AUTH_MFA_CODE_REQUIRED: 'login.api_errors.mfa_code_required',
+  AUTH_MFA_TOKEN_INVALID: 'login.api_errors.mfa_token_invalid',
+  AUTH_USER_NOT_FOUND: 'login.api_errors.user_not_found',
+  AUTH_MFA_CODE_EXPIRED: 'login.api_errors.mfa_code_expired',
+  AUTH_MFA_CODE_INVALID: 'login.api_errors.mfa_code_invalid',
+  AUTH_MFA_VERIFY_FAILED: 'login.mfa_error_default',
+}
+
 export default function Login() {
+  const { t, i18n } = useTranslation('auth')
   const [email, setEmail] = useState('')
   const [collaboratorId, setCollaboratorId] = useState('')
   const [password, setPassword] = useState('')
@@ -65,7 +90,10 @@ export default function Login() {
 
       navigate('/')
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Error al iniciar sesion')
+      setError(resolveApiErrorMessage(err, t, {
+        codeMap: LOGIN_API_ERROR_KEYS,
+        fallbackKey: 'login.error_default',
+      }))
     } finally {
       setLoading(false)
     }
@@ -83,7 +111,10 @@ export default function Login() {
       })
       navigate('/')
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Error al verificar codigo')
+      setError(resolveApiErrorMessage(err, t, {
+        codeMap: MFA_API_ERROR_KEYS,
+        fallbackKey: 'login.mfa_error_default',
+      }))
     } finally {
       setLoading(false)
     }
@@ -110,11 +141,11 @@ export default function Login() {
       const response = await api.post(`/auth/sso/${provider.slug || provider.id}/start`)
       const redirectUrl = response.data?.redirectUrl
       if (!redirectUrl) {
-        throw new Error('No se pudo obtener la URL de autenticacion corporativa')
+        throw new Error(t('login.sso_start_error'))
       }
       window.location.assign(redirectUrl)
     } catch (err: any) {
-      setError(err.response?.data?.error || err.message || 'No se pudo iniciar el acceso corporativo')
+      setError(resolveApiErrorMessage(err, t, { fallbackKey: 'login.error_default' }))
       setSsoLoading(false)
     }
   }
@@ -126,85 +157,94 @@ export default function Login() {
       <div className="corner-brand" aria-hidden="true">
         KPI Manager
       </div>
+      <div className="login-language-selector" aria-label={t('language.label')}>
+        {LANGUAGES.map((lang) => (
+          <button
+            key={lang.code}
+            type="button"
+            className={`login-lang-btn${i18n.resolvedLanguage === lang.code ? ' login-lang-btn--active' : ''}`}
+            onClick={() => i18n.changeLanguage(lang.code)}
+            aria-pressed={i18n.resolvedLanguage === lang.code}
+          >
+            {lang.label}
+          </button>
+        ))}
+      </div>
       <div className="login-shell">
         <section className="login-hero">
           <div className="brand">
             <span className="brand-mark">KPI</span>
             <div className="brand-copy">
               <p className="brand-eyebrow">KPI Manager</p>
-              <h1>Control real de objetivos, sin ruido</h1>
-              <p className="brand-subtitle">
-                Un tablero claro para colaboradores, lideres y direccion.
-              </p>
+              <h1>{t('hero.tagline')}</h1>
+              <p className="brand-subtitle">{t('hero.subtitle')}</p>
             </div>
           </div>
           <ul className="hero-points">
-            <li>Visibilidad por rol con foco en resultados</li>
-            <li>Seguimiento ponderado y avances por periodo</li>
-            <li>Listo para evaluaciones y auditoria interna</li>
+            <li>{t('hero.point_1')}</li>
+            <li>{t('hero.point_2')}</li>
+            <li>{t('hero.point_3')}</li>
           </ul>
           <div className="hero-metrics">
             <div className="metric-card">
               <span className="metric-value">98%</span>
-              <span className="metric-label">KPIs con trazabilidad</span>
+              <span className="metric-label">{t('hero.metric_kpi_traceability')}</span>
             </div>
             <div className="metric-card">
               <span className="metric-value">24h</span>
-              <span className="metric-label">Tiempo medio de carga</span>
+              <span className="metric-label">{t('hero.metric_load_time')}</span>
             </div>
             <div className="metric-card">
               <span className="metric-value">3x</span>
-              <span className="metric-label">Visibilidad por equipo</span>
+              <span className="metric-label">{t('hero.metric_team_visibility')}</span>
             </div>
           </div>
-          <div className="hero-badge">Version empresarial</div>
+          <div className="hero-badge">{t('hero.enterprise_badge')}</div>
         </section>
         <section className="login-panel">
           <div className="login-card">
             <div className="login-header">
-              <h2>{mfaRequired ? 'Verificacion de acceso' : 'Accede a tu tablero'}</h2>
+              <h2>{mfaRequired ? t('login.mfa_title') : t('login.title')}</h2>
               <p className="subtitle">
-                {mfaRequired
-                  ? 'Te enviamos un codigo al email registrado.'
-                  : 'Usa tu email o ID de colaborador.'}
+                {mfaRequired ? t('login.mfa_subtitle') : t('login.subtitle')}
               </p>
             </div>
             {!mfaRequired ? (
               <>
               <form onSubmit={handleLogin} className="login-form">
                 <div className="field">
-                  <label htmlFor="email">Email</label>
+                  <label htmlFor="email">{t('login.email')}</label>
                   <input
                     id="email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="usuario@empresa.com"
+                    placeholder={t('login.email_placeholder')}
                     autoComplete="username"
                   />
                 </div>
 
                 <div className="field">
-                  <label htmlFor="collaboratorId">ID de colaborador (opcional)</label>
+                  <label htmlFor="collaboratorId">{t('login.collaborator_id')}</label>
                   <input
                     id="collaboratorId"
                     type="number"
                     inputMode="numeric"
                     value={collaboratorId}
                     onChange={(e) => setCollaboratorId(e.target.value)}
-                    placeholder="Ej: 11"
+                    placeholder={t('login.collaborator_id_placeholder')}
                   />
                 </div>
 
                 <div className="field">
-                  <label htmlFor="password">Contraseña</label>
+                  <label htmlFor="password">{t('login.password')}</label>
                   <div className="input-wrap">
                     <input
                       id="password"
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Tu clave"
+                      placeholder={t('login.password_placeholder')}
                       autoComplete="current-password"
                       className="input-no-reveal"
                     />
@@ -212,7 +252,7 @@ export default function Login() {
                       type="button"
                       className="toggle-visibility"
                       onClick={() => setShowPassword((prev) => !prev)}
-                      aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      aria-label={showPassword ? t('login.hide_password') : t('login.show_password')}
                     >
                       {showPassword ? (
                         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -237,7 +277,7 @@ export default function Login() {
                       checked={rememberMe}
                       onChange={(e) => setRememberMe(e.target.checked)}
                     />
-                    <span>Recordarme</span>
+                    <span>{t('login.remember_me')}</span>
                   </label>
                   <button
                     type="button"
@@ -248,20 +288,20 @@ export default function Login() {
                       setResetOpen(true)
                     }}
                   >
-                    Olvidé mi contraseña
+                    {t('login.forgot_password')}
                   </button>
                 </div>
 
                 {error && <div className="login-error">{error}</div>}
 
                 <button type="submit" className="btn-primary" disabled={loginDisabled}>
-                  {loading ? 'Ingresando...' : 'Ingresar'}
+                  {loading ? t('login.submitting') : t('login.submit')}
                 </button>
 
                 {ssoProviders.length ? (
                   <div className="sso-section">
                     <div className="sso-divider">
-                      <span>o continua con tu identidad corporativa</span>
+                      <span>{t('login.sso_divider')}</span>
                     </div>
                     <div className="sso-provider-list">
                       {ssoProviders.map((provider) => (
@@ -272,7 +312,7 @@ export default function Login() {
                           disabled={loading || ssoLoading}
                           onClick={() => handleSsoStart(provider)}
                         >
-                          {ssoLoading ? 'Conectando...' : `Ingresar con ${provider.name}`}
+                          {ssoLoading ? t('login.sso_connecting') : t('login.sso_btn', { name: provider.name })}
                         </button>
                       ))}
                     </div>
@@ -280,32 +320,32 @@ export default function Login() {
                 ) : null}
 
                 <div className="login-help">
-                  <span>Necesitas ayuda? Contacta a RRHH para recuperar tu ID.</span>
+                  <span>{t('login.help')}</span>
                 </div>
               </form>
               <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '14px', color: '#94a3b8' }}>
                 {selfRegisterEnabled ? (
                   <>
-                    ¿No tenés cuenta?{' '}
+                    {t('login.no_account')}{' '}
                     <a href="/register" style={{ color: '#f97316', fontWeight: 600, textDecoration: 'none' }}>
-                      Crear instancia →
+                      {t('login.create_instance')}
                     </a>
                   </>
                 ) : (
-                  'Alta inicial y nuevos accesos gestionados por el administrador de esta instancia.'
+                  t('login.managed_by_admin')
                 )}
               </div>
               </>
             ) : (
               <form onSubmit={handleVerifyMfa} className="login-form">
                 <div className="field">
-                  <label htmlFor="mfaCode">Codigo de verificacion</label>
+                  <label htmlFor="mfaCode">{t('login.mfa_code_label')}</label>
                   <input
                     id="mfaCode"
                     type="text"
                     value={mfaCode}
                     onChange={(e) => setMfaCode(e.target.value)}
-                    placeholder="Ej: 123456"
+                    placeholder={t('login.mfa_code_placeholder')}
                     inputMode="numeric"
                   />
                 </div>
@@ -313,7 +353,7 @@ export default function Login() {
                 {error && <div className="login-error">{error}</div>}
 
                 <button type="submit" className="btn-primary" disabled={loading || !mfaCode}>
-                  {loading ? 'Verificando...' : 'Verificar'}
+                  {loading ? t('login.mfa_verifying') : t('login.mfa_verify')}
                 </button>
               </form>
             )}
@@ -324,25 +364,25 @@ export default function Login() {
       {resetOpen && (
         <div className="reset-modal" role="dialog" aria-modal="true">
           <div className="reset-card">
-            <h3>Recuperar contraseña</h3>
-            <p>Enviaremos un enlace a tu email corporativo.</p>
+            <h3>{t('reset.title')}</h3>
+            <p>{t('reset.subtitle')}</p>
             <form onSubmit={handleRequestReset} className="login-form">
               <div className="field">
-                <label htmlFor="resetEmail">Email</label>
+                <label htmlFor="resetEmail">{t('reset.email')}</label>
                 <input
                   id="resetEmail"
                   type="email"
                   value={resetEmail}
                   onChange={(e) => setResetEmail(e.target.value)}
-                  placeholder="usuario@empresa.com"
+                  placeholder={t('reset.email_placeholder')}
                   required
                 />
               </div>
               {resetStatus === 'sent' && (
-                <div className="login-success">Si el email existe, enviaremos instrucciones.</div>
+                <div className="login-success">{t('reset.success')}</div>
               )}
               {resetStatus === 'error' && (
-                <div className="login-error">No se pudo enviar el email. Intenta mas tarde.</div>
+                <div className="login-error">{t('reset.error')}</div>
               )}
               <div className="reset-actions">
                 <button
@@ -350,14 +390,14 @@ export default function Login() {
                   className="btn-secondary"
                   onClick={() => setResetOpen(false)}
                 >
-                  Cancelar
+                  {t('reset.cancel')}
                 </button>
                 <button
                   type="submit"
                   className="btn-primary"
                   disabled={resetStatus === 'loading'}
                 >
-                  {resetStatus === 'loading' ? 'Enviando...' : 'Enviar enlace'}
+                  {resetStatus === 'loading' ? t('reset.submitting') : t('reset.submit')}
                 </button>
               </div>
             </form>

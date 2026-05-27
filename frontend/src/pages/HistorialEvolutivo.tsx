@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import HistorialIndividual from './HistorialIndividual'
 import Evolutivo from './Evolutivo'
 import './HistorialEvolutivo.css'
 
 export default function HistorialEvolutivo() {
+  const { t } = useTranslation('history')
   const [activeTab, setActiveTab] = useState<'historial' | 'evolutivo'>('historial')
 
   return (
@@ -13,13 +15,13 @@ export default function HistorialEvolutivo() {
           className={`tab-button ${activeTab === 'historial' ? 'active' : ''}`}
           onClick={() => setActiveTab('historial')}
         >
-          Mi proceso
+          {t('tabs.process')}
         </button>
         <button
           className={`tab-button ${activeTab === 'evolutivo' ? 'active' : ''}`}
           onClick={() => setActiveTab('evolutivo')}
         >
-          Evolutivo
+          {t('tabs.evolution')}
         </button>
       </div>
 
