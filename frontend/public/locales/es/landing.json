@@ -1,16 +1,21 @@
 {
   "nav": {
     "login": "Iniciar sesión",
-    "demo_btn": "Solicitar demo"
+    "demo_btn": "Hablar con ventas",
+    "try_btn": "Probar gratis"
   },
   "hero": {
-    "eyebrow": "Demo guiada + propuesta comercial",
-    "title_line1": "Convertí información en",
-    "title_line2": "decisiones ejecutivas que mueven resultados",
-    "subtitle": "Centralizá KPIs, detectá desvíos críticos y simulá escenarios antes de que impacten el negocio. Alineá a tu equipo con datos confiables. Pasá de reportar a intervenir con trazabilidad completa.",
-    "cta_demo": "Coordinar demo →",
+    "eyebrow": "Resultados, no reportes",
+    "title_line1": "Tu tablero de KPIs en 15 minutos,",
+    "title_line2": "sin consultoría ni implementación",
+    "subtitle": "Importá colaboradores y KPIs desde CSV o Sheets, detectá desvíos y exportá reportes ejecutivos desde el primer día.",
+    "cta_demo_link": "Ver la demo →",
     "cta_how": "Ver cómo funciona",
-    "trust": "Implementación guiada para dirección, operaciones, RRHH y finanzas",
+    "cta_demo": "Hablar con ventas",
+    "trust_p1": "Sin tarjeta de crédito",
+    "trust_p2": "Datos de ejemplo precargados",
+    "trust_p3": "Primer tablero en menos de 15 min",
+    "trust": "Equipos de RRHH, Operaciones y Dirección ya lo usan",
     "phone_label_0": "Teléfono comercial",
     "phone_label_n": "Teléfono {{n}}",
     "email_label": "Email comercial",
@@ -22,7 +27,7 @@
       "critical_label": "Crítico",
       "score_label": "salud operativa proyectada",
       "controls_title": "Probá el impacto de tus drivers",
-      "controls_subtitle": "Simulá un escenario comercial antes de pedir la demo"
+      "controls_subtitle": "Así se ve el tablero real de tu equipo"
     },
     "summary": {
       "green": "Escenario sólido",
@@ -65,6 +70,20 @@
       "hr": "RRHH"
     }
   },
+  "demo_preview": {
+    "eyebrow": "Plataforma en acción",
+    "title": "Así luce el tablero real",
+    "subtitle": "Explorá cada módulo con datos de ejemplo. Hacé clic en las pestañas para navegar.",
+    "tabs": {
+      "dashboard": "Dashboard",
+      "kpis": "Mis KPIs",
+      "risk": "Mapa de riesgo",
+      "executive": "Tablero ejecutivo",
+      "report": "Reportes PDF"
+    },
+    "pause": "Pausar rotación",
+    "play": "Reanudar rotación"
+  },
   "stats": {
     "eyebrow": "Impacto directo en la gestión del negocio",
     "metric_1_value": "+20–30%",
@@ -74,7 +93,7 @@
     "metric_3_value": "1–2 sem",
     "metric_3_label": "menos en tiempo de reacción",
     "metric_4_value": "<1min",
-    "metric_4_label": "Para generar un reporte ejecutivo"
+    "metric_4_label": "para generar un reporte ejecutivo"
   },
   "problem": {
     "eyebrow": "Problema que resolvemos",
@@ -97,19 +116,28 @@
     }
   },
   "process": {
-    "eyebrow": "Flujo experiencial",
-    "title": "De métricas a decisiones.<br />De seguimiento a resultados.",
-    "subtitle": "Implementación guiada para asegurar impacto real. Cuatro pasos para que tu equipo pase de reportar a intervenir.",
+    "eyebrow": "Cómo funciona",
+    "title": "Empezás a ver resultados<br />en tu primer día",
+    "subtitle": "Sin implementación guiada. Sin consultor. Sin esperar.",
     "steps": {
-      "demo_title": "Demo",
-      "demo_desc": "Recorremos el tablero ejecutivo, la detección de desvíos y el simulador de escenarios con un caso cercano a tu operación.",
-      "survey_title": "Relevamiento",
-      "survey_desc": "Validamos usuarios, áreas, KPIs, seguridad, SSO e integraciones para definir el alcance real de implementación.",
-      "impl_title": "Implementación",
-      "impl_desc": "Onboarding guiado con acompañamiento hasta que el equipo opera con autonomía completa.",
-      "decide_title": "Tomás decisiones",
-      "decide_desc": "Con datos confiables, trazabilidad completa y contexto centralizado, la dirección interviene antes de que los problemas escalen."
+      "setup_title": "Cargá tu estructura",
+      "setup_desc": "Creá períodos, áreas y colaboradores. O importá desde CSV en menos de 5 minutos.",
+      "import_title": "Importá o elegí templates",
+      "import_desc": "Partí de los 36 templates del marketplace o cargá tus KPIs existentes con fórmulas propias.",
+      "track_title": "Seguí resultados y exportá",
+      "track_desc": "El tablero detecta desvíos automáticamente. Exportá reportes ejecutivos cuando los necesitás."
     }
+  },
+  "outcomes": {
+    "eyebrow": "Resultados que importan",
+    "title": "Menos reuniones, más decisiones",
+    "subtitle": "Lo que tu equipo gana desde el primer tablero.",
+    "detect_title": "Detectá desvíos antes del cierre",
+    "detect_desc": "El semáforo te avisa en tiempo real qué KPIs están en riesgo, sin esperar el reporte del mes.",
+    "avoid_title": "Evitá reuniones sin datos",
+    "avoid_desc": "Los check-ins semanales y el dashboard centralizado reemplazan la reunión de seguimiento de 2 horas.",
+    "report_title": "Generá reportes ejecutivos en minutos",
+    "report_desc": "Exportá PDF con narrativa automática para dirección, comités y reuniones de resultados."
   },
   "features": {
     "eyebrow": "Funcionalidades",
@@ -141,18 +169,18 @@
     "security_tag": "Enterprise-ready"
   },
   "pricing": {
-    "eyebrow": "Planes y alcance",
-    "title": "Diseñado para adaptarse a tu estructura",
-    "subtitle": "Implementación guiada para asegurar impacto real. La activación se coordina con demo previa según usuarios, integraciones y requisitos de seguridad.",
-    "featured_badge": "Más solicitado",
-    "note": "La compra y el acceso se gestionan con el equipo comercial luego de la demo.",
-    "note_link": "Solicitar demo →",
+    "eyebrow": "Planes",
+    "title": "Precio visible, sin sorpresas",
+    "subtitle": "Elegí el plan que se ajusta a tu equipo y consultá con ventas para activarlo.",
+    "featured_badge": "Más popular",
+    "note": "¿Tenés dudas? Consultá con el equipo comercial antes de elegir.",
+    "payment_secure": "Pago seguro",
     "plans": {
       "starter_name": "Starter",
-      "starter_desc": "Para equipos pequeños que quieren ordenar sus KPIs con una implementación ágil.",
-      "starter_amount": "USD 100",
+      "starter_desc": "Para equipos de hasta 10 personas que quieren ordenar sus KPIs hoy.",
+      "starter_amount": "USD 300",
       "starter_period": "/ mes",
-      "starter_cta": "Solicitar demo",
+      "starter_cta": "Contratar",
       "starter_f1": "Hasta 10 colaboradores",
       "starter_f2": "KPIs individuales y grupales",
       "starter_f3": "Dashboard ejecutivo",
@@ -162,10 +190,10 @@
       "starter_f7": "Simulador de escenarios",
       "starter_f8": "SSO / MFA",
       "pro_name": "Professional",
-      "pro_desc": "Para organizaciones que necesitan visibilidad completa y automatización operativa.",
-      "pro_amount": "USD 200",
+      "pro_desc": "Para organizaciones de hasta 50 personas que necesitan visibilidad completa y automatización operativa.",
+      "pro_amount": "USD 700",
       "pro_period": "/ mes",
-      "pro_cta": "Coordinar demo",
+      "pro_cta": "Contratar",
       "pro_f1": "Hasta 50 colaboradores",
       "pro_f2": "KPIs individuales y grupales",
       "pro_f3": "Dashboard ejecutivo + árbol de objetivos",
@@ -176,7 +204,7 @@
       "pro_f8": "SSO / MFA",
       "enterprise_name": "Enterprise",
       "enterprise_desc": "Para estructuras complejas con mayores requisitos de seguridad y acompañamiento.",
-      "enterprise_amount": "USD 400",
+      "enterprise_amount": "Desde USD 1.500",
       "enterprise_period": "/ mes",
       "enterprise_cta": "Hablar con ventas",
       "enterprise_f1": "Colaboradores ilimitados",
@@ -213,17 +241,21 @@
     "a3": "Cada instancia es single-tenant: una empresa, una base de datos, sin mezcla de datos. Eso garantiza aislamiento y control operativo.",
     "q4": "¿Qué pasa si un colaborador propone un valor muy fuera de lo normal?",
     "a4": "El sistema calcula el z-score del valor respecto al historial y muestra una advertencia visual antes de que el líder apruebe. Para muestras pequeñas usa desvío porcentual.",
-    "q5": "¿Cómo solicito una demo y avanzo con la compra?",
-    "a5": "Coordinamos una demo, relevamos cantidad de usuarios, integraciones y requisitos de seguridad, y luego armamos la propuesta comercial e implementación."
+    "q5": "¿Necesito un consultor o implementación para empezar?",
+    "a5": "No. Podés cargar tu primera estructura en menos de 15 minutos. El marketplace tiene templates listos y los datos de ejemplo te permiten explorar antes de cargar tu operación real.",
+    "q6": "¿Puedo arrancar sin cargar todos mis datos?",
+    "a6": "Sí. El sistema viene con datos de ejemplo precargados. Podés explorar todas las funcionalidades antes de conectar tu operación real.",
+    "q7": "¿Qué pasa si no me sirve?",
+    "a7": "Podés cancelar cuando quieras. No hay contrato mínimo ni penalidades para Starter y Professional. Para Enterprise conversamos el alcance antes de activar."
   },
   "contact": {
-    "eyebrow": "Contacto comercial",
-    "title_line1": "Solicitá una demo y",
-    "title_line2": "gestionamos la compra con tu equipo",
-    "subtitle": "Completá el formulario y relevamos usuarios, KPIs, seguridad, integraciones y modalidad de implementación.",
-    "mail_subject": "Solicitud de demo KPI Manager",
-    "form_title": "Pedí una demo guiada",
-    "form_copy": "Te contactamos para coordinar una reunión breve y revisar el alcance comercial.",
+    "eyebrow": "¿Necesitás Enterprise?",
+    "title_line1": "SSO corporativo, auditoría y",
+    "title_line2": "soporte dedicado para estructuras grandes",
+    "subtitle": "Para implementaciones corporativas con requisitos de seguridad avanzados, integraciones propias o más de 50 usuarios.",
+    "mail_subject": "Consulta Enterprise KPI Manager",
+    "form_title": "Consultar Enterprise",
+    "form_copy": "Completá el formulario y un especialista te va a contactar para revisar alcance, seguridad e integraciones.",
     "field_name": "Nombre",
     "field_name_placeholder": "Tu nombre",
     "field_company": "Empresa",
@@ -232,17 +264,17 @@
     "field_email_placeholder": "nombre@empresa.com",
     "field_phone": "Teléfono",
     "field_phone_placeholder": "+54 9 ...",
-    "field_users": "Cantidad de usuarios",
-    "field_users_placeholder": "Ej: 35",
-    "submit_loading": "Enviando solicitud...",
-    "submit": "Enviar solicitud de demo →",
-    "form_note": "Respuesta comercial estimada: dentro de 1 día hábil.",
-    "success_manual": "Recibimos tu solicitud. En este entorno la derivación automática no está configurada; usá también los teléfonos para acelerar el contacto.",
-    "success_default": "Recibimos tu solicitud. El equipo comercial te va a contactar pronto.",
-    "error_default": "No pudimos enviar la solicitud. Probá nuevamente o usá los canales directos.",
+    "field_users": "Cantidad de usuarios estimados",
+    "field_users_placeholder": "Ej: 80",
+    "submit_loading": "Enviando consulta...",
+    "submit": "Consultar Enterprise →",
+    "form_note": "Respuesta estimada: dentro de 1 día hábil.",
+    "success_manual": "Recibimos tu consulta. En este entorno la derivación automática no está configurada; usá también los teléfonos para acelerar el contacto.",
+    "success_default": "Recibimos tu consulta. Un especialista te va a contactar pronto.",
+    "error_default": "No pudimos enviar la consulta. Probá nuevamente o usá los canales directos.",
     "api_errors": {
       "invalid_form": "Revisá los datos del formulario e intentá nuevamente.",
-      "submit_failed": "No pudimos enviar la solicitud. Probá nuevamente o usá los canales directos."
+      "submit_failed": "No pudimos enviar la consulta. Probá nuevamente o usá los canales directos."
     },
     "side_title": "Canales directos",
     "side_copy": "Si preferís avanzar por llamada o correo, también podés usar estos datos de contacto.",

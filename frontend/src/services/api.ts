@@ -11,7 +11,9 @@ export const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401 && window.location.pathname !== '/login') {
+    const isAuthSessionProbe = String(error.config?.url || '').includes('/auth/me')
+
+    if (error.response?.status === 401 && !isAuthSessionProbe && window.location.pathname !== '/login') {
       window.location.replace('/login?session=expired')
     }
     return Promise.reject(error)
