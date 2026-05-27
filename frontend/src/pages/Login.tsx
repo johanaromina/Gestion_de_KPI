@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import { persistSsoRememberMe } from '../utils/authStorage'
@@ -157,6 +157,9 @@ export default function Login() {
       <div className="corner-brand" aria-hidden="true">
         KPI Manager
       </div>
+      <Link className="login-back-home" to="/landing">
+        {t('login.back_home')}
+      </Link>
       <div className="login-language-selector" aria-label={t('language.label')}>
         {LANGUAGES.map((lang) => (
           <button

@@ -82,6 +82,7 @@ function App() {
               <Route path="/sso/callback" element={<SsoCallback />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/landing" element={<Landing />} />
               <Route path="/" element={<HomeRoute />} />
               <Route
                 path="/analytics"

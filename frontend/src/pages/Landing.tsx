@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Trans, useTranslation } from 'react-i18next'
 import { contactEmail, contactPhones } from '../config/runtime'
@@ -132,6 +132,225 @@ const TESTIMONIALS = [
 const PROBLEM_KEYS = ['p1', 'p2', 'p3', 'p4'] as const
 const FAQ_IDS = [1, 2, 3, 4, 5, 6, 7] as const
 
+const DEMO_SCREENS = [
+  { key: 'dashboard', icon: '📊', path: 'dashboard' },
+  { key: 'kpis', icon: '📋', path: 'kpis' },
+  { key: 'risk', icon: '⚠️', path: 'mapa-riesgo' },
+  { key: 'executive', icon: '🏆', path: 'tablero-ejecutivo' },
+  { key: 'report', icon: '📄', path: 'reportes' },
+] as const
+
+const DEMO_AREAS = [
+  { name: 'Comercial', score: 82, trend: '+4%', status: 'green' as const, kpis: ['Cierre · 88%', 'Pipeline · 92%', 'NPS · 115%'] },
+  { name: 'Tecnología', score: 71, trend: '−2%', status: 'yellow' as const, kpis: ['Deploy · 94%', 'Bugs · 76%', 'Uptime · 99%'] },
+  { name: 'Operaciones', score: 65, trend: '+1%', status: 'yellow' as const, kpis: ['Entrega · 79%', 'Eficiencia · 68%', 'Stock · 91%'] },
+  { name: 'RRHH', score: 89, trend: '+3%', status: 'green' as const, kpis: ['Retención · 103%', 'Clima · 88%', 'Capacitación · 96%'] },
+]
+
+const DEMO_KPIS_DATA = [
+  { name: 'Tasa de cierre comercial', owner: 'María R.', goal: '25%', actual: '22%', pct: 88, status: 'yellow' as const },
+  { name: 'NPS clientes', owner: 'Carlos M.', goal: '45 pts', actual: '52 pts', pct: 115, status: 'green' as const },
+  { name: 'Tiempo de entrega', owner: 'Ana L.', goal: '5 días', actual: '6.2 días', pct: 79, status: 'red' as const },
+  { name: 'Retención de empleados', owner: 'Sofía G.', goal: '90%', actual: '93%', pct: 103, status: 'green' as const },
+  { name: 'Ingresos MRR', owner: 'Pedro V.', goal: '$50k', actual: '$47k', pct: 94, status: 'yellow' as const },
+  { name: 'Tickets < SLA', owner: 'Juan P.', goal: '95%', actual: '97%', pct: 102, status: 'green' as const },
+]
+
+function DemoDashboard() {
+  return (
+    <div className="ldp-screen">
+      <div className="ldp-topbar">
+        <span className="ldp-breadcrumb">Dashboard <span className="ldp-sep">›</span> Q2 2026</span>
+        <span className="ldp-badge ldp-badge-yellow">Salud global · 78%</span>
+      </div>
+      <div className="ldp-dash-grid">
+        {DEMO_AREAS.map((area) => (
+          <div key={area.name} className={`ldp-area-card ldp-tone-${area.status}`}>
+            <div className="ldp-area-head">
+              <span className="ldp-area-name">{area.name}</span>
+              <span className={`ldp-badge ldp-badge-${area.status}`}>{area.score}%</span>
+            </div>
+            <div className="ldp-area-trend">{area.trend} vs mes ant.</div>
+            <div className="ldp-area-tags">
+              {area.kpis.map((k) => <span key={k} className="ldp-tag">{k}</span>)}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="ldp-summary-bar">
+        <span className="ldp-chip ldp-chip-green">✓ 12 en verde</span>
+        <span className="ldp-chip ldp-chip-yellow">◎ 4 en riesgo</span>
+        <span className="ldp-chip ldp-chip-red">✕ 2 críticos</span>
+        <span className="ldp-chip ldp-chip-gray">18 KPIs activos</span>
+      </div>
+    </div>
+  )
+}
+
+function DemoKPIs() {
+  return (
+    <div className="ldp-screen">
+      <div className="ldp-topbar">
+        <span className="ldp-breadcrumb">KPIs <span className="ldp-sep">›</span> Mis indicadores · Q2 2026</span>
+        <div className="ldp-filter-pills">
+          <span className="ldp-pill ldp-pill-active">Todos (18)</span>
+          <span className="ldp-pill">En riesgo (4)</span>
+          <span className="ldp-pill">Críticos (2)</span>
+        </div>
+      </div>
+      <div className="ldp-kpi-table">
+        <div className="ldp-krow ldp-krow-head">
+          <span>Indicador</span><span>Objetivo</span><span>Actual</span><span>%</span><span>Estado</span>
+        </div>
+        {DEMO_KPIS_DATA.map((k) => (
+          <div key={k.name} className="ldp-krow">
+            <div className="ldp-kpi-cell">
+              <span className="ldp-kpi-nm">{k.name}</span>
+              <small className="ldp-kpi-own">{k.owner}</small>
+            </div>
+            <span className="ldp-kv">{k.goal}</span>
+            <span className="ldp-kv">{k.actual}</span>
+            <span className={`ldp-kv ldp-kv-${k.status}`}>{k.pct}%</span>
+            <span className={`ldp-badge ldp-badge-${k.status}`}>
+              {k.status === 'green' ? 'OK' : k.status === 'yellow' ? 'Riesgo' : 'Crítico'}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function DemoRiskMap() {
+  return (
+    <div className="ldp-screen">
+      <div className="ldp-topbar">
+        <span className="ldp-breadcrumb">Análisis <span className="ldp-sep">›</span> Mapa de riesgo · Q2 2026</span>
+      </div>
+      <div className="ldp-risk-layout">
+        <div className="ldp-risk-yaxis">
+          <span>Alta prob.</span><span>Media</span><span>Baja prob.</span>
+        </div>
+        <div className="ldp-risk-body">
+          <div className="ldp-risk-grid">
+            <div className="ldp-rc ldp-rc-yellow"><span className="ldp-rdot ldp-rdot-yellow">Bugs críticos</span></div>
+            <div className="ldp-rc ldp-rc-yellow" />
+            <div className="ldp-rc ldp-rc-red"><span className="ldp-rdot ldp-rdot-red">Tiempo de entrega</span></div>
+            <div className="ldp-rc ldp-rc-green"><span className="ldp-rdot ldp-rdot-green">Deploy freq.</span></div>
+            <div className="ldp-rc ldp-rc-yellow" />
+            <div className="ldp-rc ldp-rc-yellow">
+              <span className="ldp-rdot ldp-rdot-yellow">MRR</span>
+              <span className="ldp-rdot ldp-rdot-yellow">Cierre</span>
+            </div>
+            <div className="ldp-rc ldp-rc-green">
+              <span className="ldp-rdot ldp-rdot-green">NPS</span>
+              <span className="ldp-rdot ldp-rdot-green">Retención</span>
+            </div>
+            <div className="ldp-rc ldp-rc-green"><span className="ldp-rdot ldp-rdot-green">Tickets SLA</span></div>
+            <div className="ldp-rc ldp-rc-yellow" />
+          </div>
+          <div className="ldp-risk-xaxis">
+            <span>Bajo impacto</span><span>Medio</span><span>Alto impacto</span>
+          </div>
+        </div>
+      </div>
+      <div className="ldp-summary-bar">
+        <span className="ldp-chip ldp-chip-red">1 crítico</span>
+        <span className="ldp-chip ldp-chip-yellow">4 a vigilar</span>
+        <span className="ldp-chip ldp-chip-green">5 bajo riesgo</span>
+      </div>
+    </div>
+  )
+}
+
+function DemoExecutive() {
+  return (
+    <div className="ldp-screen">
+      <div className="ldp-topbar">
+        <span className="ldp-breadcrumb">Tablero ejecutivo <span className="ldp-sep">›</span> Q2 2026</span>
+        <span className="ldp-date-chip">Mayo 2026</span>
+      </div>
+      <div className="ldp-exec-layout">
+        <div className="ldp-exec-score-card">
+          <div className="ldp-exec-ring">
+            <span className="ldp-exec-num">78</span>
+            <span className="ldp-exec-den">/100</span>
+          </div>
+          <div className="ldp-exec-meta">
+            <div className="ldp-exec-label">Salud operativa global</div>
+            <div className="ldp-exec-sub">Q2 2026 · 18 KPIs activos</div>
+            <div className="ldp-exec-chips">
+              <span className="ldp-chip ldp-chip-green">12 verde</span>
+              <span className="ldp-chip ldp-chip-yellow">4 riesgo</span>
+              <span className="ldp-chip ldp-chip-red">2 crítico</span>
+            </div>
+          </div>
+        </div>
+        <div className="ldp-exec-areas">
+          {DEMO_AREAS.map((area) => (
+            <div key={area.name} className="ldp-exec-row">
+              <span className={`ldp-dot ldp-dot-${area.status}`} />
+              <span className="ldp-exec-area">{area.name}</span>
+              <div className="ldp-exec-bar">
+                <div
+                  className="ldp-exec-fill"
+                  style={{
+                    width: `${area.score}%`,
+                    background: area.status === 'green' ? '#22c55e' : area.status === 'yellow' ? '#f59e0b' : '#ef4444',
+                  }}
+                />
+              </div>
+              <span className="ldp-exec-pct">{area.score}%</span>
+              <span className={`ldp-trend ${area.trend.startsWith('+') ? 'ldp-up' : 'ldp-dn'}`}>{area.trend}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DemoReport() {
+  return (
+    <div className="ldp-screen ldp-screen-report">
+      <div className="ldp-topbar">
+        <span className="ldp-breadcrumb">Reportes <span className="ldp-sep">›</span> PDF ejecutivo · Q2 2026</span>
+        <button className="ldp-export-btn" type="button">⬇ Exportar PDF</button>
+      </div>
+      <div className="ldp-pdf-doc">
+        <div className="ldp-pdf-hdr">
+          <div className="ldp-pdf-logo">KPI</div>
+          <div>
+            <div className="ldp-pdf-brand">KPI Manager · Reporte Ejecutivo</div>
+            <div className="ldp-pdf-sub">Q2 2026 · Acme Corp · Mayo 2026</div>
+          </div>
+        </div>
+        <div className="ldp-pdf-metrics">
+          {DEMO_AREAS.map((a) => (
+            <div key={a.name} className={`ldp-pdf-met ldp-tone-${a.status}`}>
+              <span className="ldp-pdf-met-val">{a.score}%</span>
+              <span className="ldp-pdf-met-lbl">{a.name}</span>
+            </div>
+          ))}
+        </div>
+        <div className="ldp-pdf-s">
+          <div className="ldp-pdf-sh">Resumen ejecutivo</div>
+          <p className="ldp-pdf-body">La compañía muestra una salud operativa del <strong>78%</strong> al cierre del período. RRHH lidera el rendimiento (89%), seguida de Comercial (82%). Tecnología y Operaciones requieren atención focalizada por desvíos en tiempos de entrega y eficiencia operativa.</p>
+        </div>
+        <div className="ldp-pdf-s">
+          <div className="ldp-pdf-sh">KPIs bajo seguimiento</div>
+          <div className="ldp-pdf-risks">
+            <div className="ldp-pdf-rrow"><span className="ldp-badge ldp-badge-red">Crítico</span><span>Tiempo de entrega · 6.2 días vs 5 días objetivo (79%)</span></div>
+            <div className="ldp-pdf-rrow"><span className="ldp-badge ldp-badge-yellow">Riesgo</span><span>Ingresos MRR · $47k vs $50k objetivo (94%)</span></div>
+            <div className="ldp-pdf-rrow"><span className="ldp-badge ldp-badge-yellow">Riesgo</span><span>Tasa de cierre · 22% vs 25% objetivo (88%)</span></div>
+          </div>
+        </div>
+        <div className="ldp-pdf-footer">Generado automáticamente · KPI Manager · kpimanager@gmail.com · Mayo 2026</div>
+      </div>
+    </div>
+  )
+}
+
 const normalizePhoneHref = (value: string) => {
   const trimmed = String(value || '').trim()
   if (!trimmed) return ''
@@ -141,7 +360,7 @@ const normalizePhoneHref = (value: string) => {
 }
 
 export default function Landing() {
-  const { t } = useTranslation('landing')
+  const { t, i18n } = useTranslation('landing')
   const [openFaq, setOpenFaq] = useState<number | null>(null)
   const [heroControls, setHeroControls] = useState(() => ({
     sales: HERO_CONTROLS[0].initial,
@@ -151,9 +370,17 @@ export default function Landing() {
   const [demoForm, setDemoForm] = useState<DemoFormState>(INITIAL_DEMO_FORM)
   const [demoSubmitState, setDemoSubmitState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [demoSubmitMessage, setDemoSubmitMessage] = useState('')
+  const [demoScreen, setDemoScreen] = useState(0)
+  const [demoPaused, setDemoPaused] = useState(false)
+
+  useEffect(() => {
+    if (demoPaused) return
+    const id = setInterval(() => setDemoScreen((p) => (p + 1) % DEMO_SCREENS.length), 4500)
+    return () => clearInterval(id)
+  }, [demoPaused])
 
   const demoHref = '#contacto'
-  const tryHref = '/login'
+  const demoPreviewHref = '#demo'
   const contactMailHref = contactEmail
     ? `mailto:${contactEmail}?subject=${encodeURIComponent(t('contact.mail_subject'))}`
     : '#contacto'
@@ -356,13 +583,24 @@ export default function Landing() {
   return (
     <div className="landing">
       <nav className="landing-nav">
-        <a href="/" className="landing-nav-brand">
+        <Link to="/landing" className="landing-nav-brand">
           <div className="landing-nav-mark">KPI</div>
           <span className="landing-nav-name">KPI Manager</span>
-        </a>
+        </Link>
         <div className="landing-nav-actions">
+          <div className="landing-lang-switcher">
+            <button
+              className={`landing-lang-btn${i18n.language === 'es' ? ' active' : ''}`}
+              onClick={() => i18n.changeLanguage('es')}
+            >ES</button>
+            <span className="landing-lang-sep" />
+            <button
+              className={`landing-lang-btn${i18n.language === 'en' ? ' active' : ''}`}
+              onClick={() => i18n.changeLanguage('en')}
+            >EN</button>
+          </div>
           <Link to="/login" className="landing-btn-ghost">{t('nav.login')}</Link>
-          <Link to={tryHref} className="landing-btn-primary">{t('nav.try_btn')}</Link>
+          <a href={demoHref} className="landing-btn-primary">{t('nav.demo_btn')}</a>
         </div>
       </nav>
 
@@ -381,9 +619,9 @@ export default function Landing() {
               {t('hero.subtitle')}
             </p>
             <div className="landing-hero-ctas">
-              <Link to={tryHref} className="landing-hero-cta-primary">
-                {t('hero.cta_try')}
-              </Link>
+              <a href={demoPreviewHref} className="landing-hero-cta-primary">
+                {t('hero.cta_demo_link')}
+              </a>
               <a href="#como-funciona" className="landing-hero-cta-secondary">
                 {t('hero.cta_how')}
               </a>
@@ -500,6 +738,55 @@ export default function Landing() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="landing-demo-preview" id="demo">
+        <div className="landing-section-header">
+          <div className="landing-section-eyebrow">{t('demo_preview.eyebrow')}</div>
+          <h2 className="landing-section-title">{t('demo_preview.title')}</h2>
+          <p className="landing-section-subtitle">{t('demo_preview.subtitle')}</p>
+        </div>
+        <div className="ldp-container">
+          <div className="ldp-nav">
+            {DEMO_SCREENS.map((screen, index) => (
+              <button
+                key={screen.key}
+                type="button"
+                className={`ldp-nav-tab${demoScreen === index ? ' active' : ''}`}
+                onClick={() => { setDemoScreen(index); setDemoPaused(true) }}
+              >
+                <span>{screen.icon}</span>
+                {t(`demo_preview.tabs.${screen.key}`)}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="ldp-pause-btn"
+              onClick={() => setDemoPaused((p) => !p)}
+              aria-label={demoPaused ? t('demo_preview.play') : t('demo_preview.pause')}
+            >
+              {demoPaused ? '▶' : '⏸'}
+            </button>
+          </div>
+          <div className="ldp-stage">
+            {demoScreen === 0 && <DemoDashboard />}
+            {demoScreen === 1 && <DemoKPIs />}
+            {demoScreen === 2 && <DemoRiskMap />}
+            {demoScreen === 3 && <DemoExecutive />}
+            {demoScreen === 4 && <DemoReport />}
+          </div>
+          <div className="ldp-dots">
+            {DEMO_SCREENS.map((screen, index) => (
+              <button
+                key={screen.key}
+                type="button"
+                className={`ldp-dot-btn${demoScreen === index ? ' active' : ''}`}
+                onClick={() => { setDemoScreen(index); setDemoPaused(true) }}
+                aria-label={t(`demo_preview.tabs.${screen.key}`)}
+              />
+            ))}
           </div>
         </div>
       </section>
@@ -641,16 +928,23 @@ export default function Landing() {
                   </li>
                 ))}
               </ul>
-              {plan.key === 'enterprise'
-                ? <a href={demoHref} className={`landing-plan-cta ${plan.ctaStyle}`}>{plan.cta}</a>
-                : <Link to={tryHref} className={`landing-plan-cta ${plan.ctaStyle}`}>{plan.cta}</Link>
-              }
+              <a href={demoHref} className={`landing-plan-cta ${plan.ctaStyle}`}>{plan.cta}</a>
             </div>
           ))}
         </div>
         <p className="landing-pricing-note">
-          {t('pricing.note')} · <Link to={tryHref} className="landing-pricing-note-link">{t('pricing.note_link')}</Link>
+          {t('pricing.note')}
         </p>
+        <div className="landing-payment-strip">
+          <span className="landing-payment-secure">🔒 {t('pricing.payment_secure')}</span>
+          <span className="landing-payment-sep" />
+          <div className="landing-payment-methods">
+            <span className="landing-payment-badge">Visa</span>
+            <span className="landing-payment-badge">Mastercard</span>
+            <span className="landing-payment-badge">PayPal</span>
+            <span className="landing-payment-badge">Stripe</span>
+          </div>
+        </div>
       </section>
 
       <section className="landing-proof">
