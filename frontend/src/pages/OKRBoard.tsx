@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery } from 'react-query'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import api from '../services/api'
+import api, { buildApiUrl } from '../services/api'
 import './OKRBoard.css'
 
 type KRStatus = 'not_started' | 'on_track' | 'at_risk' | 'behind' | 'completed'
@@ -123,7 +123,7 @@ export default function OKRBoard() {
               className="btn-export btn-export-pdf"
               title={t('export.pdf_title')}
               onClick={() => window.open(
-                `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/export/okr/period/${selectedPeriod}/pdf`,
+                buildApiUrl(`/export/okr/period/${selectedPeriod}/pdf`),
                 '_blank'
               )}
             >
@@ -133,7 +133,7 @@ export default function OKRBoard() {
               className="btn-export btn-export-excel"
               title={t('export.excel_title')}
               onClick={() => window.open(
-                `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/export/okr/period/${selectedPeriod}/excel`,
+                buildApiUrl(`/export/okr/period/${selectedPeriod}/excel`),
                 '_blank'
               )}
             >

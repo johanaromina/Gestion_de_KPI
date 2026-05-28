@@ -21,6 +21,10 @@ PORT=5000
 # Genera una clave segura con: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 JWT_SECRET=tu-clave-secreta-jwt-muy-segura-aqui
 
+# Clave para cifrar secretos de integraciones/SSO
+# Recomendado: una clave distinta de JWT_SECRET
+AUTH_ENCRYPTION_KEY=tu-clave-de-cifrado-segura-aqui
+
 # URL base de la app (para links de recuperacion)
 APP_BASE_URL=http://localhost:5173
 
@@ -57,6 +61,8 @@ node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 ```
 
 Copia el resultado y úsalo como valor de `JWT_SECRET`.
+
+Podés generar `AUTH_ENCRYPTION_KEY` con el mismo comando. En producción se recomienda usar una clave dedicada. Si no la definís, el backend usará `JWT_SECRET` como compatibilidad temporal.
 
 ## Nota de Desarrollo
 

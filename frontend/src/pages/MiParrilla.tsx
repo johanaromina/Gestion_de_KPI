@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import api from '../services/api'
+import api, { buildApiUrl } from '../services/api'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import ProposeValueModal from '../components/ProposeValueModal'
 import ConsistencyAlerts from '../components/ConsistencyAlerts'
@@ -284,7 +284,7 @@ export default function MiParrilla() {
               className="btn-export btn-export-pdf"
               onClick={() => {
                 window.open(
-                  `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/export/parrilla/${resolvedId}/${currentPeriodId}/pdf`,
+                  buildApiUrl(`/export/parrilla/${resolvedId}/${currentPeriodId}/pdf`),
                   '_blank'
                 )
               }}
@@ -296,7 +296,7 @@ export default function MiParrilla() {
               className="btn-export btn-export-excel"
               onClick={() => {
                 window.open(
-                  `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/export/parrilla/${resolvedId}/${currentPeriodId}/excel`,
+                  buildApiUrl(`/export/parrilla/${resolvedId}/${currentPeriodId}/excel`),
                   '_blank'
                 )
               }}

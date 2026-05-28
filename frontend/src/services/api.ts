@@ -1,12 +1,18 @@
 import axios from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
+const API_BASE_URL_NORMALIZED = API_BASE_URL.replace(/\/+$/, '')
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
 })
+
+export const buildApiUrl = (path: string) => {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  return `${API_BASE_URL_NORMALIZED}${normalizedPath}`
+}
 
 api.interceptors.response.use(
   (response) => response,

@@ -52,8 +52,10 @@ if (isProduction && (!parsed.JWT_SECRET || parsed.JWT_SECRET === 'dev-secret-key
   throw new Error('JWT_SECRET es obligatorio en produccion')
 }
 
-if (isProduction && !parsed.AUTH_ENCRYPTION_KEY) {
-  throw new Error('AUTH_ENCRYPTION_KEY es obligatorio en produccion')
+if (isProduction && !parsed.AUTH_ENCRYPTION_KEY && parsed.JWT_SECRET) {
+  console.warn(
+    '[env] AUTH_ENCRYPTION_KEY no configurado en produccion. Usando JWT_SECRET como fallback temporal.'
+  )
 }
 
 export const appEnv = {

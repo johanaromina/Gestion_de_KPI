@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import api from '../services/api'
+import api, { buildApiUrl } from '../services/api'
 import { useDialog } from '../components/Dialog'
 import { resolveDirection, calculateVariationPercent } from '../utils/kpi'
 import { resolveApiErrorMessage } from '../utils/apiErrors'
@@ -362,7 +362,7 @@ export default function OKRDetalle() {
             className="btn-export btn-export-pdf"
             title={t('detail.export.pdf_title')}
             onClick={() => window.open(
-              `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/export/okr/${id}/pdf`,
+              buildApiUrl(`/export/okr/${id}/pdf`),
               '_blank'
             )}
           >
@@ -372,7 +372,7 @@ export default function OKRDetalle() {
             className="btn-export btn-export-excel"
             title={t('detail.export.excel_title')}
             onClick={() => window.open(
-              `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/export/okr/${id}/excel`,
+              buildApiUrl(`/export/okr/${id}/excel`),
               '_blank'
             )}
           >

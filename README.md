@@ -78,6 +78,12 @@ Correo saliente:
 - para pruebas podes usar tu correo personal con app password
 - para venta real conviene usar un mailbox del producto o tu dominio comercial
 
+Seguridad en produccion:
+
+- `JWT_SECRET` es obligatorio
+- `AUTH_ENCRYPTION_KEY` es recomendado para cifrar secretos de integraciones y SSO
+- si `AUTH_ENCRYPTION_KEY` no esta definido, el backend usa `JWT_SECRET` como fallback para mantener compatibilidad
+
 ## Estado actual (funcionalidades principales)
 
 - KPIs macro + asignaciones por colaborador y periodo (con subperiodos)
