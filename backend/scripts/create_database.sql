@@ -9,7 +9,7 @@ USE gestion_kpi;
 CREATE TABLE IF NOT EXISTS org_scopes (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  type ENUM('company', 'area', 'team', 'person', 'product') NOT NULL DEFAULT 'area',
+  type ENUM('company', 'area', 'team', 'person', 'product', 'business_unit') NOT NULL DEFAULT 'area',
   parentId INT NULL,
   calendarProfileId INT NULL,
   metadata TEXT NULL,
@@ -617,7 +617,7 @@ CREATE TABLE IF NOT EXISTS integration_template_runs (
 CREATE TABLE IF NOT EXISTS org_scopes (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  type ENUM('company', 'area', 'team', 'person', 'product') NOT NULL DEFAULT 'area',
+  type ENUM('company', 'area', 'team', 'person', 'product', 'business_unit') NOT NULL DEFAULT 'area',
   parentId INT NULL,
   calendarProfileId INT NULL,
   metadata TEXT NULL,

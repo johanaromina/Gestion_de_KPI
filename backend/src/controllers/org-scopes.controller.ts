@@ -168,11 +168,22 @@ export const importOrgScopes = async (req: Request, res: Response) => {
           })
           continue
         }
-        const [r] = await pool.query(
-          `INSERT INTO org_scopes (name, type, parentId, active) VALUES (?, ?, ?, 1)`,
-          [item.name.trim(), scopeType, parentId]
-        ) as any[]
-        const newId = (r as any).insertId
+        let newId: number
+        try {
+          const [r] = await pool.query(
+            `INSERT INTO org_scopes (name, type, parentId, active) VALUES (?, ?, ?, 1)`,
+            [item.name.trim(), scopeType, parentId]
+          ) as any[]
+          newId = (r as any).insertId
+        } catch (dbErr: any) {
+          logger.error(`Error inserting org scope row ${item.rowIndex}:`, dbErr)
+          errors.push({
+            row: item.rowIndex,
+            code: 'ORG_SCOPE_IMPORT_FAILED',
+            message: `Error al crear "${item.name.trim()}": ${dbErr?.sqlMessage || dbErr?.message || 'error de base de datos'}`,
+          })
+          continue
+        }
         byName.set(normalizedName, newId)
         existingKeys.add(duplicateKey)
         created.push(item.rowIndex)
