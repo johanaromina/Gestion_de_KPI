@@ -73,7 +73,7 @@ export const getCollaborators = async (req: Request, res: Response) => {
     const includeInactive = req.query.includeInactive === 'true'
     const limit = req.query.limit !== undefined ? Math.max(1, Math.min(1000, Number(req.query.limit))) : null
     const offset = req.query.offset !== undefined ? Math.max(0, Number(req.query.offset)) : 0
-    const safeColumns = 'id, name, email, position, area, orgScopeId, managerId, role, status, mfaEnabled, inviteToken, inviteTokenExpiresAt, createdAt, updatedAt'
+    const safeColumns = 'id, name, email, position, area, orgScopeId, managerId, role, status, mfaEnabled, createdAt, updatedAt'
     const where = includeInactive ? '' : `WHERE status = 'active'`
     const baseQuery = `SELECT ${safeColumns} FROM collaborators ${where} ORDER BY name ASC`
 
@@ -94,7 +94,7 @@ export const getCollaborators = async (req: Request, res: Response) => {
 export const getCollaboratorById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const safeColumns = 'id, name, email, position, area, orgScopeId, managerId, role, status, mfaEnabled, inviteToken, inviteTokenExpiresAt, createdAt, updatedAt'
+    const safeColumns = 'id, name, email, position, area, orgScopeId, managerId, role, status, mfaEnabled, createdAt, updatedAt'
     const [rows] = await pool.query<CollaboratorRow[]>(
       `SELECT ${safeColumns} FROM collaborators WHERE id = ?`,
       [id]
