@@ -97,10 +97,14 @@
     "parent": "Parent unit",
     "empty_filtered": "No units match the current filters.",
     "empty_title": "There are no areas or teams yet.",
-    "empty_hint": "Click New unit to create your company’s first area (for example: Sales, Technology, Operations).",
+    "empty_hint": "Click New unit to create your company's first area (for example: Sales, Technology, Operations).",
+    "save_error": "Could not save the organizational unit",
     "delete_confirm": "Are you sure you want to delete unit \"{{name}}\" ({{type}})? This action cannot be undone.",
     "delete_confirm_title": "Confirm deletion",
-    "delete_error": "Could not delete the organizational unit"
+    "delete_error": "Could not delete the organizational unit",
+    "cascade_delete_confirm": "Delete \"{{name}}\" and its entire structure? This will also delete all sub-units it contains ({{count}} direct). Assigned collaborators will be unlinked from their area. This action cannot be undone.",
+    "cascade_delete_confirm_title": "Delete entire structure",
+    "cascade_delete_btn": "Delete structure"
   },
   "modals": {
     "template_new": "New template",
@@ -157,6 +161,9 @@
     "mapping_entity_id_required": "The mapping entity is missing.",
     "mapping_entity_not_found": "The selected mapping entity no longer exists.",
     "mapping_items_required": "You must send at least one mapping to save.",
+    "org_name_exists": "A unit named \"{{name}}\" already exists. In this app unit names must be unique.",
+    "org_company_exists": "A root company \"{{name}}\" already exists. This workspace supports a single company.",
+    "org_company_parent_invalid": "The root company cannot depend on another unit.",
     "org_delete_has_children": "This unit cannot be deleted because it has child units.",
     "org_delete_has_collaborators": "This unit cannot be deleted because it has assigned collaborators.",
     "org_delete_has_assignments": "This unit cannot be deleted because it has linked assignments.",
@@ -801,10 +808,11 @@
     "type_hints": {
       "area": "Stable area: Sales, HR, Technology…",
       "team": "Sub-group within an area: Technical Support, B2B Sales…",
-      "company": "Root unit of the organization.",
+      "company": "Single root unit of the organization.",
       "person": "Individual person as a structure unit.",
       "product": "Product or business line."
     },
+    "single_company_hint": "A root company already exists: {{name}}. To avoid mixed data this workspace uses a single company.",
     "hierarchy_title": "Hierarchy and calendar",
     "parent": "Depends on",
     "no_parent": "— No parent (root unit) —",

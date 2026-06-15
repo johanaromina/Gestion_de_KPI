@@ -9,6 +9,7 @@
     "format_sep": "Separador aceptado: coma (<code>,</code>) o punto y coma (<code>;</code>).",
     "format_types": "Tipos válidos: <code>company</code> · <code>area</code> · <code>team</code> · <code>business_unit</code>",
     "format_root": "Dejá <code>area_padre</code> vacío para los nodos raíz. El orden no importa: el sistema resuelve la jerarquía.",
+    "format_single_company": "Este workspace admite <strong>una sola empresa raíz</strong>. Si ya existe una, importá solo sus áreas/equipos debajo de esa estructura.",
     "download_template": "⬇ Descargar plantilla",
     "template_filename": "plantilla_areas.csv",
     "template_csv": "nombre,tipo,area_padre\nEmpresa SA,company,\nDirección Comercial,area,Empresa SA\nVentas Norte,team,Dirección Comercial\nVentas Sur,team,Dirección Comercial",
@@ -38,8 +39,11 @@
     "api_errors": {
       "rows_required": "No hay filas para importar.",
       "name_empty": "Nombre vacío",
+      "name_exists": "Ya existe una unidad con el nombre \"{{name}}\". Los nombres deben ser únicos.",
       "parent_not_found": "Área padre \"{{parentName}}\" no encontrada",
       "duplicate": "La unidad \"{{name}}\" ya existe con el mismo tipo y padre",
+      "company_exists": "Ya existe una empresa raíz \"{{name}}\". Este workspace soporta una sola empresa.",
+      "company_parent_invalid": "La empresa raíz no puede depender de otra unidad",
       "import_failed": "Error al importar áreas"
     },
     "err_name_empty": "Nombre vacío",

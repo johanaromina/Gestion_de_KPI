@@ -21,8 +21,11 @@ const VALID_ROLES = ['collaborator', 'leader', 'director', 'admin']
 const AREA_IMPORT_API_ERROR_KEYS: Record<string, string> = {
   ORG_SCOPE_IMPORT_ROWS_REQUIRED: 'areas.api_errors.rows_required',
   ORG_SCOPE_IMPORT_NAME_EMPTY: 'areas.api_errors.name_empty',
+  ORG_SCOPE_IMPORT_NAME_EXISTS: 'areas.api_errors.name_exists',
   ORG_SCOPE_IMPORT_PARENT_NOT_FOUND: 'areas.api_errors.parent_not_found',
   ORG_SCOPE_IMPORT_DUPLICATE: 'areas.api_errors.duplicate',
+  ORG_SCOPE_IMPORT_COMPANY_ALREADY_EXISTS: 'areas.api_errors.company_exists',
+  ORG_SCOPE_IMPORT_COMPANY_PARENT_INVALID: 'areas.api_errors.company_parent_invalid',
   ORG_SCOPE_IMPORT_FAILED: 'areas.api_errors.import_failed',
 }
 
@@ -320,6 +323,7 @@ export default function ImportarDatos() {
             <p dangerouslySetInnerHTML={{ __html: t('areas.format_sep') }} />
             <p dangerouslySetInnerHTML={{ __html: t('areas.format_types') }} />
             <p dangerouslySetInnerHTML={{ __html: t('areas.format_root') }} />
+            <p dangerouslySetInnerHTML={{ __html: t('areas.format_single_company') }} />
             <button
               className="btn-download-template"
               onClick={() => downloadTemplate(areaTemplateCsv, areaTemplateFilename)}

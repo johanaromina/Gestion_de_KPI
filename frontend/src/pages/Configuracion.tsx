@@ -43,6 +43,9 @@ const DATASOURCE_MAPPING_API_ERROR_KEYS: Record<string, string> = {
 }
 
 const ORG_SCOPE_API_ERROR_KEYS: Record<string, string> = {
+  ORG_SCOPE_NAME_EXISTS: 'config:api_errors.org_name_exists',
+  ORG_SCOPE_COMPANY_ALREADY_EXISTS: 'config:api_errors.org_company_exists',
+  ORG_SCOPE_COMPANY_PARENT_INVALID: 'config:api_errors.org_company_parent_invalid',
   ORG_SCOPE_DELETE_HAS_CHILDREN: 'config:api_errors.org_delete_has_children',
   ORG_SCOPE_DELETE_HAS_COLLABORATORS: 'config:api_errors.org_delete_has_collaborators',
   ORG_SCOPE_DELETE_HAS_ASSIGNMENTS: 'config:api_errors.org_delete_has_assignments',
@@ -592,6 +595,21 @@ export default function Configuracion() {
     const map = new Map<number, any>()
     orgScopes?.forEach((scope) => map.set(scope.id, scope))
     return map
+  }, [orgScopes])
+
+  const existingCompanyScope = useMemo(() => {
+    const editingScopeId = editingScope?.id ? Number(editingScope.id) : null
+    return (orgScopes || []).find(
+      (scope) => scope.type === 'company' && Number(scope.id) !== Number(editingScopeId || 0)
+    ) || null
+  }, [editingScope?.id, orgScopes])
+
+  const scopeChildCount = useMemo(() => {
+    const counts = new Map<number, number>()
+    orgScopes?.forEach((scope) => {
+      if (scope.parentId) counts.set(scope.parentId, (counts.get(scope.parentId) || 0) + 1)
+    })
+    return counts
   }, [orgScopes])
 
   const scopeTypeOptions = useMemo(() => {
@@ -2138,6 +2156,15 @@ export default function Configuracion() {
           void dialog.alert(data.warning, { title: t('config:dialog_titles.warning'), variant: 'warning' })
         }
       },
+      onError: (error: any) => {
+        void dialog.alert(
+          resolveApiErrorMessage(error, t, {
+            codeMap: ORG_SCOPE_API_ERROR_KEYS,
+            fallbackKey: 'config:org.save_error',
+          }),
+          { title: t('common:error_title'), variant: 'danger' }
+        )
+      },
     }
   )
 
@@ -2149,6 +2176,28 @@ export default function Configuracion() {
     {
       onSuccess: () => {
         queryClient.invalidateQueries('org-scopes')
+      },
+      onError: (error: any) => {
+        void dialog.alert(
+          resolveApiErrorMessage(error, t, {
+            codeMap: ORG_SCOPE_API_ERROR_KEYS,
+            fallbackKey: 'config:org.delete_error',
+          }),
+          { title: t('common:error_title'), variant: 'danger' }
+        )
+      },
+    }
+  )
+
+  const deleteScopeCascade = useMutation(
+    async (scope: any) => {
+      await api.delete(`/org-scopes/${scope.id}/cascade`)
+      return scope
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('org-scopes')
+        queryClient.invalidateQueries('organigrama-collaborators')
       },
       onError: (error: any) => {
         void dialog.alert(
@@ -3250,10 +3299,26 @@ export default function Configuracion() {
                           )
                           if (ok) deleteScope.mutate(scope)
                         }}
-                        disabled={deleteScope.isLoading}
+                        disabled={deleteScope.isLoading || deleteScopeCascade.isLoading}
                       >
                         {t('common:delete')}
                       </button>
+                      {(scopeChildCount.get(scope.id) || 0) > 0 && (
+                        <button
+                          className="btn-secondary danger"
+                          onClick={async () => {
+                            const childCount = scopeChildCount.get(scope.id) || 0
+                            const ok = await dialog.confirm(
+                              t('config:org.cascade_delete_confirm', { name: scope.name, count: childCount }),
+                              { title: t('config:org.cascade_delete_confirm_title'), confirmLabel: t('config:org.cascade_delete_btn'), variant: 'danger' }
+                            )
+                            if (ok) deleteScopeCascade.mutate(scope)
+                          }}
+                          disabled={deleteScope.isLoading || deleteScopeCascade.isLoading}
+                        >
+                          {t('config:org.cascade_delete_btn')}
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -4820,7 +4885,9 @@ export default function Configuracion() {
                       value={scopeForm.type}
                       onChange={(e) => setScopeForm((prev) => ({ ...prev, type: e.target.value }))}
                     >
-                      <option value="company">🏢 {getOrgScopeTypeLabel('company')}</option>
+                      <option value="company" disabled={Boolean(existingCompanyScope)}>
+                        🏢 {getOrgScopeTypeLabel('company')}
+                      </option>
                       <option value="area">🗂 {getOrgScopeTypeLabel('area')}</option>
                       <option value="team">👥 {getOrgScopeTypeLabel('team')}</option>
                       <option value="person">👤 {getOrgScopeTypeLabel('person')}</option>
@@ -4833,6 +4900,11 @@ export default function Configuracion() {
                       {scopeForm.type === 'person' && t('config:scope_modal.type_hints.person')}
                       {scopeForm.type === 'product' && t('config:scope_modal.type_hints.product')}
                     </small>
+                    {existingCompanyScope && (
+                      <small className="form-hint">
+                        {t('config:scope_modal.single_company_hint', { name: existingCompanyScope.name })}
+                      </small>
+                    )}
                   </div>
                   <div className="form-group">
                     <label>{t('common:status')}</label>

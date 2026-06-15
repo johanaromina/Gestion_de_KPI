@@ -9,6 +9,7 @@
     "format_sep": "Accepted separator: comma (<code>,</code>) or semicolon (<code>;</code>).",
     "format_types": "Valid types: <code>company</code> · <code>area</code> · <code>team</code> · <code>business_unit</code>",
     "format_root": "Leave <code>parent_area</code> empty for root nodes. Order does not matter — the system resolves the hierarchy.",
+    "format_single_company": "This workspace supports <strong>a single root company</strong>. If one already exists, import only its areas/teams under that structure.",
     "download_template": "⬇ Download template",
     "template_filename": "areas_template.csv",
     "template_csv": "name,type,parent_area\nAcme Corp,company,\nCommercial Directorate,area,Acme Corp\nNorth Sales,team,Commercial Directorate\nSouth Sales,team,Commercial Directorate",
@@ -38,8 +39,11 @@
     "api_errors": {
       "rows_required": "There are no rows to import.",
       "name_empty": "Empty name",
+      "name_exists": "A unit named \"{{name}}\" already exists. Unit names must be unique.",
       "parent_not_found": "Parent area \"{{parentName}}\" was not found",
       "duplicate": "The unit \"{{name}}\" already exists with the same type and parent",
+      "company_exists": "A root company \"{{name}}\" already exists. This workspace supports a single company.",
+      "company_parent_invalid": "The root company cannot depend on another unit",
       "import_failed": "Could not import areas"
     },
     "err_name_empty": "Empty name",

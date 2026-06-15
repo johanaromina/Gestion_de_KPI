@@ -60,18 +60,19 @@ export default function Colaboradores() {
     ? orgScopes.filter((scope) => scope.type !== 'person').sort((a, b) => a.name.localeCompare(b.name))
     : []
 
-  const { data: collaborators, isLoading } = useQuery<Collaborator[]>(
+  const { data: collaborators, isLoading, isError } = useQuery<Collaborator[]>(
     ['collaborators', showInactive],
     async () => {
       const response = await api.get('/collaborators', {
         params: { includeInactive: showInactive },
       })
-      return response.data
+      const data = response.data
+      return Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : [])
     },
     {
-      retry: false,
+      retry: 1,
       keepPreviousData: true,
-      staleTime: 3 * 60 * 1000,
+      staleTime: 30 * 1000,
     }
   )
 
@@ -286,6 +287,15 @@ export default function Colaboradores() {
       <div className="table-container">
         {isLoading ? (
           <div className="loading">{t('loading')}</div>
+        ) : isError ? (
+          <div className="empty-state">
+            <div className="empty-icon">⚠️</div>
+            <h3>{t('empty.error_title', { defaultValue: 'Error al cargar colaboradores' })}</h3>
+            <p>{t('empty.error_subtitle', { defaultValue: 'No se pudo conectar con el servidor. Recargá la página e intentá de nuevo.' })}</p>
+            <button className="btn-primary" onClick={() => window.location.reload()}>
+              {t('common:reload', { defaultValue: 'Recargar página' })}
+            </button>
+          </div>
         ) : filteredCollaborators && filteredCollaborators.length > 0 ? (
           <>
             <div className="results-info">

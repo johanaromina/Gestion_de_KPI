@@ -98,9 +98,13 @@
     "empty_filtered": "No hay unidades que coincidan con los filtros actuales.",
     "empty_title": "Todavía no hay áreas ni equipos.",
     "empty_hint": "Hacé clic en Nueva unidad para crear la primera área de tu empresa (por ejemplo: Ventas, Tecnología, Operaciones).",
+    "save_error": "Error al guardar la unidad organizacional",
     "delete_confirm": "¿Seguro que querés eliminar la unidad \"{{name}}\" ({{type}})? Esta acción no se puede deshacer.",
     "delete_confirm_title": "Confirmar eliminación",
-    "delete_error": "Error al eliminar la unidad organizacional"
+    "delete_error": "Error al eliminar la unidad organizacional",
+    "cascade_delete_confirm": "¿Eliminar \"{{name}}\" y toda su estructura? Esto eliminará también todas las sub-unidades que contiene ({{count}} directas). Los colaboradores asignados quedarán sin área. Esta acción no se puede deshacer.",
+    "cascade_delete_confirm_title": "Eliminar toda la estructura",
+    "cascade_delete_btn": "Eliminar estructura"
   },
   "modals": {
     "template_new": "Nueva plantilla",
@@ -161,6 +165,9 @@
     "org_delete_has_collaborators": "No se puede eliminar la unidad porque tiene colaboradores asignados.",
     "org_delete_has_assignments": "No se puede eliminar la unidad porque tiene asignaciones vinculadas.",
     "org_delete_has_targets": "No se puede eliminar la unidad porque tiene targets o integraciones asociados.",
+    "org_name_exists": "Ya existe una unidad con el nombre \"{{name}}\". En esta app los nombres deben ser únicos.",
+    "org_company_exists": "Ya existe una empresa raíz \"{{name}}\". Este workspace soporta una sola empresa.",
+    "org_company_parent_invalid": "La empresa raíz no puede depender de otra unidad.",
     "template_not_found": "La plantilla seleccionada ya no existe.",
     "template_test_required_fields": "Faltan datos obligatorios para probar la plantilla.",
     "template_test_ratio_required": "La plantilla ratio necesita la query de historias.",
@@ -801,10 +808,11 @@
     "type_hints": {
       "area": "Sector estable: Comercial, RRHH, Tecnología…",
       "team": "Subgrupo dentro de un área: Soporte Técnico, Ventas B2B…",
-      "company": "Unidad raíz de la organización.",
+      "company": "Unidad raíz única de la organización.",
       "person": "Persona individual como unidad de estructura.",
       "product": "Producto o línea de negocio."
     },
+    "single_company_hint": "Ya existe una empresa raíz: {{name}}. Para evitar mezcla de datos, este workspace usa una sola empresa.",
     "hierarchy_title": "Jerarquía y calendario",
     "parent": "Depende de",
     "no_parent": "— Sin superior (unidad raíz) —",
