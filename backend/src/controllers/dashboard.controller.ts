@@ -248,20 +248,23 @@ export const getAreaStats = async (req: Request, res: Response) => {
   try {
     const [rows] = await pool.query<any[]>(
       `SELECT
-        c.area,
+        COALESCE(os.name, c.area) as area,
+        COALESCE(os.type, 'area') as scopeType,
         COUNT(DISTINCT c.id) as collaborators,
         AVG(ck.variation) as averageCompliance,
         COUNT(DISTINCT CASE WHEN ck.actual IS NOT NULL THEN ck.id END) as completedKPIs
       FROM collaborators c
+      LEFT JOIN org_scopes os ON os.id = c.orgScopeId
       LEFT JOIN collaborator_kpis ck ON c.id = ck.collaboratorId
-      WHERE c.area IS NOT NULL AND c.area != ''
-      GROUP BY c.area
-      ORDER BY c.area`
+      WHERE (c.area IS NOT NULL AND c.area != '') OR c.orgScopeId IS NOT NULL
+      GROUP BY COALESCE(os.name, c.area), COALESCE(os.type, 'area')
+      ORDER BY COALESCE(os.type, 'area'), COALESCE(os.name, c.area)`
     )
 
     const stats = Array.isArray(rows)
       ? rows.map((row) => ({
           area: row.area,
+          scopeType: row.scopeType || 'area',
           collaborators: Number(row.collaborators),
           averageCompliance: Number(row.averageCompliance || 0),
           completedKPIs: Number(row.completedKPIs || 0),

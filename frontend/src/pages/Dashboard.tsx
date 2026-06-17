@@ -153,6 +153,7 @@ interface TeamStats {
 
 interface AreaStats {
   area: string
+  scopeType: string
   collaborators: number
   averageCompliance: number
   completedKPIs: number
@@ -207,6 +208,7 @@ export default function Dashboard() {
   const [wizardDismissed, setWizardDismissed] = useState(
     () => localStorage.getItem('onboarding-dismissed') === 'true'
   )
+  const [areaTypeFilter, setAreaTypeFilter] = useState<string>('area')
   const handleDismissWizard = () => {
     localStorage.setItem('onboarding-dismissed', 'true')
     setWizardDismissed(true)
@@ -496,7 +498,9 @@ export default function Dashboard() {
             <div className="stat-icon"><StatIcon name="chart" /></div>
             <div className="stat-content">
               <h3>{t('hr.stats.compliance')}</h3>
-              <p className="stat-value">{stats?.averageCompliance?.toFixed(1) || 0}%</p>
+              <p className="stat-value" style={{ color: stats ? progressColor(stats.averageCompliance) : undefined }}>
+                {stats ? formatPercent(stats.averageCompliance, 1) : '0.0%'}
+              </p>
               <p className="stat-label">{t('hr.stats.compliance_label')}</p>
             </div>
           </div>
@@ -504,7 +508,10 @@ export default function Dashboard() {
             <div className="stat-icon"><StatIcon name="clipboard" /></div>
             <div className="stat-content">
               <h3>{t('hr.stats.assignments')}</h3>
-              <p className="stat-value">{stats?.totalAssignments || 0}</p>
+              <p className="stat-value">
+                {stats?.completedAssignments || 0}
+                <span className="stat-value-sub"> / {stats?.totalAssignments || 0}</span>
+              </p>
               <p className="stat-label">{t('hr.stats.assignments_label')}</p>
             </div>
           </div>
@@ -512,7 +519,9 @@ export default function Dashboard() {
             <div className="stat-icon"><StatIcon name="clock" /></div>
             <div className="stat-content">
               <h3>{t('hr.stats.pending')}</h3>
-              <p className="stat-value">{stats?.pendingAssignments || 0}</p>
+              <p className="stat-value" style={{ color: (stats?.pendingAssignments ?? 0) > 0 ? '#d97706' : '#16a34a' }}>
+                {stats?.pendingAssignments || 0}
+              </p>
               <p className="stat-label">{t('hr.stats.pending_label')}</p>
             </div>
           </div>
@@ -524,65 +533,124 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="charts-grid">
-          {areaStats && areaStats.length > 0 && (
-            <div className="chart-card">
-              <h3>{t('hr.charts.compliance_by_area')}</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={areaStats}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="area" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="averageCompliance" fill="#6366f1" name={t('charts.compliance_pct')} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
+        {areaStats && areaStats.length > 0 && (() => {
+          const availableTypes = Array.from(new Set(areaStats.map((s) => s.scopeType))).sort()
+          const effectiveFilter = availableTypes.includes(areaTypeFilter) ? areaTypeFilter : availableTypes[0]
+          const filtered = areaStats.filter((s) => s.scopeType === effectiveFilter)
+          const typeLabel: Record<string, string> = {
+            company: t('scope_types.company', { defaultValue: 'Empresa' }),
+            area: t('scope_types.area', { defaultValue: 'Áreas' }),
+            team: t('scope_types.team', { defaultValue: 'Equipos' }),
+            business_unit: t('scope_types.business_unit', { defaultValue: 'Unidades de negocio' }),
+          }
+          const complianceBarColor = (value: number) =>
+            value >= 90 ? '#16a34a' : value >= 70 ? '#d97706' : '#dc2626'
 
-          {complianceByPeriod && complianceByPeriod.length > 0 && (
-            <div className="chart-card">
-              <h3>{t('hr.charts.compliance_evolution')}</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={complianceByPeriod}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="period" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="compliance" stroke="#0ea5e9" name={t('charts.compliance_pct')} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          )}
+          return (
+            <div className="charts-section">
+              <div className="charts-section-header">
+                <h2>{t('hr.charts.section_title', { defaultValue: 'Rendimiento por unidad' })}</h2>
+                <div className="chart-type-tabs">
+                  {availableTypes.map((type) => (
+                    <button
+                      key={type}
+                      className={`chart-type-tab${effectiveFilter === type ? ' chart-type-tab--active' : ''}`}
+                      onClick={() => setAreaTypeFilter(type)}
+                    >
+                      {typeLabel[type] || type}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-          {areaStats && areaStats.length > 0 && (
-            <div className="chart-card">
-              <h3>{t('hr.charts.collaborators_by_area')}</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={areaStats}
-                    dataKey="collaborators"
-                    nameKey="area"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={100}
-                    fill="#6366f1"
-                    label
-                  >
-                    {areaStats.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={AREA_COLORS[index % AREA_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+              <div className="charts-grid">
+                <div className="chart-card">
+                  <h3>{t('hr.charts.compliance_by_area')}</h3>
+                  {filtered.length === 0 ? (
+                    <p className="chart-empty">{t('hr.charts.no_data', { defaultValue: 'Sin datos para este tipo de unidad.' })}</p>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={320}>
+                      <BarChart data={filtered} margin={{ bottom: 60 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis
+                          dataKey="area"
+                          angle={-40}
+                          textAnchor="end"
+                          interval={0}
+                          tick={{ fontSize: 12 }}
+                          tickFormatter={(v: string) => v.length > 18 ? `${v.slice(0, 16)}…` : v}
+                        />
+                        <YAxis domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} width={45} />
+                        <Tooltip
+                          formatter={(value: number) => [`${Number(value).toFixed(1)}%`, t('charts.compliance_pct')]}
+                          labelFormatter={(label: string) => label}
+                        />
+                        <Bar dataKey="averageCompliance" name={t('charts.compliance_pct')} radius={[4, 4, 0, 0]}>
+                          {filtered.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={complianceBarColor(entry.averageCompliance)} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+
+                <div className="chart-card">
+                  <h3>{t('hr.charts.collaborators_by_area')}</h3>
+                  {filtered.length === 0 ? (
+                    <p className="chart-empty">{t('hr.charts.no_data', { defaultValue: 'Sin datos para este tipo de unidad.' })}</p>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={320}>
+                      <PieChart>
+                        <Pie
+                          data={filtered}
+                          dataKey="collaborators"
+                          nameKey="area"
+                          cx="50%"
+                          cy="45%"
+                          outerRadius={100}
+                          label={({ name, percent }: { name: string; percent: number }) =>
+                            `${name.length > 14 ? `${name.slice(0, 12)}…` : name} (${(percent * 100).toFixed(0)}%)`
+                          }
+                          labelLine={false}
+                        >
+                          {filtered.map((_, index) => (
+                            <Cell key={`cell-${index}`} fill={AREA_COLORS[index % AREA_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(v: number) => [v, t('hr.charts.collaborators_label', { defaultValue: 'colaboradores' })]} />
+                        <Legend wrapperStyle={{ fontSize: 12 }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+
+                {complianceByPeriod && complianceByPeriod.length > 0 && (
+                  <div className="chart-card chart-card--wide">
+                    <h3>{t('hr.charts.compliance_evolution')}</h3>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <LineChart data={complianceByPeriod} margin={{ left: 10, right: 20 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="period" tick={{ fontSize: 12 }} />
+                        <YAxis domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} width={45} />
+                        <Tooltip formatter={(value: number) => [`${Number(value).toFixed(1)}%`, t('charts.compliance_pct')]} />
+                        <Legend />
+                        <Line
+                          type="monotone"
+                          dataKey="compliance"
+                          stroke="#0ea5e9"
+                          strokeWidth={2}
+                          dot={{ r: 4 }}
+                          name={t('charts.compliance_pct')}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </div>
             </div>
-          )}
-        </div>
+          )
+        })()}
 
         <div className="dashboard-section">
           <h2>{t('hr.quick_actions.title')}</h2>
@@ -696,19 +764,28 @@ export default function Dashboard() {
         )}
 
         {teamComplianceByPeriod && teamComplianceByPeriod.length > 0 && (
-          <div className="charts-grid">
-            <div className="chart-card">
-              <h3>{t('leadership.charts.team_compliance_evolution')}</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={teamComplianceByPeriod}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="period" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="compliance" stroke="#10b981" name={t('charts.compliance_pct')} />
-                </LineChart>
-              </ResponsiveContainer>
+          <div className="charts-section">
+            <div className="charts-grid">
+              <div className="chart-card chart-card--wide">
+                <h3>{t('leadership.charts.team_compliance_evolution')}</h3>
+                <ResponsiveContainer width="100%" height={280}>
+                  <LineChart data={teamComplianceByPeriod} margin={{ left: 10, right: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="period" tick={{ fontSize: 12 }} />
+                    <YAxis domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} width={45} />
+                    <Tooltip formatter={(value: number) => [`${Number(value).toFixed(1)}%`, t('charts.compliance_pct')]} />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="compliance"
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
+                      name={t('charts.compliance_pct')}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
         )}
@@ -963,15 +1040,30 @@ export default function Dashboard() {
         <div className="dashboard-section">
           <h2>{t('collab.section_team_kpis')}</h2>
           <div className="chart-card">
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={teamKPIs}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="kpiName" angle={-45} textAnchor="end" height={100} />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="target" fill="#cbd5e1" name={t('collab.team_chart.target')} />
-                <Bar dataKey="actual" fill="#6366f1" name={t('collab.team_chart.actual')} />
+            <ResponsiveContainer width="100%" height={320}>
+              <BarChart data={teamKPIs} margin={{ bottom: 60 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis
+                  dataKey="kpiName"
+                  angle={-40}
+                  textAnchor="end"
+                  interval={0}
+                  tick={{ fontSize: 12 }}
+                  tickFormatter={(v: string) => v.length > 18 ? `${v.slice(0, 16)}…` : v}
+                />
+                <YAxis domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} width={45} />
+                <Tooltip
+                  formatter={(value: number, name: string) => [`${Number(value).toFixed(1)}%`, name]}
+                  labelFormatter={(label: string) => label}
+                />
+                <Bar dataKey="compliance" name={t('charts.compliance_pct')} radius={[4, 4, 0, 0]}>
+                  {teamKPIs.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={entry.compliance >= 90 ? '#16a34a' : entry.compliance >= 70 ? '#d97706' : '#dc2626'}
+                    />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
