@@ -81,6 +81,11 @@ echo ""
 echo "=== git pull ==="
 git pull
 
+# ── Backup pre-deploy ─────────────────────────────────────────────────────────
+echo ""
+echo "=== Backup pre-deploy ==="
+bash "$(dirname "$0")/backup.sh"
+
 # ── Migraciones ───────────────────────────────────────────────────────────────
 if [[ ${#MIGRATIONS[@]} -gt 0 ]]; then
   echo ""
