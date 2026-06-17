@@ -66,6 +66,7 @@ fi
 # Agregar cada nueva migración aquí, en orden cronológico.
 MIGRATIONS=(
   "backend/scripts/add-check-ins-note.sql"
+  "backend/scripts/add-collaborator-kpis-period-index.sql"
 )
 
 run_migration() {

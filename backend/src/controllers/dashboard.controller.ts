@@ -246,20 +246,27 @@ export const getDashboardStats = async (req: Request, res: Response) => {
 // Estadísticas por área para Admin/HR
 export const getAreaStats = async (req: Request, res: Response) => {
   try {
-    const [rows] = await pool.query<any[]>(
-      `SELECT
-        COALESCE(os.name, c.area) as area,
-        COALESCE(os.type, 'area') as scopeType,
-        COUNT(DISTINCT c.id) as collaborators,
-        AVG(ck.variation) as averageCompliance,
-        COUNT(DISTINCT CASE WHEN ck.actual IS NOT NULL THEN ck.id END) as completedKPIs
-      FROM collaborators c
-      LEFT JOIN org_scopes os ON os.id = c.orgScopeId
-      LEFT JOIN collaborator_kpis ck ON c.id = ck.collaboratorId
-      WHERE (c.area IS NOT NULL AND c.area != '') OR c.orgScopeId IS NOT NULL
-      GROUP BY COALESCE(os.name, c.area), COALESCE(os.type, 'area')
-      ORDER BY COALESCE(os.type, 'area'), COALESCE(os.name, c.area)`
+    const resolvedPeriod = await resolveExecutivePeriod(
+      req.query.periodId ? Number(req.query.periodId) : null
     )
+
+    const [rows] = resolvedPeriod
+      ? await pool.query<any[]>(
+          `SELECT
+            COALESCE(os.name, c.area) as area,
+            COALESCE(os.type, 'area') as scopeType,
+            COUNT(DISTINCT c.id) as collaborators,
+            AVG(ck.variation) as averageCompliance,
+            COUNT(DISTINCT CASE WHEN ck.actual IS NOT NULL THEN ck.id END) as completedKPIs
+          FROM collaborators c
+          LEFT JOIN org_scopes os ON os.id = c.orgScopeId
+          LEFT JOIN collaborator_kpis ck ON c.id = ck.collaboratorId AND ck.periodId = ?
+          WHERE (c.area IS NOT NULL AND c.area != '') OR c.orgScopeId IS NOT NULL
+          GROUP BY COALESCE(os.name, c.area), COALESCE(os.type, 'area')
+          ORDER BY COALESCE(os.type, 'area'), COALESCE(os.name, c.area)`,
+          [resolvedPeriod.id]
+        )
+      : [[], []]
 
     const stats = Array.isArray(rows)
       ? rows.map((row) => ({
@@ -557,6 +564,13 @@ export const getExecutiveTree = async (req: Request, res: Response) => {
       childrenMap.set(Number(scope.parentId), current)
     })
 
+    const subPeriodClause = resolvedSubPeriod?.id
+      ? `AND (sk.subPeriodId = ? OR sk.subPeriodId IS NULL)`
+      : ``
+    const scopeKpiParams = resolvedSubPeriod?.id
+      ? [resolvedPeriod.id, resolvedSubPeriod.id]
+      : [resolvedPeriod.id]
+
     const [scopeKpiRows] = await pool.query<any[]>(
       `SELECT sk.*,
               k.name as kpiName,
@@ -574,10 +588,10 @@ export const getExecutiveTree = async (req: Request, res: Response) => {
        LEFT JOIN objective_trees_scope_kpis otsk ON otsk.scopeKpiId = sk.id
        LEFT JOIN objective_trees ot ON ot.id = otsk.objectiveTreeId
        WHERE sk.periodId = ?
-         AND (? IS NULL OR sk.subPeriodId = ? OR sk.subPeriodId IS NULL)
+         ${subPeriodClause}
        GROUP BY sk.id
        ORDER BY os.name ASC, sk.weightedResult DESC, sk.name ASC`,
-      [resolvedPeriod.id, resolvedSubPeriod?.id || null, resolvedSubPeriod?.id || null]
+      scopeKpiParams
     )
 
     const scopeKpisByScope = new Map<number, any[]>()
