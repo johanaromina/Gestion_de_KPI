@@ -224,6 +224,112 @@ const buildNodeRollup = (node: ExecutiveTreeNode, objectiveName: string | null):
   }
 }
 
+const GroupOverviewSection = ({
+  companies,
+  selectedCompanyId,
+  onSelectCompany,
+}: {
+  companies: ExecutiveTreeNode[]
+  selectedCompanyId: number | null
+  onSelectCompany: (id: number) => void
+}) => {
+  const { t } = useTranslation('executive')
+
+  const rollups = useMemo(() => companies.map((c) => buildNodeRollup(c, null)), [companies])
+
+  if (companies.length < 2) return null
+
+  const variations = rollups.map((r) => r.averageVariation).filter((v): v is number => v !== null)
+  const groupAvgVariation = average(variations)
+  const totalWeightedResult = sum(rollups.map((r) => r.weightedResultTotal))
+  const totalKpis = rollups.reduce((acc, r) => acc + r.allScopeKpis.length, 0)
+  const totalTeams = rollups.reduce((acc, r) => acc + r.teamCount, 0)
+
+  const onTrack = rollups.filter((r) => (r.averageVariation ?? 0) >= 100).length
+  const atRisk = rollups.filter((r) => r.averageVariation !== null && r.averageVariation < 80).length
+
+  return (
+    <section className="executive-group-overview">
+      <div className="executive-section-header">
+        <h3>{t('group.title', { defaultValue: 'Vista del Grupo' })}</h3>
+        <span>{t('group.subtitle', { count: companies.length, defaultValue: `${companies.length} empresas` })}</span>
+      </div>
+
+      <div className="executive-group-aggregate">
+        <div className="executive-group-agg-stat">
+          <span>{t('group.agg_variation', { defaultValue: 'Variación promedio' })}</span>
+          <strong className={semaphoreClass(groupAvgVariation)}>{formatNumber(groupAvgVariation, 1)}%</strong>
+        </div>
+        <div className="executive-group-agg-stat">
+          <span>{t('group.agg_result', { defaultValue: 'Resultado consolidado' })}</span>
+          <strong>{formatNumber(totalWeightedResult)}</strong>
+        </div>
+        <div className="executive-group-agg-stat">
+          <span>{t('group.agg_kpis', { defaultValue: 'KPIs en seguimiento' })}</span>
+          <strong>{totalKpis}</strong>
+        </div>
+        <div className="executive-group-agg-stat">
+          <span>{t('group.agg_teams', { defaultValue: 'Equipos' })}</span>
+          <strong>{totalTeams}</strong>
+        </div>
+        <div className="executive-group-agg-stat">
+          <span>{t('group.agg_on_track', { defaultValue: 'En objetivo' })}</span>
+          <strong className="semaphore-green">{onTrack}</strong>
+        </div>
+        <div className="executive-group-agg-stat">
+          <span>{t('group.agg_at_risk', { defaultValue: 'En riesgo' })}</span>
+          <strong className={atRisk > 0 ? 'semaphore-red' : ''}>{atRisk}</strong>
+        </div>
+      </div>
+
+      <div className="executive-group-company-grid">
+        {companies.map((company, index) => {
+          const rollup = rollups[index]
+          const isSelected = company.scope.id === selectedCompanyId
+          return (
+            <button
+              type="button"
+              key={`group-company-${company.scope.id}`}
+              className={`executive-group-company-card ${isSelected ? 'selected' : ''} ${semaphoreClass(rollup.averageVariation)}`}
+              onClick={() => onSelectCompany(company.scope.id)}
+            >
+              <div className="executive-group-company-header">
+                <span className="executive-group-company-name">{company.scope.name}</span>
+                <span className={`executive-semaphore-badge ${semaphoreClass(rollup.averageVariation)}`}>
+                  {formatNumber(rollup.averageVariation, 1)}%
+                </span>
+              </div>
+              <div className="executive-group-company-metrics">
+                <div>
+                  <span>{t('group.company_result', { defaultValue: 'Resultado' })}</span>
+                  <strong>{formatNumber(rollup.weightedResultTotal)}</strong>
+                </div>
+                <div>
+                  <span>{t('group.company_kpis', { defaultValue: 'KPIs' })}</span>
+                  <strong>{rollup.allScopeKpis.length}</strong>
+                </div>
+                <div>
+                  <span>{t('group.company_coverage', { defaultValue: 'Cobertura' })}</span>
+                  <strong>{formatNumber(rollup.completionRate, 0)}%</strong>
+                </div>
+                <div>
+                  <span>{t('group.company_teams', { defaultValue: 'Equipos' })}</span>
+                  <strong>{rollup.teamCount}</strong>
+                </div>
+              </div>
+              {isSelected && (
+                <div className="executive-group-selected-badge">
+                  {t('group.company_selected_badge', { defaultValue: 'Vista activa ↓' })}
+                </div>
+              )}
+            </button>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
 const ExecutiveKpiCard = ({
   scopeKpi,
   onOpenDetail,
@@ -882,6 +988,19 @@ export default function TableroEjecutivo() {
           </select>
         </label>
       </div>
+
+      {!isLoading && (executiveTree?.companies?.length ?? 0) >= 2 && (
+        <GroupOverviewSection
+          companies={executiveTree!.companies}
+          selectedCompanyId={selectedCompanyId}
+          onSelectCompany={(id) => {
+            setSelectedCompanyId(id)
+            setSelectedAreaId(null)
+            setSelectedTeamId(null)
+            setSelectedObjective(null)
+          }}
+        />
+      )}
 
       {isLoading ? (
         <div className="executive-empty">{t('tablero.loading')}</div>
