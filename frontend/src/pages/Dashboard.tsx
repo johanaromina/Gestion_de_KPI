@@ -534,6 +534,7 @@ export default function Dashboard() {
         )}
 
         {areaStats && areaStats.length > 0 && (() => {
+          const CHART_LIMIT = 15
           const availableTypes = Array.from(new Set(areaStats.map((s) => s.scopeType))).sort()
           const effectiveFilter = availableTypes.includes(areaTypeFilter) ? areaTypeFilter : availableTypes[0]
           const filtered = areaStats.filter((s) => s.scopeType === effectiveFilter)
@@ -545,6 +546,15 @@ export default function Dashboard() {
           }
           const complianceBarColor = (value: number) =>
             value >= 90 ? '#16a34a' : value >= 70 ? '#d97706' : '#dc2626'
+
+          const isManyItems = filtered.length > CHART_LIMIT
+          // Bar chart: worst-first (most actionable), capped at CHART_LIMIT
+          const chartData = isManyItems
+            ? [...filtered].sort((a, b) => a.averageCompliance - b.averageCompliance).slice(0, CHART_LIMIT)
+            : filtered
+          // Right panel: table when many items, pie when few
+          const showRankedTable = filtered.length > 10
+          const rankedRows = [...filtered].sort((a, b) => a.averageCompliance - b.averageCompliance)
 
           return (
             <div className="charts-section">
@@ -565,28 +575,39 @@ export default function Dashboard() {
 
               <div className="charts-grid">
                 <div className="chart-card">
-                  <h3>{t('hr.charts.compliance_by_area')}</h3>
+                  <h3>
+                    {t('hr.charts.compliance_by_area')}
+                    {isManyItems && (
+                      <span className="chart-subtitle">
+                        {` — peor cumplimiento (${CHART_LIMIT} de ${filtered.length})`}
+                      </span>
+                    )}
+                  </h3>
                   {filtered.length === 0 ? (
                     <p className="chart-empty">{t('hr.charts.no_data', { defaultValue: 'Sin datos para este tipo de unidad.' })}</p>
                   ) : (
                     <ResponsiveContainer width="100%" height={320}>
-                      <BarChart data={filtered} margin={{ bottom: 60 }}>
+                      <BarChart data={chartData} margin={{ bottom: 60 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis
                           dataKey="area"
                           angle={-40}
                           textAnchor="end"
                           interval={0}
-                          tick={{ fontSize: 12 }}
-                          tickFormatter={(v: string) => v.length > 18 ? `${v.slice(0, 16)}…` : v}
+                          tick={{ fontSize: 11 }}
+                          tickFormatter={(v: string) => v.length > 16 ? `${v.slice(0, 14)}…` : v}
                         />
-                        <YAxis domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} width={45} />
+                        <YAxis
+                          domain={[0, (dataMax: number) => Math.ceil(Math.max(dataMax, 100) / 10) * 10]}
+                          tickFormatter={(v: number) => `${v}%`}
+                          width={45}
+                        />
                         <Tooltip
                           formatter={(value: number) => [`${Number(value).toFixed(1)}%`, t('charts.compliance_pct')]}
                           labelFormatter={(label: string) => label}
                         />
                         <Bar dataKey="averageCompliance" name={t('charts.compliance_pct')} radius={[4, 4, 0, 0]}>
-                          {filtered.map((entry, index) => (
+                          {chartData.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={complianceBarColor(entry.averageCompliance)} />
                           ))}
                         </Bar>
@@ -599,6 +620,47 @@ export default function Dashboard() {
                   <h3>{t('hr.charts.collaborators_by_area')}</h3>
                   {filtered.length === 0 ? (
                     <p className="chart-empty">{t('hr.charts.no_data', { defaultValue: 'Sin datos para este tipo de unidad.' })}</p>
+                  ) : showRankedTable ? (
+                    <div className="ranked-table-wrap">
+                      <table className="ranked-table">
+                        <thead>
+                          <tr>
+                            <th>#</th>
+                            <th>Unidad</th>
+                            <th>Colab.</th>
+                            <th>Cumplimiento</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rankedRows.map((row, i) => (
+                            <tr key={row.area}>
+                              <td className="ranked-rank">{i + 1}</td>
+                              <td className="ranked-name" title={row.area}>
+                                {row.area.length > 22 ? `${row.area.slice(0, 20)}…` : row.area}
+                              </td>
+                              <td className="ranked-collab">{row.collaborators}</td>
+                              <td className="ranked-compliance">
+                                <div className="ranked-bar-track">
+                                  <div
+                                    className="ranked-bar-fill"
+                                    style={{
+                                      width: `${Math.min(row.averageCompliance, 100)}%`,
+                                      background: complianceBarColor(row.averageCompliance),
+                                    }}
+                                  />
+                                </div>
+                                <span
+                                  className="ranked-pct"
+                                  style={{ color: complianceBarColor(row.averageCompliance) }}
+                                >
+                                  {row.averageCompliance.toFixed(1)}%
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   ) : (
                     <ResponsiveContainer width="100%" height={320}>
                       <PieChart>
