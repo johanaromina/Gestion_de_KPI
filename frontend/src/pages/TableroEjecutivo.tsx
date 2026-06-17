@@ -680,6 +680,7 @@ export default function TableroEjecutivo() {
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null)
   const [selectedObjective, setSelectedObjective] = useState<string | null>(null)
   const [detailScopeKpi, setDetailScopeKpi] = useState<ScopeKPI | null>(null)
+  const [showAllDescendantKpis, setShowAllDescendantKpis] = useState(false)
 
   const { data: periods } = useQuery<Period[]>('periods', async () => (await api.get('/periods')).data)
 
@@ -807,6 +808,8 @@ export default function TableroEjecutivo() {
 
   const focusNode = selectedTeam || selectedArea || selectedCompany
 
+  useEffect(() => { setShowAllDescendantKpis(false) }, [focusNode?.scope.id])
+
   const focusRollup = useMemo(
     () => (focusNode ? buildNodeRollup(focusNode, selectedObjective) : null),
     [focusNode, selectedObjective]
@@ -818,7 +821,7 @@ export default function TableroEjecutivo() {
   )
 
   const focusDescendantKpis = useMemo(
-    () => (focusRollup ? focusRollup.descendantScopeKpis.slice(0, 8) : []),
+    () => (focusRollup ? focusRollup.descendantScopeKpis : []),
     [focusRollup]
   )
 
@@ -1367,15 +1370,28 @@ export default function TableroEjecutivo() {
                       <span>{t('tablero.focus_desc_kpis_count', { count: focusDescendantKpis.length })}</span>
                     </div>
                     {focusDescendantKpis.length ? (
-                      <div className="executive-kpi-grid compact">
-                        {focusDescendantKpis.map((scopeKpi) => (
-                          <ExecutiveKpiCard
-                            key={`focus-desc-kpi-${scopeKpi.id}`}
-                            scopeKpi={scopeKpi}
-                            onOpenDetail={setDetailScopeKpi}
-                          />
-                        ))}
-                      </div>
+                      <>
+                        <div className="executive-kpi-grid compact">
+                          {(showAllDescendantKpis ? focusDescendantKpis : focusDescendantKpis.slice(0, 12)).map((scopeKpi) => (
+                            <ExecutiveKpiCard
+                              key={`focus-desc-kpi-${scopeKpi.id}`}
+                              scopeKpi={scopeKpi}
+                              onOpenDetail={setDetailScopeKpi}
+                            />
+                          ))}
+                        </div>
+                        {focusDescendantKpis.length > 12 && (
+                          <button
+                            type="button"
+                            className="executive-show-more-btn"
+                            onClick={() => setShowAllDescendantKpis((v) => !v)}
+                          >
+                            {showAllDescendantKpis
+                              ? t('tablero.show_less', { defaultValue: 'Ver menos' })
+                              : t('tablero.show_all', { count: focusDescendantKpis.length, defaultValue: `Ver todos (${focusDescendantKpis.length})` })}
+                          </button>
+                        )}
+                      </>
                     ) : (
                       <div className="executive-empty">{t('tablero.focus_desc_kpis_empty')}</div>
                     )}
