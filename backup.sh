@@ -60,6 +60,7 @@ dump_db() {
     --single-transaction \
     --quick \
     --skip-lock-tables \
+    --no-tablespaces \
     --routines \
     --triggers \
     "$DB_NAME" \
