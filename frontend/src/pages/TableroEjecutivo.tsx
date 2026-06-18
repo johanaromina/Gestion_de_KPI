@@ -681,6 +681,11 @@ export default function TableroEjecutivo() {
   const [selectedObjective, setSelectedObjective] = useState<string | null>(null)
   const [detailScopeKpi, setDetailScopeKpi] = useState<ScopeKPI | null>(null)
   const [showAllDescendantKpis, setShowAllDescendantKpis] = useState(false)
+  const [showAllLensChips, setShowAllLensChips] = useState(false)
+  const [showAllObjectiveHighlights, setShowAllObjectiveHighlights] = useState(false)
+
+  const LENS_CHIPS_LIMIT = 6
+  const OBJECTIVE_HIGHLIGHTS_LIMIT = 6
 
   const { data: periods } = useQuery<Period[]>('periods', async () => (await api.get('/periods')).data)
 
@@ -749,6 +754,8 @@ export default function TableroEjecutivo() {
     if (selectedObjective && !companyObjectiveOptions.includes(selectedObjective)) {
       setSelectedObjective(null)
     }
+    setShowAllLensChips(false)
+    setShowAllObjectiveHighlights(false)
   }, [companyObjectiveOptions, selectedObjective])
 
   const filteredCompanyKpis = useMemo(
@@ -848,7 +855,6 @@ export default function TableroEjecutivo() {
           b.scopeKpiCount - a.scopeKpiCount ||
           a.objective.localeCompare(b.objective)
       )
-      .slice(0, 8)
   }, [companyObjectiveOptions, selectedCompany])
 
   const focusScopeId = focusNode?.scope.id || null
@@ -1060,7 +1066,7 @@ export default function TableroEjecutivo() {
                     >
                       {t('tablero.lens_all_btn')}
                     </button>
-                    {companyObjectiveOptions.map((objective) => (
+                    {(showAllLensChips ? companyObjectiveOptions : companyObjectiveOptions.slice(0, LENS_CHIPS_LIMIT)).map((objective) => (
                       <button
                         type="button"
                         key={`objective-filter-${objective}`}
@@ -1073,6 +1079,17 @@ export default function TableroEjecutivo() {
                         {objective}
                       </button>
                     ))}
+                    {companyObjectiveOptions.length > LENS_CHIPS_LIMIT && (
+                      <button
+                        type="button"
+                        className="executive-lens-chip executive-lens-chip--more"
+                        onClick={() => setShowAllLensChips((v) => !v)}
+                      >
+                        {showAllLensChips
+                          ? t('tablero.lens_show_less', { defaultValue: 'Ver menos' })
+                          : t('tablero.lens_show_more', { count: companyObjectiveOptions.length - LENS_CHIPS_LIMIT, defaultValue: `+${companyObjectiveOptions.length - LENS_CHIPS_LIMIT} más` })}
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div className="executive-empty compact">{t('tablero.lens_no_objectives')}</div>
@@ -1115,7 +1132,7 @@ export default function TableroEjecutivo() {
                 <span>{t('tablero.objectives_subtitle')}</span>
               </div>
               <div className="executive-objective-grid">
-                {objectiveHighlights.map((objective) => (
+                {(showAllObjectiveHighlights ? objectiveHighlights : objectiveHighlights.slice(0, OBJECTIVE_HIGHLIGHTS_LIMIT)).map((objective) => (
                   <button
                     type="button"
                     key={`objective-highlight-${objective.objective}`}
@@ -1133,6 +1150,17 @@ export default function TableroEjecutivo() {
                   </button>
                 ))}
               </div>
+              {objectiveHighlights.length > OBJECTIVE_HIGHLIGHTS_LIMIT && (
+                <button
+                  type="button"
+                  className="executive-show-more-btn"
+                  onClick={() => setShowAllObjectiveHighlights((v) => !v)}
+                >
+                  {showAllObjectiveHighlights
+                    ? t('tablero.show_less', { defaultValue: 'Ver menos' })
+                    : t('tablero.show_all', { count: objectiveHighlights.length, defaultValue: `Ver todos (${objectiveHighlights.length})` })}
+                </button>
+              )}
             </section>
           ) : null}
 
