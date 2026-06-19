@@ -29,6 +29,31 @@ const DASHBOARD_STALE = 2 * 60 * 1000
 
 const AREA_COLORS = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#84cc16']
 
+// ─── Chart expand modal ───────────────────────────────────────────────────────
+
+function ChartModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="chart-modal-overlay" onClick={onClose}>
+      <div className="chart-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="chart-modal-header">
+          <h3>{title}</h3>
+          <button className="chart-modal-close" onClick={onClose} aria-label="Cerrar">✕</button>
+        </div>
+        <div className="chart-modal-body">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+function ExpandIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" />
+      <line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" />
+    </svg>
+  )
+}
+
 // ─── Static render helpers ────────────────────────────────────────────────────
 
 function StatIcon({ name }: { name: 'users' | 'calendar' | 'target' | 'chart' | 'clipboard' | 'clock' }) {
@@ -209,6 +234,7 @@ export default function Dashboard() {
     () => localStorage.getItem('onboarding-dismissed') === 'true'
   )
   const [areaTypeFilter, setAreaTypeFilter] = useState<string>('area')
+  const [expandedChart, setExpandedChart] = useState<'compliance' | 'distribution' | 'evolution' | null>(null)
   const handleDismissWizard = () => {
     localStorage.setItem('onboarding-dismissed', 'true')
     setWizardDismissed(true)
@@ -575,41 +601,28 @@ export default function Dashboard() {
 
               <div className="charts-grid">
                 <div className="chart-card">
-                  <h3>
-                    {t('hr.charts.compliance_by_area')}
-                    {isManyItems && (
-                      <span className="chart-subtitle">
-                        {` — peor cumplimiento (${CHART_LIMIT} de ${filtered.length})`}
-                      </span>
-                    )}
-                  </h3>
+                  <div className="chart-card-header">
+                    <h3>
+                      {t('hr.charts.compliance_by_area')}
+                      {isManyItems && (
+                        <span className="chart-subtitle">
+                          {` — peor cumplimiento (${CHART_LIMIT} de ${filtered.length})`}
+                        </span>
+                      )}
+                    </h3>
+                    <button className="chart-expand-btn" title="Expandir" onClick={() => setExpandedChart('compliance')}><ExpandIcon /></button>
+                  </div>
                   {filtered.length === 0 ? (
                     <p className="chart-empty">{t('hr.charts.no_data', { defaultValue: 'Sin datos para este tipo de unidad.' })}</p>
                   ) : (
-                    <ResponsiveContainer width="100%" height={320}>
+                    <ResponsiveContainer width="100%" height={300}>
                       <BarChart data={chartData} margin={{ bottom: 60 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis
-                          dataKey="area"
-                          angle={-40}
-                          textAnchor="end"
-                          interval={0}
-                          tick={{ fontSize: 11 }}
-                          tickFormatter={(v: string) => v.length > 16 ? `${v.slice(0, 14)}…` : v}
-                        />
-                        <YAxis
-                          domain={[0, (dataMax: number) => Math.ceil(Math.max(dataMax, 100) / 10) * 10]}
-                          tickFormatter={(v: number) => `${v}%`}
-                          width={45}
-                        />
-                        <Tooltip
-                          formatter={(value: number) => [`${Number(value).toFixed(1)}%`, t('charts.compliance_pct')]}
-                          labelFormatter={(label: string) => label}
-                        />
+                        <XAxis dataKey="area" angle={-40} textAnchor="end" interval={0} tick={{ fontSize: 11 }} tickFormatter={(v: string) => v.length > 16 ? `${v.slice(0, 14)}…` : v} />
+                        <YAxis domain={[0, (dataMax: number) => Math.ceil(Math.max(dataMax, 100) / 10) * 10]} tickFormatter={(v: number) => `${v}%`} width={45} />
+                        <Tooltip formatter={(value: number) => [`${Number(value).toFixed(1)}%`, t('charts.compliance_pct')]} labelFormatter={(label: string) => label} />
                         <Bar dataKey="averageCompliance" name={t('charts.compliance_pct')} radius={[4, 4, 0, 0]}>
-                          {chartData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={complianceBarColor(entry.averageCompliance)} />
-                          ))}
+                          {chartData.map((entry, index) => (<Cell key={`cell-${index}`} fill={complianceBarColor(entry.averageCompliance)} />))}
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
@@ -617,44 +630,25 @@ export default function Dashboard() {
                 </div>
 
                 <div className="chart-card">
-                  <h3>{t('hr.charts.collaborators_by_area')}</h3>
+                  <div className="chart-card-header">
+                    <h3>{t('hr.charts.collaborators_by_area')}</h3>
+                    {!showRankedTable && <button className="chart-expand-btn" title="Expandir" onClick={() => setExpandedChart('distribution')}><ExpandIcon /></button>}
+                  </div>
                   {filtered.length === 0 ? (
                     <p className="chart-empty">{t('hr.charts.no_data', { defaultValue: 'Sin datos para este tipo de unidad.' })}</p>
                   ) : showRankedTable ? (
                     <div className="ranked-table-wrap">
                       <table className="ranked-table">
-                        <thead>
-                          <tr>
-                            <th>#</th>
-                            <th>Unidad</th>
-                            <th>Colab.</th>
-                            <th>Cumplimiento</th>
-                          </tr>
-                        </thead>
+                        <thead><tr><th>#</th><th>Unidad</th><th>Colab.</th><th>Cumplimiento</th></tr></thead>
                         <tbody>
                           {rankedRows.map((row, i) => (
                             <tr key={row.area}>
                               <td className="ranked-rank">{i + 1}</td>
-                              <td className="ranked-name" title={row.area}>
-                                {row.area.length > 22 ? `${row.area.slice(0, 20)}…` : row.area}
-                              </td>
+                              <td className="ranked-name" title={row.area}>{row.area.length > 22 ? `${row.area.slice(0, 20)}…` : row.area}</td>
                               <td className="ranked-collab">{row.collaborators}</td>
                               <td className="ranked-compliance">
-                                <div className="ranked-bar-track">
-                                  <div
-                                    className="ranked-bar-fill"
-                                    style={{
-                                      width: `${Math.min(row.averageCompliance, 100)}%`,
-                                      background: complianceBarColor(row.averageCompliance),
-                                    }}
-                                  />
-                                </div>
-                                <span
-                                  className="ranked-pct"
-                                  style={{ color: complianceBarColor(row.averageCompliance) }}
-                                >
-                                  {row.averageCompliance.toFixed(1)}%
-                                </span>
+                                <div className="ranked-bar-track"><div className="ranked-bar-fill" style={{ width: `${Math.min(row.averageCompliance, 100)}%`, background: complianceBarColor(row.averageCompliance) }} /></div>
+                                <span className="ranked-pct" style={{ color: complianceBarColor(row.averageCompliance) }}>{row.averageCompliance.toFixed(1)}%</span>
                               </td>
                             </tr>
                           ))}
@@ -662,23 +656,10 @@ export default function Dashboard() {
                       </table>
                     </div>
                   ) : (
-                    <ResponsiveContainer width="100%" height={320}>
+                    <ResponsiveContainer width="100%" height={300}>
                       <PieChart>
-                        <Pie
-                          data={filtered}
-                          dataKey="collaborators"
-                          nameKey="area"
-                          cx="50%"
-                          cy="45%"
-                          outerRadius={100}
-                          label={({ name, percent }: { name: string; percent: number }) =>
-                            `${name.length > 14 ? `${name.slice(0, 12)}…` : name} (${(percent * 100).toFixed(0)}%)`
-                          }
-                          labelLine={false}
-                        >
-                          {filtered.map((_, index) => (
-                            <Cell key={`cell-${index}`} fill={AREA_COLORS[index % AREA_COLORS.length]} />
-                          ))}
+                        <Pie data={filtered} dataKey="collaborators" nameKey="area" cx="50%" cy="45%" outerRadius={100} label={({ name, percent }: { name: string; percent: number }) => `${name.length > 14 ? `${name.slice(0, 12)}…` : name} (${(percent * 100).toFixed(0)}%)`} labelLine={false}>
+                          {filtered.map((_, index) => (<Cell key={`cell-${index}`} fill={AREA_COLORS[index % AREA_COLORS.length]} />))}
                         </Pie>
                         <Tooltip formatter={(v: number) => [v, t('hr.charts.collaborators_label', { defaultValue: 'colaboradores' })]} />
                         <Legend wrapperStyle={{ fontSize: 12 }} />
@@ -689,27 +670,70 @@ export default function Dashboard() {
 
                 {complianceByPeriod && complianceByPeriod.length > 0 && (
                   <div className="chart-card chart-card--wide">
-                    <h3>{t('hr.charts.compliance_evolution')}</h3>
-                    <ResponsiveContainer width="100%" height={280}>
+                    <div className="chart-card-header">
+                      <h3>{t('hr.charts.compliance_evolution')}</h3>
+                      <button className="chart-expand-btn" title="Expandir" onClick={() => setExpandedChart('evolution')}><ExpandIcon /></button>
+                    </div>
+                    <ResponsiveContainer width="100%" height={260}>
                       <LineChart data={complianceByPeriod} margin={{ left: 10, right: 20 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis dataKey="period" tick={{ fontSize: 12 }} />
                         <YAxis domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} width={45} />
                         <Tooltip formatter={(value: number) => [`${Number(value).toFixed(1)}%`, t('charts.compliance_pct')]} />
                         <Legend />
-                        <Line
-                          type="monotone"
-                          dataKey="compliance"
-                          stroke="#0ea5e9"
-                          strokeWidth={2}
-                          dot={{ r: 4 }}
-                          name={t('charts.compliance_pct')}
-                        />
+                        <Line type="monotone" dataKey="compliance" stroke="#0ea5e9" strokeWidth={2} dot={{ r: 4 }} name={t('charts.compliance_pct')} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
                 )}
               </div>
+
+              {expandedChart === 'compliance' && filtered.length > 0 && (
+                <ChartModal title={t('hr.charts.compliance_by_area')} onClose={() => setExpandedChart(null)}>
+                  <ResponsiveContainer width="100%" height={520}>
+                    <BarChart data={isManyItems ? [...filtered].sort((a, b) => a.averageCompliance - b.averageCompliance) : filtered} margin={{ bottom: 80, left: 10, right: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="area" angle={-40} textAnchor="end" interval={0} tick={{ fontSize: 12 }} tickFormatter={(v: string) => v.length > 22 ? `${v.slice(0, 20)}…` : v} />
+                      <YAxis domain={[0, (dataMax: number) => Math.ceil(Math.max(dataMax, 100) / 10) * 10]} tickFormatter={(v: number) => `${v}%`} width={50} />
+                      <Tooltip formatter={(value: number) => [`${Number(value).toFixed(1)}%`, t('charts.compliance_pct')]} labelFormatter={(label: string) => label} />
+                      <Bar dataKey="averageCompliance" name={t('charts.compliance_pct')} radius={[4, 4, 0, 0]}>
+                        {(isManyItems ? [...filtered].sort((a, b) => a.averageCompliance - b.averageCompliance) : filtered).map((entry, index) => (
+                          <Cell key={`modal-cell-${index}`} fill={complianceBarColor(entry.averageCompliance)} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartModal>
+              )}
+
+              {expandedChart === 'distribution' && filtered.length > 0 && !showRankedTable && (
+                <ChartModal title={t('hr.charts.collaborators_by_area')} onClose={() => setExpandedChart(null)}>
+                  <ResponsiveContainer width="100%" height={520}>
+                    <PieChart>
+                      <Pie data={filtered} dataKey="collaborators" nameKey="area" cx="50%" cy="45%" outerRadius={180} label={({ name, percent }: { name: string; percent: number }) => `${name.length > 18 ? `${name.slice(0, 16)}…` : name} (${(percent * 100).toFixed(0)}%)`}>
+                        {filtered.map((_, index) => (<Cell key={`modal-cell-${index}`} fill={AREA_COLORS[index % AREA_COLORS.length]} />))}
+                      </Pie>
+                      <Tooltip formatter={(v: number) => [v, t('hr.charts.collaborators_label', { defaultValue: 'colaboradores' })]} />
+                      <Legend wrapperStyle={{ fontSize: 13 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </ChartModal>
+              )}
+
+              {expandedChart === 'evolution' && complianceByPeriod && complianceByPeriod.length > 0 && (
+                <ChartModal title={t('hr.charts.compliance_evolution')} onClose={() => setExpandedChart(null)}>
+                  <ResponsiveContainer width="100%" height={480}>
+                    <LineChart data={complianceByPeriod} margin={{ left: 10, right: 30, bottom: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="period" tick={{ fontSize: 13 }} />
+                      <YAxis domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} width={50} />
+                      <Tooltip formatter={(value: number) => [`${Number(value).toFixed(1)}%`, t('charts.compliance_pct')]} />
+                      <Legend />
+                      <Line type="monotone" dataKey="compliance" stroke="#0ea5e9" strokeWidth={3} dot={{ r: 5 }} name={t('charts.compliance_pct')} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </ChartModal>
+              )}
             </div>
           )
         })()}
