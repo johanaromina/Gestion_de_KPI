@@ -10,7 +10,7 @@
 }
 
 .bulk-modal {
-  background: #fff;
+  background: var(--color-card-bg);
   border-radius: 12px;
   width: 100%;
   max-width: 600px;
@@ -26,20 +26,20 @@
   justify-content: space-between;
   gap: 12px;
   padding: 20px 24px 16px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .bulk-modal-header h2 {
   margin: 0 0 4px;
   font-size: 1.1rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .bulk-modal-sub {
   margin: 0;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .bulk-modal-close {
@@ -52,7 +52,7 @@
   padding: 0 4px;
 }
 
-.bulk-modal-close:hover { color: #374151; }
+.bulk-modal-close:hover { color: var(--color-text-secondary); }
 
 /* Steps indicator */
 .bulk-modal-steps {
@@ -72,9 +72,9 @@
   justify-content: center;
   font-size: 12px;
   font-weight: 700;
-  background: #f3f4f6;
+  background: var(--color-surface-alt);
   color: #9ca3af;
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--color-border);
   flex-shrink: 0;
 }
 
@@ -88,7 +88,7 @@
   flex: 1;
   max-width: 80px;
   height: 2px;
-  background: #e5e7eb;
+  background: var(--color-border);
 }
 
 /* Body */
@@ -121,7 +121,7 @@
 .bulk-field label {
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-secondary);
 }
 
 .bulk-field input,
@@ -131,7 +131,7 @@
   border: 1px solid #d1d5db;
   border-radius: 6px;
   font-size: 13px;
-  background: #fff;
+  background: var(--color-card-bg);
 }
 
 .bulk-field textarea {
@@ -150,8 +150,8 @@
   flex-direction: column;
   gap: 6px;
   padding: 12px 14px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
 }
 
@@ -161,7 +161,7 @@
   gap: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-secondary);
 }
 
 .bulk-advanced-panel {
@@ -169,7 +169,7 @@
   flex-direction: column;
   gap: 14px;
   padding: 16px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   background: #fcfcfd;
 }
@@ -181,7 +181,7 @@
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
-  background: #f0f9ff;
+  background: var(--color-body-bg);
   border: 1px solid #bae6fd;
   border-radius: 8px;
   font-size: 13px;
@@ -210,7 +210,7 @@
 
 .bulk-count-label {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .bulk-select-all {
@@ -220,16 +220,16 @@
   padding: 4px 12px;
   font-size: 12px;
   cursor: pointer;
-  color: #374151;
+  color: var(--color-text-secondary);
 }
 
 .bulk-select-all:hover {
-  background: #f9fafb;
+  background: var(--color-surface);
 }
 
 /* Collaborator list */
 .bulk-collaborator-list {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   overflow-y: auto;
   max-height: 280px;
@@ -275,12 +275,12 @@
 .bulk-collab-name {
   font-size: 13px;
   font-weight: 500;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .bulk-collab-pos {
   font-size: 11px;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .bulk-collab-scope {
@@ -291,7 +291,7 @@
 .bulk-collab-taken {
   font-size: 11px;
   color: #9ca3af;
-  background: #f3f4f6;
+  background: var(--color-surface-alt);
   padding: 2px 8px;
   border-radius: 999px;
   white-space: nowrap;
@@ -321,5 +321,5 @@
   justify-content: flex-end;
   gap: 10px;
   padding: 16px 24px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--color-border);
 }

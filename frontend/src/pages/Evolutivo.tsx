@@ -219,7 +219,7 @@ export default function Evolutivo() {
                 <Tooltip />
                 <Legend />
                 <Line type="monotone" dataKey="plan" name={t('evolution.line_plan')} stroke="#a3a3a3" />
-                <Line type="monotone" dataKey="actual" name={t('evolution.line_actual')} stroke="#f97316" />
+                <Line type="monotone" dataKey="actual" name={t('evolution.line_actual')} stroke="#0891b2" />
               </LineChart>
             </ResponsiveContainer>
           </div>

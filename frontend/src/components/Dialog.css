@@ -19,7 +19,7 @@
 }
 
 .dialog-box {
-  background: #fff;
+  background: var(--color-card-bg);
   border-radius: 16px;
   box-shadow: 0 20px 60px rgba(17, 24, 39, 0.18), 0 4px 16px rgba(17, 24, 39, 0.08);
   width: min(440px, 100%);
@@ -58,13 +58,13 @@
 .dialog-title {
   font-size: 16px;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
   margin: 0;
 }
 
 .dialog-message {
   font-size: 14px;
-  color: #4b5563;
+  color: var(--color-text-muted);
   line-height: 1.6;
   margin: 0 0 20px;
 }
@@ -75,13 +75,13 @@
   border: 1.5px solid #d1d5db;
   border-radius: 8px;
   font-size: 14px;
-  color: #111827;
+  color: var(--color-text);
   margin-bottom: 20px;
   outline: none;
   transition: border-color 0.15s ease;
   box-sizing: border-box;
 }
-.dialog-input:focus { border-color: #f97316; box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1); }
+.dialog-input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.1); }
 
 .dialog-actions {
   display: flex;

@@ -20,7 +20,7 @@
 .arbol-subtitle {
   margin: 0;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .arbol-toolbar {
@@ -36,11 +36,11 @@
   display: flex;
   gap: 16px;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .arbol-stats strong {
-  color: #111827;
+  color: var(--color-text);
 }
 
 .arbol-period-filter {
@@ -48,19 +48,19 @@
   border: 1px solid #d1d5db;
   border-radius: 6px;
   font-size: 13px;
-  background: #fff;
+  background: var(--color-card-bg);
 }
 
 .arbol-loading {
   padding: 3rem;
   text-align: center;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .arbol-empty {
   padding: 3rem;
   text-align: center;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .arbol-empty-icon {
@@ -70,7 +70,7 @@
 
 .arbol-empty h3 {
   margin: 0 0 8px;
-  color: #374151;
+  color: var(--color-text-secondary);
 }
 
 .arbol-empty p {
@@ -89,10 +89,10 @@
 /* ── Scope (Level 1) ── */
 
 .arbol-scope-block {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   overflow: hidden;
-  background: #fff;
+  background: var(--color-card-bg);
 }
 
 .arbol-scope-header {
@@ -101,18 +101,18 @@
   align-items: center;
   gap: 10px;
   padding: 14px 16px;
-  background: #f8fafc;
+  background: var(--color-surface);
   border: none;
   cursor: pointer;
   text-align: left;
   font-size: 14px;
   font-weight: 600;
-  color: #1e293b;
-  border-bottom: 1px solid #e5e7eb;
+  color: var(--color-text);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .arbol-scope-header:hover {
-  background: #f1f5f9;
+  background: var(--color-surface-alt);
 }
 
 .arbol-scope-chevron {
@@ -133,8 +133,8 @@
 .arbol-scope-count {
   font-size: 12px;
   font-weight: 400;
-  color: #6b7280;
-  background: #e5e7eb;
+  color: var(--color-text-muted);
+  background: var(--color-border);
   padding: 2px 8px;
   border-radius: 999px;
 }
@@ -149,7 +149,7 @@
 /* ── OKR (Level 2) ── */
 
 .arbol-okr-block {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -159,7 +159,7 @@
   align-items: flex-start;
   gap: 8px;
   padding: 10px 12px;
-  background: #fff;
+  background: var(--color-card-bg);
 }
 
 .arbol-expand-btn {
@@ -209,7 +209,7 @@
 .arbol-okr-title {
   font-size: 14px;
   font-weight: 600;
-  color: #111827;
+  color: var(--color-text);
   flex: 1;
 }
 
@@ -223,13 +223,13 @@
 
 .arbol-status-pill--active { background: #d1fae5; color: #065f46; }
 .arbol-status-pill--draft  { background: #fef9c3; color: #854d0e; }
-.arbol-status-pill--closed { background: #f3f4f6; color: #6b7280; }
+.arbol-status-pill--closed { background: var(--color-surface-alt); color: var(--color-text-muted); }
 
 .arbol-okr-meta {
   display: flex;
   gap: 12px;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   margin-bottom: 6px;
   flex-wrap: wrap;
 }
@@ -243,7 +243,7 @@
 .arbol-progress-track {
   flex: 1;
   height: 6px;
-  background: #f3f4f6;
+  background: var(--color-surface-alt);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -282,14 +282,14 @@
   padding: 4px 10px;
   font-size: 12px;
   cursor: pointer;
-  color: #374151;
+  color: var(--color-text-secondary);
   white-space: nowrap;
   flex-shrink: 0;
   align-self: center;
 }
 
 .arbol-goto-btn:hover {
-  background: #f9fafb;
+  background: var(--color-surface);
   border-color: #9ca3af;
 }
 
@@ -333,7 +333,7 @@
 .arbol-kr-title {
   font-size: 13px;
   font-weight: 500;
-  color: #1f2937;
+  color: var(--color-text-secondary);
   flex: 1;
 }
 
@@ -351,12 +351,12 @@
 
 .arbol-kr-status-label {
   font-size: 11px;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .arbol-kr-values {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   margin-bottom: 4px;
 }
 
@@ -365,7 +365,7 @@
 }
 
 .arbol-kr-manual {
-  color: #374151;
+  color: var(--color-text-secondary);
 }
 
 /* ── KPIs (Level 4) ── */
@@ -376,7 +376,7 @@
   flex-direction: column;
   gap: 4px;
   background: #f8f9fa;
-  border-top: 1px dashed #e5e7eb;
+  border-top: 1px dashed var(--color-border);
 }
 
 .arbol-kpi-row {
@@ -384,7 +384,7 @@
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: #374151;
+  color: var(--color-text-secondary);
   padding: 4px 0;
 }
 
@@ -408,7 +408,7 @@
 
 .arbol-kpi-values {
   font-size: 11px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   white-space: nowrap;
 }
 

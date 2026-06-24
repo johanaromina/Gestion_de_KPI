@@ -10,8 +10,8 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f4f4f5;
-  color: #111827;
+  background-color: var(--color-body-bg);
+  color: var(--color-text);
 }
 
 code {
@@ -23,12 +23,292 @@ code {
   min-height: 100vh;
 }
 
+/* ─── Token definitions ──────────────────────────────────────────
+   Neutral tokens adapt in dark themes.
+   Brand tokens adapt per accent theme.
+   ─────────────────────────────────────────────────────────────── */
+
 :root {
-  --color-primary: #f97316;
-  --color-primary-dark: #ea580c;
+  /* Neutral (overridden in dark) */
   --color-text: #111827;
+  --color-text-secondary: #374151;
+  --color-text-muted: #6b7280;
+  --color-card-bg: #ffffff;
   --color-surface: #f9fafb;
+  --color-surface-alt: #f3f4f6;
   --color-border: #e5e7eb;
+
+  /* Navy + Teal (default) */
+  --color-primary: #0891b2;
+  --color-primary-rgb: 8, 145, 178;
+  --color-primary-dark: #0e7490;
+  --color-primary-light: #22d3ee;
+  --color-primary-lighter: #67e8f9;
+  --color-brand-bg: #ecfeff;
+  --color-brand-bg-mid: #cffafe;
+  --color-brand-bg-border: #a5f3fc;
+  --color-brand-text: #164e63;
+  --color-brand-text-dark: #0c4a6e;
+  --color-nav-bg: #0f2d4a;
+  --color-nav-bg-end: #1e3a5f;
+  --color-body-bg: #f0f9ff;
+}
+
+/* ─── Light themes ─────────────────────────────────────────── */
+
+[data-theme="navy-teal"] {
+  --color-text: #111827;
+  --color-text-secondary: #374151;
+  --color-text-muted: #6b7280;
+  --color-card-bg: #ffffff;
+  --color-surface: #f9fafb;
+  --color-surface-alt: #f3f4f6;
+  --color-border: #e5e7eb;
+  --color-primary: #0891b2;
+  --color-primary-rgb: 8, 145, 178;
+  --color-primary-dark: #0e7490;
+  --color-primary-light: #22d3ee;
+  --color-primary-lighter: #67e8f9;
+  --color-brand-bg: #ecfeff;
+  --color-brand-bg-mid: #cffafe;
+  --color-brand-bg-border: #a5f3fc;
+  --color-brand-text: #164e63;
+  --color-brand-text-dark: #0c4a6e;
+  --color-nav-bg: #0f2d4a;
+  --color-nav-bg-end: #1e3a5f;
+  --color-body-bg: #f0f9ff;
+}
+
+[data-theme="orange"] {
+  --color-text: #111827;
+  --color-text-secondary: #374151;
+  --color-text-muted: #6b7280;
+  --color-card-bg: #ffffff;
+  --color-surface: #f9fafb;
+  --color-surface-alt: #f3f4f6;
+  --color-border: #e5e7eb;
+  --color-primary: #f97316;
+  --color-primary-rgb: 249, 115, 22;
+  --color-primary-dark: #ea580c;
+  --color-primary-light: #fb923c;
+  --color-primary-lighter: #fdba74;
+  --color-brand-bg: #fff7ed;
+  --color-brand-bg-mid: #ffedd5;
+  --color-brand-bg-border: #fed7aa;
+  --color-brand-text: #9a3412;
+  --color-brand-text-dark: #7c2d12;
+  --color-nav-bg: #1a0e05;
+  --color-nav-bg-end: #2d1800;
+  --color-body-bg: #fffbf7;
+}
+
+[data-theme="indigo"] {
+  --color-text: #111827;
+  --color-text-secondary: #374151;
+  --color-text-muted: #6b7280;
+  --color-card-bg: #ffffff;
+  --color-surface: #f9fafb;
+  --color-surface-alt: #f3f4f6;
+  --color-border: #e5e7eb;
+  --color-primary: #6366f1;
+  --color-primary-rgb: 99, 102, 241;
+  --color-primary-dark: #4f46e5;
+  --color-primary-light: #818cf8;
+  --color-primary-lighter: #a5b4fc;
+  --color-brand-bg: #eef2ff;
+  --color-brand-bg-mid: #e0e7ff;
+  --color-brand-bg-border: #c7d2fe;
+  --color-brand-text: #3730a3;
+  --color-brand-text-dark: #312e81;
+  --color-nav-bg: #1e1b4b;
+  --color-nav-bg-end: #312e81;
+  --color-body-bg: #f5f3ff;
+}
+
+[data-theme="emerald"] {
+  --color-text: #111827;
+  --color-text-secondary: #374151;
+  --color-text-muted: #6b7280;
+  --color-card-bg: #ffffff;
+  --color-surface: #f9fafb;
+  --color-surface-alt: #f3f4f6;
+  --color-border: #e5e7eb;
+  --color-primary: #059669;
+  --color-primary-rgb: 5, 150, 105;
+  --color-primary-dark: #047857;
+  --color-primary-light: #34d399;
+  --color-primary-lighter: #6ee7b7;
+  --color-brand-bg: #ecfdf5;
+  --color-brand-bg-mid: #d1fae5;
+  --color-brand-bg-border: #a7f3d0;
+  --color-brand-text: #065f46;
+  --color-brand-text-dark: #064e3b;
+  --color-nav-bg: #0a2e1e;
+  --color-nav-bg-end: #1a4731;
+  --color-body-bg: #f0fdf6;
+}
+
+/* ─── Dark themes ─────────────────────────────────────────── */
+
+[data-theme="fuchsia-dark"] {
+  color-scheme: dark;
+  --color-text: #f1f5f9;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #94a3b8;
+  --color-card-bg: #1e1a2e;
+  --color-surface: #16122a;
+  --color-surface-alt: #0f0b1e;
+  --color-border: #3b3356;
+  --color-body-bg: #0f0b1e;
+  --color-primary: #ec4899;
+  --color-primary-rgb: 236, 72, 153;
+  --color-primary-dark: #db2777;
+  --color-primary-light: #f472b6;
+  --color-primary-lighter: #fbcfe8;
+  --color-brand-bg: rgba(236, 72, 153, 0.12);
+  --color-brand-bg-mid: rgba(236, 72, 153, 0.22);
+  --color-brand-bg-border: rgba(236, 72, 153, 0.38);
+  --color-brand-text: #f472b6;
+  --color-brand-text-dark: #ec4899;
+  --color-nav-bg: #160d1e;
+  --color-nav-bg-end: #2a1540;
+}
+
+[data-theme="lime-dark"] {
+  color-scheme: dark;
+  --color-text: #f1f5f9;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #94a3b8;
+  --color-card-bg: #1a1e1b;
+  --color-surface: #121a14;
+  --color-surface-alt: #0d1410;
+  --color-border: #2d4033;
+  --color-body-bg: #0d1410;
+  --color-primary: #22c55e;
+  --color-primary-rgb: 34, 197, 94;
+  --color-primary-dark: #16a34a;
+  --color-primary-light: #4ade80;
+  --color-primary-lighter: #86efac;
+  --color-brand-bg: rgba(34, 197, 94, 0.12);
+  --color-brand-bg-mid: rgba(34, 197, 94, 0.22);
+  --color-brand-bg-border: rgba(34, 197, 94, 0.38);
+  --color-brand-text: #4ade80;
+  --color-brand-text-dark: #22c55e;
+  --color-nav-bg: #0a1a0c;
+  --color-nav-bg-end: #142418;
+}
+
+[data-theme="orange-dark"] {
+  color-scheme: dark;
+  --color-text: #f1f5f9;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #94a3b8;
+  --color-card-bg: #1e1a14;
+  --color-surface: #16120e;
+  --color-surface-alt: #100e08;
+  --color-border: #3d3020;
+  --color-body-bg: #100e08;
+  --color-primary: #f97316;
+  --color-primary-rgb: 249, 115, 22;
+  --color-primary-dark: #ea580c;
+  --color-primary-light: #fb923c;
+  --color-primary-lighter: #fdba74;
+  --color-brand-bg: rgba(249, 115, 22, 0.12);
+  --color-brand-bg-mid: rgba(249, 115, 22, 0.22);
+  --color-brand-bg-border: rgba(249, 115, 22, 0.38);
+  --color-brand-text: #fb923c;
+  --color-brand-text-dark: #f97316;
+  --color-nav-bg: #1a0c00;
+  --color-nav-bg-end: #2e1800;
+}
+
+[data-theme="gold-dark"] {
+  color-scheme: dark;
+  --color-text: #f1f5f9;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #94a3b8;
+  --color-card-bg: #1e1c14;
+  --color-surface: #161410;
+  --color-surface-alt: #0f0e08;
+  --color-border: #3d3a1a;
+  --color-body-bg: #0f0e08;
+  --color-primary: #eab308;
+  --color-primary-rgb: 234, 179, 8;
+  --color-primary-dark: #ca8a04;
+  --color-primary-light: #facc15;
+  --color-primary-lighter: #fde047;
+  --color-brand-bg: rgba(234, 179, 8, 0.12);
+  --color-brand-bg-mid: rgba(234, 179, 8, 0.22);
+  --color-brand-bg-border: rgba(234, 179, 8, 0.38);
+  --color-brand-text: #facc15;
+  --color-brand-text-dark: #eab308;
+  --color-nav-bg: #1a1800;
+  --color-nav-bg-end: #2e2a00;
+}
+
+/* ─── Dark mode: text safety-net ─────────────────────────
+   Catches any hardcoded dark text color that wasn't variablized.
+   Excludes semantic (green/red/amber) and button elements.
+   ─────────────────────────────────────────────────────────── */
+
+[data-theme$="-dark"] h1,
+[data-theme$="-dark"] h2,
+[data-theme$="-dark"] h3,
+[data-theme$="-dark"] h4,
+[data-theme$="-dark"] h5,
+[data-theme$="-dark"] h6 {
+  color: var(--color-text);
+}
+
+[data-theme$="-dark"] th {
+  color: var(--color-text);
+  background: var(--color-surface) !important;
+}
+
+[data-theme$="-dark"] td {
+  color: var(--color-text-secondary);
+  border-color: var(--color-border) !important;
+}
+
+[data-theme$="-dark"] label {
+  color: var(--color-text-secondary);
+}
+
+[data-theme$="-dark"] .card,
+[data-theme$="-dark"] .chart-card,
+[data-theme$="-dark"] .modal-content,
+[data-theme$="-dark"] .dialog-box,
+[data-theme$="-dark"] [class*="modal-content"] {
+  background: var(--color-card-bg) !important;
+  border-color: var(--color-border) !important;
+}
+
+[data-theme$="-dark"] .muted,
+[data-theme$="-dark"] .subtitle,
+[data-theme$="-dark"] [class$="-subtitle"],
+[data-theme$="-dark"] [class$="-description"],
+[data-theme$="-dark"] [class$="-muted"] {
+  color: var(--color-text-muted) !important;
+}
+
+/* ─── Dark mode: input / form overrides ──────────────────── */
+
+[data-theme$="-dark"] input,
+[data-theme$="-dark"] textarea,
+[data-theme$="-dark"] select {
+  background: var(--color-card-bg) !important;
+  color: var(--color-text) !important;
+  border-color: var(--color-border) !important;
+}
+
+[data-theme$="-dark"] input::placeholder,
+[data-theme$="-dark"] textarea::placeholder {
+  color: var(--color-text-muted) !important;
+}
+
+[data-theme$="-dark"] option {
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 /* ─── Global button system ───────────────────────────────────── */
@@ -46,12 +326,12 @@ code {
   font-weight: 600;
   cursor: pointer;
   transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
-  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.25);
+  box-shadow: 0 2px 8px rgba(var(--color-primary-rgb), 0.25);
   white-space: nowrap;
 }
 .btn-primary:hover:not(:disabled) {
   background: var(--color-primary-dark) !important;
-  box-shadow: 0 4px 14px rgba(249, 115, 22, 0.35);
+  box-shadow: 0 4px 14px rgba(var(--color-primary-rgb), 0.35);
   transform: translateY(-1px);
 }
 .btn-primary:active:not(:disabled) { transform: translateY(0); }
@@ -61,9 +341,9 @@ code {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #fff !important;
-  color: #374151 !important;
-  border: 1.5px solid #d1d5db !important;
+  background: var(--color-card-bg) !important;
+  color: var(--color-text-secondary) !important;
+  border: 1.5px solid var(--color-border) !important;
   padding: 9px 18px;
   border-radius: 10px;
   font-size: 14px;
@@ -73,9 +353,9 @@ code {
   white-space: nowrap;
 }
 .btn-secondary:hover:not(:disabled) {
-  border-color: #f97316 !important;
-  color: #ea580c !important;
-  background: #fff7ed !important;
+  border-color: var(--color-primary) !important;
+  color: var(--color-primary-dark) !important;
+  background: var(--color-brand-bg) !important;
 }
 .btn-secondary:disabled { opacity: 0.55; cursor: not-allowed; }
 
@@ -111,7 +391,7 @@ code {
   border-radius: 6px;
   transition: background 0.15s ease;
 }
-.btn-text:hover:not(:disabled) { background: #fff4e6 !important; }
+.btn-text:hover:not(:disabled) { background: var(--color-brand-bg) !important; }
 
 /* ─── Action buttons in tables ───────────────────────────────── */
 
@@ -133,7 +413,6 @@ code {
 .action-button:active:not(:disabled) { transform: translateY(0); }
 .action-button:disabled { opacity: 0.45; cursor: not-allowed; }
 
-/* view / detail — blue */
 .action-button.view {
   background: #eff6ff;
   color: #1d4ed8;
@@ -141,7 +420,6 @@ code {
 }
 .action-button.view:hover:not(:disabled) { background: #dbeafe; border-color: #93c5fd; }
 
-/* edit — amber */
 .action-button.edit {
   background: #fffbeb;
   color: #b45309;
@@ -149,7 +427,6 @@ code {
 }
 .action-button.edit:hover:not(:disabled) { background: #fef3c7; border-color: #fcd34d; }
 
-/* approve / positive — green */
 .action-button.approve,
 .action-button.reopen {
   background: #f0fdf4;
@@ -159,17 +436,15 @@ code {
 .action-button.approve:hover:not(:disabled),
 .action-button.reopen:hover:not(:disabled) { background: #dcfce7; border-color: #86efac; }
 
-/* reject / close — orange-red */
 .action-button.reject,
 .action-button.close {
-  background: #fff7ed;
-  color: #c2410c;
-  border-color: #fed7aa;
+  background: #fffbeb;
+  color: #b45309;
+  border-color: #fde68a;
 }
 .action-button.reject:hover:not(:disabled),
-.action-button.close:hover:not(:disabled) { background: #ffedd5; border-color: #fdba74; }
+.action-button.close:hover:not(:disabled) { background: #fef3c7; border-color: #fcd34d; }
 
-/* delete — red */
 .action-button.delete {
   background: #fef2f2;
   color: #b91c1c;
@@ -177,7 +452,6 @@ code {
 }
 .action-button.delete:hover:not(:disabled) { background: #fee2e2; border-color: #fca5a5; }
 
-/* invite / neutral action — purple */
 .action-button.invite {
   background: #f5f3ff;
   color: #6d28d9;
@@ -185,15 +459,26 @@ code {
 }
 .action-button.invite:hover:not(:disabled) { background: #ede9fe; border-color: #c4b5fd; }
 
+/* ─── Dark mode: action buttons keep semantic colors but adapt ── */
+
+[data-theme$="-dark"] .action-button.view   { background: rgba(29,78,216,0.15); color: #93c5fd; border-color: rgba(29,78,216,0.4); }
+[data-theme$="-dark"] .action-button.edit   { background: rgba(180,83,9,0.15);  color: #fcd34d; border-color: rgba(180,83,9,0.4); }
+[data-theme$="-dark"] .action-button.approve,
+[data-theme$="-dark"] .action-button.reopen { background: rgba(21,128,61,0.15); color: #86efac; border-color: rgba(21,128,61,0.4); }
+[data-theme$="-dark"] .action-button.reject,
+[data-theme$="-dark"] .action-button.close  { background: rgba(180,83,9,0.15);  color: #fcd34d; border-color: rgba(180,83,9,0.4); }
+[data-theme$="-dark"] .action-button.delete { background: rgba(185,28,28,0.15); color: #fca5a5; border-color: rgba(185,28,28,0.4); }
+[data-theme$="-dark"] .action-button.invite { background: rgba(109,40,217,0.15);color: #c4b5fd; border-color: rgba(109,40,217,0.4); }
+
 /* ─── Status / type badges ───────────────────────────────────── */
 
 .status-badge {
   border: 1px solid var(--color-border);
-  background: #fff8f1;
-  color: #7c2d12;
+  background: var(--color-brand-bg);
+  color: var(--color-brand-text-dark);
 }
 .type-badge {
   border: 1px solid var(--color-border);
-  background: #fff4e6;
-  color: #7c2d12;
+  background: var(--color-brand-bg);
+  color: var(--color-brand-text-dark);
 }

@@ -18,8 +18,8 @@
 
 .kpi-form textarea:focus {
   outline: none;
-  border-color: #f97316;
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
 }
 
 .kpi-form textarea.error {
@@ -28,7 +28,7 @@
 
 .form-hint {
   display: block;
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 12px;
   margin-top: 4px;
   font-style: italic;
@@ -66,11 +66,11 @@
   padding: 8px 10px;
   border: 1px solid #d1d5db;
   border-radius: 8px;
-  background: #fff;
+  background: var(--color-card-bg);
 }
 
 .scope-label {
   font-size: 13px;
-  color: #374151;
+  color: var(--color-text-secondary);
 }
 

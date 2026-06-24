@@ -18,11 +18,11 @@
 .mapping-stat-value {
   font-size: 32px;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .mapping-stat-label {
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 13px;
 }
 
@@ -63,7 +63,7 @@
   padding: 0;
 }
 
-.mapping-clear-input:hover { color: #374151; }
+.mapping-clear-input:hover { color: var(--color-text-secondary); }
 
 .mapping-field-clear {
   grid-column: span 1;
@@ -90,7 +90,7 @@
 }
 
 .mapping-field label {
-  color: #374151;
+  color: var(--color-text-secondary);
   font-size: 13px;
   font-weight: 600;
 }
@@ -103,7 +103,7 @@
   border-radius: 8px;
   border: 1px solid #d1d5db;
   font-size: 14px;
-  background: #fff;
+  background: var(--color-card-bg);
 }
 
 .mapping-field textarea,
@@ -145,21 +145,21 @@
 }
 
 .btn-secondary {
-  background: #f3f4f6;
-  color: #111827;
+  background: var(--color-surface-alt);
+  color: var(--color-text);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: #e5e7eb;
+  background: var(--color-border);
 }
 
 .btn-ghost {
-  background: #fff;
-  color: #374151;
+  background: var(--color-card-bg);
+  color: var(--color-text-secondary);
 }
 
 .btn-ghost:hover:not(:disabled) {
-  background: #f9fafb;
+  background: var(--color-surface);
   border-color: #9ca3af;
 }
 
@@ -178,7 +178,7 @@
 }
 
 .mapping-row-dirty {
-  background: #fff7ed;
+  background: var(--color-brand-bg);
 }
 
 .mapping-chip {
@@ -194,12 +194,12 @@
 
 .mapping-entity-name {
   font-weight: 600;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .mapping-entity-subtitle,
 .mapping-row-meta {
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 12px;
 }
 
@@ -214,7 +214,7 @@
   border-radius: 8px;
   border: 1px solid #d1d5db;
   font-size: 14px;
-  background: #fff;
+  background: var(--color-card-bg);
 }
 
 @media (max-width: 1080px) {

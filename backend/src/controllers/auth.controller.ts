@@ -482,11 +482,31 @@ export const getCurrentUser = async (req: Request, res: Response) => {
     }
 
     const collaborator = rows[0]
-
     const permissions = await getEffectivePermissions(collaborator.id)
+
+    let companyTheme = 'navy-teal'
+    if (collaborator.orgScopeId) {
+      try {
+        const [themeRows] = await pool.query<any[]>(
+          `WITH RECURSIVE ancestry AS (
+             SELECT os.id, os.parentId, os.type, os.theme
+             FROM org_scopes os WHERE os.id = ?
+             UNION ALL
+             SELECT os.id, os.parentId, os.type, os.theme
+             FROM org_scopes os JOIN ancestry a ON os.id = a.parentId
+           )
+           SELECT theme FROM ancestry WHERE type = 'company' LIMIT 1`,
+          [collaborator.orgScopeId]
+        )
+        companyTheme = themeRows?.[0]?.theme ?? 'navy-teal'
+      } catch {
+        // theme column may not exist yet (migration pending)
+      }
+    }
 
     res.json({
       ...buildTokenPayload(collaborator, permissions),
+      companyTheme,
     } as User)
   } catch (error: any) {
     logger.error('[auth] getCurrentUser', error)

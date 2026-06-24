@@ -71,7 +71,7 @@ export default function Register() {
                 {selfRegisterEnabled ? (
                   <>
                     {t('register.subtitle_has_account')}{' '}
-                    <a href="/login" style={{ color: '#f97316', fontWeight: 600, textDecoration: 'none' }}>
+                    <a href="/login" style={{ color: '#0891b2', fontWeight: 600, textDecoration: 'none' }}>
                       {t('register.subtitle_link_login')}
                     </a>
                   </>
@@ -79,7 +79,7 @@ export default function Register() {
                   <>
                     {t('register.subtitle_single_tenant')}
                     {' '}
-                    <a href="/login" style={{ color: '#f97316', fontWeight: 600, textDecoration: 'none' }}>
+                    <a href="/login" style={{ color: '#0891b2', fontWeight: 600, textDecoration: 'none' }}>
                       {t('register.subtitle_back_login')}
                     </a>
                   </>

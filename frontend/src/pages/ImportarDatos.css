@@ -13,12 +13,12 @@
 .page-header h1 {
   font-size: 28px;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
   margin-bottom: 6px;
 }
 
 .subtitle {
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 15px;
 }
 
@@ -28,7 +28,7 @@
   display: flex;
   gap: 8px;
   margin-bottom: 24px;
-  border-bottom: 2px solid #e5e7eb;
+  border-bottom: 2px solid var(--color-border);
   padding-bottom: 0;
 }
 
@@ -40,13 +40,13 @@
   padding: 10px 20px;
   font-size: 14px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--color-text-muted);
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
 }
 
 .import-tab:hover {
-  color: #374151;
+  color: var(--color-text-secondary);
 }
 
 .import-tab--active {
@@ -70,7 +70,7 @@
 .import-info-box p {
   margin: 0;
   font-size: 13px;
-  color: #374151;
+  color: var(--color-text-secondary);
   line-height: 1.6;
 }
 
@@ -128,14 +128,14 @@
 
 .import-file-info {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 /* ── Preview table ──────────────────────────────────────────── */
 
 .import-preview-scroll {
   overflow-x: auto;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   margin-bottom: 16px;
   max-height: 420px;
@@ -149,12 +149,12 @@
 }
 
 .import-preview-table th {
-  background: #f9fafb;
+  background: var(--color-surface);
   padding: 8px 12px;
   text-align: left;
   font-weight: 600;
-  color: #374151;
-  border-bottom: 1px solid #e5e7eb;
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border);
   position: sticky;
   top: 0;
   z-index: 1;
@@ -163,7 +163,7 @@
 .import-preview-table td {
   padding: 7px 12px;
   border-bottom: 1px solid #f3f4f6;
-  color: #374151;
+  color: var(--color-text-secondary);
 }
 
 .import-row--error td {
@@ -171,7 +171,7 @@
 }
 
 .import-row--ok:hover td {
-  background: #f9fafb;
+  background: var(--color-surface);
 }
 
 .import-row-num {
@@ -186,8 +186,8 @@
 }
 
 .import-type-badge {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--color-surface-alt);
+  color: var(--color-text-secondary);
   font-size: 11px;
   font-weight: 600;
   padding: 2px 8px;
@@ -219,8 +219,8 @@
 }
 
 .btn-import-cancel {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--color-surface-alt);
+  color: var(--color-text-secondary);
   border: none;
   padding: 10px 18px;
   border-radius: 8px;
@@ -231,7 +231,7 @@
 }
 
 .btn-import-cancel:hover {
-  background: #e5e7eb;
+  background: var(--color-border);
 }
 
 .btn-import-confirm {
@@ -290,8 +290,8 @@
 }
 
 .import-result--partial {
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
+  background: var(--color-brand-bg);
+  border: 1px solid #fde68a;
   color: #92400e;
 }
 

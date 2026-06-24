@@ -596,7 +596,7 @@ export default function HistorialIndividual() {
                     <YAxis />
                     <Tooltip />
                     <Bar dataKey="target" fill="#e5e7eb" name={t('individual.bar_target')} />
-                    <Bar dataKey="actual" fill="#f97316" name={t('individual.bar_actual')} />
+                    <Bar dataKey="actual" fill="#0891b2" name={t('individual.bar_actual')} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

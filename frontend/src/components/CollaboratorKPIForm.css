@@ -12,7 +12,7 @@
 }
 
 .modal-content {
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 12px;
   width: 90%;
   max-width: 600px;
@@ -30,27 +30,27 @@
   justify-content: space-between;
   align-items: center;
   padding: 24px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .modal-header h2 {
   font-size: 24px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-text-secondary);
   margin: 0;
 }
 
 .modal-subtitle {
   margin: 6px 0 0 0;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .close-button {
   background: none;
   border: none;
   font-size: 32px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -63,7 +63,7 @@
 }
 
 .close-button:hover {
-  background: #f3f4f6;
+  background: var(--color-surface-alt);
 }
 
 .period-closed-warning {
@@ -108,14 +108,14 @@
   margin: 10px 0 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .form-hint {
   display: block;
   margin-top: 6px;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   line-height: 1.4;
   min-height: 18px;
 }
@@ -148,8 +148,8 @@
   border-radius: 999px;
   font-size: 11px;
   font-weight: 600;
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--color-surface-alt);
+  color: var(--color-text-secondary);
 }
 
 .calendar-chip.open {
@@ -158,13 +158,13 @@
 }
 
 .calendar-chip.closed {
-  background: #e5e7eb;
-  color: #6b7280;
+  background: var(--color-border);
+  color: var(--color-text-muted);
   text-decoration: line-through;
 }
 
 .calendar-chip.selected {
-  background: #f97316;
+  background: var(--color-primary);
   color: #fff;
   font-weight: 600;
 }
@@ -173,13 +173,13 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 8px 14px;
   font-size: 14px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-text-secondary);
 }
 
 .period-status-tag {
@@ -218,7 +218,7 @@
   display: block;
   font-size: 14px;
   font-weight: 500;
-  color: #374151;
+  color: var(--color-text-secondary);
   margin-bottom: 8px;
 }
 
@@ -238,13 +238,13 @@
 .form-group select:focus:not(:disabled),
 .form-group textarea:focus:not(:disabled) {
   outline: none;
-  border-color: #f97316;
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
 }
 
 .form-group input:disabled,
 .form-group select:disabled {
-  background: #f3f4f6;
+  background: var(--color-surface-alt);
   cursor: not-allowed;
   opacity: 0.6;
 }
@@ -276,10 +276,10 @@
 }
 
 .curation-section {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 16px;
-  background: #f9fafb;
+  background: var(--color-surface);
   margin: 12px 0 20px 0;
 }
 
@@ -303,7 +303,7 @@
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
 }
 
 .curation-pending {
@@ -348,7 +348,7 @@
   display: block;
   margin-top: 6px;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   line-height: 1.4;
 }
 
@@ -362,7 +362,7 @@
 
 .weight-total {
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-secondary);
 }
 
 .weight-remaining {
@@ -385,7 +385,7 @@
   gap: 12px;
   margin-top: 24px;
   padding-top: 24px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--color-border);
 }
 
 .plan-section {
@@ -452,12 +452,12 @@
 }
 
 .btn-primary {
-  background: #f97316;
-  color: #111827;
+  background: var(--color-primary);
+  color: var(--color-text);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #ea580c;
+  background: var(--color-primary-dark);
 }
 
 .btn-primary:disabled {
@@ -466,12 +466,12 @@
 }
 
 .btn-secondary {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--color-surface-alt);
+  color: var(--color-text-secondary);
 }
 
 .btn-secondary:hover {
-  background: #e5e7eb;
+  background: var(--color-border);
 }
 
 @media (max-width: 768px) {

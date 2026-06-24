@@ -4,8 +4,8 @@
 }
 
 .account-card {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border);
   border-radius: 16px;
   padding: 28px;
   box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
@@ -14,7 +14,7 @@
 .account-header h2 {
   margin: 0 0 8px;
   font-size: 28px;
-  color: #0f172a;
+  color: var(--color-text);
 }
 
 .account-header p {
@@ -30,7 +30,7 @@
 }
 
 .account-summary-item {
-  background: #f8fafc;
+  background: var(--color-surface);
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 14px 16px;
@@ -48,7 +48,7 @@
   margin-top: 6px;
   font-size: 15px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--color-text);
   word-break: break-word;
 }
 
@@ -65,7 +65,7 @@
 
 .account-field label {
   font-weight: 600;
-  color: #0f172a;
+  color: var(--color-text);
 }
 
 .account-field input {
@@ -74,13 +74,13 @@
   border: 1px solid #cbd5e1;
   border-radius: 10px;
   font-size: 15px;
-  background: #fff;
+  background: var(--color-card-bg);
 }
 
 .account-field input:focus {
   outline: none;
-  border-color: #f97316;
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.14);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.14);
 }
 
 .account-hint {
@@ -117,7 +117,7 @@
   border: none;
   border-radius: 10px;
   padding: 12px 18px;
-  background: #f97316;
+  background: var(--color-primary);
   color: #fff;
   font-weight: 700;
   cursor: pointer;

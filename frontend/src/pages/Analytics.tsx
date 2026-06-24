@@ -196,7 +196,7 @@ export default function Analytics() {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Line type="monotone" dataKey="weightedResultTotal" stroke="#f97316" name={t('analytics:series.weighted_result')} dot strokeWidth={2} />
+                    <Line type="monotone" dataKey="weightedResultTotal" stroke="#0891b2" name={t('analytics:series.weighted_result')} dot strokeWidth={2} />
                     <Line type="monotone" dataKey="averageVariation" stroke="#6366f1" name={t('analytics:series.average_variation')} dot strokeDasharray="4 2" strokeWidth={2} />
                   </LineChart>
                 </ResponsiveContainer>
@@ -210,7 +210,7 @@ export default function Analytics() {
                     <XAxis dataKey="periodName" tick={{ fontSize: 12 }} />
                     <YAxis unit="%" domain={[0, 100]} />
                     <Tooltip />
-                    <Bar dataKey="completionRate" fill="#f97316" name={t('analytics:series.completion')} />
+                    <Bar dataKey="completionRate" fill="#0891b2" name={t('analytics:series.completion')} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -263,7 +263,7 @@ export default function Analytics() {
                     <XAxis dataKey="week" tick={{ fontSize: 11 }} />
                     <YAxis allowDecimals={false} />
                     <Tooltip />
-                    <Bar dataKey="checkIns" fill="#f97316" name={t('analytics:series.checkins')} />
+                    <Bar dataKey="checkIns" fill="#0891b2" name={t('analytics:series.checkins')} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

@@ -213,3 +213,57 @@ export const toggleSuperpowers = async (req: Request, res: Response) => {
     return sendApiError(res, 500, 'CONFIG_SUPERPOWERS_UPDATE_FAILED', 'Error al actualizar superpoderes')
   }
 }
+
+const VALID_THEMES = ['navy-teal', 'orange', 'indigo', 'emerald', 'fuchsia-dark', 'lime-dark', 'orange-dark', 'gold-dark'] as const
+
+const findCompanyScopeId = async (collaboratorId: number): Promise<number | null> => {
+  const [rows] = await pool.query<any[]>(
+    `WITH RECURSIVE ancestry AS (
+       SELECT os.id, os.parentId, os.type
+       FROM org_scopes os
+       JOIN collaborators c ON c.orgScopeId = os.id
+       WHERE c.id = ?
+       UNION ALL
+       SELECT os.id, os.parentId, os.type
+       FROM org_scopes os JOIN ancestry a ON os.id = a.parentId
+     )
+     SELECT id FROM ancestry WHERE type = 'company' LIMIT 1`,
+    [collaboratorId]
+  )
+  return rows?.[0]?.id ?? null
+}
+
+export const getCompanyTheme = async (req: Request, res: Response) => {
+  try {
+    const user = (req as AuthRequest).user
+    const collaboratorId = Number(user?.collaboratorId || user?.id)
+    const scopeId = await findCompanyScopeId(collaboratorId)
+    if (!scopeId) return sendApiError(res, 404, 'CONFIG_COMPANY_NOT_FOUND', 'Empresa no encontrada')
+    const [rows] = await pool.query<any[]>('SELECT theme FROM org_scopes WHERE id = ?', [scopeId])
+    res.json({ theme: rows?.[0]?.theme ?? 'navy-teal' })
+  } catch (error) {
+    logger.error('Error getting company theme:', error)
+    return sendApiError(res, 500, 'CONFIG_THEME_GET_FAILED', 'Error al obtener tema')
+  }
+}
+
+export const updateCompanyTheme = async (req: Request, res: Response) => {
+  try {
+    if (!userCanManageConfig(req)) {
+      return sendApiError(res, 403, 'CONFIG_FORBIDDEN', 'No autorizado')
+    }
+    const { theme } = req.body as { theme: string }
+    if (!theme || !VALID_THEMES.includes(theme as any)) {
+      return sendApiError(res, 400, 'CONFIG_INVALID_THEME', 'Tema inválido')
+    }
+    const user = (req as AuthRequest).user
+    const collaboratorId = Number(user?.collaboratorId || user?.id)
+    const scopeId = await findCompanyScopeId(collaboratorId)
+    if (!scopeId) return sendApiError(res, 404, 'CONFIG_COMPANY_NOT_FOUND', 'Empresa no encontrada')
+    await pool.query('UPDATE org_scopes SET theme = ? WHERE id = ?', [theme, scopeId])
+    res.json({ theme })
+  } catch (error) {
+    logger.error('Error updating company theme:', error)
+    return sendApiError(res, 500, 'CONFIG_THEME_UPDATE_FAILED', 'Error al actualizar tema')
+  }
+}

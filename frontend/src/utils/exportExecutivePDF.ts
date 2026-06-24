@@ -135,10 +135,10 @@ export function exportExecutivePDF(data: ExportData) {
     .page { max-width: 900px; margin: 0 auto; padding: 32px 40px; }
 
     /* Header */
-    .report-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #f97316; padding-bottom: 16px; margin-bottom: 24px; }
+    .report-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #0891b2; padding-bottom: 16px; margin-bottom: 24px; }
     .report-title { font-size: 22px; font-weight: 800; color: #111827; }
     .report-meta { font-size: 11px; color: #6b7280; margin-top: 4px; }
-    .report-logo { font-size: 13px; font-weight: 700; color: #f97316; }
+    .report-logo { font-size: 13px; font-weight: 700; color: #0891b2; }
 
     /* Summary pills */
     .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
@@ -226,7 +226,7 @@ export function exportExecutivePDF(data: ExportData) {
     </div>
 
     <div class="no-print" style="text-align:center;margin-top:28px">
-      <button onclick="window.print()" style="background:#f97316;color:#fff;border:none;padding:12px 28px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">
+      <button onclick="window.print()" style="background:#0891b2;color:#fff;border:none;padding:12px 28px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">
         ${t('pdf.print_btn')}
       </button>
       <button onclick="window.close()" style="background:#f3f4f6;color:#374151;border:none;padding:12px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-left:10px">

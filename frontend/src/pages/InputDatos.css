@@ -9,11 +9,11 @@
 .page-header h1 {
   font-size: 32px;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .subtitle {
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 16px;
 }
 
@@ -24,14 +24,14 @@
 }
 
 .card {
-  background: #fff;
+  background: var(--color-card-bg);
   border-radius: 12px;
   padding: 16px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
 }
 
 .btn-primary {
-  background: #f97316;
+  background: var(--color-primary);
   color: #fff;
   border: none;
   padding: 10px 18px;
@@ -41,9 +41,9 @@
 }
 
 .btn-secondary {
-  background: #fff7ed;
-  color: #9a3412;
-  border: 1px solid #fed7aa;
+  background: var(--color-brand-bg);
+  color: var(--color-brand-text);
+  border: 1px solid var(--color-primary-lighter);
   padding: 10px 18px;
   border-radius: 8px;
   font-weight: 600;
@@ -55,7 +55,7 @@
   align-items: center;
   gap: 6px;
   font-weight: 600;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .form-group {
@@ -67,7 +67,7 @@
 
 .form-group label {
   font-size: 13px;
-  color: #374151;
+  color: var(--color-text-secondary);
   font-weight: 600;
 }
 
@@ -75,19 +75,19 @@
   padding: 8px 10px;
   border: 1px solid #d1d5db;
   border-radius: 8px;
-  background: #fff;
+  background: var(--color-card-bg);
 }
 
 .form-group input {
   padding: 8px 10px;
   border: 1px solid #d1d5db;
   border-radius: 8px;
-  background: #fff;
+  background: var(--color-card-bg);
 }
 
 .form-hint {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .form-hint.warning {
@@ -129,8 +129,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
   padding: 10px 12px;
   border-radius: 10px;
 }
@@ -140,7 +140,7 @@
 }
 
 .auto-meta {
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 12px;
 }
 
@@ -153,7 +153,7 @@
 }
 
 .auto-last {
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .input-table {
@@ -164,14 +164,14 @@
 }
 
 .input-table thead {
-  background: #f3f4f6;
+  background: var(--color-surface-alt);
 }
 
 .input-table th,
 .input-table td {
   text-align: left;
   padding: 10px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .status-pill {
@@ -195,7 +195,7 @@
 
 .empty-row {
   text-align: center;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .card-actions {
@@ -237,8 +237,8 @@
   gap: 6px;
   margin-top: 12px;
   padding: 10px 14px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   font-size: 12px;
   font-weight: 600;
@@ -267,25 +267,25 @@
 .assignment-meta {
   margin-top: 10px;
   padding: 10px 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 10px;
-  background: #f9fafb;
+  background: var(--color-surface);
   display: grid;
   gap: 6px;
   font-size: 13px;
-  color: #374151;
+  color: var(--color-text-secondary);
 }
 
 .job-status {
   margin-top: 10px;
   padding: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 10px;
-  background: #fff7ed;
+  background: var(--color-brand-bg);
   display: grid;
   gap: 6px;
   font-size: 13px;
-  color: #7c2d12;
+  color: var(--color-brand-text-dark);
 }
 
 .job-header {
@@ -296,7 +296,7 @@
 
 .job-meta {
   font-size: 12px;
-  color: #9a3412;
+  color: var(--color-brand-text);
 }
 
 .job-row {
@@ -342,11 +342,11 @@
 }
 
 .meta-value {
-  color: #111827;
+  color: var(--color-text);
 }
 
 .meta-sub {
-  color: #6b7280;
+  color: var(--color-text-muted);
   margin-left: 4px;
 }
 
@@ -362,7 +362,7 @@
 }
 
 .meta-criteria {
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 12px;
 }
 
@@ -377,7 +377,7 @@
 }
 
 .modal-content {
-  background: #fff;
+  background: var(--color-card-bg);
   border-radius: 12px;
   width: 90%;
   max-width: 640px;
@@ -389,7 +389,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .modal-header h2 {
@@ -410,13 +410,13 @@
 
 .modal-meta {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   margin-bottom: 12px;
 }
 
 .modal-actions {
   padding: 16px 20px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--color-border);
   display: flex;
   justify-content: flex-end;
   gap: 10px;
@@ -434,8 +434,8 @@
 }
 
 .validation-item {
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
   padding: 12px;
   border-radius: 10px;
 }
@@ -445,7 +445,7 @@
 }
 
 .validation-desc {
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 13px;
   margin-top: 6px;
 }

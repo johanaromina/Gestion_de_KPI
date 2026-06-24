@@ -13,12 +13,12 @@
 .page-header h1 {
   font-size: 32px;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
   margin-bottom: 8px;
 }
 
 .subtitle {
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 16px;
 }
 
@@ -34,7 +34,7 @@
 }
 
 .btn-primary {
-  background: #f97316;
+  background: var(--color-primary);
   color: white;
   border: none;
   padding: 12px 24px;
@@ -46,11 +46,11 @@
 }
 
 .btn-primary:hover {
-  background: #ea580c;
+  background: var(--color-primary-dark);
 }
 
 .btn-small {
-  background: #f97316;
+  background: var(--color-primary);
   color: white;
   border: none;
   padding: 6px 12px;
@@ -62,11 +62,11 @@
 }
 
 .btn-small:hover {
-  background: #ea580c;
+  background: var(--color-primary-dark);
 }
 
 .table-container {
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 12px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   overflow: hidden;
@@ -80,10 +80,10 @@
 }
 
 .period-card {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 14px;
   padding: 14px 16px;
-  background: white;
+  background: var(--color-card-bg);
   transition: box-shadow 0.2s, border-color 0.2s;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
@@ -114,13 +114,13 @@
 .period-name {
   font-size: 18px;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
   margin: 0 0 4px;
 }
 
 .period-dates {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .period-status {
@@ -135,12 +135,12 @@
 }
 
 .meta-pill {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 4px 8px;
   font-size: 12px;
-  color: #374151;
+  color: var(--color-text-secondary);
 }
 
 .status-badge {
@@ -152,18 +152,18 @@
 }
 
 .status-open {
-  background: #fff4e6;
-  color: #7c2d12;
+  background: var(--color-brand-bg);
+  color: var(--color-brand-text-dark);
 }
 
 .status-review {
   background: #f2f4f7;
-  color: #1f2937;
+  color: var(--color-text-secondary);
 }
 
 .status-closed {
   background: #f2f4f7;
-  color: #4b5563;
+  color: var(--color-text-muted);
 }
 
 .period-actions {
@@ -184,13 +184,13 @@
 }
 
 .btn-icon:hover:not(:disabled) {
-  background: #f3f4f6;
+  background: var(--color-surface-alt);
 }
 
 .btn-text {
   background: none;
   border: none;
-  color: #f97316;
+  color: var(--color-primary);
   cursor: pointer;
   padding: 4px 8px;
   font-size: 14px;
@@ -199,7 +199,7 @@
 }
 
 .btn-text:hover:not(:disabled) {
-  background: #f3f4f6;
+  background: var(--color-surface-alt);
 }
 
 .btn-text:disabled {
@@ -241,7 +241,7 @@
 .subperiods-section {
   margin-top: 20px;
   padding-top: 20px;
-  border-top: 1px dashed #e5e7eb;
+  border-top: 1px dashed var(--color-border);
 }
 
 .subperiods-header {
@@ -260,7 +260,7 @@
 .subperiods-header h4 {
   font-size: 16px;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-secondary);
 }
 
 .subperiods-notice {
@@ -289,28 +289,28 @@
 }
 
 .subperiods-table thead {
-  background: #f9fafb;
+  background: var(--color-surface);
 }
 
 .subperiods-table th {
   padding: 12px;
   text-align: left;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-secondary);
   font-size: 14px;
-  border-bottom: 2px solid #e5e7eb;
+  border-bottom: 2px solid var(--color-border);
 }
 
 .subperiods-table td {
   padding: 12px;
-  border-bottom: 1px solid #e5e7eb;
-  color: #1f2937;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
   font-size: 14px;
   vertical-align: middle;
 }
 
 .subperiods-table tbody tr:hover {
-  background: #f9fafb;
+  background: var(--color-surface);
 }
 
 .row-actions {
@@ -320,14 +320,14 @@
 
 .loading-row {
   padding: 16px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 14px;
 }
 
 .empty-subperiods {
   padding: 24px;
   text-align: center;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .empty-subperiods p {
@@ -347,12 +347,12 @@
 
 .empty-state h3 {
   font-size: 20px;
-  color: #374151;
+  color: var(--color-text-secondary);
   margin-bottom: 8px;
 }
 
 .empty-state p {
-  color: #6b7280;
+  color: var(--color-text-muted);
   margin-bottom: 24px;
 }
 
@@ -362,7 +362,7 @@
   gap: 16px;
   margin-bottom: 24px;
   padding: 20px;
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 12px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   flex-wrap: wrap;
@@ -387,7 +387,7 @@
 .search-group label,
 .filter-group label {
   font-weight: 500;
-  color: #374151;
+  color: var(--color-text-secondary);
   font-size: 14px;
 }
 
@@ -398,7 +398,7 @@
   border: 1px solid #d1d5db;
   border-radius: 8px;
   font-size: 14px;
-  background: white;
+  background: var(--color-card-bg);
   transition: border-color 0.2s;
 }
 
@@ -406,8 +406,8 @@
 .filter-group select:focus,
 .filter-group input[type='date']:focus {
   outline: none;
-  border-color: #f97316;
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.1);
 }
 
 .btn-clear-filters {
@@ -430,9 +430,9 @@
 
 .results-info {
   padding: 12px 16px;
-  background: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
-  color: #6b7280;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
   font-size: 14px;
 }
 
@@ -485,7 +485,7 @@
   background: none;
   border: none;
   font-size: 24px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   cursor: pointer;
   padding: 0 4px;
   line-height: 1;
@@ -494,7 +494,7 @@
 }
 
 .modal-close:hover:not(:disabled) {
-  background: #f3f4f6;
+  background: var(--color-surface-alt);
 }
 
 .modal-close:disabled {
@@ -525,28 +525,28 @@
 
 .form-input:focus {
   outline: none;
-  border-color: #f97316;
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
 }
 
 .copy-source-label {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   margin-bottom: 20px;
 }
 
 .copy-options {
   margin-top: 20px;
   padding: 16px;
-  background: #f9fafb;
+  background: var(--color-surface);
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
 }
 
 .copy-options-label {
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-secondary);
   margin-bottom: 12px;
 }
 
@@ -555,7 +555,7 @@
   align-items: center;
   gap: 10px;
   font-size: 14px;
-  color: #374151;
+  color: var(--color-text-secondary);
   cursor: pointer;
   padding: 6px 0;
 }
@@ -563,7 +563,7 @@
 .checkbox-label input[type='checkbox'] {
   width: 16px;
   height: 16px;
-  accent-color: #f97316;
+  accent-color: var(--color-primary);
   cursor: pointer;
 }
 
@@ -589,7 +589,7 @@
 .copy-result h3 {
   font-size: 18px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-text-secondary);
   margin-bottom: 16px;
 }
 
@@ -603,10 +603,10 @@
 
 .copy-result-list li {
   font-size: 14px;
-  color: #4b5563;
+  color: var(--color-text-muted);
   padding: 4px 0;
 }
 
 .copy-result-list li strong {
-  color: #111827;
+  color: var(--color-text);
 }

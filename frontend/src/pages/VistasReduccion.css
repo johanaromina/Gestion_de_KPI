@@ -11,12 +11,12 @@
 .page-header h1 {
   font-size: 32px;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
   margin-bottom: 8px;
 }
 
 .subtitle {
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 16px;
 }
 
@@ -26,7 +26,7 @@
   gap: 16px;
   margin-bottom: 32px;
   padding: 20px;
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 12px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   flex-wrap: wrap;
@@ -41,7 +41,7 @@
 
 .filter-group label {
   font-weight: 500;
-  color: #374151;
+  color: var(--color-text-secondary);
   font-size: 14px;
 }
 
@@ -50,15 +50,15 @@
   border: 1px solid #d1d5db;
   border-radius: 8px;
   font-size: 14px;
-  background: white;
+  background: var(--color-card-bg);
   cursor: pointer;
   transition: border-color 0.2s;
 }
 
 .filter-group select:focus {
   outline: none;
-  border-color: #f97316;
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.1);
 }
 
 /* Estadísticas */
@@ -69,7 +69,7 @@
 .stats-section h2 {
   font-size: 24px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-text-secondary);
   margin-bottom: 20px;
 }
 
@@ -80,7 +80,7 @@
 }
 
 .stat-card {
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -90,7 +90,7 @@
 .stat-card h3 {
   font-size: 18px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-text-secondary);
   margin-bottom: 16px;
 }
 
@@ -107,14 +107,14 @@
 }
 
 .stat-label {
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 14px;
 }
 
 .stat-value {
   font-weight: 600;
   font-size: 16px;
-  color: #1f2937;
+  color: var(--color-text-secondary);
 }
 
 .stat-value.positive {
@@ -131,7 +131,7 @@
 
 /* Gráficos */
 .chart-section {
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 12px;
   padding: 24px;
   margin-bottom: 32px;
@@ -142,7 +142,7 @@
 .chart-section h3 {
   font-size: 20px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-text-secondary);
   margin-bottom: 20px;
 }
 
@@ -154,7 +154,7 @@
 .table-section h2 {
   font-size: 24px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-text-secondary);
   margin-bottom: 20px;
 }
 
@@ -165,7 +165,7 @@
 }
 
 .kpi-group {
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -174,12 +174,12 @@
 .kpi-group h3 {
   font-size: 20px;
   font-weight: 600;
-  color: #111827;
+  color: var(--color-text);
   margin-bottom: 8px;
 }
 
 .kpi-description {
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 14px;
   margin-bottom: 16px;
 }
@@ -191,27 +191,27 @@
 }
 
 .data-table thead {
-  background: #f9fafb;
+  background: var(--color-surface);
 }
 
 .data-table th {
   padding: 12px 16px;
   text-align: left;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-secondary);
   font-size: 14px;
-  border-bottom: 2px solid #e5e7eb;
+  border-bottom: 2px solid var(--color-border);
 }
 
 .data-table td {
   padding: 12px 16px;
-  border-bottom: 1px solid #e5e7eb;
-  color: #1f2937;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
   font-size: 14px;
 }
 
 .data-table tbody tr:hover {
-  background: #f9fafb;
+  background: var(--color-surface);
 }
 
 .data-table td.positive {
@@ -239,13 +239,13 @@
 }
 
 .status-badge.status-draft {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
 }
 
 .status-badge.status-proposed {
-  background: #fff4e6;
-  color: #7c2d12;
+  background: var(--color-brand-bg);
+  color: var(--color-brand-text-dark);
 }
 
 .status-badge.status-approved {
@@ -254,8 +254,8 @@
 }
 
 .status-badge.status-closed {
-  background: #e5e7eb;
-  color: #374151;
+  background: var(--color-border);
+  color: var(--color-text-secondary);
 }
 
 /* Evolución */
@@ -266,12 +266,12 @@
 .evolution-section h2 {
   font-size: 24px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-text-secondary);
   margin-bottom: 20px;
 }
 
 .kpi-selector {
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 12px;
   padding: 20px;
   margin-bottom: 24px;
@@ -283,7 +283,7 @@
 
 .kpi-selector label {
   font-weight: 500;
-  color: #374151;
+  color: var(--color-text-secondary);
   font-size: 14px;
 }
 
@@ -294,12 +294,12 @@
   border: 1px solid #d1d5db;
   border-radius: 8px;
   font-size: 14px;
-  background: white;
+  background: var(--color-card-bg);
   cursor: pointer;
 }
 
 .evolution-table {
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 12px;
   padding: 24px;
   margin-top: 32px;
@@ -309,7 +309,7 @@
 .evolution-table h3 {
   font-size: 20px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-text-secondary);
   margin-bottom: 20px;
 }
 
@@ -318,18 +318,18 @@
 .empty-state {
   padding: 64px 32px;
   text-align: center;
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 12px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .empty-state p {
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 16px;
 }
 
 .loading {
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 16px;
 }
 

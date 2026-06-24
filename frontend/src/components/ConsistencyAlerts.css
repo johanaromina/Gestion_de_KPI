@@ -1,5 +1,5 @@
 .consistency-alerts {
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 12px;
   padding: 20px;
   margin-bottom: 24px;
@@ -12,13 +12,13 @@
   align-items: center;
   margin-bottom: 16px;
   padding-bottom: 12px;
-  border-bottom: 2px solid #e5e7eb;
+  border-bottom: 2px solid var(--color-border);
 }
 
 .alerts-header h3 {
   font-size: 18px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-text-secondary);
   margin: 0;
 }
 
@@ -52,8 +52,8 @@
 }
 
 .alert-info {
-  background: #fff7ed;
-  border-left-color: #f97316;
+  background: var(--color-brand-bg);
+  border-left-color: var(--color-primary);
 }
 
 .alert-icon {
@@ -68,13 +68,13 @@
 .alert-message {
   font-size: 14px;
   font-weight: 500;
-  color: #1f2937;
+  color: var(--color-text-secondary);
   margin-bottom: 8px;
 }
 
 .alert-details {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   margin-top: 8px;
 }
 
@@ -92,6 +92,6 @@
 }
 
 .detail-item strong {
-  color: #374151;
+  color: var(--color-text-secondary);
 }
 

@@ -10,7 +10,7 @@
 }
 
 .review-info {
-  background: #f3f4f6;
+  background: var(--color-surface-alt);
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 20px;
@@ -18,12 +18,12 @@
 
 .review-info p {
   margin: 8px 0;
-  color: #1f2937;
+  color: var(--color-text-secondary);
   font-size: 14px;
 }
 
 .review-info strong {
-  color: #374151;
+  color: var(--color-text-secondary);
   font-weight: 600;
 }
 
@@ -40,8 +40,8 @@
 
 .review-form textarea:focus {
   outline: none;
-  border-color: #f97316;
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
 }
 
 .btn-approve {

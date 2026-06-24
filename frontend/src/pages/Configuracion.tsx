@@ -214,11 +214,25 @@ const getOrgScopeTypeLabel = (type?: string | null) =>
       'Sin tipo',
   })
 
+const THEMES = [
+  { id: 'navy-teal',    label: 'Navy + Teal',      primary: '#0891b2', nav: '#0f2d4a', dark: false },
+  { id: 'orange',       label: 'Naranja',           primary: '#f97316', nav: '#1a0e05', dark: false },
+  { id: 'indigo',       label: 'Índigo + Violeta',  primary: '#6366f1', nav: '#1e1b4b', dark: false },
+  { id: 'emerald',      label: 'Esmeralda',         primary: '#059669', nav: '#0a2e1e', dark: false },
+  { id: 'fuchsia-dark', label: 'Fucsia Oscuro',     primary: '#ec4899', nav: '#160d1e', dark: true  },
+  { id: 'lime-dark',    label: 'Verde Oscuro',      primary: '#22c55e', nav: '#0a1a0c', dark: true  },
+  { id: 'orange-dark',  label: 'Naranja Oscuro',    primary: '#f97316', nav: '#1a0c00', dark: true  },
+  { id: 'gold-dark',    label: 'Gold Oscuro',       primary: '#eab308', nav: '#1a1800', dark: true  },
+] as const
+
 export default function Configuracion() {
   const { t } = useTranslation(['config', 'common', 'security', 'datasource'])
   const { user } = useAuth()
   const dialog = useDialog()
   const queryClient = useQueryClient()
+  const [selectedTheme, setSelectedTheme] = useState<string>(user?.companyTheme ?? 'navy-teal')
+  const [themeSaving, setThemeSaving] = useState(false)
+  const [themeSaved, setThemeSaved] = useState(false)
   const getConnectorLabel = (connector?: string | null) =>
     connector ? t(`config:options.connectors.${connector}`, { defaultValue: connector }) : '-'
   const getMetricTypeLabel = (metricType?: string | null) =>
@@ -2584,6 +2598,94 @@ export default function Configuracion() {
             </button>
           </div>
         )}
+      </div>
+
+      <div className="config-section">
+        <div className="card">
+          <div className="card-header">
+            <div>
+              <h3>Paleta de colores</h3>
+              <p className="muted">Elige el tema visual para toda tu empresa. Se aplica a todos los usuarios.</p>
+            </div>
+            {themeSaved && <span style={{ color: 'var(--color-primary)', fontWeight: 600, fontSize: 13 }}>Guardado</span>}
+          </div>
+          <p className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Claros</p>
+          <div className="theme-palette-grid">
+            {THEMES.filter(t => !t.dark).map((theme) => (
+              <button
+                key={theme.id}
+                type="button"
+                className={`theme-palette-card ${selectedTheme === theme.id ? 'theme-palette-card--active' : ''}`}
+                onClick={() => {
+                  setSelectedTheme(theme.id)
+                  document.documentElement.setAttribute('data-theme', theme.id)
+                }}
+              >
+                <div className="theme-palette-preview">
+                  <div className="theme-palette-nav" style={{ background: theme.nav }} />
+                  <div className="theme-palette-content" style={{ background: '#f9fafb' }}>
+                    <div className="theme-palette-bar" style={{ background: theme.primary }} />
+                    <div className="theme-palette-bar theme-palette-bar--short" style={{ background: theme.primary, opacity: 0.4 }} />
+                    <div className="theme-palette-dot" style={{ background: theme.primary }} />
+                  </div>
+                </div>
+                <span className="theme-palette-label">{theme.label}</span>
+                {selectedTheme === theme.id && <span className="theme-palette-check">✓</span>}
+              </button>
+            ))}
+          </div>
+          <p className="muted" style={{ fontSize: 12, marginTop: 14, marginBottom: 6 }}>Oscuros</p>
+          <div className="theme-palette-grid">
+            {THEMES.filter(t => t.dark).map((theme) => (
+              <button
+                key={theme.id}
+                type="button"
+                className={`theme-palette-card ${selectedTheme === theme.id ? 'theme-palette-card--active' : ''}`}
+                onClick={() => {
+                  setSelectedTheme(theme.id)
+                  document.documentElement.setAttribute('data-theme', theme.id)
+                }}
+              >
+                <div className="theme-palette-preview">
+                  <div className="theme-palette-nav" style={{ background: theme.nav }} />
+                  <div className="theme-palette-content" style={{ background: '#1e1e2e' }}>
+                    <div className="theme-palette-bar" style={{ background: theme.primary }} />
+                    <div className="theme-palette-bar theme-palette-bar--short" style={{ background: theme.primary, opacity: 0.5 }} />
+                    <div className="theme-palette-dot" style={{ background: theme.primary }} />
+                  </div>
+                </div>
+                <span className="theme-palette-label">{theme.label}</span>
+                {selectedTheme === theme.id && <span className="theme-palette-check">✓</span>}
+              </button>
+            ))}
+          </div>
+          <div style={{ marginTop: 16, display: 'flex', gap: 12, alignItems: 'center' }}>
+            <button
+              className="btn-primary"
+              disabled={themeSaving || selectedTheme === (user?.companyTheme ?? 'navy-teal')}
+              onClick={async () => {
+                setThemeSaving(true)
+                setThemeSaved(false)
+                try {
+                  await api.patch('/config/company-theme', { theme: selectedTheme })
+                  document.documentElement.setAttribute('data-theme', selectedTheme)
+                  queryClient.invalidateQueries('currentUser')
+                  setThemeSaved(true)
+                  setTimeout(() => setThemeSaved(false), 2500)
+                } finally {
+                  setThemeSaving(false)
+                }
+              }}
+            >
+              {themeSaving ? 'Guardando...' : 'Aplicar tema'}
+            </button>
+            {selectedTheme !== (user?.companyTheme ?? 'navy-teal') && (
+              <span style={{ fontSize: 12, color: '#6b7280' }}>
+                Vista previa — guarda para confirmar
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       <button

@@ -11,12 +11,12 @@
 .page-header h1 {
   font-size: 32px;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
   margin-bottom: 8px;
 }
 
 .subtitle {
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 16px;
 }
 
@@ -27,7 +27,7 @@
   gap: 16px;
   margin-bottom: 32px;
   padding: 20px;
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 12px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
@@ -40,7 +40,7 @@
 
 .filter-group label {
   font-weight: 500;
-  color: #374151;
+  color: var(--color-text-secondary);
   font-size: 14px;
 }
 
@@ -50,15 +50,15 @@
   border: 1px solid #d1d5db;
   border-radius: 8px;
   font-size: 14px;
-  background: white;
+  background: var(--color-card-bg);
   transition: border-color 0.2s;
 }
 
 .filter-group select:focus,
 .filter-group input:focus {
   outline: none;
-  border-color: #f97316;
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
 }
 
 .btn-clear-filters {
@@ -85,12 +85,12 @@
 
 .table-info {
   margin-bottom: 16px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 14px;
 }
 
 .table-container {
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 12px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   overflow-x: auto;
@@ -103,27 +103,27 @@
 }
 
 .audit-table thead {
-  background: #f9fafb;
+  background: var(--color-surface);
 }
 
 .audit-table th {
   padding: 16px;
   text-align: left;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-secondary);
   font-size: 14px;
-  border-bottom: 2px solid #e5e7eb;
+  border-bottom: 2px solid var(--color-border);
 }
 
 .audit-table td {
   padding: 16px;
-  border-bottom: 1px solid #e5e7eb;
-  color: #1f2937;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
   font-size: 14px;
 }
 
 .audit-table tbody tr:hover {
-  background: #f9fafb;
+  background: var(--color-surface);
 }
 
 .date-cell {
@@ -147,7 +147,7 @@
 
 .action-update {
   background: #dbeafe;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .action-delete {
@@ -162,7 +162,7 @@
 .changes-detail {
   margin-top: 8px;
   padding: 12px;
-  background: #f9fafb;
+  background: var(--color-surface);
   border-radius: 8px;
   font-size: 12px;
 }
@@ -170,7 +170,7 @@
 .change-item {
   margin-bottom: 8px;
   padding-bottom: 8px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .change-item:last-child {
@@ -192,7 +192,7 @@
 .ip-cell {
   font-family: 'Courier New', monospace;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .text-muted {
@@ -210,8 +210,8 @@
 }
 
 .btn-pagination {
-  background: #f97316;
-  color: #111827;
+  background: var(--color-primary);
+  color: var(--color-text);
   border: none;
   padding: 8px 16px;
   border-radius: 8px;
@@ -222,17 +222,17 @@
 }
 
 .btn-pagination:hover:not(:disabled) {
-  background: #ea580c;
+  background: var(--color-primary-dark);
 }
 
 .btn-pagination:disabled {
-  background: #e5e7eb;
+  background: var(--color-border);
   color: #9ca3af;
   cursor: not-allowed;
 }
 
 .page-info {
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 14px;
 }
 
@@ -241,18 +241,18 @@
 .empty-state {
   padding: 64px 32px;
   text-align: center;
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 12px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .empty-state p {
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 16px;
 }
 
 .loading {
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 16px;
 }
 

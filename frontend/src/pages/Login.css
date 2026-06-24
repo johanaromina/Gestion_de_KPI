@@ -9,11 +9,11 @@
     radial-gradient(circle at 10% 10%, #e2e8f0 0, transparent 35%),
     radial-gradient(circle at 80% 20%, #bbf7d0 0, transparent 30%),
     radial-gradient(circle at 20% 80%, #d1fae5 0, transparent 35%),
-    linear-gradient(135deg, #0a1628 0%, #0f2318 40%, #061012 100%);
+    linear-gradient(135deg, var(--color-nav-bg) 0%, #0f2318 40%, #061012 100%);
   padding: 32px 16px;
   position: relative;
   overflow: hidden;
-  color: #0f172a;
+  color: var(--color-text);
 }
 
 .corner-brand {
@@ -83,7 +83,7 @@
 
 .login-lang-btn--active {
   background: #00c37a;
-  color: #0a1628;
+  color: var(--color-nav-bg);
   border-color: #00c37a;
 }
 
@@ -181,7 +181,7 @@
   border-radius: 16px;
   display: grid;
   place-items: center;
-  background: #0a1628;
+  background: var(--color-nav-bg);
   color: #00c37a;
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 700;
@@ -193,7 +193,7 @@
   font-family: 'Fraunces', serif;
   font-size: 32px;
   margin: 8px 0 0;
-  color: #0a1628;
+  color: var(--color-nav-bg);
 }
 
 .brand-eyebrow {
@@ -219,14 +219,14 @@
   display: grid;
   gap: 10px;
   font-family: 'Space Grotesk', sans-serif;
-  color: #1f2937;
+  color: var(--color-text-secondary);
   font-weight: 500;
 }
 
 .hero-points li {
   padding: 10px 14px;
   border-radius: 12px;
-  background: #ffffff;
+  background: var(--color-card-bg);
   border: 1px solid #bbf7d0;
   box-shadow: 0 10px 24px rgba(10, 22, 40, 0.07);
 }
@@ -235,7 +235,7 @@
   align-self: flex-start;
   padding: 8px 16px;
   border-radius: 999px;
-  background: #0a1628;
+  background: var(--color-nav-bg);
   color: #00c37a;
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 600;
@@ -253,7 +253,7 @@
 }
 
 .metric-card {
-  background: #ffffff;
+  background: var(--color-card-bg);
   border: 1px solid #bbf7d0;
   border-radius: 14px;
   padding: 12px 14px;
@@ -269,7 +269,7 @@
 .metric-value {
   font-family: 'Fraunces', serif;
   font-size: 22px;
-  color: #0a1628;
+  color: var(--color-nav-bg);
 }
 
 .metric-label {
@@ -301,7 +301,7 @@
 
 .login-card {
   width: 100%;
-  background: #ffffff;
+  background: var(--color-card-bg);
   border-radius: 24px;
   padding: 32px;
   box-shadow: 0 24px 60px rgba(10, 22, 40, 0.28);
@@ -317,7 +317,7 @@
   font-family: 'Fraunces', serif;
   font-size: 26px;
   margin: 0;
-  color: #0a1628;
+  color: var(--color-nav-bg);
 }
 
 .login-header .subtitle {
@@ -341,7 +341,7 @@
 
 .login-form label {
   font-weight: 600;
-  color: #0a1628;
+  color: var(--color-nav-bg);
 }
 
 .login-form input {
@@ -350,7 +350,7 @@
   border-radius: 12px;
   font-size: 14px;
   font-family: 'Space Grotesk', sans-serif;
-  background: #f8fafc;
+  background: var(--color-surface);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -358,7 +358,7 @@
   outline: none;
   border-color: #00c37a;
   box-shadow: 0 0 0 3px rgba(0, 195, 122, 0.2);
-  background: #ffffff;
+  background: var(--color-card-bg);
 }
 
 .input-wrap {
@@ -374,7 +374,7 @@
   justify-content: space-between;
   gap: 12px;
   font-size: 13px;
-  color: #475569;
+  color: var(--color-text-secondary);
 }
 
 .remember-row {
@@ -392,7 +392,7 @@
 .link-btn {
   border: none;
   background: transparent;
-  color: #0a1628;
+  color: var(--color-nav-bg);
   font-weight: 600;
   cursor: pointer;
   padding: 0;
@@ -426,7 +426,7 @@
 }
 
 .toggle-visibility:hover {
-  color: #0a1628;
+  color: var(--color-nav-bg);
   background: #e2e8f0;
 }
 
@@ -510,7 +510,7 @@
   position: relative;
   z-index: 1;
   display: inline-block;
-  background: #fff;
+  background: var(--color-card-bg);
   padding: 0 12px;
 }
 
@@ -523,7 +523,7 @@
   width: 100%;
   border: 1px solid #bbf7d0;
   background: #f0fdf4;
-  color: #0a1628;
+  color: var(--color-nav-bg);
 }
 
 .login-page .sso-provider-btn:hover {
@@ -553,7 +553,7 @@
 
 .reset-card {
   width: min(420px, 90vw);
-  background: #ffffff;
+  background: var(--color-card-bg);
   border-radius: 18px;
   padding: 24px;
   box-shadow: 0 20px 50px rgba(10, 22, 40, 0.3);
@@ -564,7 +564,7 @@
   margin: 0 0 8px;
   font-family: 'Fraunces', serif;
   font-size: 22px;
-  color: #0a1628;
+  color: var(--color-nav-bg);
 }
 
 .reset-card p {
@@ -581,7 +581,7 @@
 
 .login-page .btn-secondary {
   background: #e2e8f0;
-  color: #0a1628;
+  color: var(--color-nav-bg);
   padding: 12px 16px;
   border: none;
   border-radius: 12px;

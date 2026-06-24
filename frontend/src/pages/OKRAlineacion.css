@@ -18,7 +18,7 @@
 
 .okr-alineacion-subtitle {
   margin: 0;
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 0.9rem;
 }
 
@@ -30,7 +30,7 @@
   padding: 0.5rem 0.75rem;
   border: 1px solid #d1d5db;
   border-radius: 6px;
-  background: #fff;
+  background: var(--color-card-bg);
   font-size: 0.9rem;
   min-width: 220px;
 }
@@ -40,8 +40,8 @@
   gap: 2rem;
   margin-bottom: 1.5rem;
   padding: 1rem 1.5rem;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
 }
 
@@ -58,7 +58,7 @@
 
 .summary-label {
   font-size: 0.8rem;
-  color: #6b7280;
+  color: var(--color-text-muted);
   margin-top: 0.25rem;
 }
 
@@ -66,7 +66,7 @@
 .okr-loading {
   text-align: center;
   padding: 3rem;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .okr-empty p {
@@ -89,8 +89,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 0.85rem 1rem;
   cursor: pointer;
@@ -127,7 +127,7 @@
   border: none;
   cursor: pointer;
   font-size: 1rem;
-  color: #6b7280;
+  color: var(--color-text-muted);
   padding: 0;
   width: 18px;
   flex-shrink: 0;
@@ -152,7 +152,7 @@
 .tree-card-title {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--color-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -190,7 +190,7 @@
 .tree-progress-track {
   width: 100px;
   height: 6px;
-  background: #f3f4f6;
+  background: var(--color-surface-alt);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -217,14 +217,14 @@
 }
 
 .tree-status-pill--active { background: #dcfce7; color: #15803d; }
-.tree-status-pill--draft  { background: #f3f4f6; color: #374151; }
-.tree-status-pill--closed { background: #f3f4f6; color: #6b7280; }
+.tree-status-pill--draft  { background: var(--color-surface-alt); color: var(--color-text-secondary); }
+.tree-status-pill--closed { background: var(--color-surface-alt); color: var(--color-text-muted); }
 
 .tree-children {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  border-left: 2px solid #e5e7eb;
+  border-left: 2px solid var(--color-border);
   margin-left: 12px;
   padding-left: 4px;
 }

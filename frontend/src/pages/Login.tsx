@@ -330,7 +330,7 @@ export default function Login() {
                 {selfRegisterEnabled ? (
                   <>
                     {t('login.no_account')}{' '}
-                    <a href="/register" style={{ color: '#f97316', fontWeight: 600, textDecoration: 'none' }}>
+                    <a href="/register" style={{ color: '#0891b2', fontWeight: 600, textDecoration: 'none' }}>
                       {t('login.create_instance')}
                     </a>
                   </>

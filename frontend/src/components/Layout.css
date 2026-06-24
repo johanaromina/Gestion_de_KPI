@@ -1,12 +1,12 @@
 .layout {
   display: flex;
   min-height: 100vh;
-  background-color: #f4f4f5;
+  background-color: var(--color-body-bg);
 }
 
 .sidebar {
   width: 260px;
-  background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
+  background: linear-gradient(180deg, var(--color-nav-bg) 0%, var(--color-nav-bg-end) 100%);
   color: #f9fafb;
   display: flex;
   flex-direction: column;
@@ -54,7 +54,7 @@
 .user-role {
   font-size: 12px;
   opacity: 0.9;
-  color: #e5e7eb;
+  color: var(--color-border);
 }
 
 .footer-link {
@@ -156,13 +156,13 @@
 .nav-item:hover {
   background-color: rgba(249, 250, 251, 0.08);
   color: #f9fafb;
-  border-left-color: #f97316;
+  border-left-color: var(--color-primary);
 }
 
 .nav-item.active {
   background-color: rgba(249, 250, 251, 0.12);
   color: #f9fafb;
-  border-left-color: #f97316;
+  border-left-color: var(--color-primary);
   font-weight: 600;
 }
 
@@ -207,7 +207,7 @@
     top: 12px;
     left: 12px;
     z-index: 200;
-    background: #0f172a;
+    background: var(--color-nav-bg);
     color: #f9fafb;
     border: none;
     border-radius: 8px;

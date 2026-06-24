@@ -6,13 +6,13 @@
 .historial-header {
   margin-bottom: 32px;
   padding-bottom: 24px;
-  border-bottom: 2px solid #e5e7eb;
+  border-bottom: 2px solid var(--color-border);
 }
 
 .historial-header h1 {
   font-size: 32px;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
   margin-bottom: 16px;
 }
 
@@ -23,13 +23,13 @@
 .collaborator-name {
   font-size: 20px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-text-secondary);
   margin-bottom: 4px;
 }
 
 .collaborator-details {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .status-line {
@@ -58,12 +58,12 @@
 }
 
 .muted {
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 12px;
 }
 
 .event-timeline {
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 12px;
   padding: 16px 20px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
@@ -72,7 +72,7 @@
 
 .event-timeline h3 {
   margin-bottom: 12px;
-  color: #111827;
+  color: var(--color-text);
   font-size: 16px;
 }
 
@@ -94,12 +94,12 @@
 
 .event-date {
   font-weight: 600;
-  color: #f97316;
+  color: var(--color-primary);
 }
 
 .event-desc {
   font-weight: 500;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .filters-section {
@@ -107,7 +107,7 @@
   gap: 24px;
   margin-bottom: 32px;
   padding: 24px;
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 12px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   flex-wrap: wrap;
@@ -122,7 +122,7 @@
   display: block;
   font-size: 14px;
   font-weight: 500;
-  color: #374151;
+  color: var(--color-text-secondary);
   margin-bottom: 8px;
 }
 
@@ -132,24 +132,24 @@
   border: 1px solid #d1d5db;
   border-radius: 8px;
   font-size: 14px;
-  background: white;
-  color: #1f2937;
+  background: var(--color-card-bg);
+  color: var(--color-text-secondary);
   cursor: pointer;
   transition: border-color 0.2s;
 }
 
 .filter-select:hover {
-  border-color: #f97316;
+  border-color: var(--color-primary);
 }
 
 .filter-select:focus {
   outline: none;
-  border-color: #f97316;
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.1);
 }
 
 .global-result-card {
-  background: linear-gradient(135deg, #f97316 0%, #111827 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, #111827 100%);
   border-radius: 16px;
   padding: 32px;
   margin-bottom: 32px;
@@ -158,12 +158,12 @@
 }
 
 .annual-summary-card {
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
+  background: var(--color-brand-bg);
+  border: 1px solid var(--color-primary-lighter);
   border-radius: 16px;
   padding: 24px;
   margin-bottom: 32px;
-  color: #7c2d12;
+  color: var(--color-brand-text-dark);
 }
 
 .summary-header {
@@ -180,7 +180,7 @@
 }
 
 .summary-pill {
-  background: #f97316;
+  background: var(--color-primary);
   color: white;
   font-weight: 600;
   padding: 6px 12px;
@@ -198,19 +198,19 @@
 .summary-metrics .metric-label {
   display: block;
   font-size: 12px;
-  color: #9a3412;
+  color: var(--color-brand-text);
 }
 
 .summary-metrics .metric-value {
   font-size: 16px;
   font-weight: 600;
-  color: #7c2d12;
+  color: var(--color-brand-text-dark);
 }
 
 .summary-table-container {
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 10px;
-  border: 1px solid #fde68a;
+  border: 1px solid var(--color-primary-lighter);
   overflow: hidden;
 }
 
@@ -220,7 +220,7 @@
 }
 
 .summary-table thead {
-  background: #ffedd5;
+  background: var(--color-brand-bg-mid);
 }
 
 .summary-table th,
@@ -228,7 +228,7 @@
   padding: 10px 12px;
   font-size: 13px;
   text-align: left;
-  border-bottom: 1px solid #fde68a;
+  border-bottom: 1px solid var(--color-primary-lighter);
 }
 
 .result-content h2 {
@@ -260,7 +260,7 @@
 
 .result-fill {
   height: 100%;
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 6px;
   transition: width 0.3s ease;
 }
@@ -278,7 +278,7 @@
 .kpis-section h2 {
   font-size: 24px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-text-secondary);
   margin-bottom: 16px;
 }
 
@@ -294,7 +294,7 @@
 }
 
 .kpis-table-container {
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 12px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   overflow-x: auto;
@@ -307,32 +307,32 @@
 }
 
 .kpis-table thead {
-  background: #f9fafb;
+  background: var(--color-surface);
 }
 
 .kpis-table th {
   padding: 16px;
   text-align: left;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-secondary);
   font-size: 14px;
-  border-bottom: 2px solid #e5e7eb;
+  border-bottom: 2px solid var(--color-border);
 }
 
 .kpis-table td {
   padding: 16px;
-  border-bottom: 1px solid #e5e7eb;
-  color: #1f2937;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
   font-size: 14px;
 }
 
 .kpis-table tbody tr:hover {
-  background: #f9fafb;
+  background: var(--color-surface);
 }
 
 .kpi-name {
   font-weight: 600;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .kpi-description,
@@ -354,7 +354,7 @@
 .kpi-weighted {
   text-align: right;
   font-weight: 600;
-  color: #f97316;
+  color: var(--color-primary);
 }
 
 .kpi-status {
@@ -367,8 +367,8 @@
 }
 
 .kpi-status-draft {
-  background: #e5e7eb;
-  color: #374151;
+  background: var(--color-border);
+  color: var(--color-text-secondary);
 }
 
 .kpi-status-proposed {
@@ -382,8 +382,8 @@
 }
 
 .kpi-status-closed {
-  background: #e5e7eb;
-  color: #111827;
+  background: var(--color-border);
+  color: var(--color-text);
 }
 
 .chart-section {
@@ -393,12 +393,12 @@
 .chart-section h2 {
   font-size: 24px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-text-secondary);
   margin-bottom: 16px;
 }
 
 .chart-container {
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -417,12 +417,12 @@
 
 .empty-state h3 {
   font-size: 20px;
-  color: #374151;
+  color: var(--color-text-secondary);
   margin-bottom: 8px;
 }
 
 .empty-state p {
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 @media (max-width: 768px) {

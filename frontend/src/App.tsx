@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from 'react-query'
 import { DialogProvider } from './components/Dialog'
@@ -56,6 +56,15 @@ const queryClient = new QueryClient({
   },
 })
 
+const ThemeApplier = () => {
+  const { user } = useAuth()
+  useEffect(() => {
+    const theme = user?.companyTheme ?? 'navy-teal'
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [user?.companyTheme])
+  return null
+}
+
 const RequireAuth = ({ children }: { children: JSX.Element }) => {
   const { user, isLoading, error } = useAuth()
   if (isLoading) return null
@@ -75,6 +84,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <DialogProvider>
       <Router>
+        <ThemeApplier />
         <Layout>
           <Suspense fallback={null}>
             <Routes>

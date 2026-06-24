@@ -10,7 +10,7 @@
 }
 
 .slack-wizard-modal {
-  background: #fff;
+  background: var(--color-card-bg);
   border-radius: 16px;
   width: 100%;
   max-width: 540px;
@@ -26,7 +26,7 @@
   align-items: flex-start;
   justify-content: space-between;
   padding: 24px 24px 16px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 
@@ -45,13 +45,13 @@
   margin: 0 0 4px;
   font-size: 18px;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .slack-wizard-title p {
   margin: 0;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .slack-wizard-close {
@@ -67,8 +67,8 @@
 }
 
 .slack-wizard-close:hover {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--color-surface-alt);
+  color: var(--color-text-secondary);
 }
 
 .slack-wizard-progress {
@@ -101,7 +101,7 @@
 .slack-loading {
   text-align: center;
   padding: 32px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 14px;
 }
 
@@ -122,17 +122,17 @@
 }
 
 .slack-status-badge--off {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
 }
 
 .slack-preview {
   display: inline-block;
-  background: #f3f4f6;
+  background: var(--color-surface-alt);
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 12px;
-  color: #374151;
+  color: var(--color-text-secondary);
   margin-top: 4px;
   word-break: break-all;
 }
@@ -148,8 +148,8 @@
 
 .slack-benefits li {
   font-size: 14px;
-  color: #374151;
-  background: #f9fafb;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
   padding: 8px 12px;
   border-radius: 8px;
 }
@@ -182,12 +182,12 @@
 
 .slack-steps li {
   font-size: 14px;
-  color: #374151;
+  color: var(--color-text-secondary);
   line-height: 1.5;
 }
 
 .slack-steps li a {
-  color: #f97316;
+  color: var(--color-primary);
   text-decoration: none;
 }
 
@@ -196,21 +196,21 @@
 }
 
 .slack-steps li strong {
-  color: #111827;
+  color: var(--color-text);
 }
 
 .slack-steps li code {
-  background: #f3f4f6;
+  background: var(--color-surface-alt);
   padding: 1px 6px;
   border-radius: 4px;
   font-size: 13px;
-  color: #374151;
+  color: var(--color-text-secondary);
 }
 
 /* Test preview */
 .slack-test-preview {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 16px;
   margin: 12px 0 20px;
@@ -219,7 +219,7 @@
 .slack-test-msg {
   font-size: 14px;
   line-height: 1.6;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .slack-test-msg strong {
@@ -228,8 +228,8 @@
 
 .slack-test-badge {
   display: inline-block;
-  background: #e5e7eb;
-  color: #6b7280;
+  background: var(--color-border);
+  color: var(--color-text-muted);
   font-size: 11px;
   font-weight: 600;
   padding: 1px 6px;
@@ -247,7 +247,7 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #e5e7eb;
+  background: var(--color-border);
   flex-shrink: 0;
 }
 
@@ -256,8 +256,8 @@
 }
 
 .progress-dot.active {
-  background: #f97316;
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
+  background: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.2);
 }
 
 .progress-label {
@@ -270,12 +270,12 @@
   margin: 0 0 6px;
   font-size: 17px;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .step-hint {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   margin: 0 0 16px;
   line-height: 1.5;
 }
@@ -290,7 +290,7 @@
   display: block;
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-secondary);
   margin-bottom: 6px;
 }
 
@@ -306,8 +306,8 @@
 
 .wizard-input:focus {
   outline: none;
-  border-color: #f97316;
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.12);
 }
 
 .wizard-actions {
@@ -318,7 +318,7 @@
 }
 
 .btn-wizard-primary {
-  background: #f97316;
+  background: var(--color-primary);
   color: white;
   border: none;
   padding: 10px 22px;
@@ -330,7 +330,7 @@
 }
 
 .btn-wizard-primary:hover:not(:disabled) {
-  background: #ea580c;
+  background: var(--color-primary-dark);
 }
 
 .btn-wizard-primary:disabled {
@@ -339,8 +339,8 @@
 }
 
 .btn-wizard-secondary {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--color-surface-alt);
+  color: var(--color-text-secondary);
   border: none;
   padding: 10px 18px;
   border-radius: 8px;
@@ -351,7 +351,7 @@
 }
 
 .btn-wizard-secondary:hover {
-  background: #e5e7eb;
+  background: var(--color-border);
 }
 
 .wizard-done {
@@ -368,7 +368,7 @@
 }
 
 .wizard-done p {
-  color: #374151;
+  color: var(--color-text-secondary);
   font-size: 14px;
   margin-bottom: 6px;
   line-height: 1.5;

@@ -199,7 +199,7 @@ export default function VistasAgregadas() {
                   <YAxis domain={[0, 100]} />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="promedio" fill="#f97316" name={t('aggregated.chart.bar_avg')} />
+                  <Bar dataKey="promedio" fill="#0891b2" name={t('aggregated.chart.bar_avg')} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

@@ -16,8 +16,8 @@
 }
 
 .btn-secondary {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--color-surface-alt);
+  color: var(--color-text-secondary);
   border: none;
   padding: 12px 24px;
   border-radius: 8px;
@@ -28,24 +28,24 @@
 }
 
 .btn-secondary:hover {
-  background: #e5e7eb;
+  background: var(--color-border);
 }
 
 .page-header h1 {
   font-size: 32px;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
   margin-bottom: 8px;
 }
 
 .subtitle {
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 16px;
 }
 
 .btn-primary {
-  background: #f97316;
-  color: #111827;
+  background: var(--color-primary);
+  color: var(--color-text);
   border: none;
   padding: 12px 24px;
   border-radius: 8px;
@@ -56,7 +56,7 @@
 }
 
 .btn-primary:hover {
-  background: #ea580c;
+  background: var(--color-primary-dark);
 }
 
 .filters-section {
@@ -65,7 +65,7 @@
   gap: 12px 16px;
   margin-bottom: 24px;
   padding: 20px;
-  background: #ffffff;
+  background: var(--color-card-bg);
   border-radius: 14px;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
 }
@@ -87,7 +87,7 @@
 .search-group label,
 .filter-group label {
   font-weight: 500;
-  color: #374151;
+  color: var(--color-text-secondary);
   font-size: 14px;
   display: inline-flex;
   align-items: center;
@@ -127,20 +127,20 @@
   border: 1px solid #dfe3e8;
   border-radius: 10px;
   font-size: 14px;
-  background: white;
-  color: #1f2937;
+  background: var(--color-card-bg);
+  color: var(--color-text-secondary);
   cursor: pointer;
   transition: border-color 0.2s;
 }
 
 .filter-select:hover {
-  border-color: #f97316;
+  border-color: var(--color-primary);
 }
 
 .filter-select:focus {
   outline: none;
-  border-color: #f97316;
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
 }
 
 .toggle-group {
@@ -153,7 +153,7 @@
 }
 
 .table-container {
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 12px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   overflow-x: auto;
@@ -189,27 +189,27 @@
 }
 
 .data-table thead {
-  background: #f9fafb;
+  background: var(--color-surface);
 }
 
 .data-table th {
   padding: 16px;
   text-align: left;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-secondary);
   font-size: 14px;
-  border-bottom: 2px solid #e5e7eb;
+  border-bottom: 2px solid var(--color-border);
 }
 
 .data-table td {
   padding: 16px;
-  border-bottom: 1px solid #e5e7eb;
-  color: #1f2937;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
   font-size: 14px;
 }
 
 .data-table tbody tr:hover {
-  background: #f9fafb;
+  background: var(--color-surface);
 }
 
 .data-table th.actions-column,
@@ -217,22 +217,22 @@
   position: sticky;
   right: 0;
   z-index: 2;
-  background: #fff;
+  background: var(--color-card-bg);
   box-shadow: -6px 0 8px rgba(17, 24, 39, 0.06);
 }
 
 .data-table thead th.actions-column {
-  background: #f9fafb;
+  background: var(--color-surface);
   z-index: 3;
 }
 
 .data-table tbody tr:hover td.actions-column {
-  background: #f9fafb;
+  background: var(--color-surface);
 }
 
 .name-cell {
   font-weight: 500;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .number-cell {
@@ -262,8 +262,8 @@
 }
 
 .status-draft {
-  background: #e5e7eb;
-  color: #374151;
+  background: var(--color-border);
+  color: var(--color-text-secondary);
 }
 
 .status-proposed {
@@ -277,8 +277,8 @@
 }
 
 .status-closed {
-  background: #e5e7eb;
-  color: #374151;
+  background: var(--color-border);
+  color: var(--color-text-secondary);
 }
 
 .curation-badge,
@@ -289,7 +289,7 @@
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
 }
 
 .curation-badge.curation-pending {
@@ -313,17 +313,17 @@
 }
 
 .curation-badge.locked {
-  background: #e5e7eb;
-  color: #374151;
+  background: var(--color-border);
+  color: var(--color-text-secondary);
 }
 
 .input-badge.input-manual {
-  background: #fff7ed;
-  color: #9a3412;
+  background: var(--color-brand-bg);
+  color: var(--color-brand-text);
 }
 
 .input-badge.input-import {
-  background: #ecfeff;
+  background: var(--color-brand-bg);
   color: #155e75;
 }
 
@@ -334,7 +334,7 @@
 
 .measurement-cell {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .action-buttons {
@@ -352,7 +352,7 @@
 }
 
 .comments-text {
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 13px;
   cursor: help;
 }
@@ -374,8 +374,8 @@
 }
 
 .btn-reject-small {
-  background: #ea580c;
-  color: #111827;
+  background: var(--color-primary-dark);
+  color: var(--color-text);
   border: none;
   padding: 4px 8px;
   border-radius: 4px;
@@ -386,7 +386,7 @@
 }
 
 .btn-reject-small:hover {
-  background: #c2410c;
+  background: #b45309;
 }
 
 .btn-icon {
@@ -400,7 +400,7 @@
 }
 
 .btn-icon:hover {
-  background: #f3f4f6;
+  background: var(--color-surface-alt);
 }
 
 .locked-badge {
@@ -409,22 +409,22 @@
   border-radius: 12px;
   font-size: 12px;
   font-weight: 500;
-  color: #6b7280;
-  background: #f3f4f6;
+  color: var(--color-text-muted);
+  background: var(--color-surface-alt);
   cursor: not-allowed;
 }
 
 .weight-summary {
   margin-top: 24px;
   padding: 20px;
-  border-top: 2px solid #e5e7eb;
-  background: #f9fafb;
+  border-top: 2px solid var(--color-border);
+  background: var(--color-surface);
 }
 
 .weight-summary h3 {
   font-size: 18px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-text-secondary);
   margin-bottom: 16px;
 }
 
@@ -440,8 +440,8 @@
   align-items: center;
   padding: 12px 16px;
   border-radius: 8px;
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border);
 }
 
 .summary-row.valid {
@@ -461,12 +461,12 @@
 
 .summary-name {
   font-weight: 500;
-  color: #1f2937;
+  color: var(--color-text-secondary);
 }
 
 .summary-weight {
   font-weight: 600;
-  color: #111827;
+  color: var(--color-text);
   font-size: 16px;
 }
 
@@ -513,12 +513,12 @@
 
 .empty-state h3 {
   font-size: 20px;
-  color: #374151;
+  color: var(--color-text-secondary);
   margin-bottom: 8px;
 }
 
 .empty-state p {
-  color: #6b7280;
+  color: var(--color-text-muted);
   margin-bottom: 16px;
 }
 
@@ -529,7 +529,7 @@
 }
 
 .empty-state-hint a {
-  color: #f97316;
+  color: var(--color-primary);
   font-weight: 600;
   text-decoration: none;
 }

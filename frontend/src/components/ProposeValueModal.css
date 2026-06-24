@@ -10,7 +10,7 @@
 }
 
 .propose-info {
-  background: #f3f4f6;
+  background: var(--color-surface-alt);
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 20px;
@@ -18,12 +18,12 @@
 
 .propose-info p {
   margin: 8px 0;
-  color: #1f2937;
+  color: var(--color-text-secondary);
   font-size: 14px;
 }
 
 .propose-info strong {
-  color: #374151;
+  color: var(--color-text-secondary);
   font-weight: 600;
 }
 
@@ -40,8 +40,8 @@
 
 .propose-form textarea:focus {
   outline: none;
-  border-color: #f97316;
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
 }
 
 /* ── Outlier banner ──────────────────────────────────────── */
@@ -56,17 +56,17 @@
 }
 
 .outlier-banner-high {
-  background: #fef2f2;
+  background: var(--color-surface);
   border-color: #fecaca;
 }
 
 .outlier-banner-medium {
-  background: #fffbeb;
+  background: var(--color-surface);
   border-color: #fde68a;
 }
 
 .outlier-banner-low {
-  background: #eff6ff;
+  background: var(--color-surface);
   border-color: #bfdbfe;
 }
 
@@ -86,7 +86,7 @@
 .outlier-title {
   font-size: 13px;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .outlier-banner-high .outlier-title  { color: #b91c1c; }
@@ -95,12 +95,12 @@
 
 .outlier-message {
   font-size: 12px;
-  color: #374151;
+  color: var(--color-text-secondary);
   line-height: 1.5;
 }
 
 .outlier-stats {
   font-size: 11px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   margin-top: 2px;
 }

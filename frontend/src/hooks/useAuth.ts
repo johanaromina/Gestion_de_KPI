@@ -10,6 +10,7 @@ export interface User {
   collaboratorId: number
   hasSuperpowers?: boolean
   permissions?: string[]
+  companyTheme?: 'navy-teal' | 'orange' | 'indigo' | 'emerald' | 'fuchsia-dark' | 'lime-dark' | 'orange-dark' | 'gold-dark'
 }
 
 export function useAuth() {

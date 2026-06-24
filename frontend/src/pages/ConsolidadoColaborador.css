@@ -18,15 +18,15 @@
 }
 
 .subtitle {
-  color: #6b7280;
+  color: var(--color-text-muted);
   margin: 4px 0 0;
 }
 
 .period-chip {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 10px 12px;
-  background: #f9fafb;
+  background: var(--color-surface);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -34,7 +34,7 @@
 
 .chip-label {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -61,20 +61,20 @@
 
 .filter-group label {
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-secondary);
 }
 
 .filter-group select {
   padding: 10px 12px;
   border: 1px solid #d1d5db;
   border-radius: 8px;
-  background: #fff;
+  background: var(--color-card-bg);
 }
 
 .loading {
   padding: 12px;
   border-radius: 8px;
-  background: #f3f4f6;
+  background: var(--color-surface-alt);
 }
 
 .empty-state {
@@ -82,7 +82,7 @@
   border-radius: 12px;
   padding: 24px;
   text-align: center;
-  background: #f9fafb;
+  background: var(--color-surface);
 }
 
 .empty-icon {
@@ -97,8 +97,8 @@
 }
 
 .summary-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border);
   border-radius: 12px;
   padding: 16px;
   display: flex;
@@ -120,13 +120,13 @@
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .card-value {
   font-size: 32px;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .card-value.small {
@@ -135,7 +135,7 @@
 
 .card-help {
   margin: 0;
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 13px;
 }
 
@@ -146,8 +146,8 @@
 }
 
 .subperiod-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border);
   border-radius: 12px;
   padding: 12px;
   display: flex;
@@ -177,14 +177,14 @@
 
 .subperiod-score small {
   display: block;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .subperiod-meta {
   display: flex;
   gap: 12px;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .table-wrapper {
@@ -199,7 +199,7 @@
 .subperiod-card th,
 .subperiod-card td {
   padding: 8px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--color-border);
   text-align: left;
 }
 
@@ -208,7 +208,7 @@
 }
 
 .kpi-desc {
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 12px;
 }
 

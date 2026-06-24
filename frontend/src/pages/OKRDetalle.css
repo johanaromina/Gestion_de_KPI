@@ -7,7 +7,7 @@
 .okr-detalle-loading {
   padding: 3rem;
   text-align: center;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .okr-detalle-header {
@@ -29,13 +29,13 @@
   padding: 0.4rem 0.8rem;
   font-size: 0.85rem;
   cursor: pointer;
-  color: #374151;
+  color: var(--color-text-secondary);
 }
 
-.btn-back:hover { background: #f9fafb; }
+.btn-back:hover { background: var(--color-surface); }
 
 .btn-export {
-  background: white;
+  background: var(--color-card-bg);
   border: 1px solid #d1d5db;
   padding: 0.4rem 0.8rem;
   border-radius: 6px;
@@ -54,8 +54,8 @@
 .btn-export-excel:hover { background: #d1fae5; border-color: #059669; }
 
 .okr-detalle-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 1.5rem;
   margin-bottom: 1.5rem;
@@ -86,18 +86,18 @@
 }
 
 .okr-status-pill--active { background: #dcfce7; color: #15803d; }
-.okr-status-pill--draft  { background: #f3f4f6; color: #374151; }
-.okr-status-pill--closed { background: #f3f4f6; color: #6b7280; }
+.okr-status-pill--draft  { background: var(--color-surface-alt); color: var(--color-text-secondary); }
+.okr-status-pill--closed { background: var(--color-surface-alt); color: var(--color-text-muted); }
 
 .okr-detalle-title {
   margin: 0 0 0.5rem;
   font-size: 1.4rem;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .okr-detalle-desc {
   margin: 0 0 0.5rem;
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 0.9rem;
 }
 
@@ -116,12 +116,12 @@
   justify-content: space-between;
   font-size: 0.85rem;
   margin-bottom: 0.3rem;
-  color: #374151;
+  color: var(--color-text-secondary);
 }
 
 .okr-progress-track {
   height: 10px;
-  background: #f3f4f6;
+  background: var(--color-surface-alt);
   border-radius: 5px;
   overflow: hidden;
 }
@@ -141,7 +141,7 @@
 .okr-kr-section h3 {
   margin: 0 0 0.25rem;
   font-size: 1rem;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .okr-empty-inline {
@@ -150,8 +150,8 @@
 }
 
 .okr-kr-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 1rem 1.25rem;
   transition: box-shadow 0.15s;
@@ -173,7 +173,7 @@
 .okr-kr-card-title {
   font-weight: 600;
   font-size: 0.9rem;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .okr-kr-owner {
@@ -186,12 +186,12 @@
 }
 
 .kr-status-select {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   padding: 0.3rem 0.5rem;
   font-size: 0.8rem;
   font-weight: 600;
-  background: #fff;
+  background: var(--color-card-bg);
   cursor: pointer;
 }
 
@@ -210,7 +210,7 @@
 .okr-kr-pct {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-secondary);
   min-width: 36px;
   text-align: right;
 }
@@ -220,10 +220,10 @@
   justify-content: space-between;
   align-items: center;
   font-size: 0.82rem;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
-.okr-kr-value-text { color: #374151; }
+.okr-kr-value-text { color: var(--color-text-secondary); }
 
 .okr-kr-linked-kpis {
   display: flex;
@@ -256,7 +256,7 @@
   margin-top: 0.75rem;
   border-top: 1px solid #f3f4f6;
   padding-top: 0.75rem;
-  background: #f9fafb;
+  background: var(--color-surface);
   border-radius: 0 0 8px 8px;
   padding: 0.85rem 1rem;
 }
@@ -269,14 +269,14 @@
   display: block;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-secondary);
   margin-bottom: 0.2rem;
 }
 
 .checkin-panel-hint {
   display: block;
   font-size: 0.78rem;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .checkin-form {
@@ -296,7 +296,7 @@
 .checkin-field label {
   font-size: 0.78rem;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .checkin-field--wide {
@@ -309,13 +309,13 @@
   border: 1px solid #d1d5db;
   border-radius: 6px;
   font-size: 0.85rem;
-  background: #fff;
+  background: var(--color-card-bg);
 }
 
 .checkin-form input:focus {
   outline: none;
-  border-color: #f97316;
-  box-shadow: 0 0 0 2px rgba(249,115,22,0.15);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb), 0.15);
 }
 
 .checkin-field:not(.checkin-field--wide) input { width: 130px; }
@@ -349,12 +349,12 @@
 
 .checkin-value {
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
   min-width: 60px;
 }
 
 .checkin-note {
-  color: #374151;
+  color: var(--color-text-secondary);
   flex: 1;
 }
 
@@ -378,8 +378,8 @@
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .btn-secondary {
-  background: #fff;
-  color: #374151;
+  background: var(--color-card-bg);
+  color: var(--color-text-secondary);
   border: 1px solid #d1d5db;
   padding: 0.4rem 0.9rem;
   border-radius: 6px;
@@ -388,7 +388,7 @@
   cursor: pointer;
 }
 
-.btn-secondary:hover { background: #f9fafb; }
+.btn-secondary:hover { background: var(--color-surface); }
 
 /* Panel de trazabilidad de fuentes de datos */
 .datasource-panel {
@@ -400,7 +400,7 @@
 .datasource-panel-title {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin: 0 0 0.6rem;
@@ -413,8 +413,8 @@
 }
 
 .datasource-row {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   padding: 0.5rem 0.75rem;
 }
@@ -429,7 +429,7 @@
 
 .datasource-name {
   font-size: 0.82rem;
-  color: #111827;
+  color: var(--color-text);
   font-weight: 500;
   display: flex;
   align-items: center;
@@ -444,7 +444,7 @@
 
 .datasource-bar-track {
   height: 4px;
-  background: #e5e7eb;
+  background: var(--color-border);
   border-radius: 2px;
   overflow: hidden;
   margin-bottom: 0.3rem;
@@ -458,7 +458,7 @@
 
 .datasource-values {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .datasource-type-badge {
@@ -480,8 +480,8 @@
 
 /* Vinculos Arbol de Objetivos */
 .okr-tree-links-section {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 1.25rem;
   margin-top: 1.5rem;
@@ -490,7 +490,7 @@
 .okr-tree-links-section h3 {
   margin: 0 0 1rem;
   font-size: 1rem;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .okr-tree-links-list {
@@ -504,8 +504,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-left: 3px solid #7c3aed;
   border-radius: 6px;
   padding: 0.5rem 0.85rem;
@@ -515,7 +515,7 @@
 .okr-tree-link-name {
   font-size: 0.88rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .okr-tree-link-level {
@@ -542,7 +542,7 @@
   border: 1px solid #d1d5db;
   border-radius: 6px;
   font-size: 0.88rem;
-  background: #fff;
+  background: var(--color-card-bg);
 }
 
 @media (max-width: 768px) {
@@ -631,7 +631,7 @@
 
 .okr-tree-hint {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .tree-search-wrapper {
@@ -651,8 +651,8 @@
 }
 
 .tree-search-input:focus {
-  border-color: #f97316;
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.12);
 }
 
 .tree-search-dropdown {
@@ -660,8 +660,8 @@
   top: calc(100% + 4px);
   left: 0;
   right: 0;
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.12);
   z-index: 100;
@@ -689,19 +689,19 @@
 }
 
 .tree-search-option:hover {
-  background: #fff7ed;
+  background: var(--color-brand-bg);
 }
 
 .tree-option-name {
   font-size: 13px;
-  color: #111827;
+  color: var(--color-text);
   font-weight: 500;
 }
 
 .tree-option-level {
   font-size: 11px;
   color: #9ca3af;
-  background: #f3f4f6;
+  background: var(--color-surface-alt);
   padding: 2px 7px;
   border-radius: 4px;
   white-space: nowrap;
@@ -711,14 +711,14 @@
 .tree-search-empty {
   padding: 12px 14px;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   text-align: center;
 }
 
 .kr-edit-panel {
   margin-top: 16px;
   padding: 16px;
-  background: #f8fafc;
+  background: var(--color-surface);
   border: 1px solid #e2e8f0;
   border-radius: 8px;
 }
@@ -726,7 +726,7 @@
 .kr-edit-panel-title {
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-secondary);
   margin-bottom: 14px;
 }
 
@@ -750,7 +750,7 @@
 .kr-edit-field label {
   font-size: 12px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .kr-edit-field input,
@@ -759,15 +759,15 @@
   border: 1px solid #d1d5db;
   border-radius: 6px;
   font-size: 13px;
-  background: #fff;
+  background: var(--color-card-bg);
   width: 100%;
 }
 
 .kr-edit-field input:focus,
 .kr-edit-field select:focus {
   outline: none;
-  border-color: #f97316;
-  box-shadow: 0 0 0 2px rgba(249,115,22,0.15);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb), 0.15);
 }
 
 .kr-edit-actions {
@@ -797,10 +797,10 @@
   padding: 6px 14px;
   border: 1px solid #d1d5db;
   border-radius: 6px;
-  background: #fff;
+  background: var(--color-card-bg);
   cursor: pointer;
   font-size: 13px;
-  color: #374151;
+  color: var(--color-text-secondary);
 }
 
 .kr-type-btn.active {

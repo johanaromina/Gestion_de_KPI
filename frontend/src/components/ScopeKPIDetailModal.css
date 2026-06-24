@@ -13,7 +13,7 @@
   width: min(1120px, 100%);
   max-height: 90vh;
   overflow: auto;
-  background: #fff;
+  background: var(--color-card-bg);
   border-radius: 18px;
   box-shadow: 0 22px 60px rgba(15, 23, 42, 0.2);
   padding: 24px;
@@ -29,7 +29,7 @@
 
 .scope-detail-header h2 {
   margin: 0 0 8px;
-  color: #111827;
+  color: var(--color-text);
   font-size: 28px;
 }
 
@@ -54,27 +54,27 @@
 .scope-detail-breadcrumb-button {
   border: none;
   background: none;
-  color: #6b7280;
+  color: var(--color-text-muted);
   cursor: pointer;
   padding: 0;
   font-size: 13px;
 }
 
 .scope-detail-breadcrumb-button.active {
-  color: #111827;
+  color: var(--color-text);
   font-weight: 700;
   cursor: default;
 }
 
 .scope-detail-breadcrumb-button:not(.active):hover {
-  color: #f97316;
+  color: var(--color-primary);
 }
 
 .scope-detail-subtitle {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 12px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 14px;
 }
 
@@ -90,15 +90,15 @@
 }
 
 .scope-detail-section {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border);
   border-radius: 14px;
   padding: 18px;
 }
 
 .scope-detail-section h3 {
   margin: 0 0 14px;
-  color: #111827;
+  color: var(--color-text);
   font-size: 18px;
 }
 
@@ -111,13 +111,13 @@
 .scope-detail-stat {
   padding: 14px;
   border-radius: 12px;
-  background: linear-gradient(180deg, #fff7ed 0%, #ffffff 100%);
-  border: 1px solid #fed7aa;
+  background: linear-gradient(180deg, var(--color-brand-bg) 0%, #ffffff 100%);
+  border: 1px solid var(--color-primary-lighter);
 }
 
 .scope-detail-stat span {
   display: block;
-  color: #9a3412;
+  color: var(--color-brand-text);
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -125,7 +125,7 @@
 }
 
 .scope-detail-stat strong {
-  color: #111827;
+  color: var(--color-text);
   font-size: 22px;
   font-weight: 700;
 }
@@ -136,8 +136,8 @@
 }
 
 .scope-detail-mix {
-  background: #fff7ed;
-  border: 1px solid #fdba74;
+  background: var(--color-brand-bg);
+  border: 1px solid var(--color-primary-lighter);
   border-radius: 14px;
   padding: 16px;
 }
@@ -150,8 +150,8 @@
 }
 
 .scope-detail-mix-card {
-  background: #fff;
-  border: 1px solid #fed7aa;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-primary-lighter);
   border-radius: 12px;
   padding: 14px;
 }
@@ -159,7 +159,7 @@
 .scope-detail-mix-card span {
   display: block;
   font-size: 12px;
-  color: #9a3412;
+  color: var(--color-brand-text);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin-bottom: 6px;
@@ -167,14 +167,14 @@
 
 .scope-detail-mix-card strong {
   display: block;
-  color: #111827;
+  color: var(--color-text);
   font-size: 20px;
 }
 
 .scope-detail-mix-card small {
   display: block;
   margin-top: 6px;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .scope-detail-list {
@@ -183,10 +183,10 @@
 }
 
 .scope-detail-item {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 12px;
   padding: 12px 14px;
-  background: #fff;
+  background: var(--color-card-bg);
 }
 
 .scope-detail-item-main {
@@ -198,11 +198,11 @@
 }
 
 .scope-detail-item-main strong {
-  color: #111827;
+  color: var(--color-text);
 }
 
 .scope-detail-item-main span {
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 13px;
 }
 
@@ -214,8 +214,8 @@
 
 .scope-detail-link-button {
   border: none;
-  background: #fff7ed;
-  color: #c2410c;
+  background: var(--color-brand-bg);
+  color: #b45309;
   border-radius: 999px;
   padding: 6px 10px;
   font-size: 12px;
@@ -224,14 +224,14 @@
 }
 
 .scope-detail-link-button:hover {
-  background: #fed7aa;
+  background: var(--color-brand-bg-mid);
 }
 
 .scope-detail-item-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 14px;
-  color: #4b5563;
+  color: var(--color-text-muted);
   font-size: 13px;
 }
 
@@ -253,7 +253,7 @@
 }
 
 .scope-detail-empty {
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 14px;
 }
 

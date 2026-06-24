@@ -12,7 +12,7 @@
 }
 
 .modal-content {
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 12px;
   width: 90%;
   max-width: 500px;
@@ -26,18 +26,18 @@
   justify-content: space-between;
   align-items: center;
   padding: 24px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .modal-header.warning {
-  border-bottom-color: #fef3c7;
-  background: #fffbeb;
+  border-bottom-color: var(--color-border);
+  background: var(--color-surface);
 }
 
 .modal-header h2 {
   font-size: 24px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-text-secondary);
   margin: 0;
 }
 
@@ -45,7 +45,7 @@
   background: none;
   border: none;
   font-size: 32px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -58,7 +58,7 @@
 }
 
 .close-button:hover {
-  background: #f3f4f6;
+  background: var(--color-surface-alt);
 }
 
 .close-parrilla-form {
@@ -88,7 +88,7 @@
 }
 
 .parrilla-info {
-  background: #f9fafb;
+  background: var(--color-surface);
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 24px;
@@ -99,7 +99,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 8px 0;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .info-row:last-child {
@@ -108,13 +108,13 @@
 
 .info-label {
   font-weight: 500;
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 14px;
 }
 
 .info-value {
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-text-secondary);
   font-size: 14px;
 }
 
@@ -126,7 +126,7 @@
   display: block;
   font-size: 14px;
   font-weight: 500;
-  color: #374151;
+  color: var(--color-text-secondary);
   margin-bottom: 8px;
 }
 
@@ -141,8 +141,8 @@
 
 .form-group input:focus {
   outline: none;
-  border-color: #f97316;
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
 }
 
 .form-group input.error {
@@ -162,7 +162,7 @@
   gap: 12px;
   margin-top: 24px;
   padding-top: 24px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--color-border);
 }
 
 .btn-secondary,
@@ -177,21 +177,21 @@
 }
 
 .btn-secondary {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--color-surface-alt);
+  color: var(--color-text-secondary);
 }
 
 .btn-secondary:hover {
-  background: #e5e7eb;
+  background: var(--color-border);
 }
 
 .btn-danger {
-  background: #ea580c;
-  color: #111827;
+  background: var(--color-primary-dark);
+  color: var(--color-text);
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: #c2410c;
+  background: #b45309;
 }
 
 .btn-danger:disabled {

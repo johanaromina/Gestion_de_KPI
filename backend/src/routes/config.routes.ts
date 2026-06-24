@@ -6,6 +6,8 @@ import {
   assignRoleToCollaborator,
   toggleSuperpowers,
   updateCollaboratorPermissions,
+  getCompanyTheme,
+  updateCompanyTheme,
 } from '../controllers/config.controller'
 import { authenticate, requirePermission } from '../middleware/auth.middleware'
 
@@ -19,5 +21,7 @@ router.get('/collaborators/:collaboratorId/permissions', requirePermission('conf
 router.put('/collaborators/:collaboratorId/permissions', requirePermission('config.manage'), updateCollaboratorPermissions)
 router.post('/collaborators/:collaboratorId/role', requirePermission('config.manage'), assignRoleToCollaborator)
 router.patch('/collaborators/:collaboratorId/superpowers', requirePermission('config.manage'), toggleSuperpowers)
+router.get('/company-theme', getCompanyTheme)
+router.patch('/company-theme', requirePermission('config.manage'), updateCompanyTheme)
 
 export default router

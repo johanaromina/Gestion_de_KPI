@@ -12,7 +12,7 @@
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
   padding: 16px;
-  background: #fff;
+  background: var(--color-card-bg);
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   margin-bottom: 16px;
@@ -33,7 +33,7 @@
 }
 
 .parrilla-general-page .table-container {
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 12px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
@@ -51,7 +51,7 @@
 }
 
 .parrilla-general-page .data-table thead {
-  background: #f9fafb;
+  background: var(--color-surface);
 }
 
 .parrilla-general-page .number-cell {
@@ -77,10 +77,10 @@
 }
 
 .summary-card {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 12px;
-  background: #fff;
+  background: var(--color-card-bg);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
 }
 
@@ -96,12 +96,12 @@
 
 .card-title {
   font-weight: 600;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .card-meta {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   margin-bottom: 8px;
 }
 
@@ -109,7 +109,7 @@
   display: flex;
   justify-content: space-between;
   font-size: 14px;
-  color: #374151;
+  color: var(--color-text-secondary);
 }
 
 .badge-type {
@@ -118,8 +118,8 @@
   border-radius: 8px;
   font-size: 12px;
   text-transform: capitalize;
-  background: #e5e7eb;
-  color: #374151;
+  background: var(--color-border);
+  color: var(--color-text-secondary);
 }
 .badge-type.growth {
   background: #d1fae5;
@@ -134,8 +134,8 @@
   color: #4338ca;
 }
 .badge-type.manual {
-  background: #f1f5f9;
-  color: #334155;
+  background: var(--color-surface-alt);
+  color: var(--color-text-secondary);
 }
 .badge-type.count {
   background: #dcfce7;

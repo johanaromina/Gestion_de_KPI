@@ -528,7 +528,7 @@ export default function MiParrilla() {
                 <YAxis />
                 <Tooltip />
                 <Bar dataKey="target" fill="#e5e7eb" name={t('table.target')} />
-                <Bar dataKey="actual" fill="#f97316" name={t('table.actual')} />
+                <Bar dataKey="actual" fill="#0891b2" name={t('table.actual')} />
               </BarChart>
             </ResponsiveContainer>
           </div>

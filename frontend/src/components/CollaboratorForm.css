@@ -4,7 +4,7 @@
 .helper-text {
   display: block;
   margin-top: 5px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 12px;
   line-height: 1.4;
 }
@@ -54,11 +54,11 @@
   gap: 8px;
   align-items: center;
   padding: 10px 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 10px;
-  background: #f9fafb;
+  background: var(--color-surface);
   font-size: 14px;
-  color: #374151;
+  color: var(--color-text-secondary);
 }
 
 .checkbox-row input {
@@ -96,7 +96,7 @@
 }
 
 .manager-clear:hover {
-  color: #374151;
+  color: var(--color-text-secondary);
 }
 
 .manager-dropdown {
@@ -105,7 +105,7 @@
   left: 0;
   right: 0;
   z-index: 100;
-  background: #fff;
+  background: var(--color-card-bg);
   border: 1px solid #d1d5db;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -127,18 +127,18 @@
 
 .manager-option:hover,
 .manager-option.selected {
-  background: #f0f9ff;
+  background: var(--color-body-bg);
 }
 
 .manager-option-name {
   font-size: 14px;
   font-weight: 500;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .manager-option-pos {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .manager-no-results {
