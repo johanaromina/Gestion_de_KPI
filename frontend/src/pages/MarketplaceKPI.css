@@ -257,7 +257,7 @@
 
 .marketplace-type-pill        { background: #eff6ff; color: #1d4ed8; }
 .marketplace-dir-pill         { background: var(--color-surface-alt); color: var(--color-text-secondary); }
-.marketplace-target-pill      { background: #fafafa; color: var(--color-text-muted); border: 1px solid var(--color-border); }
+.marketplace-target-pill      { background: var(--color-surface); color: var(--color-text-muted); border: 1px solid var(--color-border); }
 
 .marketplace-dir-pill.dir-growth    { background: #f0fdf4; color: #15803d; }
 .marketplace-dir-pill.dir-reduction { background: #fef2f2; color: #b91c1c; }

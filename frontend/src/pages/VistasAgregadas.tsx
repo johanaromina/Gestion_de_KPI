@@ -49,6 +49,16 @@ export default function VistasAgregadas() {
     return response.data
   })
 
+  useEffect(() => {
+    if (!selectedPeriodId && periods?.length) {
+      const openNonDemo = periods.find((p: any) => p.status === 'open' && !p.name.startsWith('['))
+      const anyNonDemo = periods.find((p: any) => !p.name.startsWith('['))
+      const openAny = periods.find((p: any) => p.status === 'open')
+      const defaultPeriod = openNonDemo ?? anyNonDemo ?? openAny ?? periods[0]
+      if (defaultPeriod) setSelectedPeriodId(defaultPeriod.id)
+    }
+  }, [periods, selectedPeriodId])
+
   // Obtener datos agregados según el tipo de vista
   const { data: aggregatedData, isLoading } = useQuery<{
     periodId: number
@@ -76,10 +86,11 @@ export default function VistasAgregadas() {
 
   const filteredAggregated = useMemo(() => {
     if (!aggregatedData?.aggregatedData) return []
+    let data = aggregatedData.aggregatedData
     if (!canViewCompany && teamArea) {
-      return aggregatedData.aggregatedData.filter((item) => item.area === teamArea)
+      data = data.filter((item) => item.area === teamArea)
     }
-    return aggregatedData.aggregatedData
+    return data.filter((item) => item.statistics.count > 0)
   }, [aggregatedData, canViewCompany, teamArea])
 
   // Preparar datos para gráficos

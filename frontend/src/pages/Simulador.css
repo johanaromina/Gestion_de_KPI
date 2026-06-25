@@ -186,7 +186,7 @@
 }
 
 .sim-kpi-row:hover {
-  background: #fafafa;
+  background: var(--color-surface);
 }
 
 .sim-kpi-row.modified {
@@ -357,11 +357,11 @@
 }
 
 .sim-impact-table tbody tr {
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .sim-impact-table tbody tr:hover {
-  background: #fafafa;
+  background: var(--color-surface);
 }
 
 .sim-impact-table td {

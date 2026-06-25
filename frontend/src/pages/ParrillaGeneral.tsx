@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from 'react-query'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -31,6 +31,16 @@ export default function ParrillaGeneral() {
     },
     { enabled: canView }
   )
+
+  useEffect(() => {
+    if (!selectedPeriodId && periods?.length) {
+      const openNonDemo = periods.find((p: any) => p.status === 'open' && !p.name.startsWith('['))
+      const anyNonDemo = periods.find((p: any) => !p.name.startsWith('['))
+      const openAny = periods.find((p: any) => p.status === 'open')
+      const defaultPeriod = openNonDemo ?? anyNonDemo ?? openAny ?? periods[0]
+      if (defaultPeriod) setSelectedPeriodId(defaultPeriod.id)
+    }
+  }, [periods, selectedPeriodId])
 
   const { data: collaborators } = useQuery(
     'collaborators',

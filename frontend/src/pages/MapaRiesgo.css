@@ -182,11 +182,11 @@
 
 /* Body rows */
 .mapa-table tbody tr {
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--color-border);
   transition: background 0.1s ease;
 }
 
-.mapa-table tbody tr:hover { background: #fafafa; }
+.mapa-table tbody tr:hover { background: var(--color-surface); }
 
 .mapa-td-area {
   position: sticky;
@@ -197,7 +197,7 @@
   border-right: 1px solid var(--color-border);
 }
 
-.mapa-table tbody tr:hover .mapa-td-area { background: #fafafa; }
+.mapa-table tbody tr:hover .mapa-td-area { background: var(--color-surface); }
 
 .mapa-area-name {
   font-size: 13px;

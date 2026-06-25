@@ -665,10 +665,35 @@ export const getExecutiveTrends = async (req: Request, res: Response) => {
     )
     const childrenMap = buildScopeChildrenMap(filteredScopeRows)
 
-    const fallbackScope =
-      filteredScopeRows.find((scope) => scope.type === 'company') ||
-      filteredScopeRows.find((scope) => ['business_unit', 'area', 'team'].includes(scope.type)) ||
-      null
+    // Prefer the user's own company scope as fallback (not alphabetically-first company)
+    let fallbackScope: any = null
+    const collaboratorId = Number((user as any).collaboratorId || (user as any).id)
+    if (collaboratorId) {
+      const [userCompanyRows] = await pool.query<any[]>(
+        `WITH RECURSIVE ancestry AS (
+           SELECT os.id, os.parentId, os.type
+           FROM org_scopes os
+           JOIN collaborators c ON c.orgScopeId = os.id
+           WHERE c.id = ?
+           UNION ALL
+           SELECT os.id, os.parentId, os.type
+           FROM org_scopes os JOIN ancestry a ON os.id = a.parentId
+         )
+         SELECT id FROM ancestry WHERE type = 'company' LIMIT 1`,
+        [collaboratorId]
+      )
+      const userCompanyId = userCompanyRows?.[0]?.id
+      if (userCompanyId) {
+        fallbackScope = filteredScopeRows.find((s) => Number(s.id) === Number(userCompanyId)) ?? null
+      }
+    }
+    if (!fallbackScope) {
+      fallbackScope =
+        filteredScopeRows.find((scope) => scope.type === 'company' && !scope.name.startsWith('[')) ||
+        filteredScopeRows.find((scope) => scope.type === 'company') ||
+        filteredScopeRows.find((scope) => ['business_unit', 'area', 'team'].includes(scope.type)) ||
+        null
+    }
     const requestedScope =
       (requestedScopeId
         ? filteredScopeRows.find((scope) => Number(scope.id) === requestedScopeId)

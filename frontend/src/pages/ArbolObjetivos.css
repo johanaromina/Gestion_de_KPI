@@ -296,8 +296,8 @@
 /* ── KR (Level 3) ── */
 
 .arbol-kr-block {
-  border-top: 1px solid #f3f4f6;
-  background: #fafafa;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
 }
 
 .arbol-kr-row {

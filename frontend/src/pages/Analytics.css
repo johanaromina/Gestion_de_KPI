@@ -78,6 +78,7 @@
   border: 1px solid var(--color-border);
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+  background: var(--color-card-bg);
 }
 
 .analytics-table {
@@ -102,14 +103,14 @@
 
 .analytics-table td {
   padding: 10px 14px;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--color-border);
   color: var(--color-text-secondary);
   vertical-align: middle;
 }
 
 .analytics-table tr:last-child td { border-bottom: none; }
-.analytics-table tr.depth-1 td { background: #fafafa; }
-.analytics-table tr.depth-2 td { background: #f5f5f5; }
+.analytics-table tr.depth-1 td { background: var(--color-surface); }
+.analytics-table tr.depth-2 td { background: var(--color-surface-alt); }
 
 .tree-label {
   display: flex;

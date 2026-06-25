@@ -99,6 +99,16 @@ export default function VistasReduccion() {
     return response.data
   })
 
+  useEffect(() => {
+    if (!selectedPeriodId && periods?.length) {
+      const openNonDemo = periods.find((p: any) => p.status === 'open' && !p.name.startsWith('['))
+      const anyNonDemo = periods.find((p: any) => !p.name.startsWith('['))
+      const openAny = periods.find((p: any) => p.status === 'open')
+      const defaultPeriod = openNonDemo ?? anyNonDemo ?? openAny ?? periods[0]
+      if (defaultPeriod) setSelectedPeriodId(defaultPeriod.id)
+    }
+  }, [periods, selectedPeriodId])
+
   // Obtener áreas únicas
   const { data: collaborators } = useQuery('collaborators', async () => {
     const response = await api.get('/collaborators')

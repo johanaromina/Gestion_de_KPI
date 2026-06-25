@@ -32,6 +32,7 @@ export default function Analytics() {
   const { t, i18n } = useTranslation(['analytics', 'common'])
   const [tab, setTab] = useState<Tab>('tree')
   const [periodId, setPeriodId] = useState<number | null>(null)
+  const [trendsScopeId, setTrendsScopeId] = useState<number | null>(null)
   const [checkInWeeks, setCheckInWeeks] = useState(12)
   const locale = i18n.resolvedLanguage?.startsWith('en') ? 'en-US' : 'es-AR'
 
@@ -53,10 +54,20 @@ export default function Analytics() {
     { enabled: !!activePeriodId && tab === 'tree' }
   )
 
+  const { data: orgScopes } = useQuery<any[]>(
+    'org-scopes-for-trends',
+    async () => (await api.get('/org-scopes')).data,
+    { enabled: tab === 'trends', staleTime: 5 * 60 * 1000 }
+  )
+
+  const companyScopes = (orgScopes ?? []).filter((s: any) => s.type === 'company')
+
   const { data: trends, isLoading: loadingTrends } = useQuery(
-    ['executive-trends-analytics', activePeriodId],
+    ['executive-trends-analytics', activePeriodId, trendsScopeId],
     async () =>
-      (await api.get('/dashboard/executive-trends', { params: { periodId: activePeriodId } })).data,
+      (await api.get('/dashboard/executive-trends', {
+        params: { periodId: activePeriodId, ...(trendsScopeId ? { scopeId: trendsScopeId } : {}) },
+      })).data,
     { enabled: tab === 'trends' }
   )
 
@@ -68,6 +79,10 @@ export default function Analytics() {
   )
 
   const treeRows = treeData?.companies ? flattenTree(treeData.companies) : []
+
+  const hasTrendData = (trends?.periodSeries ?? []).some(
+    (p: any) => (p.weightedResultTotal ?? 0) > 0 || (p.completionRate ?? 0) > 0
+  )
 
   const checkInChartData = ((checkInSummary ?? []) as any[])
     .slice()
@@ -175,6 +190,23 @@ export default function Analytics() {
       {/* ── Tendencias KPI ─────────────────────────────────────── */}
       {tab === 'trends' && (
         <div className="analytics-section">
+          {companyScopes.length > 1 && (
+            <div className="analytics-toolbar" style={{ marginBottom: 12 }}>
+              <label>
+                Empresa:
+                <select
+                  value={trendsScopeId ?? ''}
+                  onChange={(e) => setTrendsScopeId(e.target.value ? Number(e.target.value) : null)}
+                  style={{ marginLeft: 8 }}
+                >
+                  <option value="">{trends?.scope?.name ?? 'Mi empresa'}</option>
+                  {companyScopes.map((s: any) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
           {trends?.scope && (
             <p className="analytics-meta">
               {t('analytics:meta.scope')} <strong>{trends.scope.name}</strong>
@@ -183,8 +215,12 @@ export default function Analytics() {
           )}
           {loadingTrends ? (
             <div className="analytics-empty">{t('common:loading')}</div>
-          ) : !trends?.periodSeries?.length ? (
-            <div className="analytics-empty">{t('analytics:empty.trends')}</div>
+          ) : !trends?.periodSeries?.length || !hasTrendData ? (
+            <div className="analytics-empty">
+              {trends?.scope
+                ? `Sin KPIs aprobados en "${trends.scope.name}" para los períodos recientes.`
+                : t('analytics:empty.trends')}
+            </div>
           ) : (
             <div className="analytics-charts">
               <div className="analytics-chart-card">
@@ -215,7 +251,7 @@ export default function Analytics() {
                 </ResponsiveContainer>
               </div>
 
-              {trends.subPeriodSeries?.length > 0 && (
+              {trends.subPeriodSeries?.some((p: any) => (p.weightedResultTotal ?? 0) > 0) && (
                 <div className="analytics-chart-card">
                   <h3>{t('analytics:charts.weighted_by_subperiod', { period: trends.periodName })}</h3>
                   <ResponsiveContainer width="100%" height={220}>
