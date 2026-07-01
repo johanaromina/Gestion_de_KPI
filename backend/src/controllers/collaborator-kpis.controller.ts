@@ -457,6 +457,26 @@ export const getCollaboratorKPIsByPeriod = async (req: Request, res: Response) =
     const { periodId } = req.params
     const limit = req.query.limit !== undefined ? Math.max(1, Math.min(1000, Number(req.query.limit))) : null
     const offset = req.query.offset !== undefined ? Math.max(0, Number(req.query.offset)) : 0
+    const orgScopeId = req.query.orgScopeId ? Number(req.query.orgScopeId) : null
+    const search = req.query.search ? String(req.query.search).trim() : null
+    const summaryOnly = req.query.summaryOnly === 'true'
+
+    const conditions: string[] = ['ck.periodId = ?']
+    const filterParams: any[] = [periodId]
+
+    if (orgScopeId) {
+      conditions.push('c.orgScopeId = ?')
+      filterParams.push(orgScopeId)
+    }
+    if (search) {
+      conditions.push('(c.name LIKE ? OR k.name LIKE ?)')
+      filterParams.push(`%${search}%`, `%${search}%`)
+    }
+    if (summaryOnly) {
+      conditions.push('ck.subPeriodId IS NULL')
+    }
+
+    const whereClause = conditions.join(' AND ')
 
     const baseQuery = `SELECT ck.*,
               k.type as kpiType,
@@ -465,6 +485,12 @@ export const getCollaboratorKPIsByPeriod = async (req: Request, res: Response) =
               k.description as kpiDescription,
               k.criteria as kpiCriteria,
               c.name as collaboratorName,
+              c.orgScopeId as collaboratorOrgScopeId,
+              c.area as collaboratorArea,
+              os.name as orgScopeName,
+              os.type as orgScopeType,
+              os.parentId as orgScopeParentId,
+              pos.name as parentOrgScopeName,
               sp.name as subPeriodName,
               sp.weight as subPeriodWeight,
               COALESCE(cv_active.criteriaText, cv_latest.criteriaText, k.criteria) as criteriaText,
@@ -477,6 +503,8 @@ export const getCollaboratorKPIsByPeriod = async (req: Request, res: Response) =
        FROM collaborator_kpis ck
        JOIN kpis k ON ck.kpiId = k.id
        JOIN collaborators c ON ck.collaboratorId = c.id
+       LEFT JOIN org_scopes os ON c.orgScopeId = os.id
+       LEFT JOIN org_scopes pos ON os.parentId = pos.id
        LEFT JOIN calendar_subperiods sp ON ck.subPeriodId = sp.id
        LEFT JOIN kpi_criteria_versions cv_active ON cv_active.id = ck.activeCriteriaVersionId
        LEFT JOIN kpi_criteria_versions cv_latest
@@ -487,19 +515,23 @@ export const getCollaboratorKPIsByPeriod = async (req: Request, res: Response) =
          )
        LEFT JOIN kpi_measurements km ON km.id = ck.lastMeasurementId
        LEFT JOIN collaborators mc ON km.capturedBy = mc.id
-       WHERE ck.periodId = ?
+       WHERE ${whereClause}
        ORDER BY c.name ASC`
 
     if (limit !== null) {
       const [[{ total }]] = await pool.query<any[]>(
-        `SELECT COUNT(*) as total FROM collaborator_kpis ck WHERE ck.periodId = ?`,
-        [periodId]
+        `SELECT COUNT(*) as total
+         FROM collaborator_kpis ck
+         JOIN kpis k ON ck.kpiId = k.id
+         JOIN collaborators c ON ck.collaboratorId = c.id
+         WHERE ${whereClause}`,
+        filterParams
       )
-      const [rows] = await pool.query<CollaboratorKPI[]>(`${baseQuery} LIMIT ? OFFSET ?`, [periodId, limit, offset])
+      const [rows] = await pool.query<CollaboratorKPI[]>(`${baseQuery} LIMIT ? OFFSET ?`, [...filterParams, limit, offset])
       return res.json({ data: rows, total: Number(total), limit, offset })
     }
 
-    const [rows] = await pool.query<CollaboratorKPI[]>(baseQuery, [periodId])
+    const [rows] = await pool.query<CollaboratorKPI[]>(baseQuery, filterParams)
     res.json(rows)
   } catch (error: any) {
     logger.error('Error fetching collaborator KPIs:', error)

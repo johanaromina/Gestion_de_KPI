@@ -478,7 +478,8 @@ export const getCurrentUser = async (req: Request, res: Response) => {
     )
 
     if (Array.isArray(rows) && rows.length === 0) {
-      return sendApiError(res, 404, 'AUTH_USER_NOT_FOUND', 'Usuario no encontrado')
+      clearAuthCookie(res)
+      return sendApiError(res, 401, 'AUTH_USER_NOT_FOUND', 'Usuario no encontrado')
     }
 
     const collaborator = rows[0]

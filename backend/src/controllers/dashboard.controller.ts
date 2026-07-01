@@ -98,7 +98,7 @@ const buildExecutiveTreeNode = (
   scopeKpisByScope: Map<number, any[]>
 ): any => {
   const children = (childrenMap.get(Number(scopeRow.id)) || [])
-    .filter((child) => ['area', 'business_unit', 'team'].includes(child.type))
+    .filter((child) => ['company', 'area', 'business_unit', 'team'].includes(child.type))
     .map((child) => buildExecutiveTreeNode(child, childrenMap, scopeKpisByScope))
   const scopeKpis = scopeKpisByScope.get(Number(scopeRow.id)) || []
   const summary = buildExecutiveScopeSummary(scopeKpis, children)

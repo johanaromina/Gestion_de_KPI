@@ -111,7 +111,8 @@ export const getScopeKPIs = async (req: Request, res: Response) => {
       params.push(orgScopeId)
     }
     if (subPeriodId) {
-      query += ' AND mk.subPeriodId = ?'
+      // Incluir scope_kpis del subperiodo específico + los anuales (subPeriodId IS NULL)
+      query += ' AND (mk.subPeriodId = ? OR mk.subPeriodId IS NULL)'
       params.push(subPeriodId)
     }
     if (kpiId) {

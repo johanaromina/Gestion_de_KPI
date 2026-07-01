@@ -71,6 +71,7 @@ function computeImpactsFromRows(rows: any[]): Map<number, number> {
 }
 
 // Single batch query to get all KPI rows for the period joined with collaborator info
+// Also joins org_scopes hierarchy to get area/company group names without relying on role field
 async function fetchKpiRowsForPeriod(periodId: number, extraJoin?: string, extraWhere?: string, extraParams?: any[]): Promise<any[]> {
   const sql = `
     SELECT
@@ -80,6 +81,12 @@ async function fetchKpiRowsForPeriod(periodId: number, extraJoin?: string, extra
       c.position,
       c.role,
       c.managerId,
+      c.orgScopeId,
+      os_team.name  AS teamScopeName,
+      os_area.id    AS areaScopeId,
+      os_area.name  AS areaScopeName,
+      os_company.id   AS companyScopeId,
+      os_company.name AS companyScopeName,
       ck.target,
       ck.actual,
       ck.weight,
@@ -92,6 +99,9 @@ async function fetchKpiRowsForPeriod(periodId: number, extraJoin?: string, extra
     JOIN collaborator_kpis ck ON ck.collaboratorId = c.id AND ck.periodId = ?
     JOIN kpis k ON k.id = ck.kpiId
     LEFT JOIN calendar_subperiods sp ON sp.id = ck.subPeriodId
+    LEFT JOIN org_scopes os_team    ON os_team.id    = c.orgScopeId
+    LEFT JOIN org_scopes os_area    ON os_area.id    = os_team.parentId    AND os_area.type    = 'area'
+    LEFT JOIN org_scopes os_company ON os_company.id = os_area.parentId   AND os_company.type = 'company'
     ${extraJoin || ''}
     WHERE 1=1 ${extraWhere || ''}
   `
@@ -163,37 +173,33 @@ export const getAggregatedByDirection = async (req: Request, res: Response) => {
       return sendApiError(res, 400, 'AGGREGATED_VIEW_PERIOD_REQUIRED', 'periodId es requerido')
     }
 
-    const rows = await fetchKpiRowsForPeriod(
-      Number(periodId),
-      undefined,
-      'AND c.role IN (\'director\', \'admin\') AND c.area IS NOT NULL AND c.area != \'\'',
-    )
-
+    // Agrupa todos los colaboradores por empresa (grandparent scope)
+    const rows = await fetchKpiRowsForPeriod(Number(periodId), undefined, 'AND os_company.id IS NOT NULL')
     const impacts = computeImpactsFromRows(rows)
 
-    const collabInfo = new Map<number, { name: string; position: string; role: string; area: string }>()
+    const collabInfo = new Map<number, { name: string; position: string; role: string; companyScopeName: string }>()
     for (const row of rows) {
       if (!collabInfo.has(Number(row.collaboratorId))) {
         collabInfo.set(Number(row.collaboratorId), {
           name: row.collaboratorName,
           position: row.position,
           role: row.role,
-          area: row.area,
+          companyScopeName: row.companyScopeName,
         })
       }
     }
 
-    const areaMap = new Map<string, { collaborators: any[]; results: number[] }>()
+    const groupMap = new Map<string, { collaborators: any[]; results: number[] }>()
     impacts.forEach((impact, collaboratorId) => {
       const info = collabInfo.get(collaboratorId)
-      if (!info?.area) return
-      if (!areaMap.has(info.area)) areaMap.set(info.area, { collaborators: [], results: [] })
-      const group = areaMap.get(info.area)!
+      if (!info?.companyScopeName) return
+      if (!groupMap.has(info.companyScopeName)) groupMap.set(info.companyScopeName, { collaborators: [], results: [] })
+      const group = groupMap.get(info.companyScopeName)!
       group.results.push(impact)
       group.collaborators.push({ id: collaboratorId, name: info.name, position: info.position, role: info.role })
     })
 
-    const aggregatedData = Array.from(areaMap.entries())
+    const aggregatedData = Array.from(groupMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([area, { collaborators, results }]) => ({
         area,
@@ -216,57 +222,40 @@ export const getAggregatedByManagement = async (req: Request, res: Response) => 
       return sendApiError(res, 400, 'AGGREGATED_VIEW_PERIOD_REQUIRED', 'periodId es requerido')
     }
 
-    // Get all managers
-    const [managers] = await pool.query<any[]>(
-      `SELECT id, name, position, area FROM collaborators WHERE role = 'manager' ORDER BY area, name`
-    )
-    if (!managers.length) return res.json({ periodId: parseInt(periodId as string), aggregatedData: [] })
+    // Agrupa todos los colaboradores por área (parent scope del equipo)
+    const rows = await fetchKpiRowsForPeriod(Number(periodId), undefined, 'AND os_area.id IS NOT NULL')
+    const impacts = computeImpactsFromRows(rows)
 
-    const managerIds = managers.map((m) => m.id)
-
-    // Get KPI rows for managers
-    const managerRows = await fetchKpiRowsForPeriod(
-      Number(periodId),
-      undefined,
-      `AND c.id IN (${managerIds.map(() => '?').join(',')})`,
-      managerIds
-    )
-    const managerImpacts = computeImpactsFromRows(managerRows)
-
-    // Get KPI rows for all team members of these managers
-    const teamRows = await fetchKpiRowsForPeriod(
-      Number(periodId),
-      undefined,
-      `AND c.managerId IN (${managerIds.map(() => '?').join(',')})`,
-      managerIds
-    )
-    const teamImpacts = computeImpactsFromRows(teamRows)
-
-    // Build team membership map
-    const teamByManager = new Map<number, number[]>()
-    for (const row of teamRows) {
-      const managerId = Number(row.managerId)
-      if (!teamByManager.has(managerId)) teamByManager.set(managerId, [])
-      if (!teamByManager.get(managerId)!.includes(Number(row.collaboratorId))) {
-        teamByManager.get(managerId)!.push(Number(row.collaboratorId))
+    const collabInfo = new Map<number, { name: string; position: string; role: string; areaScopeName: string }>()
+    for (const row of rows) {
+      if (!collabInfo.has(Number(row.collaboratorId))) {
+        collabInfo.set(Number(row.collaboratorId), {
+          name: row.collaboratorName,
+          position: row.position,
+          role: row.role,
+          areaScopeName: row.areaScopeName,
+        })
       }
     }
 
-    const aggregatedData = managers.map((manager) => {
-      const results: number[] = []
-      const mi = managerImpacts.get(manager.id)
-      if (mi !== undefined) results.push(mi)
-      for (const memberId of teamByManager.get(manager.id) || []) {
-        const ti = teamImpacts.get(memberId)
-        if (ti !== undefined) results.push(ti)
-      }
-      return {
-        manager: { id: manager.id, name: manager.name, position: manager.position, area: manager.area },
-        teamMembers: [],
+    const groupMap = new Map<string, { collaborators: any[]; results: number[] }>()
+    impacts.forEach((impact, collaboratorId) => {
+      const info = collabInfo.get(collaboratorId)
+      if (!info?.areaScopeName) return
+      if (!groupMap.has(info.areaScopeName)) groupMap.set(info.areaScopeName, { collaborators: [], results: [] })
+      const group = groupMap.get(info.areaScopeName)!
+      group.results.push(impact)
+      group.collaborators.push({ id: collaboratorId, name: info.name, position: info.position, role: info.role })
+    })
+
+    const aggregatedData = Array.from(groupMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([area, { collaborators, results }]) => ({
+        area,
+        collaborators,
         statistics: calculateStatistics(results),
         results,
-      }
-    })
+      }))
 
     res.json({ periodId: parseInt(periodId as string), aggregatedData })
   } catch (error: any) {
@@ -282,53 +271,64 @@ export const getAggregatedByLeadership = async (req: Request, res: Response) => 
       return sendApiError(res, 400, 'AGGREGATED_VIEW_PERIOD_REQUIRED', 'periodId es requerido')
     }
 
-    const [leaders] = await pool.query<any[]>(
-      `SELECT id, name, position, area FROM collaborators WHERE role = 'leader' ORDER BY area, name`
-    )
-    if (!leaders.length) return res.json({ periodId: parseInt(periodId as string), aggregatedData: [] })
+    // Agrupa colaboradores por equipo (teamScopeName), mostrando el líder (role='leader') de cada equipo
+    const rows = await fetchKpiRowsForPeriod(Number(periodId), undefined, 'AND os_team.id IS NOT NULL')
+    const impacts = computeImpactsFromRows(rows)
 
-    const leaderIds = leaders.map((l) => l.id)
-
-    const leaderRows = await fetchKpiRowsForPeriod(
-      Number(periodId),
-      undefined,
-      `AND c.id IN (${leaderIds.map(() => '?').join(',')})`,
-      leaderIds
-    )
-    const leaderImpacts = computeImpactsFromRows(leaderRows)
-
-    const teamRows = await fetchKpiRowsForPeriod(
-      Number(periodId),
-      undefined,
-      `AND c.managerId IN (${leaderIds.map(() => '?').join(',')})`,
-      leaderIds
-    )
-    const teamImpacts = computeImpactsFromRows(teamRows)
-
-    const teamByLeader = new Map<number, number[]>()
-    for (const row of teamRows) {
-      const leaderId = Number(row.managerId)
-      if (!teamByLeader.has(leaderId)) teamByLeader.set(leaderId, [])
-      if (!teamByLeader.get(leaderId)!.includes(Number(row.collaboratorId))) {
-        teamByLeader.get(leaderId)!.push(Number(row.collaboratorId))
+    // Busca el líder de cada equipo (scope) entre las filas
+    const teamLeaderMap = new Map<number, { id: number; name: string; position: string; area: string }>()
+    for (const row of rows) {
+      if (row.role === 'leader' && row.orgScopeId) {
+        const scopeId = Number(row.orgScopeId)
+        if (!teamLeaderMap.has(scopeId)) {
+          teamLeaderMap.set(scopeId, {
+            id: Number(row.collaboratorId),
+            name: row.collaboratorName,
+            position: row.position,
+            area: row.teamScopeName || row.area,
+          })
+        }
       }
     }
 
-    const aggregatedData = leaders.map((leader) => {
-      const results: number[] = []
-      const li = leaderImpacts.get(leader.id)
-      if (li !== undefined) results.push(li)
-      for (const memberId of teamByLeader.get(leader.id) || []) {
-        const ti = teamImpacts.get(memberId)
-        if (ti !== undefined) results.push(ti)
+    const collabInfo = new Map<number, { name: string; position: string; role: string; orgScopeId: number; teamScopeName: string }>()
+    for (const row of rows) {
+      if (!collabInfo.has(Number(row.collaboratorId))) {
+        collabInfo.set(Number(row.collaboratorId), {
+          name: row.collaboratorName,
+          position: row.position,
+          role: row.role,
+          orgScopeId: Number(row.orgScopeId),
+          teamScopeName: row.teamScopeName || row.area,
+        })
       }
-      return {
-        leader: { id: leader.id, name: leader.name, position: leader.position, area: leader.area },
-        teamMembers: [],
-        statistics: calculateStatistics(results),
-        results,
+    }
+
+    // Group by team scope
+    const groupMap = new Map<number, { teamName: string; collaborators: any[]; results: number[] }>()
+    impacts.forEach((impact, collaboratorId) => {
+      const info = collabInfo.get(collaboratorId)
+      if (!info?.orgScopeId) return
+      if (!groupMap.has(info.orgScopeId)) {
+        groupMap.set(info.orgScopeId, { teamName: info.teamScopeName, collaborators: [], results: [] })
       }
+      const group = groupMap.get(info.orgScopeId)!
+      group.results.push(impact)
+      group.collaborators.push({ id: collaboratorId, name: info.name, position: info.position, role: info.role })
     })
+
+    const aggregatedData = Array.from(groupMap.entries())
+      .sort(([, a], [, b]) => a.teamName.localeCompare(b.teamName))
+      .map(([scopeId, { teamName, collaborators, results }]) => {
+        const leader = teamLeaderMap.get(scopeId)
+        return {
+          area: teamName,
+          leader: leader ?? null,
+          collaborators,
+          statistics: calculateStatistics(results),
+          results,
+        }
+      })
 
     res.json({ periodId: parseInt(periodId as string), aggregatedData })
   } catch (error: any) {

@@ -25,16 +25,26 @@ export const getCurationItems = async (req: Request, res: Response) => {
                         ck.curationStatus as assignmentCurationStatus,
                         ck.dataSource as assignmentDataSource,
                         ck.sourceConfig as assignmentSourceConfig,
+                        ck.actual,
+                        ck.target,
+                        ck.variation,
+                        ck.weight,
+                        ck.weightedResult,
+                        ck.subPeriodId,
                         k.name as kpiName,
                         k.criteria as kpiCriteria,
+                        k.direction as kpiDirection,
+                        k.type as kpiType,
                         c.name as collaboratorName,
                         c.area as collaboratorArea,
                         p.name as periodName,
+                        sp.name as subPeriodName,
                         cb.name as createdByName
                  FROM collaborator_kpis ck
                  JOIN kpis k ON ck.kpiId = k.id
                  JOIN collaborators c ON ck.collaboratorId = c.id
                  JOIN periods p ON ck.periodId = p.id
+                 LEFT JOIN calendar_subperiods sp ON ck.subPeriodId = sp.id
                  LEFT JOIN (
                    SELECT *, ROW_NUMBER() OVER (PARTITION BY assignmentId ORDER BY createdAt DESC) AS rn
                    FROM kpi_criteria_versions

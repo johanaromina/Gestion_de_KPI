@@ -39,7 +39,8 @@ export default function Asignaciones() {
   const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null)
   const [selectedCollaboratorId, setSelectedCollaboratorId] = useState<number | null>(null)
   const [selectedKPIId, setSelectedKPIId] = useState<number | null>(null)
-  const [selectedScopeId, setSelectedScopeId] = useState<number | null>(null)
+  const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null)
+  const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null)
   const [selectedRole, setSelectedRole] = useState('')
   const [selectedSubPeriodId, setSelectedSubPeriodId] = useState<number | null>(null)
   const [showMonthly, setShowMonthly] = useState(true)
@@ -59,6 +60,9 @@ export default function Asignaciones() {
   } | null>(null)
   const [currentPage, setCurrentPage] = useState(0)
   const PAGE_SIZE = 50
+
+  // Scope derivado: área tiene prioridad sobre empresa
+  const selectedScopeId = selectedAreaId ?? selectedCompanyId
 
   const navigate = useNavigate()
   const dialog = useDialog()
@@ -345,10 +349,22 @@ export default function Asignaciones() {
     return parts.join(' > ')
   }
 
-  const areaScopes = (orgScopes || [])
-    .filter((scope: any) => scope.type === 'area' && scope.active !== 0 && scope.active !== false)
-    .map((scope: any) => ({ ...scope, label: buildScopeLabel(scope) }))
-    .sort((a: any, b: any) => String(a.label).localeCompare(String(b.label)))
+  const companyScopes = useMemo(() =>
+    (orgScopes || [])
+      .filter((s: any) => s.type === 'company' && s.active !== 0 && s.active !== false)
+      .sort((a: any, b: any) => String(a.name).localeCompare(String(b.name)))
+  , [orgScopes])
+
+  const areaScopes = useMemo(() =>
+    (orgScopes || [])
+      .filter((s: any) => {
+        if (s.type !== 'area' || s.active === 0 || s.active === false) return false
+        if (selectedCompanyId) return Number(s.parentId) === selectedCompanyId
+        return true
+      })
+      .map((s: any) => ({ ...s, label: buildScopeLabel(s) }))
+      .sort((a: any, b: any) => String(a.label).localeCompare(String(b.label)))
+  , [orgScopes, selectedCompanyId])
 
   const selectedScopeDescendantIds = useMemo(() => {
     if (!selectedScopeId) return new Set<number>()
@@ -457,13 +473,14 @@ export default function Asignaciones() {
 
   useEffect(() => {
     setCurrentPage(0)
-  }, [selectedPeriodId, selectedCollaboratorId, selectedKPIId, selectedScopeId, selectedRole, selectedSubPeriodId, searchTerm, showMonthly])
+  }, [selectedPeriodId, selectedCollaboratorId, selectedKPIId, selectedCompanyId, selectedAreaId, selectedRole, selectedSubPeriodId, searchTerm, showMonthly])
 
   const hasActiveFilters =
     !!selectedPeriodId ||
     !!selectedCollaboratorId ||
     !!selectedKPIId ||
-    !!selectedScopeId ||
+    !!selectedCompanyId ||
+    !!selectedAreaId ||
     !!selectedRole ||
     !!searchTerm.trim() ||
     selectedSubPeriodId !== null ||
@@ -611,12 +628,37 @@ export default function Asignaciones() {
         </div>
 
         <div className="filter-group">
-          <label htmlFor="scope-filter">{t('filters.scope')}</label>
+          <label htmlFor="company-filter">Empresa</label>
           <select
-            id="scope-filter"
-            value={selectedScopeId || ''}
-            onChange={(e) => setSelectedScopeId(e.target.value ? parseInt(e.target.value, 10) : null)}
+            id="company-filter"
+            value={selectedCompanyId || ''}
+            onChange={(e) => {
+              setSelectedCompanyId(e.target.value ? parseInt(e.target.value, 10) : null)
+              setSelectedAreaId(null)
+              setSelectedCollaboratorId(null)
+            }}
             className="filter-select"
+          >
+            <option value="">{t('filters.all_option')}</option>
+            {companyScopes.map((scope: any) => (
+              <option key={scope.id} value={scope.id}>
+                {scope.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="filter-group">
+          <label htmlFor="area-filter">Área</label>
+          <select
+            id="area-filter"
+            value={selectedAreaId || ''}
+            onChange={(e) => {
+              setSelectedAreaId(e.target.value ? parseInt(e.target.value, 10) : null)
+              setSelectedCollaboratorId(null)
+            }}
+            className="filter-select"
+            disabled={areaScopes.length === 0}
           >
             <option value="">{t('filters.all_option')}</option>
             {areaScopes.map((scope: any) => (
@@ -667,19 +709,27 @@ export default function Asignaciones() {
 
         <div className="filter-group toggle-group">
           <label>{t('filters.show_monthly')}</label>
-          <input
-            type="checkbox"
-            checked={showMonthly}
-            onChange={(e) => setShowMonthly(e.target.checked)}
-          />
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={showMonthly}
+              onChange={(e) => setShowMonthly(e.target.checked)}
+            />
+            <span className="toggle-track" />
+            {showMonthly ? t('common:yes', { defaultValue: 'Sí' }) : t('common:no', { defaultValue: 'No' })}
+          </label>
         </div>
         <div className="filter-group toggle-group">
           <label>{t('filters.compact_view')}</label>
-          <input
-            type="checkbox"
-            checked={compactView}
-            onChange={(e) => setCompactView(e.target.checked)}
-          />
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={compactView}
+              onChange={(e) => setCompactView(e.target.checked)}
+            />
+            <span className="toggle-track" />
+            {compactView ? t('common:yes', { defaultValue: 'Sí' }) : t('common:no', { defaultValue: 'No' })}
+          </label>
         </div>
 
         {hasActiveFilters && (
@@ -689,7 +739,8 @@ export default function Asignaciones() {
               setSelectedPeriodId(null)
               setSelectedCollaboratorId(null)
               setSelectedKPIId(null)
-              setSelectedScopeId(null)
+              setSelectedCompanyId(null)
+              setSelectedAreaId(null)
               setSelectedRole('')
               setSearchTerm('')
               setSelectedSubPeriodId(null)

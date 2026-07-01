@@ -14,9 +14,13 @@ export default function AsignacionesScope() {
   const { t } = useTranslation(['assignments', 'common'])
   const queryClient = useQueryClient()
   const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null)
-  const [selectedScopeId, setSelectedScopeId] = useState<number | null>(null)
+  const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null)
+  const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null)
   const [selectedSubPeriodId, setSelectedSubPeriodId] = useState<number | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+
+  // Scope activo para sub-periods y filtro client-side
+  const selectedScopeId = selectedAreaId ?? selectedCompanyId
   const [editingScopeKpi, setEditingScopeKpi] = useState<ScopeKPI | undefined>(undefined)
   const [showForm, setShowForm] = useState(false)
   const [linksScopeKpi, setLinksScopeKpi] = useState<ScopeKPI | null>(null)
@@ -25,6 +29,36 @@ export default function AsignacionesScope() {
 
   const { data: periods } = useQuery('periods', async () => (await api.get('/periods')).data)
   const { data: orgScopes } = useQuery('org-scopes', async () => (await api.get('/org-scopes')).data)
+
+  const companyScopes = useMemo(
+    () => (orgScopes || []).filter((s: any) => s.type === 'company' && s.active !== 0 && s.active !== false),
+    [orgScopes]
+  )
+
+  const areaScopes = useMemo(
+    () =>
+      (orgScopes || []).filter((s: any) => {
+        if (s.type !== 'area' || s.active === 0 || s.active === false) return false
+        if (selectedCompanyId) return Number(s.parentId) === selectedCompanyId
+        return true
+      }),
+    [orgScopes, selectedCompanyId]
+  )
+
+  // BFS para obtener todos los IDs descendientes del scope activo (para filtrado client-side)
+  const activeScopeDescendantIds = useMemo<Set<number>>(() => {
+    const set = new Set<number>()
+    if (!selectedScopeId) return set
+    const allScopes: any[] = orgScopes || []
+    const queue = [selectedScopeId]
+    while (queue.length > 0) {
+      const current = queue.shift()!
+      set.add(current)
+      allScopes.filter((s) => Number(s.parentId) === current).forEach((s) => queue.push(Number(s.id)))
+    }
+    return set
+  }, [orgScopes, selectedScopeId])
+
   const { data: subPeriods } = useQuery(
     ['scope-sub-periods', selectedPeriodId, selectedScopeId],
     async () => {
@@ -38,13 +72,15 @@ export default function AsignacionesScope() {
     { enabled: !!selectedPeriodId }
   )
   const { data: scopeKpis, isLoading } = useQuery<ScopeKPI[]>(
-    ['scope-kpis', selectedPeriodId, selectedScopeId, selectedSubPeriodId],
+    ['scope-kpis', selectedPeriodId, selectedCompanyId, selectedAreaId, selectedSubPeriodId],
     async () =>
       (
         await api.get('/scope-kpis', {
           params: {
             periodId: selectedPeriodId || undefined,
-            orgScopeId: selectedScopeId || undefined,
+            // Solo pasamos orgScopeId al backend cuando hay un área seleccionada (match directo)
+            // Si hay solo empresa, filtramos client-side por descendantIds
+            orgScopeId: selectedAreaId || undefined,
             subPeriodId: selectedSubPeriodId || undefined,
           },
         })
@@ -65,12 +101,16 @@ export default function AsignacionesScope() {
   const filteredItems = useMemo(() => {
     const normalized = searchTerm.trim().toLowerCase()
     return (scopeKpis || []).filter((item) => {
+      // Filtrado por jerarquía de scope (company → descendientes)
+      if (activeScopeDescendantIds.size > 0 && !selectedAreaId) {
+        if (!activeScopeDescendantIds.has(Number(item.orgScopeId))) return false
+      }
       if (!normalized) return true
       return [item.name, item.kpiName, item.orgScopeName, item.ownerLevel, item.sourceMode]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalized))
     })
-  }, [scopeKpis, searchTerm])
+  }, [scopeKpis, searchTerm, activeScopeDescendantIds, selectedAreaId])
 
   const getStatusLabel = (status?: string) => {
     if (!status) return t('status.unknown')
@@ -100,16 +140,6 @@ export default function AsignacionesScope() {
       return t(`scope_kpis.source_modes.${normalized}`)
     }
     return sourceMode
-  }
-
-  const getScopeTypeLabel = (scopeType?: string) => {
-    if (!scopeType) return '-'
-    const normalized = scopeType.toLowerCase()
-    const known = ['company', 'area', 'team', 'person', 'business_unit', 'product']
-    if (known.includes(normalized)) {
-      return t(`scope_kpis.scope_types.${normalized}`)
-    }
-    return scopeType
   }
 
   return (
@@ -150,12 +180,34 @@ export default function AsignacionesScope() {
           </select>
         </div>
         <div className="filter-group">
-          <label>{t('scope_kpis.filters.scope_label')}</label>
-          <select className="filter-select" value={selectedScopeId || ''} onChange={(e) => setSelectedScopeId(e.target.value ? Number(e.target.value) : null)}>
+          <label>{t('scope_kpis.filters.company_label', 'Empresa')}</label>
+          <select
+            className="filter-select"
+            value={selectedCompanyId || ''}
+            onChange={(e) => {
+              setSelectedCompanyId(e.target.value ? Number(e.target.value) : null)
+              setSelectedAreaId(null)
+            }}
+          >
             <option value="">{t('scope_kpis.filters.all')}</option>
-            {(orgScopes || []).map((scope: any) => (
+            {companyScopes.map((scope: any) => (
               <option key={scope.id} value={scope.id}>
-                {scope.name} ({getScopeTypeLabel(scope.type)})
+                {scope.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="filter-group">
+          <label>{t('scope_kpis.filters.area_label', 'Área')}</label>
+          <select
+            className="filter-select"
+            value={selectedAreaId || ''}
+            onChange={(e) => setSelectedAreaId(e.target.value ? Number(e.target.value) : null)}
+          >
+            <option value="">{t('scope_kpis.filters.all')}</option>
+            {areaScopes.map((scope: any) => (
+              <option key={scope.id} value={scope.id}>
+                {scope.name}
               </option>
             ))}
           </select>

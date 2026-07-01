@@ -17,6 +17,7 @@ type CurationItem = {
   collaboratorName: string
   collaboratorArea?: string
   periodName: string
+  subPeriodName?: string
   dataSource?: string
   sourceConfig?: string
   criteriaText?: string
@@ -25,10 +26,17 @@ type CurationItem = {
   assignmentDataSource?: string
   assignmentSourceConfig?: string
   kpiCriteria?: string
+  kpiDirection?: string
+  kpiType?: string
   comment?: string
   status?: CurationStatus
   createdAt?: string
   createdByName?: string
+  actual?: number | null
+  target?: number | null
+  variation?: number | null
+  weight?: number | null
+  weightedResult?: number | null
 }
 
 const STATUS_PILL_CLASS: Record<CurationStatus, string> = {
@@ -283,6 +291,21 @@ export default function Curaduria() {
     return item.createdAt ? `${item.createdAt}${by}` : '-'
   }
 
+  const formatRelativeTime = (dateStr?: string): string => {
+    if (!dateStr) return '-'
+    const date = new Date(dateStr)
+    if (isNaN(date.getTime())) return dateStr
+    const diff = Date.now() - date.getTime()
+    const minutes = Math.floor(diff / 60000)
+    const hours = Math.floor(diff / 3600000)
+    const days = Math.floor(diff / 86400000)
+    if (minutes < 1) return 'hace un momento'
+    if (minutes < 60) return `hace ${minutes} min`
+    if (hours < 24) return `hace ${hours}h`
+    if (days < 7) return `hace ${days} día${days > 1 ? 's' : ''}`
+    return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
+  }
+
   const resolveStatus = (item: CurationItem): CurationStatus =>
     item.criteriaStatus || item.assignmentCurationStatus || 'pending'
 
@@ -513,113 +536,168 @@ export default function Curaduria() {
         </div>
       </div>
 
-      <div className="card">
-        <table className="curaduria-table">
-          <thead>
-            <tr>
-              <th>{t('table.collaborator')}</th>
-              <th>{t('table.kpi')}</th>
-              <th>{t('table.period')}</th>
-              <th>{t('table.source')}</th>
-              <th>{t('table.criteria')}</th>
-              <th>{t('table.ai')}</th>
-              <th>{t('table.status')}</th>
-              <th>{t('table.updated')}</th>
-              <th>{t('table.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <tr>
-                <td colSpan={9} className="empty-row">{t('loading')}</td>
-              </tr>
-            ) : (
-              displayItems.map((item) => {
-                const status = resolveStatus(item)
-                const criteriaId = item.criteriaVersionId || item.id || null
-                const canReview = !!criteriaId
-                return (
-                  <tr key={criteriaId || `assignment-${item.assignmentId}`}>
-                    <td>{item.collaboratorName}</td>
-                    <td>{item.kpiName}</td>
-                    <td>{item.periodName}</td>
-                    <td title={item.sourceConfig || ''}>{formatSource(item)}</td>
-                    <td className="criteria-cell" title={resolveCriteriaText(item) || ''}>
-                      {resolveCriteriaText(item) || '-'}
-                    </td>
-                    <td className="outlier-td">
-                      {(() => {
-                        const o = outlierMap.get(item.assignmentId)
-                        if (!o || o.severity === 'none') return <span className="outlier-chip outlier-chip-ok" title={t('outlier.ok_title')}>✓</span>
-                        return (
-                          <span
-                            className={`outlier-chip outlier-chip-${o.severity}`}
-                            title={o.message || ''}
-                          >
-                            {o.severity === 'high' ? t('outlier.unusual') : o.severity === 'medium' ? t('outlier.review') : t('outlier.info')}
-                          </span>
-                        )
-                      })()}
-                    </td>
-                    <td>
-                      <span className={`status-pill ${STATUS_PILL_CLASS[status]}`}>
-                        {getStatusLabel(status)}
-                      </span>
-                      {item.comment ? <div className="comment">{item.comment}</div> : null}
-                    </td>
-                    <td>{formatMeta(item)}</td>
-                    <td>
-                      <div className="action-buttons">
-                        <button
-                          className="btn-approve-small"
-                          onClick={() => handleReview(item, 'approve')}
-                          disabled={status === 'approved'}
-                        >
-                          {t('actions.approve')}
-                        </button>
-                        <button
-                          className="btn-reject-small"
-                          onClick={() => handleReview(item, 'reject')}
-                          disabled={status === 'rejected'}
-                        >
-                          {t('actions.reject')}
-                        </button>
-                        <button
-                          className="btn-secondary"
-                          onClick={() => handleReview(item, 'request')}
-                          disabled={status === 'changes_requested' || !canReview}
-                        >
-                          {t('actions.request_changes')}
-                        </button>
-                        {!canReview && (
-                          <button
-                            className="btn-secondary"
-                            onClick={() => {
-                              setCriteriaAssignmentId(item.assignmentId)
-                              setCriteriaDataSource(item.assignmentDataSource || '')
-                              setCriteriaSourceConfig(item.assignmentSourceConfig || '')
-                              setCriteriaText(item.kpiCriteria || '')
-                              setShowCriteriaModal(true)
-                            }}
-                          >
-                            {t('actions.create_criteria')}
-                          </button>
-                        )}
+      <div className="curation-cards">
+        {isLoading && <div className="empty-row">{t('loading')}</div>}
+        {!isLoading && displayItems.length === 0 && (
+          <div className="empty-row">{t('empty')}</div>
+        )}
+        {!isLoading && displayItems.map((item) => {
+          const status = resolveStatus(item)
+          const criteriaId = item.criteriaVersionId || item.id || null
+          const canReview = !!criteriaId
+          const outlier = outlierMap.get(item.assignmentId)
+          const hasOutlier = outlier && outlier.severity !== 'none'
+          const criteriaContent = resolveCriteriaText(item)
+
+          return (
+            <div key={criteriaId || `assignment-${item.assignmentId}`} className="curation-card">
+
+              {/* Header: estado + nombre KPI + alerta IA */}
+              <div className="cc-header">
+                <div className="cc-header-left">
+                  <span className={`status-pill ${STATUS_PILL_CLASS[status]}`}>
+                    {getStatusLabel(status)}
+                  </span>
+                  <span className="cc-kpi-name">{item.kpiName}</span>
+                </div>
+                {hasOutlier && (
+                  <span className={`outlier-chip outlier-chip-${outlier.severity}`}>
+                    {outlier.severity === 'high' ? t('outlier.unusual') : outlier.severity === 'medium' ? t('outlier.review') : t('outlier.info')}
+                  </span>
+                )}
+              </div>
+
+              {/* Colaborador · Período · Área */}
+              <div className="cc-context">
+                <span className="cc-collaborator">{item.collaboratorName}</span>
+                <span className="cc-sep">·</span>
+                <span>{item.periodName}</span>
+                {item.collaboratorArea && (
+                  <>
+                    <span className="cc-sep">·</span>
+                    <span className="cc-area">{item.collaboratorArea}</span>
+                  </>
+                )}
+              </div>
+
+              <div className="cc-body">
+                {/* Métricas del dato en revisión */}
+                {(item.actual != null || item.target != null) && (
+                  <div className="cc-metrics">
+                    {item.actual != null && (
+                      <div className="cc-metric">
+                        <span className="cc-metric-value">{Number(item.actual).toLocaleString('es-AR')}</span>
+                        <span className="cc-metric-label">{t('metric_actual', { defaultValue: 'Valor reportado' })}</span>
                       </div>
-                    </td>
-                  </tr>
-                )
-              })
-            )}
-            {displayItems.length === 0 && !isLoading && (
-              <tr>
-                <td colSpan={9} className="empty-row">
-                  {t('empty')}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                    )}
+                    {item.target != null && (
+                      <div className="cc-metric">
+                        <span className="cc-metric-value">{Number(item.target).toLocaleString('es-AR')}</span>
+                        <span className="cc-metric-label">{t('metric_target', { defaultValue: 'Meta' })}</span>
+                      </div>
+                    )}
+                    {item.variation != null && (
+                      <div className={`cc-metric cc-metric-variation ${Number(item.variation) >= 100 ? 'ok' : Number(item.variation) >= 70 ? 'warn' : 'bad'}`}>
+                        <span className="cc-metric-value">{Number(item.variation).toFixed(1)}%</span>
+                        <span className="cc-metric-label">{t('metric_variation', { defaultValue: 'Cumplimiento' })}</span>
+                      </div>
+                    )}
+                    {item.weight != null && (
+                      <div className="cc-metric">
+                        <span className="cc-metric-value">{Number(item.weight)}%</span>
+                        <span className="cc-metric-label">{t('metric_weight', { defaultValue: 'Peso' })}</span>
+                      </div>
+                    )}
+                    {item.subPeriodName && (
+                      <div className="cc-metric cc-metric-period">
+                        <span className="cc-metric-value cc-metric-period-name">{item.subPeriodName}</span>
+                        <span className="cc-metric-label">{t('metric_subperiod', { defaultValue: 'Subperíodo' })}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Fuente */}
+                <div className="cc-source">
+                  <span className="cc-label">{t('table.source')}:</span>
+                  <span>{formatSource(item)}</span>
+                </div>
+
+                {/* Criterio propuesto — texto completo */}
+                <div className="cc-criteria">
+                  <div className="cc-label">{t('table.criteria')}:</div>
+                  <div className="cc-criteria-text">
+                    {criteriaContent || <em style={{ color: 'var(--color-text-muted)' }}>{t('source_none')}</em>}
+                  </div>
+                </div>
+
+                {/* Alerta IA con mensaje completo */}
+                {hasOutlier && outlier.message && (
+                  <div className={`cc-outlier-detail cc-outlier-${outlier.severity}`}>
+                    <strong>{t('table.ai')}:</strong> {outlier.message}
+                  </div>
+                )}
+
+                {/* Comentario del curador anterior */}
+                {item.comment && (
+                  <div className="cc-comment">
+                    <strong>{t('curation_comment_label', { defaultValue: 'Comentario del curador:' })}</strong>
+                    <p>{item.comment}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer: quién envió + acciones */}
+              <div className="cc-footer">
+                <div className="cc-submitted">
+                  {item.createdByName
+                    ? `${t('submitted_by', { defaultValue: 'Enviado por' })} ${item.createdByName}`
+                    : t('no_submitter', { defaultValue: 'Sin responsable asignado' })}
+                  {item.createdAt && (
+                    <span className="cc-time"> · {formatRelativeTime(item.createdAt)}</span>
+                  )}
+                </div>
+                <div className="action-buttons">
+                  <button
+                    className="btn-approve-small"
+                    onClick={() => handleReview(item, 'approve')}
+                    disabled={status === 'approved'}
+                  >
+                    {t('actions.approve')}
+                  </button>
+                  <button
+                    className="btn-reject-small"
+                    onClick={() => handleReview(item, 'reject')}
+                    disabled={status === 'rejected'}
+                  >
+                    {t('actions.reject')}
+                  </button>
+                  <button
+                    className="btn-secondary"
+                    onClick={() => handleReview(item, 'request')}
+                    disabled={status === 'changes_requested' || !canReview}
+                  >
+                    {t('actions.request_changes')}
+                  </button>
+                  {!canReview && (
+                    <button
+                      className="btn-secondary"
+                      onClick={() => {
+                        setCriteriaAssignmentId(item.assignmentId)
+                        setCriteriaDataSource(item.assignmentDataSource || '')
+                        setCriteriaSourceConfig(item.assignmentSourceConfig || '')
+                        setCriteriaText(item.kpiCriteria || '')
+                        setShowCriteriaModal(true)
+                      }}
+                    >
+                      {t('actions.create_criteria')}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       {showCriteriaModal && (

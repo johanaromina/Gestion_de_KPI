@@ -31,7 +31,8 @@ export default function Colaboradores() {
   const [showForm, setShowForm] = useState(false)
   const [editingCollaborator, setEditingCollaborator] = useState<Collaborator | undefined>(undefined)
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterArea, setFilterArea] = useState('')
+  const [filterCompanyId, setFilterCompanyId] = useState<number | null>(null)
+  const [filterAreaId, setFilterAreaId] = useState<number | null>(null)
   const [filterRole, setFilterRole] = useState('')
   const [showInactive, setShowInactive] = useState(false)
   const [resendingId, setResendingId] = useState<number | null>(null)
@@ -56,9 +57,37 @@ export default function Colaboradores() {
     { retry: false }
   )
 
-  const areaScopes = Array.isArray(orgScopes)
-    ? orgScopes.filter((scope) => scope.type !== 'person').sort((a, b) => a.name.localeCompare(b.name))
+  const activeScopeId = filterAreaId ?? filterCompanyId
+
+  const companyScopes = Array.isArray(orgScopes)
+    ? orgScopes
+        .filter((s) => s.type === 'company')
+        .sort((a, b) => a.name.localeCompare(b.name))
     : []
+
+  const areaScopes = Array.isArray(orgScopes)
+    ? orgScopes
+        .filter((s) => {
+          if (s.type !== 'area') return false
+          if (filterCompanyId) return Number(s.parentId) === filterCompanyId
+          return true
+        })
+        .sort((a, b) => a.name.localeCompare(b.name))
+    : []
+
+  // Todos los IDs descendientes del scope activo (para filtrar por jerarquía)
+  const activeScopeDescendantIds = (() => {
+    if (!activeScopeId || !Array.isArray(orgScopes)) return new Set<number>()
+    const result = new Set<number>([activeScopeId])
+    const queue = [activeScopeId]
+    while (queue.length > 0) {
+      const parentId = queue.shift()!
+      orgScopes
+        .filter((s) => Number(s.parentId) === parentId)
+        .forEach((s) => { if (!result.has(s.id)) { result.add(s.id); queue.push(s.id) } })
+    }
+    return result
+  })()
 
   const { data: collaborators, isLoading, isError } = useQuery<Collaborator[]>(
     ['collaborators', showInactive],
@@ -180,10 +209,16 @@ export default function Colaboradores() {
     const matchesSearch =
       !searchTerm || safeName.includes(safeSearch) || safePosition.includes(safeSearch)
 
-    const matchesArea = !filterArea || (collaborator.area || '').toLowerCase() === filterArea.toLowerCase()
+    const matchesScope = !activeScopeId || (
+      collaborator.orgScopeId != null
+        ? activeScopeDescendantIds.has(Number(collaborator.orgScopeId))
+        : activeScopeDescendantIds.size === 0
+    )
     const matchesRole = !filterRole || collaborator.role === filterRole
 
-    return matchesSearch && matchesArea && matchesRole
+    const matchesInactive = showInactive || collaborator.status !== 'inactive'
+
+    return matchesSearch && matchesScope && matchesRole && matchesInactive
   })
 
   return (
@@ -232,17 +267,35 @@ export default function Colaboradores() {
           />
         </div>
         <div className="filter-group">
+          <label htmlFor="filter-company">Empresa</label>
+          <select
+            id="filter-company"
+            value={filterCompanyId ?? ''}
+            onChange={(e) => {
+              setFilterCompanyId(e.target.value ? Number(e.target.value) : null)
+              setFilterAreaId(null)
+            }}
+            className="filter-select"
+          >
+            <option value="">Todas las empresas</option>
+            {companyScopes.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="filter-group">
           <label htmlFor="filter-area">{t('filters.area')}</label>
           <select
             id="filter-area"
-            value={filterArea}
-            onChange={(e) => setFilterArea(e.target.value)}
+            value={filterAreaId ?? ''}
+            onChange={(e) => setFilterAreaId(e.target.value ? Number(e.target.value) : null)}
+            className="filter-select"
+            disabled={areaScopes.length === 0}
           >
             <option value="">{t('filters.all_areas')}</option>
-            {areaScopes.map((area) => (
-              <option key={area.id} value={area.name}>
-                {area.name}
-              </option>
+            {areaScopes.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
         </div>
@@ -270,12 +323,13 @@ export default function Colaboradores() {
             onChange={(e) => setShowInactive(e.target.checked)}
           />
         </div>
-        {(searchTerm || filterArea || filterRole) && (
+        {(searchTerm || filterCompanyId || filterAreaId || filterRole) && (
           <button
             className="btn-clear-filters"
             onClick={() => {
               setSearchTerm('')
-              setFilterArea('')
+              setFilterCompanyId(null)
+              setFilterAreaId(null)
               setFilterRole('')
             }}
           >
@@ -399,7 +453,8 @@ export default function Colaboradores() {
               className="btn-primary"
               onClick={() => {
                 setSearchTerm('')
-                setFilterArea('')
+                setFilterCompanyId(null)
+                setFilterAreaId(null)
                 setFilterRole('')
               }}
             >
